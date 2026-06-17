@@ -159,6 +159,34 @@ The script will set up a production-ready instance of Frappe CRM with all the ne
 
 **Note:** You'll find all the code related to Frappe CRM's frontend inside `frappe-bench/apps/crm/frontend`
 
+## Importing Deals Into Sales Pipelines
+
+When importing deals from another CRM or a spreadsheet, prefer importing opportunities into `CRM Deal`, not `CRM Lead`, if the source row already represents a sales opportunity with a pipeline, stage, owner, and value.
+
+For most one-time imports, map human-readable CSV columns to the import helper fields:
+
+| Source CSV column | CRM Deal field |
+| :---------------- | :------------- |
+| Deal name / opportunity name | `deal_name` |
+| Pipeline / funnel name | `pipeline_label` |
+| Stage / status name | `status_label` |
+| Budget / amount | `deal_value` or `expected_deal_value` |
+| Responsible user | `deal_owner` |
+| Phone / email / contact fields | the matching contact or deal fields |
+
+`pipeline_label` and `status_label` are hidden helper fields used only during import. They resolve labels like `Domokomplekty B2C` and `Quote Sent` to the stored pipeline and stage IDs. If the same stage label exists in multiple pipelines, include `pipeline_label`; otherwise the import will fail with a validation error instead of guessing.
+
+For repeatable imports or audit trails, use source-neutral external fields:
+
+| Purpose | Field |
+| :------ | :---- |
+| Source system name, for example `amocrm` or `bitrix24` | `external_source` |
+| Source pipeline ID | `external_pipeline_id` |
+| Source stage/status ID | `external_status_id` |
+| Source deal/opportunity ID | `external_record_id` |
+
+`external_record_id` is unique per `external_source`, so `amocrm:123` and `bitrix24:123` can both exist without conflict. These fields are optional for one-time migrations; the label-based fields are usually enough when the old CRM will not be used again.
+
 ### Docker
 
 You need Docker, docker-compose and git setup on your machine. Refer [Docker documentation](https://docs.docker.com/). After that, follow below steps:
