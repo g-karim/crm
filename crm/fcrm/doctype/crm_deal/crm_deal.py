@@ -3,7 +3,6 @@
 
 import frappe
 from frappe import _
-from frappe.desk.form.assign_to import _add as assign
 from frappe.model.document import Document
 
 from crm.api.exchange_rate import get_exchange_rate
@@ -16,6 +15,11 @@ from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 )
 from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import add_status_change_log
 from crm.fcrm.doctype.utils import add_or_remove_lost_reason_section_in_sidepanel
+
+try:
+	from frappe.desk.form.assign_to import _add as assign
+except ImportError:
+	from frappe.desk.form.assign_to import add as assign
 
 
 class CRMDeal(Document):

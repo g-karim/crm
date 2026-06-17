@@ -5,7 +5,6 @@ import json
 
 import frappe
 from frappe import _
-from frappe.desk.form.assign_to import _add as assign
 from frappe.model.document import Document
 from frappe.utils import has_gravatar, validate_email_address
 
@@ -14,6 +13,11 @@ from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import (
 	add_status_change_log,
 )
 from crm.fcrm.doctype.utils import add_or_remove_lost_reason_section_in_sidepanel
+
+try:
+	from frappe.desk.form.assign_to import _add as assign
+except ImportError:
+	from frappe.desk.form.assign_to import add as assign
 
 
 class CRMLead(Document):
