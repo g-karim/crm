@@ -73,9 +73,17 @@ class CRMDealStatus(Document):
 				self.external_pipeline_id = self.external_pipeline_id or pipeline_external.external_pipeline_id
 
 	def validate(self):
+		self.validate_external_source_required()
 		self.validate_external_pipeline_id()
 		self.validate_unique_status_in_pipeline()
 		self.validate_unique_external_status_in_pipeline()
+
+	def validate_external_source_required(self):
+		if (self.external_pipeline_id or self.external_status_id) and not self.external_source:
+			frappe.throw(
+				_("External source is required when using external import IDs."),
+				frappe.ValidationError,
+			)
 
 	def validate_external_pipeline_id(self):
 		if not self.pipeline or not self.external_pipeline_id:

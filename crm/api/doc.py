@@ -294,7 +294,7 @@ def get_data(
 
 	if default_filters:
 		default_filters = frappe.parse_json(default_filters)
-		filters.update(default_filters)
+		filters = merge_default_filters(doctype, filters, default_filters)
 
 	is_default = True
 	data = []
@@ -588,6 +588,14 @@ def convert_filter_to_tuple(doctype, filters):
 		filters = []
 		for key, value in filters_items:
 			filters.append(make_filter_tuple(doctype, key, value))
+	return filters
+
+
+def merge_default_filters(doctype, filters, default_filters):
+	for key, value in default_filters.items():
+		if doctype == "CRM Deal" and key == "pipeline" and filters.get("pipeline"):
+			continue
+		filters[key] = value
 	return filters
 
 

@@ -331,7 +331,7 @@ onMounted(() => {
   if (!deal.doc.deal_owner) {
     deal.doc.deal_owner = getUser().name
   }
-  if (!deal.doc.status && dealStatuses.value[0].value) {
+  if (!deal.doc.status && dealStatuses.value[0]?.value) {
     deal.doc.status = dealStatuses.value[0].value
   }
 })

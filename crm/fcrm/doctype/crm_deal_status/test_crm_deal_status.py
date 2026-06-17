@@ -95,6 +95,21 @@ class TestCRMDealStatus(IntegrationTestCase):
 					"external_status_id": external_status_id,
 					"type": "Open",
 					"position": 100,
+					}
+				).insert()
+
+	def test_external_status_id_requires_external_source(self):
+		pipeline = get_default_pipeline()
+
+		with self.assertRaises(frappe.exceptions.ValidationError):
+			frappe.get_doc(
+				{
+					"doctype": "CRM Deal Status",
+					"deal_status": f"External Source Required Stage {frappe.generate_hash(length=8)}",
+					"pipeline": pipeline,
+					"external_status_id": f"external-status-{frappe.generate_hash(length=8)}",
+					"type": "Open",
+					"position": 99,
 				}
 			).insert()
 

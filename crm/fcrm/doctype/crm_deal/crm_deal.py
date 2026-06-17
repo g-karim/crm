@@ -5,7 +5,6 @@ import frappe
 from frappe import _
 from frappe.desk.form.assign_to import _add as assign
 from frappe.model.document import Document
-from frappe.utils import cint
 
 from crm.api.exchange_rate import get_exchange_rate
 from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
@@ -93,6 +92,7 @@ class CRMDeal(Document):
 	# end: auto-generated types
 
 	def before_validate(self):
+		self.validate_external_source_required()
 		self.normalize_import_fields()
 		self.set_sla()
 
@@ -206,6 +206,18 @@ class CRMDeal(Document):
 				frappe.ValidationError,
 			)
 
+	def validate_external_source_required(self):
+		external_fields = [
+			"external_record_id",
+			"external_pipeline_id",
+			"external_status_id",
+		]
+		if not self.external_source and any(self.get(field) for field in external_fields):
+			frappe.throw(
+				_("External source is required when using external import IDs."),
+				frappe.ValidationError,
+			)
+
 	def validate_external_record_id(self):
 		if not self.external_record_id:
 			return
@@ -226,6 +238,14 @@ class CRMDeal(Document):
 				),
 				frappe.DuplicateEntryError,
 			)
+
+	def get_pipeline_stage_order(self):
+		return frappe.get_all(
+			"CRM Deal Status",
+			filters={"pipeline": self.pipeline},
+			fields=["name", "deal_status", "position", "type"],
+			order_by="position asc, modified asc",
+		)
 
 	def emit_pipeline_rule_warnings(self):
 		warnings = self.get_pipeline_rule_warnings()
@@ -268,25 +288,17 @@ class CRMDeal(Document):
 		):
 			return []
 
-		stage_map = {
-			stage.name: stage
-			for stage in frappe.get_all(
-				"CRM Deal Status",
-				filters={"name": ["in", [previous.status, self.status]]},
-				fields=["name", "deal_status", "pipeline", "position", "type"],
-			)
-		}
+		stages = self.get_pipeline_stage_order()
+		stage_map = {stage.name: stage for stage in stages}
 		previous_stage = stage_map.get(previous.status)
 		current_stage = stage_map.get(self.status)
 		if not previous_stage or not current_stage:
 			return []
 
-		if previous_stage.pipeline != self.pipeline or current_stage.pipeline != self.pipeline:
-			return []
-
 		warnings = []
-		previous_position = cint(previous_stage.position)
-		current_position = cint(current_stage.position)
+		stage_index = {stage.name: index for index, stage in enumerate(stages)}
+		previous_position = stage_index[previous_stage.name]
+		current_position = stage_index[current_stage.name]
 
 		if rules.warn_on_stage_skip and current_position > previous_position + 1:
 			warnings.append(

@@ -49,6 +49,7 @@ class CRMSalesPipeline(Document):
 	# end: auto-generated types
 
 	def validate(self):
+		self.validate_external_source_required()
 		self.validate_external_pipeline_id()
 
 		if self.archived:
@@ -56,6 +57,25 @@ class CRMSalesPipeline(Document):
 
 		if self.is_default and (self.archived or not self.enabled):
 			frappe.throw(_("Default pipeline must be enabled and not archived."))
+
+		if (self.archived or not self.enabled) and not self.is_new():
+			active_pipeline_exists = frappe.db.exists(
+				"CRM Sales Pipeline",
+				{
+					"name": ["!=", self.name],
+					"enabled": 1,
+					"archived": 0,
+				},
+			)
+			if not active_pipeline_exists:
+				frappe.throw(_("At least one sales pipeline must stay active."))
+
+	def validate_external_source_required(self):
+		if self.external_pipeline_id and not self.external_source:
+			frappe.throw(
+				_("External source is required when using external import IDs."),
+				frappe.ValidationError,
+			)
 
 	def validate_external_pipeline_id(self):
 		if not self.external_pipeline_id:
@@ -186,9 +206,15 @@ def resolve_sales_pipeline(
 
 	resolved_from_external_id = None
 	if external_pipeline_id:
+		if not external_source:
+			frappe.throw(
+				_("External source is required when using external pipeline ID {0}.").format(
+					frappe.bold(external_pipeline_id),
+				),
+				frappe.ValidationError,
+			)
 		filters = {"external_pipeline_id": external_pipeline_id}
-		if external_source:
-			filters["external_source"] = external_source
+		filters["external_source"] = external_source
 
 		resolved_from_external_id = get_single_value(
 			"CRM Sales Pipeline",
@@ -239,11 +265,17 @@ def resolve_deal_status(
 
 	resolved_from_external_id = None
 	if external_status_id:
+		if not external_source:
+			frappe.throw(
+				_("External source is required when using external status ID {0}.").format(
+					frappe.bold(external_status_id),
+				),
+				frappe.ValidationError,
+			)
 		filters = {"external_status_id": external_status_id}
 		if pipeline:
 			filters["pipeline"] = pipeline
-		if external_source:
-			filters["external_source"] = external_source
+		filters["external_source"] = external_source
 
 		resolved_from_external_id = get_single_value(
 			"CRM Deal Status",

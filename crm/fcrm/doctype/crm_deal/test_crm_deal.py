@@ -91,6 +91,35 @@ class TestCRMDeal(UnitTestCase):
 		self.assertEqual(data["data"][0]["column"]["label"], first_stage.deal_status)
 		self.assertEqual([deal.name for deal in data["data"][0]["data"]], [first_deal.name])
 
+	def test_deal_view_pipeline_filter_overrides_default_pipeline_filter(self):
+		"""Test that a saved view pipeline filter is not overwritten by the selected pipeline filter"""
+		first_pipeline = create_test_pipeline("View First Pipeline")
+		first_stage = create_test_deal_status("View First Stage", first_pipeline.name)
+		second_pipeline = create_test_pipeline("View Second Pipeline")
+		second_stage = create_test_deal_status("View Second Stage", second_pipeline.name)
+
+		first_deal = create_test_deal(
+			organization="First Pipeline View Org",
+			pipeline=first_pipeline.name,
+			status=first_stage.name,
+		)
+		create_test_deal(
+			organization="Second Pipeline View Org",
+			pipeline=second_pipeline.name,
+			status=second_stage.name,
+		)
+
+		data = get_data(
+			doctype="CRM Deal",
+			filters={"pipeline": first_pipeline.name},
+			default_filters={"pipeline": second_pipeline.name},
+			order_by="modified desc",
+			rows=["name", "pipeline"],
+			view={"view_type": "list"},
+		)
+
+		self.assertEqual([deal.name for deal in data["data"]], [first_deal.name])
+
 	def test_import_stage_label_resolves_with_pipeline_label(self):
 		"""Test that CSV import labels resolve stages inside the selected pipeline"""
 		stage_label = f"Shared Import Stage {frappe.generate_hash(length=8)}"
@@ -159,6 +188,14 @@ class TestCRMDeal(UnitTestCase):
 				organization="External Duplicate Org",
 				external_source="bitrix24",
 				external_record_id=external_record_id,
+				)
+
+	def test_external_record_id_requires_external_source(self):
+		"""Test that external IDs require source context to avoid ambiguous imports"""
+		with self.assertRaises(frappe.exceptions.ValidationError):
+			create_test_deal(
+				organization="External Source Required Org",
+				external_record_id=f"external-deal-{frappe.generate_hash(length=8)}",
 			)
 
 	def test_external_record_id_can_repeat_across_sources(self):
@@ -194,6 +231,25 @@ class TestCRMDeal(UnitTestCase):
 
 		self.assertEqual(deal.status, third_stage.name)
 		self.assertTrue(
+			any("skipping intermediate stages" in warning for warning in deal._pipeline_rule_warnings)
+		)
+
+	def test_stage_skip_warning_uses_stage_order_not_position_gap(self):
+		"""Test that adjacent stages with non-contiguous positions do not warn as skipped"""
+		pipeline = create_test_pipeline("Warning Position Gap Pipeline", warn_on_stage_skip=1)
+		first_stage = create_test_deal_status("Gap Stage One", pipeline.name, position=10)
+		second_stage = create_test_deal_status("Gap Stage Two", pipeline.name, position=20)
+		deal = create_test_deal(
+			organization="Warning Position Gap Org",
+			pipeline=pipeline.name,
+			status=first_stage.name,
+		)
+
+		deal.status = second_stage.name
+		deal.save()
+
+		self.assertEqual(deal.status, second_stage.name)
+		self.assertFalse(
 			any("skipping intermediate stages" in warning for warning in deal._pipeline_rule_warnings)
 		)
 

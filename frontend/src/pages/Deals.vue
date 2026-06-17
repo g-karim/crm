@@ -438,7 +438,20 @@ function getPipelineFromFilters(filters) {
     }
   }
 
-  const pipeline = filters?.pipeline
+  if (Array.isArray(filters)) {
+    const pipeline = getPipelineFromFilterTuple(filters)
+    if (pipeline) return pipeline
+    for (const filter of filters) {
+      const pipeline = getPipelineFromFilterTuple(filter)
+      if (pipeline) return pipeline
+    }
+    return ''
+  }
+
+  return getPipelineFromFilterValue(filters?.pipeline)
+}
+
+function getPipelineFromFilterValue(pipeline) {
   if (!pipeline) return ''
   if (typeof pipeline === 'string') return pipeline
   if (!Array.isArray(pipeline)) return ''
@@ -446,6 +459,28 @@ function getPipelineFromFilters(filters) {
   const operator = pipeline[0]?.toLowerCase?.()
   if (['=', 'equals'].includes(operator) && typeof pipeline[1] === 'string') {
     return pipeline[1]
+  }
+  return ''
+}
+
+function getPipelineFromFilterTuple(filter) {
+  if (!Array.isArray(filter)) return ''
+
+  if (filter[1] === 'pipeline') {
+    return getPipelineFromOperatorValue(filter[2], filter[3])
+  }
+
+  if (filter[0] === 'pipeline') {
+    return getPipelineFromOperatorValue(filter[1], filter[2])
+  }
+
+  return getPipelineFromFilterValue(filter)
+}
+
+function getPipelineFromOperatorValue(operator, value) {
+  operator = operator?.toLowerCase?.()
+  if (['=', 'equals'].includes(operator) && typeof value === 'string') {
+    return value
   }
   return ''
 }

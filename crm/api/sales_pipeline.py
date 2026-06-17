@@ -42,10 +42,16 @@ COUNT_NAME = (
 	else "count(name) as count"
 )
 
+ACTIVE_DEAL_STAGE_TYPES = ["Open", "Ongoing", "On Hold"]
+
 
 def check_manager_permission():
 	if "System Manager" not in frappe.get_roles() and "Sales Manager" not in frappe.get_roles():
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+
+def can_force_archive_pipeline():
+	return frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles()
 
 
 @frappe.whitelist()
@@ -70,6 +76,8 @@ def get_pipeline_settings(show_archived: bool = False):
 			"stages": [],
 			"deal_counts": {},
 			"stage_deal_counts": {},
+			"active_deal_counts": {},
+			"can_force_archive": can_force_archive_pipeline(),
 		}
 
 	stage_filters = {}
@@ -106,6 +114,8 @@ def get_pipeline_settings(show_archived: bool = False):
 		"stages": stages,
 		"deal_counts": {row.pipeline: row.count for row in deal_counts},
 		"stage_deal_counts": {row.status: row.count for row in stage_deal_counts},
+		"active_deal_counts": get_active_deal_counts(pipeline_names),
+		"can_force_archive": can_force_archive_pipeline(),
 	}
 
 
@@ -131,13 +141,30 @@ def save_pipeline(pipeline: dict):
 
 
 @frappe.whitelist()
-def archive_pipeline(name: str, archived: bool = True):
+def archive_pipeline(name: str, archived: bool = True, force: bool = False):
 	check_manager_permission()
 	doc = frappe.get_doc("CRM Sales Pipeline", name)
 	doc.archived = frappe.utils.cint(archived)
+
+	if doc.archived:
+		active_deals = get_active_deal_count(doc.name)
+		if active_deals and not frappe.utils.cint(force):
+			frappe.throw(
+				_(
+					"Pipeline {0} has {1} active deals. Move them to Won/Lost stages or another pipeline before archiving."
+				).format(frappe.bold(doc.pipeline_name), frappe.bold(active_deals)),
+				frappe.ValidationError,
+			)
+		if active_deals and not can_force_archive_pipeline():
+			frappe.throw(
+				_("Only System Manager or Administrator can force archive a pipeline with active deals."),
+				frappe.PermissionError,
+			)
+
 	if doc.archived:
 		doc.enabled = 0
-		doc.is_default = 0
+	else:
+		doc.enabled = 1
 	doc.save()
 	return doc.as_dict()
 
@@ -240,3 +267,35 @@ def get_next_position(doctype: str, filters: dict | None = None):
 		limit=1,
 	)
 	return (frappe.utils.cint(last[0].position) if last else 0) + 1
+
+
+def get_active_deal_count(pipeline: str):
+	return get_active_deal_counts([pipeline]).get(pipeline, 0)
+
+
+def get_active_deal_counts(pipelines: list[str]):
+	if not pipelines:
+		return {}
+
+	active_stages = frappe.get_all(
+		"CRM Deal Status",
+		fields=["name"],
+		filters={
+			"pipeline": ["in", pipelines],
+			"type": ["in", ACTIVE_DEAL_STAGE_TYPES],
+		},
+	)
+	active_stage_names = [stage.name for stage in active_stages]
+	if not active_stage_names:
+		return {}
+
+	counts = frappe.get_all(
+		"CRM Deal",
+		fields=["pipeline", COUNT_NAME],
+		filters={
+			"pipeline": ["in", pipelines],
+			"status": ["in", active_stage_names],
+		},
+		group_by="pipeline",
+	)
+	return {row.pipeline: row.count for row in counts}

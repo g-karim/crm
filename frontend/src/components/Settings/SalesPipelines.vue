@@ -301,13 +301,52 @@
               size="sm"
             />
           </label>
-          <FormControl
+          <div
             v-if="draft.warn_on_closing_without_required_fields"
-            v-model="draft.required_fields_before_closing"
-            type="textarea"
-            :label="__('Required fields')"
-            placeholder="deal_value, contact, organization"
-          />
+            class="flex flex-col gap-1.5"
+          >
+            <div class="text-base text-ink-gray-5">
+              {{ __('Required fields') }}
+            </div>
+            <div v-if="requiredClosingFields.length" class="flex flex-wrap gap-1.5">
+              <div
+                v-for="field in requiredClosingFields"
+                :key="field.fieldname"
+                class="flex max-w-full items-center gap-1 rounded bg-surface-gray-2 py-1 pl-2 pr-1 text-p-sm text-ink-gray-7"
+              >
+                <span class="truncate">{{ field.label }}</span>
+                <Button
+                  icon="x"
+                  variant="ghost"
+                  class="!h-5 !w-5"
+                  @click="removeRequiredClosingField(field.fieldname)"
+                />
+              </div>
+            </div>
+            <Autocomplete
+              value=""
+              :options="requiredClosingFieldOptions"
+              :placeholder="__('Search fields')"
+              @change="addRequiredClosingField"
+            >
+              <template #target="{ togglePopover }">
+                <Button
+                  class="w-full !justify-start"
+                  :label="__('Add Field')"
+                  icon-left="plus"
+                  @click="togglePopover()"
+                />
+              </template>
+              <template #item-label="{ option }">
+                <div class="flex min-w-0 flex-col gap-0.5 text-ink-gray-9">
+                  <div class="truncate">{{ option.label }}</div>
+                  <div class="truncate text-sm text-ink-gray-4">
+                    {{ `${option.fieldname} - ${option.fieldtype}` }}
+                  </div>
+                </div>
+              </template>
+            </Autocomplete>
+          </div>
           <ErrorMessage :message="errorMessage" />
         </div>
       </section>
@@ -457,6 +496,7 @@ import {
 import { computed, reactive, ref, watch } from 'vue'
 import { statusesStore } from '@/stores/statuses'
 import IconPicker from '@/components/IconPicker.vue'
+import Autocomplete from '@/components/frappe-ui/Autocomplete.vue'
 
 const colorOptions = [
   'black',
@@ -518,12 +558,57 @@ const settings = createResource({
 const pipelines = computed(() => settings.data?.pipelines || [])
 const stages = computed(() => settings.data?.stages || [])
 const dealCounts = computed(() => settings.data?.deal_counts || {})
+const activeDealCounts = computed(() => settings.data?.active_deal_counts || {})
+const canForceArchivePipeline = computed(
+  () => settings.data?.can_force_archive || false,
+)
+
+const dealFields = createResource({
+  url: 'crm.api.doc.get_fields',
+  cache: ['fields', 'CRM Deal', 'pipelineClosingRules'],
+  params: {
+    doctype: 'CRM Deal',
+  },
+  auto: true,
+  transform: (data) => {
+    return data.filter((field) => {
+      return field.fieldname && !field.hidden && !field.read_only
+    })
+  },
+})
 
 const selectedPipeline = computed(() => getPipeline(selectedPipelineName.value))
 
 const selectedStages = computed(() =>
   stages.value.filter((stage) => stage.pipeline === selectedPipelineName.value),
 )
+
+const requiredClosingFieldnames = computed(() =>
+  parseRequiredClosingFields(draft.required_fields_before_closing),
+)
+
+const requiredClosingFields = computed(() => {
+  return requiredClosingFieldnames.value.map((fieldname) => {
+    const field = getDealField(fieldname)
+    return {
+      label: field?.label || fieldname,
+      fieldname,
+      fieldtype: field?.fieldtype || '',
+    }
+  })
+})
+
+const requiredClosingFieldOptions = computed(() => {
+  const selected = new Set(requiredClosingFieldnames.value)
+  return (dealFields.data || [])
+    .filter((field) => !selected.has(field.fieldname))
+    .map((field) => ({
+      label: __(field.label || field.fieldname),
+      value: field.fieldname,
+      fieldname: field.fieldname,
+      fieldtype: field.fieldtype,
+    }))
+})
 
 const isDirty = computed(() => {
   if (draftingNewPipeline.value) return Boolean(draft.pipeline_name?.trim())
@@ -631,22 +716,39 @@ function openPipelineArchiveDialog(pipeline = selectedPipeline.value) {
   if (!pipeline) return
 
   const restoring = Boolean(pipeline.archived)
+  const activeDeals = activeDealCounts.value[pipeline.name] || 0
+
+  if (!restoring && activeDeals && !canForceArchivePipeline.value) {
+    const message = __(
+      'This pipeline has {0} active deals. Move them to Won/Lost stages or another pipeline before archiving.',
+      [activeDeals],
+    )
+    errorMessage.value = message
+    toast.error(message)
+    return
+  }
+
   confirmDialog.value = {
     show: true,
     title: restoring ? __('Restore Pipeline') : __('Archive Pipeline'),
     message: restoring
       ? __('This pipeline will appear in active pipeline lists again.')
+      : activeDeals
+        ? __(
+            'This pipeline has {0} active deals. Force archive will hide the pipeline, but those deals will keep their current stages. Continue?',
+            [activeDeals],
+          )
       : __(
           'This pipeline will be hidden from active pipeline lists. Existing deals will stay in the system and will not be archived.',
         ),
     onConfirm: async () => {
       confirmDialog.value.show = false
-      await togglePipelineArchive(pipeline)
+      await togglePipelineArchive(pipeline, { force: Boolean(activeDeals) })
     },
   }
 }
 
-async function togglePipelineArchive(pipeline) {
+async function togglePipelineArchive(pipeline, options = {}) {
   if (!pipeline) return
 
   saving.value = true
@@ -654,6 +756,7 @@ async function togglePipelineArchive(pipeline) {
     await call('crm.api.sales_pipeline.archive_pipeline', {
       name: pipeline.name,
       archived: pipeline.archived ? 0 : 1,
+      force: options.force ? 1 : 0,
     })
     await settings.reload()
     if (!showArchived.value && pipeline.name === selectedPipelineName.value) {
@@ -867,6 +970,43 @@ function normalizeStage(stage) {
     color: stage.color || 'gray',
     archived: stage.archived ? 1 : 0,
   }
+}
+
+function parseRequiredClosingFields(value) {
+  const fieldnames = []
+  for (const row of String(value || '')
+    .replaceAll(',', '\n')
+    .split('\n')) {
+    const fieldname = row.trim()
+    if (fieldname && !fieldnames.includes(fieldname)) {
+      fieldnames.push(fieldname)
+    }
+  }
+  return fieldnames
+}
+
+function setRequiredClosingFields(fieldnames) {
+  draft.required_fields_before_closing = fieldnames.join(', ')
+}
+
+function addRequiredClosingField(option) {
+  const fieldname = option?.fieldname || option?.value
+  if (!fieldname) return
+
+  const fieldnames = requiredClosingFieldnames.value
+  if (!fieldnames.includes(fieldname)) {
+    setRequiredClosingFields([...fieldnames, fieldname])
+  }
+}
+
+function removeRequiredClosingField(fieldname) {
+  setRequiredClosingFields(
+    requiredClosingFieldnames.value.filter((name) => name !== fieldname),
+  )
+}
+
+function getDealField(fieldname) {
+  return (dealFields.data || []).find((field) => field.fieldname === fieldname)
 }
 
 function getEmptyPipeline() {
