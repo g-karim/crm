@@ -834,6 +834,22 @@ Phase 5 CSV guidance:
 - Later add hard rules per pipeline.
 - Add role-based stage restrictions only when needed.
 
+Phase 6 implementation status:
+
+- Added optional warning settings on `CRM Sales Pipeline`:
+  - `warn_on_stage_skip`
+  - `warn_on_stage_backwards`
+  - `warn_on_closing_without_required_fields`
+  - `required_fields_before_closing`
+- Deal status changes now emit backend-side soft warnings when:
+  - a deal moves forward over intermediate stages
+  - a deal moves to an earlier stage
+  - a deal moves to a Won/Lost stage without configured key fields
+- Warnings are non-blocking. Deals still save successfully.
+- Sales Pipeline settings expose warning toggles in the UI.
+- Pipeline duplication copies warning settings.
+- Hard blocking rules, role-based restrictions, and approvals remain deferred.
+
 ## Acceptance Criteria
 
 - Existing CRM data remains usable after migration.

@@ -18,7 +18,12 @@
   "color",
   "icon",
   "archived",
-  "description"
+  "description",
+  "rules_section",
+  "warn_on_stage_skip",
+  "warn_on_stage_backwards",
+  "warn_on_closing_without_required_fields",
+  "required_fields_before_closing"
  ],
  "fields": [
   {
@@ -90,6 +95,35 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "fieldname": "rules_section",
+   "fieldtype": "Section Break",
+   "label": "Warnings"
+  },
+  {
+   "default": "0",
+   "fieldname": "warn_on_stage_skip",
+   "fieldtype": "Check",
+   "label": "Warn On Stage Skip"
+  },
+  {
+   "default": "0",
+   "fieldname": "warn_on_stage_backwards",
+   "fieldtype": "Check",
+   "label": "Warn On Moving Backwards"
+  },
+  {
+   "default": "0",
+   "fieldname": "warn_on_closing_without_required_fields",
+   "fieldtype": "Check",
+   "label": "Warn On Closing Without Fields"
+  },
+  {
+   "depends_on": "eval:doc.warn_on_closing_without_required_fields",
+   "fieldname": "required_fields_before_closing",
+   "fieldtype": "Small Text",
+   "label": "Required Fields Before Closing"
   }
  ],
  "index_web_pages_for_search": 1,

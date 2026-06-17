@@ -5,6 +5,7 @@ import frappe
 from frappe import _
 from frappe.desk.form.assign_to import _add as assign
 from frappe.model.document import Document
+from frappe.utils import cint
 
 from crm.api.exchange_rate import get_exchange_rate
 from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
@@ -111,6 +112,7 @@ class CRMDeal(Document):
 				self.closed_date = frappe.utils.nowdate()
 		self.validate_forecasting_fields()
 		self.validate_lost_reason()
+		self.emit_pipeline_rule_warnings()
 		self.update_exchange_rate()
 
 	def after_insert(self):
@@ -224,6 +226,123 @@ class CRMDeal(Document):
 				),
 				frappe.DuplicateEntryError,
 			)
+
+	def emit_pipeline_rule_warnings(self):
+		warnings = self.get_pipeline_rule_warnings()
+		self._pipeline_rule_warnings = warnings
+
+		if warnings:
+			frappe.msgprint(
+				warnings,
+				title=_("Pipeline Warnings"),
+				as_list=True,
+				indicator="orange",
+				alert=True,
+			)
+
+	def get_pipeline_rule_warnings(self) -> list[str]:
+		if self.is_new() or not self.has_value_changed("status") or not self.pipeline or not self.status:
+			return []
+
+		previous = self.get_doc_before_save()
+		if not previous or not previous.status or previous.status == self.status:
+			return []
+
+		rules = frappe.db.get_value(
+			"CRM Sales Pipeline",
+			self.pipeline,
+			[
+				"warn_on_stage_skip",
+				"warn_on_stage_backwards",
+				"warn_on_closing_without_required_fields",
+				"required_fields_before_closing",
+			],
+			as_dict=True,
+		)
+		if not rules or not any(
+			[
+				rules.warn_on_stage_skip,
+				rules.warn_on_stage_backwards,
+				rules.warn_on_closing_without_required_fields,
+			]
+		):
+			return []
+
+		stage_map = {
+			stage.name: stage
+			for stage in frappe.get_all(
+				"CRM Deal Status",
+				filters={"name": ["in", [previous.status, self.status]]},
+				fields=["name", "deal_status", "pipeline", "position", "type"],
+			)
+		}
+		previous_stage = stage_map.get(previous.status)
+		current_stage = stage_map.get(self.status)
+		if not previous_stage or not current_stage:
+			return []
+
+		if previous_stage.pipeline != self.pipeline or current_stage.pipeline != self.pipeline:
+			return []
+
+		warnings = []
+		previous_position = cint(previous_stage.position)
+		current_position = cint(current_stage.position)
+
+		if rules.warn_on_stage_skip and current_position > previous_position + 1:
+			warnings.append(
+				_("Deal moved from {0} to {1}, skipping intermediate stages.").format(
+					frappe.bold(previous_stage.deal_status),
+					frappe.bold(current_stage.deal_status),
+				)
+			)
+
+		if rules.warn_on_stage_backwards and current_position < previous_position:
+			warnings.append(
+				_("Deal moved backwards from {0} to {1}.").format(
+					frappe.bold(previous_stage.deal_status),
+					frappe.bold(current_stage.deal_status),
+				)
+			)
+
+		if (
+			rules.warn_on_closing_without_required_fields
+			and current_stage.type in ["Won", "Lost"]
+			and rules.required_fields_before_closing
+		):
+			missing_fields = self.get_missing_pipeline_rule_fields(rules.required_fields_before_closing)
+			if missing_fields:
+				warnings.append(
+					_("Deal was closed without these fields: {0}.").format(
+						", ".join(frappe.bold(field) for field in missing_fields),
+					)
+				)
+
+		return warnings
+
+	def get_missing_pipeline_rule_fields(self, required_fields: str) -> list[str]:
+		fieldnames = []
+		for row in required_fields.replace(",", "\n").splitlines():
+			fieldname = row.strip()
+			if fieldname and fieldname not in fieldnames:
+				fieldnames.append(fieldname)
+
+		missing_fields = []
+		for fieldname in fieldnames:
+			if self.has_pipeline_rule_field_value(fieldname):
+				continue
+
+			df = self.meta.get_field(fieldname)
+			missing_fields.append(df.label if df and df.label else fieldname)
+
+		return missing_fields
+
+	def has_pipeline_rule_field_value(self, fieldname: str) -> bool:
+		value = self.get(fieldname)
+		if isinstance(value, str):
+			return bool(value.strip())
+		if isinstance(value, list):
+			return bool(value)
+		return value not in [None, ""]
 
 	def set_primary_contact(self, contact=None):
 		if not self.contacts:

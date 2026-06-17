@@ -16,6 +16,10 @@ PIPELINE_FIELDS = [
 	"icon",
 	"archived",
 	"description",
+	"warn_on_stage_skip",
+	"warn_on_stage_backwards",
+	"warn_on_closing_without_required_fields",
+	"required_fields_before_closing",
 ]
 
 STAGE_FIELDS = [
@@ -151,6 +155,10 @@ def duplicate_pipeline(name: str, pipeline_name: str):
 	pipeline.color = source.color
 	pipeline.icon = source.icon
 	pipeline.description = source.description
+	pipeline.warn_on_stage_skip = source.warn_on_stage_skip
+	pipeline.warn_on_stage_backwards = source.warn_on_stage_backwards
+	pipeline.warn_on_closing_without_required_fields = source.warn_on_closing_without_required_fields
+	pipeline.required_fields_before_closing = source.required_fields_before_closing
 	pipeline.insert()
 
 	for stage in frappe.get_all(

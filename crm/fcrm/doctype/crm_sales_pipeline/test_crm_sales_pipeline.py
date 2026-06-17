@@ -159,6 +159,10 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 				"pipeline_name": f"Duplicate Source {frappe.generate_hash(length=8)}",
 				"enabled": 1,
 				"position": 199,
+				"warn_on_stage_skip": 1,
+				"warn_on_stage_backwards": 1,
+				"warn_on_closing_without_required_fields": 1,
+				"required_fields_before_closing": "contact, expected_closure_date",
 			}
 		).insert()
 		active_stage = frappe.get_doc(
@@ -194,3 +198,7 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 		self.assertEqual(len(duplicate_stages), 1)
 		self.assertEqual(duplicate_stages[0].deal_status, active_stage.deal_status)
 		self.assertFalse(duplicate_stages[0].archived)
+		self.assertTrue(duplicate.warn_on_stage_skip)
+		self.assertTrue(duplicate.warn_on_stage_backwards)
+		self.assertTrue(duplicate.warn_on_closing_without_required_fields)
+		self.assertEqual(duplicate.required_fields_before_closing, "contact, expected_closure_date")

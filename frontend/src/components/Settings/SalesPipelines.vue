@@ -282,6 +282,32 @@
             <span>{{ __('Default') }}</span>
             <Switch v-model="draft.is_default" size="sm" />
           </label>
+          <div class="border-t border-outline-gray-2" />
+          <div class="text-p-sm font-medium text-ink-gray-8">
+            {{ __('Warnings') }}
+          </div>
+          <label class="flex items-center justify-between gap-2 text-p-sm">
+            <span>{{ __('Stage skipping') }}</span>
+            <Switch v-model="draft.warn_on_stage_skip" size="sm" />
+          </label>
+          <label class="flex items-center justify-between gap-2 text-p-sm">
+            <span>{{ __('Moving backwards') }}</span>
+            <Switch v-model="draft.warn_on_stage_backwards" size="sm" />
+          </label>
+          <label class="flex items-center justify-between gap-2 text-p-sm">
+            <span>{{ __('Closing fields') }}</span>
+            <Switch
+              v-model="draft.warn_on_closing_without_required_fields"
+              size="sm"
+            />
+          </label>
+          <FormControl
+            v-if="draft.warn_on_closing_without_required_fields"
+            v-model="draft.required_fields_before_closing"
+            type="textarea"
+            :label="__('Required fields')"
+            placeholder="deal_value, contact, organization"
+          />
           <ErrorMessage :message="errorMessage" />
         </div>
       </section>
@@ -821,6 +847,12 @@ function normalizePipeline(pipeline) {
     icon: pipeline.icon || '',
     archived: pipeline.archived ? 1 : 0,
     description: pipeline.description || '',
+    warn_on_stage_skip: pipeline.warn_on_stage_skip ? 1 : 0,
+    warn_on_stage_backwards: pipeline.warn_on_stage_backwards ? 1 : 0,
+    warn_on_closing_without_required_fields:
+      pipeline.warn_on_closing_without_required_fields ? 1 : 0,
+    required_fields_before_closing:
+      pipeline.required_fields_before_closing || '',
   }
 }
 
@@ -848,6 +880,10 @@ function getEmptyPipeline() {
     icon: '',
     archived: 0,
     description: '',
+    warn_on_stage_skip: 0,
+    warn_on_stage_backwards: 0,
+    warn_on_closing_without_required_fields: 0,
+    required_fields_before_closing: '',
   }
 }
 

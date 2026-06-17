@@ -42,6 +42,10 @@ class CRMSalesPipeline(Document):
 		is_default: DF.Check
 		pipeline_name: DF.Data
 		position: DF.Int
+		required_fields_before_closing: DF.SmallText | None
+		warn_on_closing_without_required_fields: DF.Check
+		warn_on_stage_backwards: DF.Check
+		warn_on_stage_skip: DF.Check
 	# end: auto-generated types
 
 	def validate(self):
