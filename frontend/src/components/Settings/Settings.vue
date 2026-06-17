@@ -67,6 +67,7 @@ import LeadSyncSourcePage from '@/components/Settings/LeadSyncing/LeadSyncSource
 import DefaultsSettings from '@/components/Settings/DefaultsSettings.vue'
 import BrandSettings from '@/components/Settings/BrandSettings.vue'
 import CalendarSettings from '@/components/Settings/CalendarSettings.vue'
+import SalesPipelines from '@/components/Settings/SalesPipelines.vue'
 import HomeActions from '@/components/Settings/HomeActions.vue'
 import GeneralSettings from '@/components/Settings/GeneralSettings.vue'
 import DashboardSettings from '@/components/Settings/DashboardSettings.vue'
@@ -140,6 +141,11 @@ const tabs = computed(() => {
           label: __('Calendar'),
           icon: CalendarIcon,
           component: markRaw(CalendarSettings),
+        },
+        {
+          label: __('Sales Pipelines'),
+          icon: 'git-branch',
+          component: markRaw(SalesPipelines),
         },
       ],
       condition: () => isManager(),

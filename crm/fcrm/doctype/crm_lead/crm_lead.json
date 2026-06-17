@@ -25,6 +25,7 @@
   "industry",
   "job_title",
   "source",
+  "planned_deal_pipeline",
   "lead_owner",
   "organization_tab",
   "section_break_uixv",
@@ -173,6 +174,13 @@
    "fieldtype": "Link",
    "label": "Source",
    "options": "CRM Lead Source"
+  },
+  {
+   "fieldname": "planned_deal_pipeline",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Planned Deal Pipeline",
+   "options": "CRM Sales Pipeline"
   },
   {
    "fieldname": "industry",

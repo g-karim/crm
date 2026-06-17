@@ -30,9 +30,17 @@ export const statusesStore = defineStore('crm-statuses', () => {
 
   const dealStatuses = createListResource({
     doctype: 'CRM Deal Status',
-    fields: ['name', 'color', 'position', 'type'],
+    fields: [
+      'name',
+      'deal_status',
+      'pipeline',
+      'color',
+      'position',
+      'type',
+      'archived',
+    ],
     orderBy: 'position asc',
-    cache: 'deal-statuses',
+    cache: 'deal-statuses-v2',
     initialData: [],
     auto: true,
     transform(statuses) {
@@ -79,13 +87,30 @@ export const statusesStore = defineStore('crm-statuses', () => {
     return communicationStatuses[name]
   }
 
-  function statusOptions(doctype, statuses = [], triggerStatusChange = null) {
+  function statusOptions(
+    doctype,
+    statuses = [],
+    triggerStatusChange = null,
+    filters = {},
+  ) {
     let statusesByName =
       doctype == 'deal' ? dealStatusesByName : leadStatusesByName
 
     if (statuses?.length) {
       statusesByName = statuses.reduce((acc, status) => {
         acc[status] = statusesByName[status]
+        return acc
+      }, {})
+    }
+
+    if (doctype == 'deal' && filters.pipeline) {
+      statusesByName = Object.keys(statusesByName).reduce((acc, status) => {
+        if (
+          statusesByName[status]?.pipeline === filters.pipeline &&
+          !statusesByName[status]?.archived
+        ) {
+          acc[status] = statusesByName[status]
+        }
         return acc
       }, {})
     }
@@ -98,8 +123,11 @@ export const statusesStore = defineStore('crm-statuses', () => {
     for (const status in statusesByName) {
       options.push({
         label: translatable
-          ? __(statusesByName[status]?.name)
-          : statusesByName[status]?.name,
+          ? __(
+              statusesByName[status]?.deal_status ||
+                statusesByName[status]?.name,
+            )
+          : statusesByName[status]?.deal_status || statusesByName[status]?.name,
         value: statusesByName[status]?.name,
         icon: () => h(IndicatorIcon, { class: statusesByName[status]?.color }),
         onClick: async () => {

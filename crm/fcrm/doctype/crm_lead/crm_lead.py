@@ -58,6 +58,7 @@ class CRMLead(Document):
 		no_of_employees: DF.Literal["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"]
 		organization: DF.Data | None
 		phone: DF.Data | None
+		planned_deal_pipeline: DF.Link | None
 		products: DF.Table[CRMProducts]
 		response_by: DF.Datetime | None
 		rolling_responses: DF.Table[CRMRollingResponseTime]
@@ -300,6 +301,7 @@ class CRMLead(Document):
 
 		lead_deal_map = {
 			"lead_owner": "deal_owner",
+			"planned_deal_pipeline": "pipeline",
 		}
 
 		restricted_fieldtypes = [

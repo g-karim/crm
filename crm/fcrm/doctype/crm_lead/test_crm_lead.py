@@ -2,20 +2,20 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
+from frappe.tests import UnitTestCase
 
 from crm.fcrm.doctype.crm_lead.crm_lead import convert_to_deal
 
 
-class TestCRMLead(IntegrationTestCase):
+class TestCRMLead(UnitTestCase):
 	@classmethod
 	def setUpClass(cls):
 		"""Set up test records once for all tests"""
+		super().setUpClass()
+
 		if not frappe.db.exists("Salutation", "Mr"):
 			frappe.get_doc({"doctype": "Salutation", "salutation": "Mr"}).insert(ignore_permissions=True)
 			frappe.db.commit()  # nosemgrep
-
-		super().setUpClass()
 
 	@classmethod
 	def tearDownClass(cls):
@@ -358,6 +358,24 @@ class TestCRMLead(IntegrationTestCase):
 		self.assertEqual(org.organization_name, "Deal Corp")
 		self.assertEqual(org.annual_revenue, 500000)
 
+	def test_convert_lead_to_deal_uses_planned_pipeline(self):
+		"""Test that planned deal pipeline is copied to the converted deal"""
+		pipeline = create_pipeline("Planned Pipeline")
+		stage = create_deal_status("Planned Stage", pipeline.name)
+		lead = create_lead(
+			first_name="Pipeline",
+			last_name="Lead",
+			email="pipelinelead@example.com",
+			planned_deal_pipeline=pipeline.name,
+		)
+
+		crm_currency = frappe.db.get_single_value("FCRM Settings", "currency") or "USD"
+		deal_name = lead.convert_to_deal(deal={"currency": crm_currency})
+		deal = frappe.get_doc("CRM Deal", deal_name)
+
+		self.assertEqual(deal.pipeline, pipeline.name)
+		self.assertEqual(deal.status, stage.name)
+
 	def test_convert_lead_with_existing_contact_and_org(self):
 		"""Test converting lead with existing contact and organization"""
 		# Create existing contact
@@ -536,3 +554,28 @@ def create_lead(**kwargs):
 	data = {"doctype": "CRM Lead"}
 	data.update(kwargs)
 	return frappe.get_doc(data).insert()
+
+
+def create_pipeline(title):
+	return frappe.get_doc(
+		{
+			"doctype": "CRM Sales Pipeline",
+			"pipeline_name": f"{title} {frappe.generate_hash(length=8)}",
+			"enabled": 1,
+			"position": 99,
+		}
+	).insert()
+
+
+def create_deal_status(title, pipeline):
+	return frappe.get_doc(
+		{
+			"doctype": "CRM Deal Status",
+			"deal_status": f"{title} {frappe.generate_hash(length=8)}",
+			"pipeline": pipeline,
+			"type": "Open",
+			"probability": 10,
+			"position": 1,
+			"color": "gray",
+		}
+	).insert()

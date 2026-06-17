@@ -18,6 +18,7 @@
                 ? document.statuses
                 : document._statuses,
               triggerStatusChange,
+              { pipeline: doc.pipeline },
             )
           "
         >
@@ -28,7 +29,7 @@
               :iconRight="open ? 'chevron-up' : 'chevron-down'"
             >
               <template #prefix>
-                <IndicatorIcon :class="getDealStatus(doc.status).color" />
+                <IndicatorIcon :class="getDealStatus(doc.status)?.color" />
               </template>
             </Button>
           </template>
@@ -417,6 +418,10 @@ const title = computed(() => {
   return doc.value?.[t] || props.dealId
 })
 
+const dealStatuses = computed(() =>
+  statusOptions('deal', [], null, { pipeline: doc.value.pipeline }),
+)
+
 usePageMeta(() => {
   return {
     title: title.value,
@@ -495,22 +500,55 @@ const sections = createResource({
 function getParsedFields(sections) {
   sections.forEach((section) => {
     if (section.name == 'contacts_section') return
-    section.columns[0].fields.forEach((field) => {
-      if (field.name == 'organization') {
-        field.create = (value, close) => {
-          _organization.value.organization_name = value
-          showOrganizationModal.value = true
-          close()
+    section.columns?.forEach((column) => {
+      column.fields?.forEach((field) => {
+        prepareDealField(field)
+
+        if (field.fieldname == 'organization') {
+          field.create = (value, close) => {
+            _organization.value.organization_name = value
+            showOrganizationModal.value = true
+            close()
+          }
+          field.link = (org) =>
+            router.push({
+              name: 'Organization',
+              params: { organizationId: org },
+            })
         }
-        field.link = (org) =>
-          router.push({
-            name: 'Organization',
-            params: { organizationId: org },
-          })
-      }
+      })
     })
   })
   return sections
+}
+
+watch(dealStatuses, () => updateDealStatusFields())
+
+watch(
+  () => doc.value.pipeline,
+  (pipeline, oldPipeline) => {
+    if (!pipeline || pipeline === oldPipeline) return
+    let currentStatus = getDealStatus(doc.value.status)
+    if (currentStatus?.pipeline !== pipeline) {
+      doc.value.status = dealStatuses.value[0]?.value || ''
+    }
+  },
+)
+
+function prepareDealField(field) {
+  if (field.fieldname == 'status') {
+    field.fieldtype = 'Select'
+    field.options = dealStatuses.value
+    field.prefix = getDealStatus(doc.value.status)?.color
+  }
+}
+
+function updateDealStatusFields() {
+  sections.data?.forEach((section) => {
+    section.columns?.forEach((column) => {
+      column.fields?.forEach((field) => prepareDealField(field))
+    })
+  })
 }
 
 const showContactModal = ref(false)
@@ -600,12 +638,22 @@ const dealContacts = createResource({
 
 function updateField(name, value) {
   value = Array.isArray(name) ? '' : value
-  let oldValues = Array.isArray(name) ? {} : doc.value[name]
+  let oldValues = Array.isArray(name)
+    ? {}
+    : name == 'pipeline'
+      ? { pipeline: doc.value.pipeline, status: doc.value.status }
+      : doc.value[name]
 
   if (Array.isArray(name)) {
     name.forEach((field) => (doc.value[field] = value))
   } else {
     doc.value[name] = value
+    if (name == 'pipeline') {
+      let currentStatus = getDealStatus(doc.value.status)
+      if (currentStatus?.pipeline !== value) {
+        doc.value.status = dealStatuses.value[0]?.value || ''
+      }
+    }
   }
 
   document.save.submit(null, {
@@ -613,6 +661,9 @@ function updateField(name, value) {
     onError: (err) => {
       if (Array.isArray(name)) {
         name.forEach((field) => (doc.value[field] = oldValues[field]))
+      } else if (name == 'pipeline') {
+        doc.value.pipeline = oldValues.pipeline
+        doc.value.status = oldValues.status
       } else {
         doc.value[name] = oldValues
       }
@@ -626,8 +677,9 @@ function deleteDeal() {
 }
 
 function statusLabel(status) {
-  if (isTranslatable('CRM Deal Status')) return __(status)
-  return status
+  let label = getDealStatus(status)?.deal_status || status
+  if (isTranslatable('CRM Deal Status')) return __(label)
+  return label
 }
 
 async function triggerStatusChange(value) {

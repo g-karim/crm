@@ -1315,6 +1315,7 @@ defineExpose({
   applyFilter,
   applyLikeFilter,
   likeDoc,
+  reload,
   updateKanbanSettings,
   fetchAndUpdateKanbanColumns,
   loadMoreKanban,
@@ -1329,6 +1330,16 @@ watch(
   () => getView(route.query.view, route.params.viewType, props.doctype),
   (value, old_value) => {
     if (_.isEqual(value, old_value)) return
+    reload()
+  },
+  { deep: true },
+)
+
+watch(
+  () => props.filters,
+  (value, old_value) => {
+    if (_.isEqual(value, old_value)) return
+    defaultParams.value = ''
     reload()
   },
   { deep: true },

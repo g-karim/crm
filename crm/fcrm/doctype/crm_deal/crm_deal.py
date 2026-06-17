@@ -8,6 +8,10 @@ from frappe.model.document import Document
 
 from crm.api.exchange_rate import get_exchange_rate
 from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
+	get_default_deal_status,
+	get_default_pipeline,
+)
 from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import add_status_change_log
 from crm.fcrm.doctype.utils import add_or_remove_lost_reason_section_in_sidepanel
 
@@ -34,6 +38,7 @@ class CRMDeal(Document):
 		contact: DF.Link | None
 		contacts: DF.Table[CRMContacts]
 		currency: DF.Link | None
+		deal_name: DF.Data | None
 		deal_owner: DF.Link | None
 		deal_value: DF.Currency
 		email: DF.Data | None
@@ -61,6 +66,7 @@ class CRMDeal(Document):
 		organization: DF.Link | None
 		organization_name: DF.Data | None
 		phone: DF.Data | None
+		pipeline: DF.Link
 		probability: DF.Percent
 		products: DF.Table[CRMProducts]
 		response_by: DF.Datetime | None
@@ -81,7 +87,9 @@ class CRMDeal(Document):
 		self.set_sla()
 
 	def validate(self):
+		self.validate_pipeline()
 		self.validate_status()
+		self.validate_status_pipeline()
 		self.set_primary_contact()
 		self.set_primary_email_mobile_no()
 		if not self.is_new() and self.has_value_changed("deal_owner") and self.deal_owner:
@@ -105,11 +113,49 @@ class CRMDeal(Document):
 		self.apply_sla()
 
 	def validate_status(self):
-		if self.is_new() and not self.status:
-			if frappe.db.exists("CRM Deal Status", "Qualification"):
-				self.status = "Qualification"
-			else:
-				self.status = frappe.get_all("CRM Deal Status", {"type": "Open"}, pluck="name")[0]
+		if self.status and self.pipeline and self.has_value_changed("pipeline") and not self.has_value_changed("status"):
+			status_pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
+			if status_pipeline and status_pipeline != self.pipeline:
+				self.status = None
+
+		if not self.status:
+			self.status = get_default_deal_status(self.pipeline)
+
+		if not self.status:
+			frappe.throw(
+				_("Please add at least one open stage in pipeline {0}.").format(frappe.bold(self.pipeline)),
+				frappe.ValidationError,
+			)
+
+	def validate_pipeline(self):
+		if not self.pipeline and self.status:
+			self.pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
+
+		if not self.pipeline:
+			self.pipeline = get_default_pipeline()
+
+		if frappe.db.get_value("CRM Sales Pipeline", self.pipeline, "archived"):
+			frappe.throw(_("Cannot use archived pipeline {0}.").format(frappe.bold(self.pipeline)))
+
+	def validate_status_pipeline(self):
+		if not self.status or not self.pipeline:
+			return
+
+		status_pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
+		if not status_pipeline:
+			frappe.throw(
+				_("Deal stage {0} is not assigned to a sales pipeline.").format(frappe.bold(self.status)),
+				frappe.ValidationError,
+			)
+
+		if status_pipeline != self.pipeline:
+			frappe.throw(
+				_("Deal stage {0} does not belong to pipeline {1}.").format(
+					frappe.bold(self.status),
+					frappe.bold(self.pipeline),
+				),
+				frappe.ValidationError,
+			)
 
 	def set_primary_contact(self, contact=None):
 		if not self.contacts:
@@ -221,7 +267,11 @@ class CRMDeal(Document):
 		"""
 		Update the closed date based on the "Won" status.
 		"""
-		if self.status == "Won" and not self.closed_date:
+		if (
+			self.status
+			and frappe.get_cached_value("CRM Deal Status", self.status, "type") == "Won"
+			and not self.closed_date
+		):
 			self.closed_date = frappe.utils.nowdate()
 
 	def update_default_probability(self):
@@ -277,6 +327,12 @@ class CRMDeal(Document):
 	def default_list_data():
 		columns = [
 			{
+				"label": "Deal Name",
+				"type": "Data",
+				"key": "deal_name",
+				"width": "14rem",
+			},
+			{
 				"label": "Organization",
 				"type": "Link",
 				"key": "organization",
@@ -324,6 +380,7 @@ class CRMDeal(Document):
 		]
 		rows = [
 			"name",
+			"deal_name",
 			"organization",
 			"annual_revenue",
 			"status",
@@ -344,8 +401,8 @@ class CRMDeal(Document):
 	def default_kanban_settings():
 		return {
 			"column_field": "status",
-			"title_field": "organization",
-			"kanban_fields": '["annual_revenue", "email", "mobile_no", "_assign", "modified"]',
+			"title_field": "deal_name",
+			"kanban_fields": '["organization", "annual_revenue", "email", "mobile_no", "_assign", "modified"]',
 		}
 
 

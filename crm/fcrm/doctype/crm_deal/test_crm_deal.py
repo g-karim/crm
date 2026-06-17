@@ -2,17 +2,19 @@
 # See license.txt
 
 import frappe
-from frappe.tests import IntegrationTestCase
+from frappe.tests import UnitTestCase
 
+from crm.api.doc import get_data
 from crm.fcrm.doctype.crm_deal.crm_deal import (
 	add_contact,
 	create_deal,
 	remove_contact,
 	set_primary_contact,
 )
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_pipeline
 
 
-class TestCRMDeal(IntegrationTestCase):
+class TestCRMDeal(UnitTestCase):
 	def tearDown(self) -> None:
 		frappe.db.rollback()
 
@@ -27,6 +29,67 @@ class TestCRMDeal(IntegrationTestCase):
 		self.assertTrue(deal.name)
 		self.assertTrue(deal.organization)
 		self.assertEqual(deal.annual_revenue, 1000000)
+
+	def test_deal_uses_default_pipeline(self):
+		"""Test that deals get the default pipeline when none is provided"""
+		deal = create_test_deal(organization="Default Pipeline Org")
+		self.assertEqual(deal.pipeline, get_default_pipeline())
+		self.assertEqual(frappe.db.get_value("CRM Deal Status", deal.status, "pipeline"), deal.pipeline)
+
+	def test_deal_rejects_stage_from_another_pipeline(self):
+		"""Test that a deal stage must belong to the selected pipeline"""
+		pipeline = create_test_pipeline("Mismatch Pipeline")
+
+		with self.assertRaises(frappe.exceptions.ValidationError):
+			create_test_deal(
+				organization="Mismatch Pipeline Org",
+				pipeline=pipeline.name,
+				status="Qualification",
+			)
+
+	def test_deal_pipeline_change_resets_stage(self):
+		"""Test that changing pipeline resets the deal to that pipeline's default stage"""
+		pipeline = create_test_pipeline("Reset Pipeline")
+		stage = create_test_deal_status("Reset Stage", pipeline.name)
+		deal = create_test_deal(organization="Reset Pipeline Org")
+
+		deal.pipeline = pipeline.name
+		deal.save()
+		deal.reload()
+
+		self.assertEqual(deal.pipeline, pipeline.name)
+		self.assertEqual(deal.status, stage.name)
+
+	def test_deal_kanban_columns_are_limited_to_selected_pipeline(self):
+		"""Test that deal kanban columns are generated from the selected pipeline"""
+		first_pipeline = create_test_pipeline("Kanban First Pipeline")
+		first_stage = create_test_deal_status("Shared Label", first_pipeline.name)
+		second_pipeline = create_test_pipeline("Kanban Second Pipeline")
+		second_stage = create_test_deal_status("Shared Label", second_pipeline.name)
+
+		first_deal = create_test_deal(
+			organization="First Pipeline Kanban Org",
+			pipeline=first_pipeline.name,
+			status=first_stage.name,
+		)
+		create_test_deal(
+			organization="Second Pipeline Kanban Org",
+			pipeline=second_pipeline.name,
+			status=second_stage.name,
+		)
+
+		data = get_data(
+			doctype="CRM Deal",
+			filters={"pipeline": first_pipeline.name},
+			order_by="modified desc",
+			column_field="status",
+			rows=["name", "status", "pipeline"],
+			view={"view_type": "kanban"},
+		)
+
+		self.assertEqual([column["column"]["name"] for column in data["data"]], [first_stage.name])
+		self.assertEqual(data["data"][0]["column"]["label"], first_stage.deal_status)
+		self.assertEqual([deal.name for deal in data["data"][0]["data"]], [first_deal.name])
 
 	def test_set_primary_contact(self):
 		"""Test setting primary contact from contacts table"""
@@ -381,6 +444,33 @@ def create_test_deal(**kwargs):
 	data = {"doctype": "CRM Deal"}
 	data.update(kwargs)
 	return frappe.get_doc(data).insert()
+
+
+def create_test_pipeline(title):
+	"""Helper function to create a CRM Sales Pipeline for testing"""
+	return frappe.get_doc(
+		{
+			"doctype": "CRM Sales Pipeline",
+			"pipeline_name": f"{title} {frappe.generate_hash(length=8)}",
+			"enabled": 1,
+			"position": 99,
+		}
+	).insert()
+
+
+def create_test_deal_status(title, pipeline):
+	"""Helper function to create a CRM Deal Status for testing"""
+	return frappe.get_doc(
+		{
+			"doctype": "CRM Deal Status",
+			"deal_status": f"{title} {frappe.generate_hash(length=8)}",
+			"pipeline": pipeline,
+			"type": "Open",
+			"probability": 10,
+			"position": 1,
+			"color": "gray",
+		}
+	).insert()
 
 
 def create_test_contact(**kwargs):

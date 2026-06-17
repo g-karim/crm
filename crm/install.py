@@ -8,6 +8,7 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from crm.fcrm.doctype.crm_dashboard.crm_dashboard import create_default_manager_dashboard
 from crm.fcrm.doctype.crm_products.crm_products import create_product_details_script
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_or_create_default_pipeline
 
 
 def before_install():
@@ -16,9 +17,11 @@ def before_install():
 
 def after_install(force=False):
 	add_default_lead_statuses()
+	add_default_sales_pipeline()
 	add_default_deal_statuses()
 	add_default_communication_statuses()
 	add_default_fields_layout(force)
+	ensure_sales_pipeline_fields_layouts()
 	add_property_setter()
 	add_email_template_custom_fields()
 	add_email_account_custom_field()
@@ -85,7 +88,12 @@ def add_default_lead_statuses():
 		doc.insert()
 
 
+def add_default_sales_pipeline():
+	get_or_create_default_pipeline()
+
+
 def add_default_deal_statuses():
+	default_pipeline = get_or_create_default_pipeline()
 	statuses = {
 		"Qualification": {
 			"color": "gray",
@@ -132,11 +140,16 @@ def add_default_deal_statuses():
 	}
 
 	for status in statuses:
-		if frappe.db.exists("CRM Deal Status", status):
+		existing = frappe.db.exists("CRM Deal Status", status)
+		if existing:
+			if not frappe.db.get_value("CRM Deal Status", existing, "pipeline"):
+				frappe.db.set_value("CRM Deal Status", existing, "pipeline", default_pipeline)
 			continue
 
 		doc = frappe.new_doc("CRM Deal Status")
+		doc.name = status
 		doc.deal_status = status
+		doc.pipeline = default_pipeline
 		doc.color = statuses[status]["color"]
 		doc.type = statuses[status]["type"]
 		doc.probability = statuses[status]["probability"]
@@ -164,7 +177,7 @@ def add_default_fields_layout(force=False):
 		},
 		"CRM Deal-Quick Entry": {
 			"doctype": "CRM Deal",
-			"layout": '[{"name": "organization_section", "hidden": true, "editable": false, "columns": [{"name": "column_GpMP", "fields": ["organization"]}, {"name": "column_FPTn", "fields": []}]}, {"name": "organization_details_section", "editable": false, "columns": [{"name": "column_S3tQ", "fields": ["organization_name", "territory"]}, {"name": "column_KqV1", "fields": ["website", "annual_revenue"]}, {"name": "column_1r67", "fields": ["no_of_employees", "industry"]}]}, {"name": "contact_section", "hidden": true, "editable": false, "columns": [{"name": "column_CeXr", "fields": ["contact"]}, {"name": "column_yHbk", "fields": []}]}, {"name": "contact_details_section", "editable": false, "columns": [{"name": "column_ZTWr", "fields": ["salutation", "email"]}, {"name": "column_tabr", "fields": ["first_name", "mobile_no"]}, {"name": "column_Qjdx", "fields": ["last_name", "gender"]}]}, {"name": "deal_section", "columns": [{"name": "column_mdps", "fields": ["status"]}, {"name": "column_H40H", "fields": ["deal_owner"]}]}]',
+			"layout": '[{"name": "organization_section", "hidden": true, "editable": false, "columns": [{"name": "column_GpMP", "fields": ["organization"]}, {"name": "column_FPTn", "fields": []}]}, {"name": "organization_details_section", "editable": false, "columns": [{"name": "column_S3tQ", "fields": ["organization_name", "territory"]}, {"name": "column_KqV1", "fields": ["website", "annual_revenue"]}, {"name": "column_1r67", "fields": ["no_of_employees", "industry"]}]}, {"name": "contact_section", "hidden": true, "editable": false, "columns": [{"name": "column_CeXr", "fields": ["contact"]}, {"name": "column_yHbk", "fields": []}]}, {"name": "contact_details_section", "editable": false, "columns": [{"name": "column_ZTWr", "fields": ["salutation", "email"]}, {"name": "column_tabr", "fields": ["first_name", "mobile_no"]}, {"name": "column_Qjdx", "fields": ["last_name", "gender"]}]}, {"name": "deal_section", "columns": [{"name": "column_mdps", "fields": ["deal_name", "pipeline", "status"]}, {"name": "column_H40H", "fields": ["deal_owner"]}]}]',
 		},
 		"Contact-Quick Entry": {
 			"doctype": "Contact",
@@ -192,6 +205,52 @@ def add_default_fields_layout(force=False):
 		},
 	}
 
+	deal_side_panel_layout = [
+		{"label": "Contacts", "name": "contacts_section", "opened": True, "editable": False, "contacts": []},
+		{
+			"label": "Deal Summary",
+			"name": "deal_summary_section",
+			"opened": True,
+			"columns": [
+				{
+					"name": "deal_summary_column",
+					"fields": [
+						"deal_name",
+						"pipeline",
+						"status",
+						"source",
+						"deal_value",
+						"probability",
+						"next_step",
+						"deal_owner",
+					],
+				}
+			],
+		},
+		{
+			"label": "Customer",
+			"name": "customer_section",
+			"opened": True,
+			"columns": [
+				{
+					"name": "customer_column",
+					"fields": ["organization", "website", "territory", "annual_revenue"],
+				}
+			],
+		},
+		{
+			"label": "Forecast",
+			"name": "forecast_section",
+			"opened": False,
+			"columns": [
+				{
+					"name": "forecast_column",
+					"fields": ["expected_deal_value", "expected_closure_date", "closed_date", "currency"],
+				}
+			],
+		},
+	]
+
 	sidebar_fields_layouts = {
 		"CRM Lead-Side Panel": {
 			"doctype": "CRM Lead",
@@ -199,7 +258,7 @@ def add_default_fields_layout(force=False):
 		},
 		"CRM Deal-Side Panel": {
 			"doctype": "CRM Deal",
-			"layout": '[{"label": "Contacts", "name": "contacts_section", "opened": true, "editable": false, "contacts": []}, {"label": "Organization Details", "name": "organization_section", "opened": true, "columns": [{"name": "column_na2Q", "fields": ["organization", "website", "territory", "annual_revenue", "closed_date", "probability", "next_step", "deal_owner"]}]}]',
+			"layout": json.dumps(deal_side_panel_layout),
 		},
 		"Contact-Side Panel": {
 			"doctype": "Contact",
@@ -211,6 +270,76 @@ def add_default_fields_layout(force=False):
 		},
 	}
 
+	deal_data_fields_layout = [
+		{
+			"label": "Overview",
+			"name": "overview_tab",
+			"sections": [
+				{
+					"label": "Deal",
+					"name": "deal_section",
+					"opened": True,
+					"columns": [
+						{"name": "deal_main_column", "fields": ["deal_name", "pipeline", "source"]},
+						{"name": "deal_owner_column", "fields": ["deal_owner", "next_step"]},
+					],
+				},
+				{
+					"label": "Customer",
+					"name": "customer_section",
+					"opened": True,
+					"columns": [
+						{"name": "customer_contact_column", "fields": ["email", "mobile_no", "phone"]},
+						{
+							"name": "customer_org_column",
+							"fields": ["organization", "website", "territory", "annual_revenue"],
+						},
+					],
+				},
+			],
+		},
+		{
+			"label": "Forecast",
+			"name": "forecast_tab",
+			"sections": [
+				{
+					"label": "Forecast & Value",
+					"name": "forecast_section",
+					"opened": True,
+					"columns": [
+						{
+							"name": "forecast_money_column",
+							"fields": ["deal_value", "expected_deal_value", "currency"],
+						},
+						{
+							"name": "forecast_timing_column",
+							"fields": ["probability", "expected_closure_date", "closed_date"],
+						},
+					],
+				}
+			],
+		},
+		{
+			"label": "Products",
+			"name": "products_tab",
+			"sections": [
+				{
+					"label": "Products",
+					"name": "products_section",
+					"opened": True,
+					"columns": [{"name": "products_column", "fields": ["products"]}],
+					"hideLabel": True,
+				},
+				{
+					"label": "Totals",
+					"name": "totals_section",
+					"opened": True,
+					"columns": [{"name": "totals_amounts_column", "fields": ["total", "net_total"]}],
+				},
+			],
+		},
+	]
+
 	data_fields_layouts = {
 		"CRM Lead-Data Fields": {
 			"doctype": "CRM Lead",
@@ -218,7 +347,7 @@ def add_default_fields_layout(force=False):
 		},
 		"CRM Deal-Data Fields": {
 			"doctype": "CRM Deal",
-			"layout": '[{"name":"first_tab","sections":[{"label":"Details","name":"details_section","opened":true,"columns":[{"name":"column_z9XL","fields":["organization","annual_revenue","next_step"]},{"name":"column_gM4w","fields":["website","closed_date","deal_owner"]},{"name":"column_gWmE","fields":["territory","probability"]}]},{"label":"Products","name":"section_jHhQ","opened":true,"columns":[{"name":"column_xiNF","fields":["products"]}],"editingLabel":false,"hideLabel":true},{"label":"New Section","name":"section_WNOQ","opened":true,"columns":[{"name":"column_ziBW","fields":["total"]},{"label":"","name":"column_wuwA","fields":["net_total"]}],"hideBorder":true,"hideLabel":true}]}]',
+			"layout": json.dumps(deal_data_fields_layout),
 		},
 	}
 
@@ -260,6 +389,141 @@ def add_default_fields_layout(force=False):
 		doc.dt = data_fields_layouts[layout]["doctype"]
 		doc.layout = data_fields_layouts[layout]["layout"]
 		doc.insert()
+
+
+def ensure_sales_pipeline_fields_layouts():
+	layout_fields = [
+		{
+			"layout": "CRM Lead-Quick Entry",
+			"section": "lead_section",
+			"field": "planned_deal_pipeline",
+			"reference": "status",
+		},
+		{
+			"layout": "CRM Lead-Side Panel",
+			"section": "details_section",
+			"field": "planned_deal_pipeline",
+			"reference": "source",
+		},
+		{
+			"layout": "CRM Lead-Data Fields",
+			"section": "details_section",
+			"field": "planned_deal_pipeline",
+			"reference": "lead_owner",
+			"before": True,
+		},
+		{
+			"layout": "CRM Deal-Quick Entry",
+			"section": "deal_section",
+			"field": "deal_name",
+			"reference": "pipeline",
+			"before": True,
+		},
+		{
+			"layout": "CRM Deal-Quick Entry",
+			"section": "deal_section",
+			"field": "pipeline",
+			"reference": "status",
+			"before": True,
+		},
+		{
+			"layout": "CRM Deal-Side Panel",
+			"section": "organization_section",
+			"field": "deal_name",
+			"reference": "organization",
+			"before": True,
+		},
+		{
+			"layout": "CRM Deal-Side Panel",
+			"section": "organization_section",
+			"field": "pipeline",
+			"reference": "organization",
+		},
+		{
+			"layout": "CRM Deal-Data Fields",
+			"section": "details_section",
+			"field": "deal_name",
+			"reference": "organization",
+			"before": True,
+		},
+		{
+			"layout": "CRM Deal-Data Fields",
+			"section": "details_section",
+			"field": "pipeline",
+			"reference": "organization",
+		},
+	]
+
+	for field in layout_fields:
+		add_field_to_fields_layout(
+			field["layout"],
+			field["section"],
+			field["field"],
+			field.get("reference"),
+			field.get("before", False),
+		)
+
+
+def add_field_to_fields_layout(layout_name, section_name, fieldname, reference_field=None, before=False):
+	if not frappe.db.exists("CRM Fields Layout", layout_name):
+		return
+
+	doc = frappe.get_doc("CRM Fields Layout", layout_name)
+	layout = json.loads(doc.layout or "[]")
+
+	if layout_has_field(layout, fieldname):
+		return
+
+	section = find_layout_section(layout, section_name)
+	if not section or not section.get("columns"):
+		return
+
+	target_column = section["columns"][0]
+	if reference_field:
+		target_column = next(
+			(
+				column
+				for column in section["columns"]
+				if reference_field in (column.get("fields") or [])
+			),
+			target_column,
+		)
+
+	fields = target_column.setdefault("fields", [])
+	if reference_field in fields:
+		index = fields.index(reference_field)
+		if not before:
+			index += 1
+		fields.insert(index, fieldname)
+	else:
+		fields.append(fieldname)
+
+	doc.layout = json.dumps(layout)
+	doc.save(ignore_permissions=True)
+
+
+def layout_has_field(layout, fieldname):
+	return any(
+		fieldname in (column.get("fields") or [])
+		for section in iter_layout_sections(layout)
+		for column in section.get("columns", [])
+	)
+
+
+def find_layout_section(layout, section_name):
+	return next(
+		(section for section in iter_layout_sections(layout) if section.get("name") == section_name),
+		None,
+	)
+
+
+def iter_layout_sections(layout):
+	for item in layout:
+		if item.get("sections"):
+			for section in item.get("sections") or []:
+				yield section
+		else:
+			yield item
 
 
 def add_property_setter():

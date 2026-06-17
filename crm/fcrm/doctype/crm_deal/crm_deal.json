@@ -9,9 +9,11 @@
  "field_order": [
   "organization_tab",
   "naming_series",
+  "deal_name",
   "organization",
   "next_step",
   "column_break_ijan",
+  "pipeline",
   "status",
   "deal_owner",
   "section_break_jgpm",
@@ -80,6 +82,15 @@
  ],
  "fields": [
   {
+   "fieldname": "deal_name",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Deal Name",
+   "search_index": 1
+  },
+  {
    "fieldname": "organization",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -145,6 +156,15 @@
    "fieldtype": "Data",
    "label": "Primary mobile no",
    "options": "Phone"
+  },
+  {
+   "fieldname": "pipeline",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Pipeline",
+   "options": "CRM Sales Pipeline",
+   "reqd": 1
   },
   {
    "fieldname": "status",
@@ -524,6 +544,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "organization",
+ "title_field": "deal_name",
  "track_changes": 1
 }

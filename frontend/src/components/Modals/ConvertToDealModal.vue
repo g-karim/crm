@@ -98,8 +98,14 @@ import { statusesStore } from '@/stores/statuses'
 import { showQuickEntryModal, quickEntryProps } from '@/composables/modals'
 import { isMobileView } from '@/composables/settings'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
-import { Switch, Dialog, createResource, call } from 'frappe-ui'
-import { ref, computed } from 'vue'
+import {
+  Switch,
+  Dialog,
+  createListResource,
+  createResource,
+  call,
+} from 'frappe-ui'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
@@ -125,6 +131,25 @@ const { capture } = useTelemetry()
 
 const { triggerConvertToDeal } = useDocument('CRM Lead', props.lead.name)
 const { document: deal } = useDocument('CRM Deal')
+
+const salesPipelines = createListResource({
+  doctype: 'CRM Sales Pipeline',
+  fields: ['name', 'pipeline_name', 'is_default', 'position'],
+  filters: { enabled: 1, archived: 0 },
+  orderBy: 'position asc, modified asc',
+  cache: 'crm-sales-pipelines',
+  initialData: [],
+  auto: true,
+})
+
+const defaultPipeline = computed(() => {
+  let pipelines = salesPipelines.data || []
+  return (
+    props.lead.planned_deal_pipeline ||
+    pipelines.find((pipeline) => pipeline.is_default)?.name ||
+    pipelines[0]?.name
+  )
+})
 
 async function convertToDeal() {
   error.value = ''
@@ -187,7 +212,33 @@ async function convertToDeal() {
   }
 }
 
-const dealStatuses = computed(() => statusOptions('deal'))
+const dealStatuses = computed(() =>
+  statusOptions('deal', [], null, { pipeline: deal.doc.pipeline }),
+)
+
+watch(dealStatuses, () => {
+  updateDealStatusFields()
+  if (!deal.doc.status && dealStatuses.value[0]?.value) {
+    deal.doc.status = dealStatuses.value[0].value
+  }
+})
+
+watch(defaultPipeline, (pipeline) => {
+  if (!deal.doc.pipeline && pipeline) {
+    deal.doc.pipeline = pipeline
+  }
+})
+
+watch(
+  () => deal.doc.pipeline,
+  (pipeline, oldPipeline) => {
+    if (!pipeline || pipeline === oldPipeline) return
+    let currentStatus = getDealStatus(deal.doc.status)
+    if (currentStatus?.pipeline !== pipeline) {
+      deal.doc.status = dealStatuses.value[0]?.value || ''
+    }
+  },
+)
 
 const dealTabs = createResource({
   url: 'crm.fcrm.doctype.crm_fields_layout.crm_fields_layout.get_fields_layout',
@@ -196,16 +247,13 @@ const dealTabs = createResource({
   auto: true,
   transform: (_tabs) => {
     let hasFields = false
+    ensureDealPipelineField(_tabs)
     let parsedTabs = _tabs?.forEach((tab) => {
       tab.sections?.forEach((section) => {
         section.columns?.forEach((column) => {
           column.fields?.forEach((field) => {
             hasFields = true
-            if (field.fieldname == 'status') {
-              field.fieldtype = 'Select'
-              field.options = dealStatuses.value
-              field.prefix = getDealStatus(deal.doc.status).color
-            }
+            prepareDealField(field)
 
             if (field.fieldtype === 'Table') {
               deal.doc[field.fieldname] = []
@@ -216,6 +264,56 @@ const dealTabs = createResource({
     })
     return hasFields ? parsedTabs : []
   },
+})
+
+function prepareDealField(field) {
+  if (field.fieldname == 'status') {
+    field.fieldtype = 'Select'
+    field.options = dealStatuses.value
+    field.prefix = getDealStatus(deal.doc.status)?.color
+  }
+}
+
+function updateDealStatusFields() {
+  dealTabs.data?.forEach((tab) => {
+    tab.sections?.forEach((section) => {
+      section.columns?.forEach((column) => {
+        column.fields?.forEach((field) => prepareDealField(field))
+      })
+    })
+  })
+}
+
+function ensureDealPipelineField(_tabs) {
+  let hasPipelineField = _tabs.some((tab) =>
+    tab.sections?.some((section) =>
+      section.columns?.some((column) =>
+        column.fields?.some((field) => field.fieldname === 'pipeline'),
+      ),
+    ),
+  )
+  if (hasPipelineField) return
+
+  let section = _tabs.at(-1)?.sections?.at(-1)
+  let column = section?.columns?.[0]
+  if (!column) return
+
+  column.fields.unshift({
+    fieldname: 'pipeline',
+    fieldtype: 'Link',
+    label: __('Sales Pipeline'),
+    options: 'CRM Sales Pipeline',
+    reqd: 1,
+  })
+}
+
+onMounted(() => {
+  if (defaultPipeline.value) {
+    deal.doc.pipeline = defaultPipeline.value
+  }
+  if (!deal.doc.status && dealStatuses.value[0]?.value) {
+    deal.doc.status = dealStatuses.value[0].value
+  }
 })
 
 function openQuickEntryModal() {

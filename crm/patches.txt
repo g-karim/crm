@@ -27,3 +27,7 @@ crm.patches.v1_0.create_email_account_custom_field
 crm.patches.v1_0.create_default_quick_filters
 crm.patches.v1_0.create_custom_fields_for_product_item_sync
 crm.patches.v1_0.add_forecasting_section_in_quick_entry
+crm.patches.v1_0.setup_sales_pipelines #16-06-2026
+crm.patches.v1_0.add_sales_pipeline_fields_to_layouts #17-06-2026
+crm.patches.v1_0.add_deal_name_to_layouts #17-06-2026
+crm.patches.v1_0.reorganize_deal_data_layouts #17-06-2026
