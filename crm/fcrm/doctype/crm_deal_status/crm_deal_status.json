@@ -8,8 +8,9 @@
  "field_order": [
   "deal_status",
   "pipeline",
-  "amo_status_id",
-  "amo_pipeline_id",
+  "external_source",
+  "external_status_id",
+  "external_pipeline_id",
   "type",
   "position",
   "archived",
@@ -43,16 +44,22 @@
    "reqd": 1
   },
   {
-   "fieldname": "amo_status_id",
+   "fieldname": "external_source",
    "fieldtype": "Data",
    "in_standard_filter": 1,
-   "label": "amoCRM Status ID"
+   "label": "External Source"
   },
   {
-   "fieldname": "amo_pipeline_id",
+   "fieldname": "external_status_id",
    "fieldtype": "Data",
    "in_standard_filter": 1,
-   "label": "amoCRM Pipeline ID"
+   "label": "External Status ID"
+  },
+  {
+   "fieldname": "external_pipeline_id",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "External Pipeline ID"
   },
   {
    "fieldname": "position",

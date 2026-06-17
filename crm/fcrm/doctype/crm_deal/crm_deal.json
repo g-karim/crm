@@ -17,9 +17,10 @@
   "status",
   "pipeline_label",
   "status_label",
-  "amo_pipeline_id",
-  "amo_status_id",
-  "amo_lead_id",
+  "external_source",
+  "external_pipeline_id",
+  "external_status_id",
+  "external_record_id",
   "deal_owner",
   "section_break_jgpm",
   "probability",
@@ -194,25 +195,32 @@
    "label": "Status Label (Import)"
   },
   {
-   "fieldname": "amo_pipeline_id",
+   "fieldname": "external_source",
    "fieldtype": "Data",
    "hidden": 1,
    "in_standard_filter": 1,
-   "label": "amoCRM Pipeline ID"
+   "label": "External Source"
   },
   {
-   "fieldname": "amo_status_id",
+   "fieldname": "external_pipeline_id",
    "fieldtype": "Data",
    "hidden": 1,
    "in_standard_filter": 1,
-   "label": "amoCRM Status ID"
+   "label": "External Pipeline ID"
   },
   {
-   "fieldname": "amo_lead_id",
+   "fieldname": "external_status_id",
    "fieldtype": "Data",
    "hidden": 1,
    "in_standard_filter": 1,
-   "label": "amoCRM Lead ID"
+   "label": "External Status ID"
+  },
+  {
+   "fieldname": "external_record_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "External Record ID"
   },
   {
    "fieldname": "contacts",

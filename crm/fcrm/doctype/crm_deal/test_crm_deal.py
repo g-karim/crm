@@ -122,34 +122,60 @@ class TestCRMDeal(UnitTestCase):
 				status_label=stage_label,
 			)
 
-	def test_import_amo_ids_resolve_pipeline_and_stage(self):
-		"""Test that amoCRM trace IDs can resolve the deal pipeline and stage"""
-		pipeline = create_test_pipeline("amo Import Pipeline")
-		pipeline.amo_pipeline_id = f"amo-pipeline-{frappe.generate_hash(length=8)}"
+	def test_import_external_ids_resolve_pipeline_and_stage(self):
+		"""Test that external IDs can resolve the deal pipeline and stage"""
+		pipeline = create_test_pipeline("External Import Pipeline")
+		pipeline.external_source = "bitrix24"
+		pipeline.external_pipeline_id = f"bitrix-pipeline-{frappe.generate_hash(length=8)}"
 		pipeline.save()
 		stage = create_test_deal_status(
-			"amo Import Stage",
+			"External Import Stage",
 			pipeline.name,
-			amo_status_id=f"amo-status-{frappe.generate_hash(length=8)}",
+			external_status_id=f"bitrix-status-{frappe.generate_hash(length=8)}",
 		)
 
 		deal = create_test_deal(
-			organization="amo Import Org",
-			amo_pipeline_id=pipeline.amo_pipeline_id,
-			amo_status_id=stage.amo_status_id,
-			amo_lead_id=f"amo-lead-{frappe.generate_hash(length=8)}",
+			organization="External Import Org",
+			external_source="bitrix24",
+			external_pipeline_id=pipeline.external_pipeline_id,
+			external_status_id=stage.external_status_id,
+			external_record_id=f"bitrix-deal-{frappe.generate_hash(length=8)}",
 		)
 
 		self.assertEqual(deal.pipeline, pipeline.name)
 		self.assertEqual(deal.status, stage.name)
 
-	def test_amo_lead_id_must_be_unique(self):
-		"""Test that amoCRM lead IDs cannot create duplicate imported deals"""
-		amo_lead_id = f"amo-lead-{frappe.generate_hash(length=8)}"
-		create_test_deal(organization="amo Unique Org", amo_lead_id=amo_lead_id)
+	def test_external_record_id_must_be_unique(self):
+		"""Test that external record IDs cannot create duplicate imported deals"""
+		external_record_id = f"external-deal-{frappe.generate_hash(length=8)}"
+		create_test_deal(
+			organization="External Unique Org",
+			external_source="bitrix24",
+			external_record_id=external_record_id,
+		)
 
 		with self.assertRaises(frappe.DuplicateEntryError):
-			create_test_deal(organization="amo Duplicate Org", amo_lead_id=amo_lead_id)
+			create_test_deal(
+				organization="External Duplicate Org",
+				external_source="bitrix24",
+				external_record_id=external_record_id,
+			)
+
+	def test_external_record_id_can_repeat_across_sources(self):
+		"""Test that the same external record ID can exist for different source systems"""
+		external_record_id = f"external-deal-{frappe.generate_hash(length=8)}"
+		first = create_test_deal(
+			organization="First Source Org",
+			external_source="amocrm",
+			external_record_id=external_record_id,
+		)
+		second = create_test_deal(
+			organization="Second Source Org",
+			external_source="bitrix24",
+			external_record_id=external_record_id,
+		)
+
+		self.assertNotEqual(first.name, second.name)
 
 	def test_set_primary_contact(self):
 		"""Test setting primary contact from contacts table"""

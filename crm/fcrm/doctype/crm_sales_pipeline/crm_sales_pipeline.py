@@ -18,7 +18,8 @@ class CRMSalesPipeline(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
-		amo_pipeline_id: DF.Data | None
+		external_source: DF.Data | None
+		external_pipeline_id: DF.Data | None
 		archived: DF.Check
 		color: DF.Literal[
 			"black",
@@ -44,7 +45,7 @@ class CRMSalesPipeline(Document):
 	# end: auto-generated types
 
 	def validate(self):
-		self.validate_amo_pipeline_id()
+		self.validate_external_pipeline_id()
 
 		if self.archived:
 			self.enabled = 0
@@ -52,21 +53,25 @@ class CRMSalesPipeline(Document):
 		if self.is_default and (self.archived or not self.enabled):
 			frappe.throw(_("Default pipeline must be enabled and not archived."))
 
-	def validate_amo_pipeline_id(self):
-		if not self.amo_pipeline_id:
+	def validate_external_pipeline_id(self):
+		if not self.external_pipeline_id:
 			return
+
+		filters = {
+			"name": ["!=", self.name],
+			"external_pipeline_id": self.external_pipeline_id,
+		}
+		if self.external_source:
+			filters["external_source"] = self.external_source
 
 		existing = frappe.db.exists(
 			"CRM Sales Pipeline",
-			{
-				"name": ["!=", self.name],
-				"amo_pipeline_id": self.amo_pipeline_id,
-			},
+			filters,
 		)
 		if existing:
 			frappe.throw(
-				_("amoCRM pipeline ID {0} is already used by pipeline {1}.").format(
-					frappe.bold(self.amo_pipeline_id),
+				_("External pipeline ID {0} is already used by pipeline {1}.").format(
+					frappe.bold(self.external_pipeline_id),
 					frappe.bold(existing),
 				),
 				frappe.DuplicateEntryError,
@@ -166,16 +171,25 @@ def get_default_deal_status(pipeline: str | None = None) -> str | None:
 	)
 
 
-def resolve_sales_pipeline(value: str | None = None, amo_pipeline_id: str | None = None) -> str | None:
+def resolve_sales_pipeline(
+	value: str | None = None,
+	external_pipeline_id: str | None = None,
+	external_source: str | None = None,
+) -> str | None:
 	value = clean_import_value(value)
-	amo_pipeline_id = clean_import_value(amo_pipeline_id)
+	external_pipeline_id = clean_import_value(external_pipeline_id)
+	external_source = clean_import_value(external_source)
 
-	resolved_from_amo = None
-	if amo_pipeline_id:
-		resolved_from_amo = get_single_value(
+	resolved_from_external_id = None
+	if external_pipeline_id:
+		filters = {"external_pipeline_id": external_pipeline_id}
+		if external_source:
+			filters["external_source"] = external_source
+
+		resolved_from_external_id = get_single_value(
 			"CRM Sales Pipeline",
-			{"amo_pipeline_id": amo_pipeline_id},
-			_("amoCRM pipeline ID {0}").format(frappe.bold(amo_pipeline_id)),
+			filters,
+			_("external pipeline ID {0}").format(frappe.bold(external_pipeline_id)),
 		)
 
 	resolved_from_value = None
@@ -196,36 +210,41 @@ def resolve_sales_pipeline(value: str | None = None, amo_pipeline_id: str | None
 				frappe.LinkValidationError,
 			)
 
-	if resolved_from_amo and resolved_from_value and resolved_from_amo != resolved_from_value:
+	if resolved_from_external_id and resolved_from_value and resolved_from_external_id != resolved_from_value:
 		frappe.throw(
-			_("Pipeline {0} does not match amoCRM pipeline ID {1}.").format(
+			_("Pipeline {0} does not match external pipeline ID {1}.").format(
 				frappe.bold(value),
-				frappe.bold(amo_pipeline_id),
+				frappe.bold(external_pipeline_id),
 			),
 			frappe.ValidationError,
 		)
 
-	return resolved_from_value or resolved_from_amo
+	return resolved_from_value or resolved_from_external_id
 
 
 def resolve_deal_status(
 	value: str | None = None,
 	pipeline: str | None = None,
-	amo_status_id: str | None = None,
+	external_status_id: str | None = None,
+	external_source: str | None = None,
 ) -> str | None:
 	value = clean_import_value(value)
 	pipeline = clean_import_value(pipeline)
-	amo_status_id = clean_import_value(amo_status_id)
+	external_status_id = clean_import_value(external_status_id)
+	external_source = clean_import_value(external_source)
 
-	resolved_from_amo = None
-	if amo_status_id:
-		filters = {"amo_status_id": amo_status_id}
+	resolved_from_external_id = None
+	if external_status_id:
+		filters = {"external_status_id": external_status_id}
 		if pipeline:
 			filters["pipeline"] = pipeline
-		resolved_from_amo = get_single_value(
+		if external_source:
+			filters["external_source"] = external_source
+
+		resolved_from_external_id = get_single_value(
 			"CRM Deal Status",
 			filters,
-			_("amoCRM status ID {0}").format(frappe.bold(amo_status_id)),
+			_("external status ID {0}").format(frappe.bold(external_status_id)),
 		)
 
 	resolved_from_value = None
@@ -260,16 +279,16 @@ def resolve_deal_status(
 					frappe.LinkValidationError,
 				)
 
-	if resolved_from_amo and resolved_from_value and resolved_from_amo != resolved_from_value:
+	if resolved_from_external_id and resolved_from_value and resolved_from_external_id != resolved_from_value:
 		frappe.throw(
-			_("Deal stage {0} does not match amoCRM status ID {1}.").format(
+			_("Deal stage {0} does not match external status ID {1}.").format(
 				frappe.bold(value),
-				frappe.bold(amo_status_id),
+				frappe.bold(external_status_id),
 			),
 			frappe.ValidationError,
 		)
 
-	return resolved_from_value or resolved_from_amo
+	return resolved_from_value or resolved_from_external_id
 
 
 def get_single_value(
@@ -311,4 +330,4 @@ def clean_import_value(value) -> str | None:
 def on_doctype_update():
 	frappe.db.add_index("CRM Sales Pipeline", ["enabled", "archived", "is_default"])
 	frappe.db.add_index("CRM Sales Pipeline", ["position"])
-	frappe.db.add_index("CRM Sales Pipeline", ["amo_pipeline_id"])
+	frappe.db.add_index("CRM Sales Pipeline", ["external_source", "external_pipeline_id"])

@@ -9,7 +9,8 @@
  "engine": "InnoDB",
  "field_order": [
   "pipeline_name",
-  "amo_pipeline_id",
+  "external_source",
+  "external_pipeline_id",
   "enabled",
   "is_default",
   "position",
@@ -30,10 +31,16 @@
    "unique": 1
   },
   {
-   "fieldname": "amo_pipeline_id",
+   "fieldname": "external_source",
    "fieldtype": "Data",
    "in_standard_filter": 1,
-   "label": "amoCRM Pipeline ID"
+   "label": "External Source"
+  },
+  {
+   "fieldname": "external_pipeline_id",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "External Pipeline ID"
   },
   {
    "default": "1",

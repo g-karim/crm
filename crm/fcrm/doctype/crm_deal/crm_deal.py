@@ -35,9 +35,10 @@ class CRMDeal(Document):
 		from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import CRMStatusChangeLog
 
 		annual_revenue: DF.Currency
-		amo_lead_id: DF.Data | None
-		amo_pipeline_id: DF.Data | None
-		amo_status_id: DF.Data | None
+		external_source: DF.Data | None
+		external_record_id: DF.Data | None
+		external_pipeline_id: DF.Data | None
+		external_status_id: DF.Data | None
 		closed_date: DF.Date | None
 		communication_status: DF.Link | None
 		contact: DF.Link | None
@@ -98,7 +99,7 @@ class CRMDeal(Document):
 		self.validate_pipeline()
 		self.validate_status()
 		self.validate_status_pipeline()
-		self.validate_amo_lead_id()
+		self.validate_external_record_id()
 		self.set_primary_contact()
 		self.set_primary_email_mobile_no()
 		if not self.is_new() and self.has_value_changed("deal_owner") and self.deal_owner:
@@ -122,7 +123,11 @@ class CRMDeal(Document):
 		self.apply_sla()
 
 	def normalize_import_fields(self):
-		resolved_pipeline = resolve_sales_pipeline(self.pipeline_label, self.amo_pipeline_id)
+		resolved_pipeline = resolve_sales_pipeline(
+			self.pipeline_label,
+			self.external_pipeline_id,
+			self.external_source,
+		)
 		if resolved_pipeline:
 			if self.pipeline and self.pipeline != resolved_pipeline:
 				frappe.throw(
@@ -134,7 +139,12 @@ class CRMDeal(Document):
 				)
 			self.pipeline = resolved_pipeline
 
-		resolved_status = resolve_deal_status(self.status_label, self.pipeline, self.amo_status_id)
+		resolved_status = resolve_deal_status(
+			self.status_label,
+			self.pipeline,
+			self.external_status_id,
+			self.external_source,
+		)
 		if resolved_status:
 			if self.status and self.status != resolved_status:
 				frappe.throw(
@@ -194,21 +204,22 @@ class CRMDeal(Document):
 				frappe.ValidationError,
 			)
 
-	def validate_amo_lead_id(self):
-		if not self.amo_lead_id:
+	def validate_external_record_id(self):
+		if not self.external_record_id:
 			return
 
-		existing = frappe.db.exists(
-			"CRM Deal",
-			{
-				"name": ["!=", self.name],
-				"amo_lead_id": self.amo_lead_id,
-			},
-		)
+		filters = {
+			"name": ["!=", self.name],
+			"external_record_id": self.external_record_id,
+		}
+		if self.external_source:
+			filters["external_source"] = self.external_source
+
+		existing = frappe.db.exists("CRM Deal", filters)
 		if existing:
 			frappe.throw(
-				_("amoCRM lead ID {0} is already linked to deal {1}.").format(
-					frappe.bold(self.amo_lead_id),
+				_("External record ID {0} is already linked to deal {1}.").format(
+					frappe.bold(self.external_record_id),
 					frappe.bold(existing),
 				),
 				frappe.DuplicateEntryError,
@@ -587,5 +598,5 @@ def create_deal(doc: dict):
 
 
 def on_doctype_update():
-	frappe.db.add_index("CRM Deal", ["amo_lead_id"])
-	frappe.db.add_index("CRM Deal", ["amo_pipeline_id", "amo_status_id"])
+	frappe.db.add_index("CRM Deal", ["external_source", "external_record_id"])
+	frappe.db.add_index("CRM Deal", ["external_source", "external_pipeline_id", "external_status_id"])

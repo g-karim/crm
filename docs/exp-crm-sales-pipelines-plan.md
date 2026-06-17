@@ -514,15 +514,16 @@ Migration approach:
 - amoCRM statuses -> `CRM Deal Status` under the matching pipeline
 - amoCRM leads -> `CRM Deal`
 
-Recommended custom trace fields:
+Optional external trace fields:
 
 ```text
-amo_pipeline_id
-amo_status_id
-amo_lead_id
+external_source
+external_pipeline_id
+external_status_id
+external_record_id
 ```
 
-Use these for audit, re-import, deduplication, and troubleshooting.
+Use these only when audit, re-import, deduplication, or troubleshooting matters. For a one-time migration, importing by `pipeline_label` and `status_label` is usually enough.
 
 Only truly raw inquiries should become `CRM Lead`.
 
@@ -785,44 +786,47 @@ Phase 4 verification:
 
 ### Phase 5: Migration And Import Support
 
-- Add amoCRM mapping fields if needed.
+- Add source-neutral external mapping fields if repeat imports need them.
 - Add import handling for pipeline/stage.
 - Add duplicate label handling.
 - Add user-facing validation errors.
 
 Phase 5 implementation status:
 
-- Added amoCRM trace fields:
-  - `CRM Sales Pipeline.amo_pipeline_id`
-  - `CRM Deal Status.amo_status_id`
-  - `CRM Deal Status.amo_pipeline_id`
-  - `CRM Deal.amo_pipeline_id`
-  - `CRM Deal.amo_status_id`
-  - `CRM Deal.amo_lead_id`
+- Added optional source-neutral external trace fields:
+  - `CRM Sales Pipeline.external_source`
+  - `CRM Sales Pipeline.external_pipeline_id`
+  - `CRM Deal Status.external_source`
+  - `CRM Deal Status.external_status_id`
+  - `CRM Deal Status.external_pipeline_id`
+  - `CRM Deal.external_source`
+  - `CRM Deal.external_pipeline_id`
+  - `CRM Deal.external_status_id`
+  - `CRM Deal.external_record_id`
 - Added hidden deal import helper fields:
   - `CRM Deal.pipeline_label`
   - `CRM Deal.status_label`
 - Deal import normalization now resolves:
   - technical pipeline IDs
   - pipeline labels through `pipeline_label`
-  - amoCRM pipeline IDs through `amo_pipeline_id`
+  - external pipeline IDs through `external_source` + `external_pipeline_id`
   - technical stage IDs
   - stage labels through `status_label`
-  - amoCRM status IDs through `amo_status_id`
+  - external status IDs through `external_source` + `external_status_id`
 - Stage labels are resolved inside the selected deal pipeline.
 - If a stage label is used without pipeline context and the same label exists in multiple pipelines, import fails with a clear validation error.
-- `amo_lead_id` is unique across deals to support deduplication and repeat-import troubleshooting.
-- `amo_pipeline_id` is unique across sales pipelines.
-- `amo_status_id` is unique inside a sales pipeline.
-- Deal stages inherit `amo_pipeline_id` from their sales pipeline when possible.
+- `external_record_id` is unique per `external_source` to support deduplication and repeat-import troubleshooting.
+- `external_pipeline_id` is unique per `external_source` across sales pipelines.
+- `external_status_id` is unique per `external_source` inside a sales pipeline.
+- Deal stages inherit `external_source` and `external_pipeline_id` from their sales pipeline when possible.
 - Migration patch reloads the updated DocTypes and restores a default enabled sales pipeline if the site has none.
 
 Phase 5 CSV guidance:
 
 - For technical imports, use `pipeline` and `status` with stored document IDs.
-- For user-facing amoCRM-style imports, use `pipeline_label` and `status_label`.
-- For repeatable amoCRM imports, include `amo_pipeline_id`, `amo_status_id`, and `amo_lead_id`.
-- If `status_label` is duplicated across pipelines, include `pipeline_label` or `amo_pipeline_id`.
+- For user-facing imports from amoCRM, Bitrix24, or spreadsheets, use `pipeline_label` and `status_label`.
+- For repeatable imports, include `external_source`, `external_pipeline_id`, `external_status_id`, and `external_record_id`.
+- If `status_label` is duplicated across pipelines, include `pipeline_label` or `external_pipeline_id`.
 
 ### Phase 6: Rules And Advanced Process Control
 

@@ -69,16 +69,17 @@ class TestCRMDealStatus(IntegrationTestCase):
 
 		self.assertNotEqual(first_stage.name, second_stage.name)
 
-	def test_duplicate_amo_status_id_is_blocked_within_pipeline(self):
+	def test_duplicate_external_status_id_is_blocked_within_pipeline(self):
 		pipeline = get_default_pipeline()
-		amo_status_id = f"amo-status-{frappe.generate_hash(length=8)}"
+		external_status_id = f"external-status-{frappe.generate_hash(length=8)}"
 
 		frappe.get_doc(
 			{
 				"doctype": "CRM Deal Status",
-				"deal_status": f"amo Stage One {frappe.generate_hash(length=8)}",
+				"deal_status": f"External Stage One {frappe.generate_hash(length=8)}",
 				"pipeline": pipeline,
-				"amo_status_id": amo_status_id,
+				"external_source": "bitrix24",
+				"external_status_id": external_status_id,
 				"type": "Open",
 				"position": 99,
 			}
@@ -88,21 +89,23 @@ class TestCRMDealStatus(IntegrationTestCase):
 			frappe.get_doc(
 				{
 					"doctype": "CRM Deal Status",
-					"deal_status": f"amo Stage Two {frappe.generate_hash(length=8)}",
+					"deal_status": f"External Stage Two {frappe.generate_hash(length=8)}",
 					"pipeline": pipeline,
-					"amo_status_id": amo_status_id,
+					"external_source": "bitrix24",
+					"external_status_id": external_status_id,
 					"type": "Open",
 					"position": 100,
 				}
 			).insert()
 
-	def test_amo_pipeline_id_is_inherited_from_pipeline(self):
-		amo_pipeline_id = f"amo-pipeline-{frappe.generate_hash(length=8)}"
+	def test_external_pipeline_id_is_inherited_from_pipeline(self):
+		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
 		pipeline = frappe.get_doc(
 			{
 				"doctype": "CRM Sales Pipeline",
-				"pipeline_name": f"amo Pipeline {frappe.generate_hash(length=8)}",
-				"amo_pipeline_id": amo_pipeline_id,
+				"pipeline_name": f"External Pipeline {frappe.generate_hash(length=8)}",
+				"external_source": "bitrix24",
+				"external_pipeline_id": external_pipeline_id,
 				"enabled": 1,
 				"position": 99,
 			}
@@ -111,11 +114,12 @@ class TestCRMDealStatus(IntegrationTestCase):
 		stage = frappe.get_doc(
 			{
 				"doctype": "CRM Deal Status",
-				"deal_status": f"amo Pipeline Stage {frappe.generate_hash(length=8)}",
+				"deal_status": f"External Pipeline Stage {frappe.generate_hash(length=8)}",
 				"pipeline": pipeline.name,
 				"type": "Open",
 				"position": 99,
 			}
 		).insert()
 
-		self.assertEqual(stage.amo_pipeline_id, amo_pipeline_id)
+		self.assertEqual(stage.external_source, "bitrix24")
+		self.assertEqual(stage.external_pipeline_id, external_pipeline_id)
