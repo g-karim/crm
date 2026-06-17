@@ -68,3 +68,54 @@ class TestCRMDealStatus(IntegrationTestCase):
 		).insert()
 
 		self.assertNotEqual(first_stage.name, second_stage.name)
+
+	def test_duplicate_amo_status_id_is_blocked_within_pipeline(self):
+		pipeline = get_default_pipeline()
+		amo_status_id = f"amo-status-{frappe.generate_hash(length=8)}"
+
+		frappe.get_doc(
+			{
+				"doctype": "CRM Deal Status",
+				"deal_status": f"amo Stage One {frappe.generate_hash(length=8)}",
+				"pipeline": pipeline,
+				"amo_status_id": amo_status_id,
+				"type": "Open",
+				"position": 99,
+			}
+		).insert()
+
+		with self.assertRaises(frappe.DuplicateEntryError):
+			frappe.get_doc(
+				{
+					"doctype": "CRM Deal Status",
+					"deal_status": f"amo Stage Two {frappe.generate_hash(length=8)}",
+					"pipeline": pipeline,
+					"amo_status_id": amo_status_id,
+					"type": "Open",
+					"position": 100,
+				}
+			).insert()
+
+	def test_amo_pipeline_id_is_inherited_from_pipeline(self):
+		amo_pipeline_id = f"amo-pipeline-{frappe.generate_hash(length=8)}"
+		pipeline = frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"amo Pipeline {frappe.generate_hash(length=8)}",
+				"amo_pipeline_id": amo_pipeline_id,
+				"enabled": 1,
+				"position": 99,
+			}
+		).insert()
+
+		stage = frappe.get_doc(
+			{
+				"doctype": "CRM Deal Status",
+				"deal_status": f"amo Pipeline Stage {frappe.generate_hash(length=8)}",
+				"pipeline": pipeline.name,
+				"type": "Open",
+				"position": 99,
+			}
+		).insert()
+
+		self.assertEqual(stage.amo_pipeline_id, amo_pipeline_id)

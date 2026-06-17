@@ -18,6 +18,8 @@ class CRMDealStatus(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
+		amo_pipeline_id: DF.Data | None
+		amo_status_id: DF.Data | None
 		archived: DF.Check
 		color: DF.Literal[
 			"black",
@@ -58,8 +60,31 @@ class CRMDealStatus(Document):
 		if not self.pipeline:
 			self.pipeline = get_default_pipeline()
 
+		if self.pipeline and not self.amo_pipeline_id:
+			self.amo_pipeline_id = frappe.db.get_value(
+				"CRM Sales Pipeline",
+				self.pipeline,
+				"amo_pipeline_id",
+			)
+
 	def validate(self):
+		self.validate_amo_pipeline_id()
 		self.validate_unique_status_in_pipeline()
+		self.validate_unique_amo_status_in_pipeline()
+
+	def validate_amo_pipeline_id(self):
+		if not self.pipeline or not self.amo_pipeline_id:
+			return
+
+		pipeline_amo_id = frappe.db.get_value("CRM Sales Pipeline", self.pipeline, "amo_pipeline_id")
+		if pipeline_amo_id and pipeline_amo_id != self.amo_pipeline_id:
+			frappe.throw(
+				_("amoCRM pipeline ID {0} does not match pipeline {1}.").format(
+					frappe.bold(self.amo_pipeline_id),
+					frappe.bold(self.pipeline),
+				),
+				frappe.ValidationError,
+			)
 
 	def validate_unique_status_in_pipeline(self):
 		if not self.pipeline or not self.deal_status:
@@ -82,8 +107,31 @@ class CRMDealStatus(Document):
 				frappe.DuplicateEntryError,
 			)
 
+	def validate_unique_amo_status_in_pipeline(self):
+		if not self.pipeline or not self.amo_status_id:
+			return
+
+		existing = frappe.db.exists(
+			"CRM Deal Status",
+			{
+				"name": ["!=", self.name],
+				"pipeline": self.pipeline,
+				"amo_status_id": self.amo_status_id,
+			},
+		)
+		if existing:
+			frappe.throw(
+				_("amoCRM status ID {0} already exists in pipeline {1}.").format(
+					frappe.bold(self.amo_status_id),
+					frappe.bold(self.pipeline),
+				),
+				frappe.DuplicateEntryError,
+			)
+
 
 def on_doctype_update():
 	frappe.db.add_index("CRM Deal Status", ["pipeline", "archived", "position"])
 	frappe.db.add_index("CRM Deal Status", ["pipeline", "position"])
 	frappe.db.add_index("CRM Deal Status", ["pipeline", "deal_status"])
+	frappe.db.add_index("CRM Deal Status", ["pipeline", "amo_status_id"])
+	frappe.db.add_index("CRM Deal Status", ["amo_pipeline_id", "amo_status_id"])

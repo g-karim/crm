@@ -31,3 +31,4 @@ crm.patches.v1_0.setup_sales_pipelines #16-06-2026
 crm.patches.v1_0.add_sales_pipeline_fields_to_layouts #17-06-2026
 crm.patches.v1_0.add_deal_name_to_layouts #17-06-2026
 crm.patches.v1_0.reorganize_deal_data_layouts #17-06-2026
+crm.patches.v1_0.add_amo_import_fields #17-06-2026

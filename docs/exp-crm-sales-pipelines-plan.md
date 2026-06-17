@@ -790,6 +790,40 @@ Phase 4 verification:
 - Add duplicate label handling.
 - Add user-facing validation errors.
 
+Phase 5 implementation status:
+
+- Added amoCRM trace fields:
+  - `CRM Sales Pipeline.amo_pipeline_id`
+  - `CRM Deal Status.amo_status_id`
+  - `CRM Deal Status.amo_pipeline_id`
+  - `CRM Deal.amo_pipeline_id`
+  - `CRM Deal.amo_status_id`
+  - `CRM Deal.amo_lead_id`
+- Added hidden deal import helper fields:
+  - `CRM Deal.pipeline_label`
+  - `CRM Deal.status_label`
+- Deal import normalization now resolves:
+  - technical pipeline IDs
+  - pipeline labels through `pipeline_label`
+  - amoCRM pipeline IDs through `amo_pipeline_id`
+  - technical stage IDs
+  - stage labels through `status_label`
+  - amoCRM status IDs through `amo_status_id`
+- Stage labels are resolved inside the selected deal pipeline.
+- If a stage label is used without pipeline context and the same label exists in multiple pipelines, import fails with a clear validation error.
+- `amo_lead_id` is unique across deals to support deduplication and repeat-import troubleshooting.
+- `amo_pipeline_id` is unique across sales pipelines.
+- `amo_status_id` is unique inside a sales pipeline.
+- Deal stages inherit `amo_pipeline_id` from their sales pipeline when possible.
+- Migration patch reloads the updated DocTypes and restores a default enabled sales pipeline if the site has none.
+
+Phase 5 CSV guidance:
+
+- For technical imports, use `pipeline` and `status` with stored document IDs.
+- For user-facing amoCRM-style imports, use `pipeline_label` and `status_label`.
+- For repeatable amoCRM imports, include `amo_pipeline_id`, `amo_status_id`, and `amo_lead_id`.
+- If `status_label` is duplicated across pipelines, include `pipeline_label` or `amo_pipeline_id`.
+
 ### Phase 6: Rules And Advanced Process Control
 
 - Add optional soft warnings.

@@ -15,6 +15,11 @@
   "column_break_ijan",
   "pipeline",
   "status",
+  "pipeline_label",
+  "status_label",
+  "amo_pipeline_id",
+  "amo_status_id",
+  "amo_lead_id",
   "deal_owner",
   "section_break_jgpm",
   "probability",
@@ -175,6 +180,39 @@
    "options": "CRM Deal Status",
    "reqd": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "pipeline_label",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Pipeline Label (Import)"
+  },
+  {
+   "fieldname": "status_label",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Status Label (Import)"
+  },
+  {
+   "fieldname": "amo_pipeline_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "amoCRM Pipeline ID"
+  },
+  {
+   "fieldname": "amo_status_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "amoCRM Status ID"
+  },
+  {
+   "fieldname": "amo_lead_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "amoCRM Lead ID"
   },
   {
    "fieldname": "contacts",

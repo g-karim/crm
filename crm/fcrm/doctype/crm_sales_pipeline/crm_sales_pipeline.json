@@ -9,6 +9,7 @@
  "engine": "InnoDB",
  "field_order": [
   "pipeline_name",
+  "amo_pipeline_id",
   "enabled",
   "is_default",
   "position",
@@ -27,6 +28,12 @@
    "label": "Pipeline Name",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "amo_pipeline_id",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "amoCRM Pipeline ID"
   },
   {
    "default": "1",

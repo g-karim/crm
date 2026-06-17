@@ -7,6 +7,7 @@ from crm.utils import is_frappe_version
 PIPELINE_FIELDS = [
 	"name",
 	"pipeline_name",
+	"amo_pipeline_id",
 	"enabled",
 	"is_default",
 	"position",
@@ -20,6 +21,8 @@ STAGE_FIELDS = [
 	"name",
 	"deal_status",
 	"pipeline",
+	"amo_status_id",
+	"amo_pipeline_id",
 	"type",
 	"position",
 	"probability",

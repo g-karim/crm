@@ -11,6 +11,8 @@ from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 	get_default_deal_status,
 	get_default_pipeline,
+	resolve_deal_status,
+	resolve_sales_pipeline,
 )
 from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import add_status_change_log
 from crm.fcrm.doctype.utils import add_or_remove_lost_reason_section_in_sidepanel
@@ -33,6 +35,9 @@ class CRMDeal(Document):
 		from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import CRMStatusChangeLog
 
 		annual_revenue: DF.Currency
+		amo_lead_id: DF.Data | None
+		amo_pipeline_id: DF.Data | None
+		amo_status_id: DF.Data | None
 		closed_date: DF.Date | None
 		communication_status: DF.Link | None
 		contact: DF.Link | None
@@ -67,6 +72,7 @@ class CRMDeal(Document):
 		organization_name: DF.Data | None
 		phone: DF.Data | None
 		pipeline: DF.Link
+		pipeline_label: DF.Data | None
 		probability: DF.Percent
 		products: DF.Table[CRMProducts]
 		response_by: DF.Datetime | None
@@ -78,18 +84,21 @@ class CRMDeal(Document):
 		source: DF.Link | None
 		status: DF.Link
 		status_change_log: DF.Table[CRMStatusChangeLog]
+		status_label: DF.Data | None
 		territory: DF.Link | None
 		total: DF.Currency
 		website: DF.Data | None
 	# end: auto-generated types
 
 	def before_validate(self):
+		self.normalize_import_fields()
 		self.set_sla()
 
 	def validate(self):
 		self.validate_pipeline()
 		self.validate_status()
 		self.validate_status_pipeline()
+		self.validate_amo_lead_id()
 		self.set_primary_contact()
 		self.set_primary_email_mobile_no()
 		if not self.is_new() and self.has_value_changed("deal_owner") and self.deal_owner:
@@ -111,6 +120,34 @@ class CRMDeal(Document):
 
 	def before_save(self):
 		self.apply_sla()
+
+	def normalize_import_fields(self):
+		resolved_pipeline = resolve_sales_pipeline(self.pipeline_label, self.amo_pipeline_id)
+		if resolved_pipeline:
+			if self.pipeline and self.pipeline != resolved_pipeline:
+				frappe.throw(
+					_("Pipeline {0} does not match imported pipeline {1}.").format(
+						frappe.bold(self.pipeline),
+						frappe.bold(resolved_pipeline),
+					),
+					frappe.ValidationError,
+				)
+			self.pipeline = resolved_pipeline
+
+		resolved_status = resolve_deal_status(self.status_label, self.pipeline, self.amo_status_id)
+		if resolved_status:
+			if self.status and self.status != resolved_status:
+				frappe.throw(
+					_("Deal stage {0} does not match imported stage {1}.").format(
+						frappe.bold(self.status),
+						frappe.bold(resolved_status),
+					),
+					frappe.ValidationError,
+				)
+			self.status = resolved_status
+
+		if self.status and not self.pipeline:
+			self.pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
 
 	def validate_status(self):
 		if self.status and self.pipeline and self.has_value_changed("pipeline") and not self.has_value_changed("status"):
@@ -155,6 +192,26 @@ class CRMDeal(Document):
 					frappe.bold(self.pipeline),
 				),
 				frappe.ValidationError,
+			)
+
+	def validate_amo_lead_id(self):
+		if not self.amo_lead_id:
+			return
+
+		existing = frappe.db.exists(
+			"CRM Deal",
+			{
+				"name": ["!=", self.name],
+				"amo_lead_id": self.amo_lead_id,
+			},
+		)
+		if existing:
+			frappe.throw(
+				_("amoCRM lead ID {0} is already linked to deal {1}.").format(
+					frappe.bold(self.amo_lead_id),
+					frappe.bold(existing),
+				),
+				frappe.DuplicateEntryError,
 			)
 
 	def set_primary_contact(self, contact=None):
@@ -527,3 +584,8 @@ def create_deal(doc: dict):
 
 	deal.insert(ignore_permissions=True)
 	return deal.name
+
+
+def on_doctype_update():
+	frappe.db.add_index("CRM Deal", ["amo_lead_id"])
+	frappe.db.add_index("CRM Deal", ["amo_pipeline_id", "amo_status_id"])

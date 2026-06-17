@@ -91,6 +91,66 @@ class TestCRMDeal(UnitTestCase):
 		self.assertEqual(data["data"][0]["column"]["label"], first_stage.deal_status)
 		self.assertEqual([deal.name for deal in data["data"][0]["data"]], [first_deal.name])
 
+	def test_import_stage_label_resolves_with_pipeline_label(self):
+		"""Test that CSV import labels resolve stages inside the selected pipeline"""
+		stage_label = f"Shared Import Stage {frappe.generate_hash(length=8)}"
+		first_pipeline = create_test_pipeline("Import Label First Pipeline")
+		second_pipeline = create_test_pipeline("Import Label Second Pipeline")
+		first_stage = create_test_deal_status(stage_label, first_pipeline.name, exact_title=True)
+		create_test_deal_status(stage_label, second_pipeline.name, exact_title=True)
+
+		deal = create_test_deal(
+			organization="Import Label Org",
+			pipeline_label=first_pipeline.pipeline_name,
+			status_label=stage_label,
+		)
+
+		self.assertEqual(deal.pipeline, first_pipeline.name)
+		self.assertEqual(deal.status, first_stage.name)
+
+	def test_import_stage_label_without_pipeline_rejects_ambiguous_stage(self):
+		"""Test that duplicate stage labels require pipeline context during import"""
+		stage_label = f"Ambiguous Import Stage {frappe.generate_hash(length=8)}"
+		first_pipeline = create_test_pipeline("Ambiguous First Pipeline")
+		second_pipeline = create_test_pipeline("Ambiguous Second Pipeline")
+		create_test_deal_status(stage_label, first_pipeline.name, exact_title=True)
+		create_test_deal_status(stage_label, second_pipeline.name, exact_title=True)
+
+		with self.assertRaises(frappe.exceptions.ValidationError):
+			create_test_deal(
+				organization="Ambiguous Import Org",
+				status_label=stage_label,
+			)
+
+	def test_import_amo_ids_resolve_pipeline_and_stage(self):
+		"""Test that amoCRM trace IDs can resolve the deal pipeline and stage"""
+		pipeline = create_test_pipeline("amo Import Pipeline")
+		pipeline.amo_pipeline_id = f"amo-pipeline-{frappe.generate_hash(length=8)}"
+		pipeline.save()
+		stage = create_test_deal_status(
+			"amo Import Stage",
+			pipeline.name,
+			amo_status_id=f"amo-status-{frappe.generate_hash(length=8)}",
+		)
+
+		deal = create_test_deal(
+			organization="amo Import Org",
+			amo_pipeline_id=pipeline.amo_pipeline_id,
+			amo_status_id=stage.amo_status_id,
+			amo_lead_id=f"amo-lead-{frappe.generate_hash(length=8)}",
+		)
+
+		self.assertEqual(deal.pipeline, pipeline.name)
+		self.assertEqual(deal.status, stage.name)
+
+	def test_amo_lead_id_must_be_unique(self):
+		"""Test that amoCRM lead IDs cannot create duplicate imported deals"""
+		amo_lead_id = f"amo-lead-{frappe.generate_hash(length=8)}"
+		create_test_deal(organization="amo Unique Org", amo_lead_id=amo_lead_id)
+
+		with self.assertRaises(frappe.DuplicateEntryError):
+			create_test_deal(organization="amo Duplicate Org", amo_lead_id=amo_lead_id)
+
 	def test_set_primary_contact(self):
 		"""Test setting primary contact from contacts table"""
 		# Create contacts
@@ -458,19 +518,19 @@ def create_test_pipeline(title):
 	).insert()
 
 
-def create_test_deal_status(title, pipeline):
+def create_test_deal_status(title, pipeline, exact_title=False, **kwargs):
 	"""Helper function to create a CRM Deal Status for testing"""
-	return frappe.get_doc(
-		{
-			"doctype": "CRM Deal Status",
-			"deal_status": f"{title} {frappe.generate_hash(length=8)}",
-			"pipeline": pipeline,
-			"type": "Open",
-			"probability": 10,
-			"position": 1,
-			"color": "gray",
-		}
-	).insert()
+	data = {
+		"doctype": "CRM Deal Status",
+		"deal_status": title if exact_title else f"{title} {frappe.generate_hash(length=8)}",
+		"pipeline": pipeline,
+		"type": "Open",
+		"probability": 10,
+		"position": 1,
+		"color": "gray",
+	}
+	data.update(kwargs)
+	return frappe.get_doc(data).insert()
 
 
 def create_test_contact(**kwargs):

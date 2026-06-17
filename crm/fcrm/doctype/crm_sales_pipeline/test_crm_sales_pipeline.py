@@ -37,6 +37,29 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 		self.assertFalse(first.is_default)
 		self.assertTrue(second.is_default)
 
+	def test_amo_pipeline_id_must_be_unique(self):
+		amo_pipeline_id = f"amo-pipeline-{frappe.generate_hash(length=8)}"
+		frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"amo Pipeline One {frappe.generate_hash(length=8)}",
+				"amo_pipeline_id": amo_pipeline_id,
+				"enabled": 1,
+				"position": 98,
+			}
+		).insert()
+
+		with self.assertRaises(frappe.DuplicateEntryError):
+			frappe.get_doc(
+				{
+					"doctype": "CRM Sales Pipeline",
+					"pipeline_name": f"amo Pipeline Two {frappe.generate_hash(length=8)}",
+					"amo_pipeline_id": amo_pipeline_id,
+					"enabled": 1,
+					"position": 99,
+				}
+			).insert()
+
 	def test_default_pipeline_cannot_be_archived(self):
 		pipeline = frappe.get_doc(
 			{

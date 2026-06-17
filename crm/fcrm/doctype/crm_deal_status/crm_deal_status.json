@@ -8,6 +8,8 @@
  "field_order": [
   "deal_status",
   "pipeline",
+  "amo_status_id",
+  "amo_pipeline_id",
   "type",
   "position",
   "archived",
@@ -39,6 +41,18 @@
    "label": "Pipeline",
    "options": "CRM Sales Pipeline",
    "reqd": 1
+  },
+  {
+   "fieldname": "amo_status_id",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "amoCRM Status ID"
+  },
+  {
+   "fieldname": "amo_pipeline_id",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "amoCRM Pipeline ID"
   },
   {
    "fieldname": "position",
