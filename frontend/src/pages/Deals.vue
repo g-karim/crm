@@ -44,6 +44,7 @@
     :filters="dealFilters"
     :options="{
       allowedViews: ['list', 'group_by', 'kanban'],
+      includeDefaultFiltersInView: true,
     }"
   />
   <KanbanView
@@ -285,6 +286,7 @@ import { globalStore } from '@/stores/global'
 import { usersStore } from '@/stores/users'
 import { organizationsStore } from '@/stores/organizations'
 import { statusesStore } from '@/stores/statuses'
+import { viewsStore } from '@/stores/views'
 import { callEnabled } from '@/composables/telephony'
 import { formatDate, timeAgo, website, formatTime } from '@/utils'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
@@ -298,6 +300,7 @@ const { makeCall } = globalStore()
 const { getUser } = usersStore()
 const { getOrganization } = organizationsStore()
 const { getDealStatus } = statusesStore()
+const { getView, views } = viewsStore()
 const { updateOnboardingStep } = useOnboarding('frappecrm')
 const { capture } = useTelemetry()
 const { showModal } = useDoctypeModal()
@@ -384,6 +387,17 @@ watch(selectedPipeline, (pipeline) => {
   defaults.pipeline = pipeline
 })
 
+watch(
+  [
+    () => route.query.view,
+    () => route.params.viewType,
+    () => views.data,
+    () => pipelineOptions.value,
+  ],
+  () => syncPipelineFromRouteView(),
+  { immediate: true, deep: true },
+)
+
 function setSelectedPipeline(option) {
   let pipeline = option?.value || ''
   if (!pipeline || pipeline === selectedPipeline.value) return
@@ -391,6 +405,49 @@ function setSelectedPipeline(option) {
   loadMore.value = 1
   triggerResize.value += 1
   selectedPipeline.value = pipeline
+}
+
+function syncPipelineFromRouteView() {
+  const pipeline = getPipelineFromRouteView()
+  if (!pipeline || pipeline === selectedPipeline.value) return
+
+  const pipelineExists =
+    !pipelineOptions.value.length ||
+    pipelineOptions.value.some((option) => option.value === pipeline)
+  if (!pipelineExists) return
+
+  deals.value = {}
+  loadMore.value = 1
+  triggerResize.value += 1
+  selectedPipeline.value = pipeline
+}
+
+function getPipelineFromRouteView() {
+  if (!route.query.view) return ''
+  const view = getView(route.query.view, route.params.viewType, 'CRM Deal')
+  return getPipelineFromFilters(view?.filters)
+}
+
+function getPipelineFromFilters(filters) {
+  if (!filters) return ''
+  if (typeof filters === 'string') {
+    try {
+      filters = JSON.parse(filters)
+    } catch {
+      return ''
+    }
+  }
+
+  const pipeline = filters?.pipeline
+  if (!pipeline) return ''
+  if (typeof pipeline === 'string') return pipeline
+  if (!Array.isArray(pipeline)) return ''
+
+  const operator = pipeline[0]?.toLowerCase?.()
+  if (['=', 'equals'].includes(operator) && typeof pipeline[1] === 'string') {
+    return pipeline[1]
+  }
+  return ''
 }
 
 function getRow(name, field) {

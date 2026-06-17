@@ -351,6 +351,7 @@ const props = defineProps({
       hideColumnsButton: false,
       defaultViewName: '',
       allowedViews: ['list'],
+      includeDefaultFiltersInView: false,
     }),
   },
 })
@@ -1155,7 +1156,10 @@ function createView() {
   view.value.name = ''
   view.value.label = ''
   view.value.icon = ''
-  viewModalObj.value = view.value
+  viewModalObj.value = {
+    ...view.value,
+    filters: getViewFiltersForSave(view.value.filters),
+  }
   viewModalObj.value.mode = 'create'
   showViewModal.value = true
 }
@@ -1243,7 +1247,7 @@ function saveView() {
     type: view.value.type || 'list',
     icon: view.value.icon,
     name: view.value.name,
-    filters: defaultParams.value.filters,
+    filters: getViewFiltersForSave(defaultParams.value.filters),
     order_by: defaultParams.value.order_by,
     group_by_field: defaultParams.value.view.group_by_field,
     column_field: defaultParams.value.column_field,
@@ -1258,6 +1262,14 @@ function saveView() {
   viewModalObj.value = view.value
   viewModalObj.value.mode = 'edit'
   showViewModal.value = true
+}
+
+function getViewFiltersForSave(filters = {}) {
+  if (!props.options.includeDefaultFiltersInView) return filters || {}
+  return {
+    ...(props.filters || {}),
+    ...(filters || {}),
+  }
 }
 
 function applyFilter({ event, idx, column, item, firstColumn }) {
