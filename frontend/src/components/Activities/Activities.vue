@@ -400,8 +400,8 @@
     </div>
     <EmptyState
       v-else
-      :title="emptyText"
-      :description="emptyTextDescription"
+      :title="__(emptyText)"
+      :description="__(emptyTextDescription)"
       :icon="emptyTextIcon"
       :top="top"
     />

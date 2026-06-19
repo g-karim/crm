@@ -19,11 +19,13 @@
             </div>
             <div v-if="task.due_date">
               <Tooltip
-                :text="formatDate(task.due_date, 'ddd, MMM D, YYYY | hh:mm a')"
+                :text="formatDate(task.due_date, dateTimeFormat)"
               >
                 <div class="flex gap-2">
                   <CalendarIcon />
-                  <div>{{ formatDate(task.due_date, 'D MMM, hh:mm a') }}</div>
+                  <div>
+                    {{ formatDate(task.due_date, shortDateTimeFormat) }}
+                  </div>
                 </div>
               </Tooltip>
             </div>
@@ -96,7 +98,7 @@ import TaskStatusIcon from '@/components/Icons/TaskStatusIcon.vue'
 import TaskPriorityIcon from '@/components/Icons/TaskPriorityIcon.vue'
 import DotIcon from '@/components/Icons/DotIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { formatDate, taskStatusOptions } from '@/utils'
+import { formatDate, getFormat, taskStatusOptions } from '@/utils'
 import { usersStore } from '@/stores/users'
 import { globalStore } from '@/stores/global'
 import { Tooltip, Dropdown } from 'frappe-ui'
@@ -108,4 +110,8 @@ defineProps({
 
 const { getUser } = usersStore()
 const { $dialog } = globalStore()
+
+const dateFormat = getFormat('', '', true, false, false)
+const dateTimeFormat = `${dateFormat} | HH:mm`
+const shortDateTimeFormat = `${dateFormat} HH:mm`
 </script>

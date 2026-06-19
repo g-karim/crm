@@ -58,6 +58,7 @@
       }),
       onNewClick: (column) => onNewClick(column),
       manageColumns: false,
+      getCardMeta: (row) => getFreezeState(row),
     }"
     @update="(data) => viewControls.updateKanbanSettings(data)"
     @loadMore="(columnName) => viewControls.loadMoreKanban(columnName)"
@@ -322,6 +323,9 @@ const loadMore = ref(1)
 const triggerResize = ref(1)
 const updatedPageCount = ref(20)
 const viewControls = ref(null)
+const freezeThresholdDays = 7
+const deepFreezeThresholdDays = 14
+const millisecondsInDay = 24 * 60 * 60 * 1000
 
 const salesPipelines = createListResource({
   doctype: 'CRM Sales Pipeline',
@@ -675,6 +679,54 @@ function parseRows(rows, columns = []) {
     _rows['_comment_count'] = deal._comment_count
     return _rows
   })
+}
+
+function getFreezeState(deal) {
+  let state = {
+    _freezeLevel: 0,
+    _freezeProgress: 0,
+    _freezeDays: 0,
+    _freezeTooltip: '',
+  }
+
+  if (deals.value?.data?.view_type !== 'kanban') return state
+  if (!deal.modified) return state
+
+  let statusType = getDealStatus(deal.status)?.type
+  if (['Won', 'Lost'].includes(statusType)) return state
+
+  let modifiedAt = parseFreezeDate(deal.modified)
+  if (Number.isNaN(modifiedAt.getTime())) return state
+
+  let days = Math.max(
+    0,
+    Math.floor((Date.now() - modifiedAt.getTime()) / millisecondsInDay),
+  )
+  if (days < freezeThresholdDays) return state
+
+  let progress = Math.min(days / deepFreezeThresholdDays, 1)
+  let level = days >= deepFreezeThresholdDays ? 2 : 1
+
+  return {
+    _freezeLevel: level,
+    _freezeProgress: progress,
+    _freezeDays: days,
+    _freezeTooltip: __('No activity for {0} days', [days]),
+  }
+}
+
+function parseFreezeDate(value) {
+  if (value instanceof Date) return value
+
+  let normalized = String(value)
+    .trim()
+    .replace(' ', 'T')
+    .replace(/(\.\d{3})\d+/, '$1')
+
+  let date = new Date(normalized)
+  if (!Number.isNaN(date.getTime())) return date
+
+  return new Date(value)
 }
 
 function onNewClick(column) {

@@ -20,7 +20,7 @@
                   class="font-medium text-ink-gray-8 mb-1 cursor-pointer"
                   @click="openEvent(alert)"
                 >
-                  {{ alert.notification.subject || 'Event Notification' }}
+                  {{ alert.notification.subject || __('Event Notification') }}
                 </div>
                 <div class="text-ink-gray-6">
                   {{ formatEventTime(alert.notification) }}
@@ -89,8 +89,8 @@ function formatEventTime(notification) {
   if (notification.all_day_event) {
     return __('All Day')
   } else if (notification.starts_on) {
-    const startTime = dayjs(notification.starts_on).format('h:mm a')
-    const endTime = dayjs(notification.ends_on).format('h:mm a')
+    const startTime = dayjs(notification.starts_on).format('HH:mm')
+    const endTime = dayjs(notification.ends_on).format('HH:mm')
     return `${startTime} - ${endTime}`
   }
   return ''

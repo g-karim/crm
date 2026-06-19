@@ -225,11 +225,11 @@ function getValueControl() {
       type: 'select',
       options: [
         {
-          label: 'Set',
+          label: __('Set'),
           value: 'set',
         },
         {
-          label: 'Not Set',
+          label: __('Not Set'),
           value: 'not set',
         },
       ],
@@ -303,33 +303,33 @@ function getOperators() {
   if (typeString.includes(fieldtype)) {
     options.push(
       ...[
-        { label: 'Equals', value: '==' },
-        { label: 'Not Equals', value: '!=' },
-        { label: 'Like', value: 'like' },
-        { label: 'Not Like', value: 'not like' },
-        { label: 'In', value: 'in' },
-        { label: 'Not In', value: 'not in' },
-        { label: 'Is', value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: '==' },
+        { label: filterOperatorLabel('Not Equals'), value: '!=' },
+        { label: filterOperatorLabel('Like'), value: 'like' },
+        { label: filterOperatorLabel('Not Like'), value: 'not like' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not In'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   if (fieldname === '_assign') {
     options = [
-      { label: 'Like', value: 'like' },
-      { label: 'Not Like', value: 'not like' },
-      { label: 'Is', value: 'is' },
+      { label: filterOperatorLabel('Like'), value: 'like' },
+      { label: filterOperatorLabel('Not Like'), value: 'not like' },
+      { label: filterOperatorLabel('Is'), value: 'is' },
     ]
   }
   if (typeNumber.includes(fieldtype)) {
     options.push(
       ...[
-        { label: 'Equals', value: '==' },
-        { label: 'Not Equals', value: '!=' },
-        { label: 'Like', value: 'like' },
-        { label: 'Not Like', value: 'not like' },
-        { label: 'In', value: 'in' },
-        { label: 'Not In', value: 'not in' },
-        { label: 'Is', value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: '==' },
+        { label: filterOperatorLabel('Not Equals'), value: '!=' },
+        { label: filterOperatorLabel('Like'), value: 'like' },
+        { label: filterOperatorLabel('Not Like'), value: 'not like' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not In'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
         { label: '<', value: '<' },
         { label: '>', value: '>' },
         { label: '<=', value: '<=' },
@@ -340,61 +340,61 @@ function getOperators() {
   if (typeSelect.includes(fieldtype)) {
     options.push(
       ...[
-        { label: 'Equals', value: '==' },
-        { label: 'Not Equals', value: '!=' },
-        { label: 'In', value: 'in' },
-        { label: 'Not In', value: 'not in' },
-        { label: 'Is', value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: '==' },
+        { label: filterOperatorLabel('Not Equals'), value: '!=' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not In'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   if (typeLink.includes(fieldtype)) {
     options.push(
       ...[
-        { label: 'Equals', value: '==' },
-        { label: 'Not Equals', value: '!=' },
-        { label: 'Like', value: 'like' },
-        { label: 'Not Like', value: 'not like' },
-        { label: 'In', value: 'in' },
-        { label: 'Not In', value: 'not in' },
-        { label: 'Is', value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: '==' },
+        { label: filterOperatorLabel('Not Equals'), value: '!=' },
+        { label: filterOperatorLabel('Like'), value: 'like' },
+        { label: filterOperatorLabel('Not Like'), value: 'not like' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not In'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   if (typeCheck.includes(fieldtype)) {
-    options.push(...[{ label: 'Equals', value: '==' }])
+    options.push(...[{ label: filterOperatorLabel('Equals'), value: '==' }])
   }
   if (['Duration'].includes(fieldtype)) {
     options.push(
       ...[
-        { label: 'Like', value: 'like' },
-        { label: 'Not Like', value: 'not like' },
-        { label: 'In', value: 'in' },
-        { label: 'Not In', value: 'not in' },
-        { label: 'Is', value: 'is' },
+        { label: filterOperatorLabel('Like'), value: 'like' },
+        { label: filterOperatorLabel('Not Like'), value: 'not like' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not In'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   if (typeDate.includes(fieldtype)) {
     options.push(
       ...[
-        { label: 'Equals', value: '==' },
-        { label: 'Not Equals', value: '!=' },
-        { label: 'Is', value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: '==' },
+        { label: filterOperatorLabel('Not Equals'), value: '!=' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
         { label: '>', value: '>' },
         { label: '<', value: '<' },
         { label: '>=', value: '>=' },
         { label: '<=', value: '<=' },
-        { label: 'Between', value: 'between' },
+        { label: filterOperatorLabel('Between'), value: 'between' },
       ],
     )
   }
   if (typeRating.includes(fieldtype)) {
     options.push(
       ...[
-        { label: 'Equals', value: '==' },
-        { label: 'Not Equals', value: '!=' },
-        { label: 'Is', value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: '==' },
+        { label: filterOperatorLabel('Not Equals'), value: '!=' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
         { label: '>', value: '>' },
         { label: '<', value: '<' },
         { label: '>=', value: '>=' },
@@ -405,6 +405,12 @@ function getOperators() {
   const op = options.find((o) => o.value == condition[1])
   condition[1] = op?.value || options[0].value
   return options
+}
+
+function filterOperatorLabel(label) {
+  const key = `Filter Operator ${label}`
+  const translated = __(key)
+  return translated === key ? label : translated
 }
 
 function getDefaultValue(field) {

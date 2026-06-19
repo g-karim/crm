@@ -93,8 +93,11 @@
               <template #item="{ element: fields }">
                 <component
                   :is="options.getRoute ? 'router-link' : 'div'"
-                  class="pt-3 px-3.5 pb-2.5 rounded-lg border bg-surface-white text-base flex flex-col text-ink-gray-9"
+                  class="relative overflow-visible pt-3 px-3.5 pb-2.5 rounded-lg border bg-surface-white text-base flex flex-col text-ink-gray-9 transition-[background-color,border-color,box-shadow] duration-500 ease-out"
+                  :class="freezeClass(cardMeta(fields))"
+                  :style="freezeStyle(cardMeta(fields))"
                   :data-name="fields.name"
+                  :title="cardMeta(fields)._freezeTooltip || undefined"
                   v-bind="{
                     to: options.getRoute ? options.getRoute(fields) : undefined,
                     onClick: options.onClick
@@ -191,7 +194,7 @@ import Draggable from 'vuedraggable'
 import { Dropdown, Popover } from 'frappe-ui'
 import { computed } from 'vue'
 
-defineProps({
+const props = defineProps({
   options: {
     type: Object,
     default: () => ({
@@ -199,6 +202,7 @@ defineProps({
       onClick: null,
       onNewClick: null,
       manageColumns: true,
+      getCardMeta: null,
     }),
   },
 })
@@ -206,6 +210,7 @@ defineProps({
 const emit = defineEmits(['update', 'loadMore'])
 
 const kanban = defineModel({ type: Object })
+const options = computed(() => props.options)
 
 const titleField = computed(() => {
   return kanban.value?.data?.title_field
@@ -283,4 +288,87 @@ function updateColumn(d, fetchNewColumns = false) {
 
   emit('update', data)
 }
+
+function freezeClass(fields) {
+  if (!fields?._freezeLevel) return ''
+  return `kanban-card-freeze kanban-card-freeze-${fields._freezeLevel}`
+}
+
+function freezeStyle(fields) {
+  if (!fields?._freezeLevel) return {}
+  return { '--freeze-progress': fields._freezeProgress || 0 }
+}
+
+function cardMeta(fields) {
+  return options.value.getCardMeta?.(fields) || fields
+}
 </script>
+
+<style scoped>
+.kanban-card-freeze {
+  isolation: isolate;
+  border-color: rgba(56, 189, 248, calc(0.76 + var(--freeze-progress) * 0.18));
+  background: rgba(240, 249, 255, 0.94);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.92),
+    inset 0 -16px 28px rgba(56, 189, 248, calc(0.1 + var(--freeze-progress) * 0.12));
+}
+
+.kanban-card-freeze > * {
+  position: relative;
+  z-index: 3;
+}
+
+.kanban-card-freeze::before,
+.kanban-card-freeze::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+}
+
+.kanban-card-freeze::before {
+  z-index: 1;
+  inset: 0;
+  border-radius: inherit;
+  opacity: calc(0.5 + var(--freeze-progress) * 0.16);
+  background-image: url('../../images/ice-card-overlay.png');
+  background-position: top center;
+  background-size: auto 118%;
+  background-repeat: no-repeat;
+}
+
+.kanban-card-freeze::after {
+  z-index: 2;
+  left: -16px;
+  right: -16px;
+  bottom: -16px;
+  height: 42px;
+  border-radius: 0;
+  opacity: calc(0.74 + var(--freeze-progress) * 0.12);
+  background-image: url('../../images/ice-card-edge.png');
+  background-position: bottom center;
+  background-size: 100% auto;
+  background-repeat: no-repeat;
+}
+
+.kanban-card-freeze-2 {
+  border-color: rgba(2, 132, 199, 0.96);
+  background: rgba(224, 242, 254, 0.96);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.98),
+    inset 0 -22px 34px rgba(56, 189, 248, 0.24),
+    inset 0 0 34px rgba(2, 132, 199, 0.16);
+}
+
+.kanban-card-freeze-2::before {
+  opacity: 0.9;
+  background-image: url('../../images/ice-card-overlay-heavy.png');
+}
+
+.kanban-card-freeze-2::after {
+  bottom: -18px;
+  height: 48px;
+  opacity: 0.94;
+}
+</style>

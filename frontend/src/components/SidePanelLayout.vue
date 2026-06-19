@@ -10,7 +10,7 @@
           <CollapsibleSection
             labelClass="px-2 font-semibold"
             headerClass="h-8"
-            :label="section.label"
+            :label="__(section.label)"
             :hideLabel="!section.label"
             :opened="section.opened"
           >
@@ -150,9 +150,7 @@
                           "
                           doctype="User"
                           :filters="field.filters"
-                          :placeholder="
-                            __('Select') + ' ' + field.label + '...'
-                          "
+                          :placeholder="field.placeholder"
                           :hideMe="true"
                           @change="(v) => fieldChange(v, field)"
                         >
@@ -201,6 +199,7 @@
                           <TimePicker
                             :value="doc[field.fieldname]"
                             :format="getFormat('', '', false, true, false)"
+                            :use12Hour="false"
                             :placeholder="field.placeholder"
                             @change="(v) => fieldChange(v, field)"
                           />
@@ -492,12 +491,17 @@ function parsedField(field) {
 
   if (field.fieldtype == 'Select' && typeof field.options === 'string') {
     field.options = field.options.split('\n').map((option) => {
-      return { label: option, value: option }
+      return { label: __(option), value: option }
     })
 
     if (field.options[0].value !== '' && !field.reqd) {
       field.options.unshift({ label: '', value: '' })
     }
+  } else if (field.fieldtype == 'Select' && Array.isArray(field.options)) {
+    field.options = field.options.map((option) => ({
+      ...option,
+      label: __(option.label || option.value || ''),
+    }))
   }
 
   if (field.fieldtype === 'Link' && field.options === 'User') {
@@ -525,7 +529,7 @@ function parsedField(field) {
   let _field = {
     ...field,
     filters: parseLinkFilters(field.link_filters),
-    placeholder: field.placeholder || field.label,
+    placeholder: getPlaceholder(field),
     display_via_depends_on: evaluateDependsOnValue(field.depends_on, doc.value),
     mandatory_via_depends_on: evaluateDependsOnValue(
       field.mandatory_depends_on,
@@ -536,6 +540,33 @@ function parsedField(field) {
 
   _field.visible = isFieldVisible(_field, overrides?.hidden)
   return _field
+}
+
+function getPlaceholder(field) {
+  if (field.placeholder && !isGeneratedPlaceholder(field)) {
+    return __(field.placeholder)
+  }
+
+  if (field.fieldtype === 'User') {
+    return __('Select {0}...', [__(field.label)])
+  }
+
+  if (['Link', 'Dynamic Link'].includes(field.fieldtype)) {
+    return __('Select {0}...', [__(field.label)])
+  }
+
+  if (field.fieldtype === 'Select') {
+    return __('Select {0}', [__(field.label)])
+  }
+
+  return __(field.label)
+}
+
+function isGeneratedPlaceholder(field) {
+  if (!field.placeholder || !field.label) return false
+  return ['Add', 'Select'].some(
+    (prefix) => field.placeholder === `${prefix} ${field.label}...`,
+  )
 }
 
 const instance = getCurrentInstance()

@@ -3,6 +3,7 @@ import './index.css'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createDialog } from './utils/dialogs'
+import { setupStaticTranslations } from './utils/staticTranslations'
 import { initSocket } from './socket'
 import router from './router'
 import translationPlugin from './translation'
@@ -64,12 +65,14 @@ if (import.meta.env.DEV) {
       socket = initSocket()
       app.config.globalProperties.$socket = socket
       app.mount('#app')
+      setupStaticTranslations()
     },
   )
 } else {
   socket = initSocket()
   app.config.globalProperties.$socket = socket
   app.mount('#app')
+  setupStaticTranslations()
 }
 
 if (import.meta.env.DEV) {

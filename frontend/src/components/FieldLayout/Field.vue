@@ -161,6 +161,7 @@
       v-else-if="field.fieldtype === 'Time'"
       :value="data[field.fieldname]"
       :format="getFormat('', '', false, true, false)"
+      :use12Hour="false"
       :placeholder="getPlaceholder(field)"
       input-class="border-none"
       @change="(v) => fieldChange(v, field)"
@@ -462,12 +463,17 @@ const field = computed(() => {
 
   if (field.fieldtype == 'Select' && typeof field.options === 'string') {
     field.options = field.options.split('\n').map((option) => {
-      return { label: option, value: option }
+      return { label: __(option), value: option }
     })
 
     if (field.options[0].value !== '' && !field.reqd) {
       field.options.unshift({ label: '', value: '' })
     }
+  } else if (field.fieldtype == 'Select' && Array.isArray(field.options)) {
+    field.options = field.options.map((option) => ({
+      ...option,
+      label: __(option.label || option.value || ''),
+    }))
   }
 
   if (field.fieldtype === 'Link' && field.options === 'User') {
@@ -513,7 +519,7 @@ const field = computed(() => {
   let _field = {
     ...field,
     filters: parseLinkFilters(field.link_filters),
-    placeholder: field.placeholder || field.label,
+    placeholder: field.placeholder,
     display_via_depends_on: displayViaDependsOn,
     mandatory_via_depends_on: evaluateDependsOnValue(
       field.mandatory_depends_on,
@@ -556,22 +562,37 @@ const resolvedHtml = computed(() => {
 })
 
 const getPlaceholder = (field) => {
-  if (field.placeholder) {
+  if (field.placeholder && !isGeneratedPlaceholder(field)) {
     return __(field.placeholder)
   }
-  if (['Select', 'Link'].includes(field.fieldtype)) {
-    return __('Select {0}', [__(field.label)])
-  } else {
-    return __('Enter {0}', [__(field.label)])
+
+  if (['Link', 'Dynamic Link', 'User'].includes(field.fieldtype)) {
+    return __('Select {0}...', [__(field.label)])
   }
+
+  if (field.fieldtype === 'Select') {
+    return __('Select {0}', [__(field.label)])
+  }
+
+  return __('Enter {0}', [__(field.label)])
+}
+
+function isGeneratedPlaceholder(field) {
+  if (!field.placeholder || !field.label) return false
+  return ['Add', 'Select'].some(
+    (prefix) => field.placeholder === `${prefix} ${field.label}...`,
+  )
 }
 
 const getOptions = (options) => {
   if (Array.isArray(options)) {
-    return options
+    return options.map((option) => ({
+      ...option,
+      label: __(option.label || option.value || ''),
+    }))
   } else if (typeof options === 'string') {
     return options.split('\n').map((option) => {
-      return { label: option, value: option }
+      return { label: __(option), value: option }
     })
   } else {
     return []

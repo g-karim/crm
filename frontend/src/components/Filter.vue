@@ -270,34 +270,34 @@ function getOperators(fieldtype, fieldname) {
   if (typeString.includes(fieldtype)) {
     options.push(
       ...[
-        { label: __('Equals'), value: 'equals' },
-        { label: __('Not equals'), value: 'not equals' },
-        { label: __('Like'), value: 'like' },
-        { label: __('Not like'), value: 'not like' },
-        { label: __('In'), value: 'in' },
-        { label: __('Not in'), value: 'not in' },
-        { label: __('Is'), value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: 'equals' },
+        { label: filterOperatorLabel('Not equals'), value: 'not equals' },
+        { label: filterOperatorLabel('Like'), value: 'like' },
+        { label: filterOperatorLabel('Not like'), value: 'not like' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not in'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   if (fieldname === '_assign') {
     // TODO: make equals and not equals work
     options = [
-      { label: __('Like'), value: 'like' },
-      { label: __('Not like'), value: 'not like' },
-      { label: __('Is'), value: 'is' },
+      { label: filterOperatorLabel('Like'), value: 'like' },
+      { label: filterOperatorLabel('Not like'), value: 'not like' },
+      { label: filterOperatorLabel('Is'), value: 'is' },
     ]
   }
   if (typeNumber.includes(fieldtype)) {
     options.push(
       ...[
-        { label: __('Equals'), value: 'equals' },
-        { label: __('Not equals'), value: 'not equals' },
-        { label: __('Like'), value: 'like' },
-        { label: __('Not like'), value: 'not like' },
-        { label: __('In'), value: 'in' },
-        { label: __('Not in'), value: 'not in' },
-        { label: __('Is'), value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: 'equals' },
+        { label: filterOperatorLabel('Not equals'), value: 'not equals' },
+        { label: filterOperatorLabel('Like'), value: 'like' },
+        { label: filterOperatorLabel('Not like'), value: 'not like' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not in'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
         { label: __('<'), value: '<' },
         { label: __('>'), value: '>' },
         { label: __('<='), value: '<=' },
@@ -308,70 +308,76 @@ function getOperators(fieldtype, fieldname) {
   if (typeSelect.includes(fieldtype)) {
     options.push(
       ...[
-        { label: __('Equals'), value: 'equals' },
-        { label: __('Not equals'), value: 'not equals' },
-        { label: __('In'), value: 'in' },
-        { label: __('Not in'), value: 'not in' },
-        { label: __('Is'), value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: 'equals' },
+        { label: filterOperatorLabel('Not equals'), value: 'not equals' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not in'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   if (typeLink.includes(fieldtype)) {
     options.push(
       ...[
-        { label: __('Equals'), value: 'equals' },
-        { label: __('Not equals'), value: 'not equals' },
-        { label: __('Like'), value: 'like' },
-        { label: __('Not like'), value: 'not like' },
-        { label: __('In'), value: 'in' },
-        { label: __('Not in'), value: 'not in' },
-        { label: __('Is'), value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: 'equals' },
+        { label: filterOperatorLabel('Not equals'), value: 'not equals' },
+        { label: filterOperatorLabel('Like'), value: 'like' },
+        { label: filterOperatorLabel('Not like'), value: 'not like' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not in'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   if (typeCheck.includes(fieldtype)) {
-    options.push(...[{ label: __('Equals'), value: 'equals' }])
+    options.push(...[{ label: filterOperatorLabel('Equals'), value: 'equals' }])
   }
   if (typeDuration.includes(fieldtype)) {
     options.push(
       ...[
-        { label: __('Like'), value: 'like' },
-        { label: __('Not like'), value: 'not like' },
-        { label: __('In'), value: 'in' },
-        { label: __('Not in'), value: 'not in' },
-        { label: __('Is'), value: 'is' },
+        { label: filterOperatorLabel('Like'), value: 'like' },
+        { label: filterOperatorLabel('Not like'), value: 'not like' },
+        { label: filterOperatorLabel('In'), value: 'in' },
+        { label: filterOperatorLabel('Not in'), value: 'not in' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   if (typeDate.includes(fieldtype)) {
     options.push(
       ...[
-        { label: __('Equals'), value: 'equals' },
-        { label: __('Not equals'), value: 'not equals' },
-        { label: __('Is'), value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: 'equals' },
+        { label: filterOperatorLabel('Not equals'), value: 'not equals' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
         { label: __('>'), value: '>' },
         { label: __('<'), value: '<' },
         { label: __('>='), value: '>=' },
         { label: __('<='), value: '<=' },
-        { label: __('Between'), value: 'between' },
-        { label: __('Timespan'), value: 'timespan' },
+        { label: filterOperatorLabel('Between'), value: 'between' },
+        { label: filterOperatorLabel('Timespan'), value: 'timespan' },
       ],
     )
   }
   if (typeRating.includes(fieldtype)) {
     options.push(
       ...[
-        { label: __('Equals'), value: 'equals' },
-        { label: __('Not equals'), value: 'not equals' },
-        { label: __('Greater than'), value: '>' },
-        { label: __('Less than'), value: '<' },
-        { label: __('Greater than or equal to'), value: '>=' },
-        { label: __('Less than or equal to'), value: '<=' },
-        { label: __('Is'), value: 'is' },
+        { label: filterOperatorLabel('Equals'), value: 'equals' },
+        { label: filterOperatorLabel('Not equals'), value: 'not equals' },
+        { label: filterOperatorLabel('Greater than'), value: '>' },
+        { label: filterOperatorLabel('Less than'), value: '<' },
+        { label: filterOperatorLabel('Greater than or equal to'), value: '>=' },
+        { label: filterOperatorLabel('Less than or equal to'), value: '<=' },
+        { label: filterOperatorLabel('Is'), value: 'is' },
       ],
     )
   }
   return options
+}
+
+function filterOperatorLabel(label) {
+  const key = `Filter Operator ${label}`
+  const translated = __(key)
+  return translated === key ? __(label) : translated
 }
 
 function getValueControl(f) {
@@ -382,11 +388,11 @@ function getValueControl(f) {
       type: 'select',
       options: [
         {
-          label: 'Set',
+          label: __('Set'),
           value: 'set',
         },
         {
-          label: 'Not Set',
+          label: __('Not Set'),
           value: 'not set',
         },
       ],

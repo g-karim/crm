@@ -309,8 +309,8 @@
             class="w-full"
             variant="outline"
             :value="_event.fromDate"
-            :format="'MMM D, YYYY'"
-            :placeholder="__('May 1, 2025')"
+            :format="dateDisplayFormat"
+            :placeholder="dateDisplayFormat"
             :clearable="false"
             @update:modelValue="(date) => updateDate(date, true)"
           >
@@ -335,6 +335,7 @@
             class="w-full"
             variant="outline"
             :modelValue="_event.fromTime"
+            :use12Hour="false"
             :placeholder="__('Start Time')"
             @update:modelValue="(time) => updateTime(time, true)"
           />
@@ -343,6 +344,7 @@
             variant="outline"
             :modelValue="_event.toTime"
             :options="toOptions"
+            :use12Hour="false"
             :placeholder="__('End Time')"
             placement="bottom-end"
             @update:modelValue="(time) => updateTime(time)"
@@ -562,7 +564,7 @@ import EventNotifications from '@/components/Calendar/EventNotifications.vue'
 import ShortcutTooltip from '@/components/ShortcutTooltip.vue'
 import { globalStore } from '@/stores/global'
 import { sessionStore } from '@/stores/session'
-import { validateEmail, deepClone, sanitizeHTML } from '@/utils'
+import { getFormat, validateEmail, deepClone, sanitizeHTML } from '@/utils'
 import {
   normalizeParticipants,
   buildEndTimeOptions,
@@ -616,6 +618,7 @@ const events = inject('events')
 const _event = ref({})
 
 const readonly = computed(() => _event.value?.owner?.value !== user)
+const dateDisplayFormat = computed(() => getFormat('', '', true, false, false))
 
 const peoples = computed({
   get() {
@@ -937,35 +940,20 @@ const formattedDateTime = computed(() => {
   const date = dayjs(_event.value.fromDate)
 
   if (_event.value.isFullDay) {
-    return `${__('All Day')} - ${date.format('ddd, D MMM YYYY')}`
+    return `${__('All Day')} - ${date.format(dateDisplayFormat.value)}`
   }
 
   let start = dayjs(_event.value.fromDate + ' ' + _event.value.fromTime)
   let end = dayjs(_event.value.toDate + ' ' + _event.value.toTime)
 
-  start = start.format('h:mm a')
-  end = end.format('h:mm a')
+  start = start.format('HH:mm')
+  end = end.format('HH:mm')
 
-  if (start.includes(':00')) {
-    start = start.replace(':00', '')
-  }
-
-  if (end.includes(':00')) {
-    end = end.replace(':00', '')
-  }
-
-  if (
-    (start.includes(' am') && end.includes(' am')) ||
-    (start.includes(' pm') && end.includes(' pm'))
-  ) {
-    start = start.replace(' am', '').replace(' pm', '')
-  }
-
-  return `${start} - ${end} ${date.format('ddd, D MMM YYYY')}`
+  return `${start} - ${end} ${date.format(dateDisplayFormat.value)}`
 })
 
 const colors = Object.keys(colorMap).map((color) => ({
-  label: color.charAt(0).toUpperCase() + color.slice(1),
+  label: __(color.charAt(0).toUpperCase() + color.slice(1)),
   value: colorMap[color].color,
   icon: h('div', {
     class: '!size-2.5 rounded-full',

@@ -135,9 +135,9 @@
             />
           </div>
           <div class="-mb-1 flex shrink-0 items-end gap-1 text-ink-gray-5">
-            <Tooltip :text="formatDate(whatsapp.creation, 'ddd, MMM D, YYYY')">
+            <Tooltip :text="formatDate(whatsapp.creation, dateFormat)">
               <div class="text-2xs">
-                {{ formatDate(whatsapp.creation, 'hh:mm a') }}
+                {{ formatDate(whatsapp.creation, 'HH:mm') }}
               </div>
             </Tooltip>
             <div v-if="whatsapp.type == 'Outgoing'">
@@ -184,7 +184,7 @@ import CheckIcon from '@/components/Icons/CheckIcon.vue'
 import DoubleCheckIcon from '@/components/Icons/DoubleCheckIcon.vue'
 import DocumentIcon from '@/components/Icons/DocumentIcon.vue'
 import ReactIcon from '@/components/Icons/ReactIcon.vue'
-import { formatDate, sanitizeHTML } from '@/utils'
+import { formatDate, getFormat, sanitizeHTML } from '@/utils'
 import { useTelemetry } from 'frappe-ui/frappe'
 import { Tooltip, Dropdown, createResource, toast } from 'frappe-ui'
 import { ref } from 'vue'
@@ -192,6 +192,8 @@ import { ref } from 'vue'
 defineProps({
   messages: { type: Array, default: () => [] },
 })
+
+const dateFormat = getFormat('', '', true, false, false)
 
 const list = defineModel({ type: Object })
 
