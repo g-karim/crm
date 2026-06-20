@@ -419,6 +419,8 @@
 
 ## Изменение 31. Где хранить assets
 
+Статус: ✅ Сделано. Логотипы, favicon, PWA/manifest icons и EXP ERP icon лежат в `apps/crm`; рабочие ссылки идут на `/assets/crm/...`, а не на `/assets/exp_theme/...`.
+
 Что было в `exp_theme`: CRM использовала `/assets/exp_theme/img/exp-favicon.png` и `/assets/exp_theme/img/exp-sign-black.png`.
 
 Как сделать в форке `crm`: скопировать нужные картинки в `apps/crm/crm/public/...` и ссылаться на `/assets/crm/...`.
@@ -426,6 +428,8 @@
 Проверка: CRM не берет логотипы, favicon, иконки и runtime-патчи из `exp_theme`. Общий словарь переводов может оставаться в обязательном `exp_theme`.
 
 ## Изменение 32. Документация и настройка для разработчиков
+
+Статус: ✅ Сделано. Добавлен документ `docs/exp-crm-fork-developer-notes.md` с описанием брендинга, assets, dropdown, скрытых настроек, переводов и patch-ей, которые меняют существующие сайты.
 
 Что сделать: добавить README/документ в `apps/crm/docs`, где описано:
 
