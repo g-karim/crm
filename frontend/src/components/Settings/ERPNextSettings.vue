@@ -8,11 +8,6 @@
         <h2 class="flex text-xl font-semibold leading-none h-5">
           {{ __('EXP ERP Settings') }}
         </h2>
-        <Tooltip text="View documentation">
-          <a href="https://docs.frappe.io/crm/erpnext" target="_blank">
-            <lucide-circle-question-mark class="h-4 w-4 text-ink-gray-6" />
-          </a>
-        </Tooltip>
       </div>
     </template>
     <template #header-actions>
@@ -302,7 +297,6 @@ import {
   LoadingIndicator,
   Switch,
   toast,
-  Tooltip,
 } from 'frappe-ui'
 import SettingsLayoutBase from '@/components/Layouts/SettingsLayoutBase.vue'
 import { computed, onMounted } from 'vue'
