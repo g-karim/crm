@@ -40,9 +40,9 @@ class CRMProduct(Document):
 		if should_sync():
 			frappe.throw(
 				_(
-					"ERPNext integration is active. Create an Item in ERPNext and it will appear in CRM Product automatically."
+					"EXP ERP integration is active. Create an Item in EXP ERP and it will appear in CRM Product automatically."
 				),
-				title=_("Use ERPNext to Create Products"),
+				title=_("Use EXP ERP to Create Products"),
 			)
 
 	def validate(self):
@@ -79,8 +79,8 @@ class CRMProduct(Document):
 		):
 			frappe.throw(
 				_(
-					"Cannot delete: linked ERPNext Item {0} is referenced by a Quotation. "
-					"Remove the reference or delete the Item in ERPNext first."
+					"Cannot delete: linked EXP ERP Item {0} is referenced by a Quotation. "
+					"Remove the reference or delete the Item in EXP ERP first."
 				).format(self.erpnext_item_code)
 			)
 

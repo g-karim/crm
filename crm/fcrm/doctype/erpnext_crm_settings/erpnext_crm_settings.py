@@ -24,7 +24,7 @@ def _log_and_throw(message: str, title: str | None = None):
 def _get_enabled_settings():
 	settings = frappe.get_single("ERPNext CRM Settings")
 	if not settings.enabled:
-		frappe.throw(_("ERPNext is not integrated with the CRM"))
+		frappe.throw(_("EXP ERP is not integrated with the CRM"))
 	return settings
 
 
@@ -67,7 +67,7 @@ class ERPNextCRMSettings(Document):
 	def validate_if_erpnext_installed(self):
 		if not self.is_erpnext_in_different_site:
 			if not _is_erpnext_installed():
-				frappe.throw(_("ERPNext is not installed in the current site"))
+				frappe.throw(_("EXP ERP is not installed in the current site"))
 
 	def add_quotation_to_option(self):
 		if not self.is_erpnext_in_different_site:
@@ -88,7 +88,7 @@ class ERPNextCRMSettings(Document):
 
 				create_custom_fields_for_frappe_crm()
 			except ImportError:
-				frappe.throw(_("ERPNext is not installed in the current site"))
+				frappe.throw(_("EXP ERP is not installed in the current site"))
 		else:
 			self.create_custom_fields_in_remote_site()
 
@@ -100,7 +100,7 @@ class ERPNextCRMSettings(Document):
 				{
 					"fieldname": "erpnext_customer",
 					"fieldtype": "Data",
-					"label": "Customer in ERPNext",
+					"label": "Customer in EXP ERP",
 					"insert_after": "lead_name",
 				}
 			],
@@ -108,7 +108,7 @@ class ERPNextCRMSettings(Document):
 				{
 					"fieldname": "erpnext_item_code",
 					"fieldtype": "Data",
-					"label": "Item Code in ERPNext",
+					"label": "Item Code in EXP ERP",
 					"read_only": 1,
 					"insert_after": "product_code",
 				}
@@ -143,7 +143,7 @@ class ERPNextCRMSettings(Document):
 			client.post_api("erpnext.crm.frappe_crm_api.create_custom_fields_for_frappe_crm")
 		except Exception:
 			_log_and_throw(
-				"Error while creating custom field in ERPNext, check error log for more details",
+				"Error while creating custom field in EXP ERP, check error log for more details",
 				f"Error while creating custom field in the remote erpnext site: {self.erpnext_site_url}",
 			)
 
@@ -202,7 +202,7 @@ class ERPNextCRMSettings(Document):
 	@frappe.whitelist()
 	def run_product_sync(self):
 		if not self.enabled or self.is_erpnext_in_different_site:
-			frappe.throw(_("ERPNext integration must be enabled on the same site"))
+			frappe.throw(_("EXP ERP integration must be enabled on the same site"))
 		from crm.fcrm.doctype.crm_product.reconcile_job import enqueue_reconciliation
 
 		enqueue_reconciliation()
@@ -274,7 +274,7 @@ def get_customer_link(crm_deal: str):
 		return ""
 	except Exception:
 		_log_and_throw(
-			"Error while fetching customer in ERPNext, check error log for more details",
+			"Error while fetching customer in EXP ERP, check error log for more details",
 			f"Error while fetching customer in remote site: {erpnext_crm_settings.erpnext_site_url}",
 		)
 
@@ -346,7 +346,7 @@ def create_prospect_in_remote_site(crm_deal, erpnext_crm_settings):
 		)
 	except Exception:
 		_log_and_throw(
-			"Error while creating prospect in ERPNext, check error log for more details",
+			"Error while creating prospect in EXP ERP, check error log for more details",
 			f"Error while creating prospect in remote site: {erpnext_crm_settings.erpnext_site_url}",
 		)
 
@@ -505,7 +505,7 @@ def create_customer_from_deal(doc, erpnext_crm_settings):
 			try:
 				from erpnext.crm.frappe_crm_api import create_customer
 			except ImportError:
-				frappe.throw(_("ERPNext is not installed in the current site"))
+				frappe.throw(_("EXP ERP is not installed in the current site"))
 
 			if doc.territory and not frappe.db.exists("Territory", doc.territory):
 				customer_data["territory"] = ""
@@ -527,13 +527,13 @@ def create_customer_from_deal(doc, erpnext_crm_settings):
 
 		if not customer_name:
 			_log_and_throw(
-				"Error while creating customer in ERPNext, check error log for more details",
-				f"Error while creating customer in ERPNext for CRM Deal: {doc.name}",
+				"Error while creating customer in EXP ERP, check error log for more details",
+				f"Error while creating customer in remote ERP for CRM Deal: {doc.name}",
 			)
 	except frappe.ValidationError:
 		raise
 	except Exception:
-		_log_and_throw("Error while creating customer in ERPNext, check error log for more details")
+		_log_and_throw("Error while creating customer in EXP ERP, check error log for more details")
 
 	if customer_name:
 		frappe.db.set_value("CRM Deal", doc.name, "erpnext_customer", customer_name)
@@ -572,10 +572,10 @@ def get_crm_form_script():
 					if (quotation_url) {
 						window.open(quotation_url, '_blank');
 					} else {
-						toast.error("Error while creating quotation in ERPNext");
+						toast.error("Error while creating quotation in EXP ERP");
 					}
 				}).catch((e) => {
-					toast.error(e.messages[0] || "Error while creating quotation in ERPNext. Check error log in ERPNext for more details");
+					toast.error(e.messages[0] || "Error while creating quotation in EXP ERP. Check error log in EXP ERP for more details");
 				});
 			}
 		})
@@ -591,7 +591,7 @@ def get_crm_form_script():
 				});
 			}
 		}).catch((e) => {
-			toast.error(e.messages[0] || "Error while fetching customer link from ERPNext. Check error log in ERPNext for more details");
+			toast.error(e.messages[0] || "Error while fetching customer link from EXP ERP. Check error log in EXP ERP for more details");
 		});
 	}
 }

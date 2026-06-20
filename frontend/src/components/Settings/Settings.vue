@@ -47,11 +47,9 @@ import LucideLayoutDashboard from '~icons/lucide/layout-dashboard'
 import LucideNetwork from '~icons/lucide/network'
 import MonitorCogIcon from '~icons/lucide/monitor-cog'
 import SlidersIcon from '@/components/Icons/SlidersIcon.vue'
-import SparkleIcon from '@/components/Icons/SparkleIcon.vue'
 import CalendarIcon from '@/components/Icons/CalendarIcon.vue'
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
 import ERPNextIcon from '@/components/Icons/ERPNextIcon.vue'
-import PhoneIcon from '@/components/Icons/PhoneIcon.vue'
 import Email2Icon from '@/components/Icons/Email2Icon.vue'
 import EmailTemplateIcon from '@/components/Icons/EmailTemplateIcon.vue'
 import SettingsIcon from '@/components/Icons/SettingsIcon.vue'
@@ -65,14 +63,12 @@ import WhatsAppSettings from '@/components/Settings/WhatsAppSettings.vue'
 import ERPNextSettings from '@/components/Settings/ERPNextSettings.vue'
 import LeadSyncSourcePage from '@/components/Settings/LeadSyncing/LeadSyncSourcePage.vue'
 import DefaultsSettings from '@/components/Settings/DefaultsSettings.vue'
-import BrandSettings from '@/components/Settings/BrandSettings.vue'
 import CalendarSettings from '@/components/Settings/CalendarSettings.vue'
 import SalesPipelines from '@/components/Settings/SalesPipelines.vue'
 import HomeActions from '@/components/Settings/HomeActions.vue'
 import GeneralSettings from '@/components/Settings/GeneralSettings.vue'
 import DashboardSettings from '@/components/Settings/DashboardSettings.vue'
 import EmailTemplatePage from '@/components/Settings/EmailTemplate/EmailTemplatePage.vue'
-import TelephonyPage from '@/components/Settings/Telephony/TelephonyPage.vue'
 import EmailConfig from '@/components/Settings/EmailConfig.vue'
 import SidebarLink from '@/components/SidebarLink.vue'
 import { usersStore } from '@/stores/users'
@@ -131,11 +127,6 @@ const tabs = computed(() => {
           label: __('Defaults'),
           component: markRaw(DefaultsSettings),
           icon: MonitorCogIcon,
-        },
-        {
-          label: __('Brand'),
-          icon: SparkleIcon,
-          component: markRaw(BrandSettings),
         },
         {
           label: __('Calendar'),
@@ -221,18 +212,13 @@ const tabs = computed(() => {
       label: __('Integrations', null, 'FCRM'),
       items: [
         {
-          label: __('Telephony'),
-          icon: PhoneIcon,
-          component: markRaw(TelephonyPage),
-        },
-        {
           label: __('WhatsApp'),
           icon: WhatsAppIcon,
           component: markRaw(WhatsAppSettings),
           condition: () => isWhatsappInstalled.value && isManager(),
         },
         {
-          label: __('ERPNext'),
+          label: __('EXP ERP'),
           icon: ERPNextIcon,
           component: markRaw(ERPNextSettings),
           condition: () => isManager(),
@@ -259,17 +245,24 @@ const tabs = computed(() => {
   })
 })
 
-const activeTab = ref(tabs.value[0].items[0])
+const activeTab = ref()
+
+const settingItems = computed(() => tabs.value.map((tab) => tab.items).flat())
+
+function getFallbackTab() {
+  return tabs.value[0]?.items?.[0]
+}
 
 function setActiveTab(tabName) {
   activeTab.value =
     (tabName &&
-      tabs.value
-        .map((tab) => tab.items)
-        .flat()
-        .find((tab) => tab.label === tabName)) ||
-    tabs.value[0].items[0]
+      settingItems.value.find((tab) => tab.label === tabName)) ||
+    getFallbackTab()
 }
 
-watch(activeSettingsPage, (activePage) => setActiveTab(activePage))
+watch(activeSettingsPage, (activePage) => setActiveTab(activePage), {
+  immediate: true,
+})
+
+watch(tabs, () => setActiveTab(activeSettingsPage.value))
 </script>

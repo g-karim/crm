@@ -26,7 +26,7 @@ export async function createDocument(doctype, obj, close, callback) {
   if (!doctype) return
   if (doctype === 'CRM Product' && (await isERPNextSyncEnabled())) {
     close?.()
-    toast.info(__('Create products as Items in ERPNext'))
+    toast.info(__('Create products as Items in EXP ERP'))
     window.open('/app/item/new', '_blank')
     return
   }

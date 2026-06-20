@@ -1,12 +1,12 @@
 <template>
   <SettingsLayoutBase
-    :title="__('ERPNext Settings')"
-    :description="__('Manage ERPNext integration settings')"
+    :title="__('EXP ERP Settings')"
+    :description="__('Manage EXP ERP integration settings')"
   >
     <template #title>
       <div class="flex gap-2 items-center">
         <h2 class="flex text-xl font-semibold leading-none h-5">
-          {{ __('ERPNext Settings') }}
+          {{ __('EXP ERP Settings') }}
         </h2>
         <Tooltip text="View documentation">
           <a href="https://docs.frappe.io/crm/erpnext" target="_blank">
@@ -65,11 +65,11 @@
               v-model="erpnextCRMSettingsResource.doc.erpnext_site_url"
               :label="__('Site URL')"
               type="text"
-              placeholder="https://erpnext.example.com"
+              placeholder="https://exp-erp.example.com"
               required
               :description="
                 __(
-                  'ERPNext is not installed on this site either install it or enter the URL of your ERPNext site to connect',
+                  'EXP ERP is not installed on this site either install it or enter the URL of your EXP ERP site to connect',
                 )
               "
               autocomplete="off"
@@ -130,7 +130,7 @@
                   {{ __('Company Name') }}
                 </div>
                 <div class="text-p-sm text-ink-gray-5 truncate">
-                  {{ __('Select your ERPNext company to connect with') }}
+                  {{ __('Select your EXP ERP company to connect with') }}
                 </div>
               </div>
               <div class="w-48">
@@ -188,12 +188,12 @@
             >
               <div class="flex flex-col">
                 <div class="text-p-base font-medium text-ink-gray-7 truncate">
-                  {{ __('Sync Products with ERPNext') }}
+                  {{ __('Sync Products with EXP ERP') }}
                 </div>
                 <div class="text-p-sm text-ink-gray-5 truncate">
                   {{
                     __(
-                      'Bidirectional sync of existing CRM Products and ERPNext Items. Runs in the background.',
+                      'Bidirectional sync of existing CRM Products and EXP ERP Items. Runs in the background.',
                     )
                   }}
                 </div>
@@ -215,7 +215,7 @@
                 <div class="text-p-sm text-ink-gray-5 truncate">
                   {{
                     __(
-                      'Create customer in ERPNext when the deal status is changed',
+                      'Create customer in EXP ERP when the deal status is changed',
                     )
                   }}
                 </div>
@@ -243,7 +243,7 @@
                   <div class="text-p-sm text-ink-gray-5">
                     {{
                       __(
-                        'Select the deal status to trigger the auto customer creation in ERPNext',
+                        'Select the deal status to trigger the auto customer creation in EXP ERP',
                       )
                     }}
                   </div>
@@ -271,12 +271,12 @@
             <ERPNextIcon class="size-7.5 text-ink-gray-5" />
             <div class="flex flex-col items-center gap-1.5 text-center">
               <span class="text-lg font-medium text-ink-gray-8">
-                {{ __('Connect ERPNext to EXP CRM') }}
+                {{ __('Connect EXP ERP to EXP CRM') }}
               </span>
               <span class="text-center text-p-base text-ink-gray-6">
                 {{
                   __(
-                    'Enable the integration to create quotations and auto create customers in ERPNext.',
+                    'Enable the integration to create quotations and auto create customers in EXP ERP.',
                   )
                 }}
               </span>
@@ -431,7 +431,7 @@ const saveSettings = async () => {
 const toggleEnable = (value) => {
   if (value) {
     $dialog({
-      title: __('Disable ERPNext Integration'),
+      title: __('Disable EXP ERP Integration'),
       message: __(
         'Create quotation button on deal page and auto customer creation on deal status change will be disabled. Are you sure?',
       ),
