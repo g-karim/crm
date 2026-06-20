@@ -8,6 +8,8 @@ from frappe.translate import get_messages_for_boot, get_translated_doctypes
 from frappe.utils import cint, get_system_timezone
 from frappe.utils.telemetry import capture
 
+from crm.branding import APP_NAME, APP_ROUTE
+
 no_cache = 1
 
 
@@ -15,7 +17,7 @@ def get_context():
 	from crm.api import check_app_permission
 
 	if not check_app_permission():
-		frappe.throw(_("You do not have permission to access EXP CRM"), frappe.PermissionError)
+		frappe.throw(_("You do not have permission to access {0}").format(APP_NAME), frappe.PermissionError)
 
 	frappe.db.commit()
 	context = frappe._dict()
@@ -58,4 +60,4 @@ def get_boot():
 
 
 def get_default_route():
-	return "/crm"
+	return APP_ROUTE

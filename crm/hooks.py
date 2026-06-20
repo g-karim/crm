@@ -1,12 +1,15 @@
+from crm.branding import APP_LOGO_URL, APP_NAME, APP_ROUTE
+
+
 app_name = "crm"
-app_title = "EXP CRM"
+app_title = APP_NAME
 app_publisher = "EXP VERSE"
-app_description = "EXP CRM"
+app_description = APP_NAME
 app_email = "shariq@frappe.io"
 app_license = "AGPLv3"
-app_icon_url = "/assets/crm/images/crm_logo.png"
-app_icon_title = "EXP CRM"
-app_icon_route = "/crm"
+app_icon_url = APP_LOGO_URL
+app_icon_title = APP_NAME
+app_icon_route = APP_ROUTE
 
 # Apps
 # ------------------
@@ -15,9 +18,9 @@ app_icon_route = "/crm"
 add_to_apps_screen = [
 	{
 		"name": "crm",
-		"logo": "/assets/crm/images/crm_logo.png",
-		"title": "EXP CRM",
-		"route": "/crm",
+		"logo": APP_LOGO_URL,
+		"title": APP_NAME,
+		"route": APP_ROUTE,
 		"has_permission": "crm.api.check_app_permission",
 	}
 ]
@@ -301,6 +304,7 @@ ignore_links_on_delete = ["Failed Lead Sync Log"]
 
 after_migrate = [
 	"crm.fcrm.doctype.fcrm_settings.fcrm_settings.after_migrate",
+	"crm.branding.ensure_crm_branding_defaults",
 	"crm.api.whatsapp.add_roles",
 ]
 
