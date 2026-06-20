@@ -2,16 +2,16 @@
 	"private": true,
 	"type": "module",
 	"name": "crm",
-	"description": "Frappe CRM helps you work, not slow you down. Open-source, intuitive, and free from extra costs.",
+	"description": "EXP CRM fork with custom branding, localized pipeline management, and CRM workflow enhancements.",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/frappe/crm.git"
+		"url": "git+https://github.com/exp-verse/crm.git"
 	},
-	"homepage": "https://frappe.io/crm",
-	"author": "Frappe Technologies Pvt. Ltd.",
+	"homepage": "https://expverse.ru",
+	"author": "EXP VERSE",
 	"license": "GPL-3.0",
 	"bugs": {
-		"url": "https://github.com/frappe/crm/issues"
+		"url": "https://github.com/exp-verse/crm/issues"
 	},
 	"scripts": {
 		"postinstall": "cd frontend && yarn install --check-files",

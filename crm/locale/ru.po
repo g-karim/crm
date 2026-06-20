@@ -5749,7 +5749,7 @@ msgstr ""
 #. Label of the mobile_no (Data) field in DocType 'CRM Deal'
 #: crm/fcrm/doctype/crm_deal/crm_deal.json
 msgid "Primary mobile no"
-msgstr ""
+msgstr "Основной мобильный"
 
 #. Label of the phone (Data) field in DocType 'CRM Deal'
 #: crm/fcrm/doctype/crm_deal/crm_deal.json
@@ -8645,4 +8645,3 @@ msgstr "⚠️ Данные для родительского поля не на
 #: frontend/src/data/script.js:257
 msgid "⚠️ No row found for idx: {0} in parent field: {1}"
 msgstr "⚠️ Не найдена строка для idx: {0} в родительском поле: {1}"
-

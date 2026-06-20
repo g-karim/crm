@@ -559,9 +559,11 @@ const pipelines = computed(() => settings.data?.pipelines || [])
 const stages = computed(() => settings.data?.stages || [])
 const dealCounts = computed(() => settings.data?.deal_counts || {})
 const activeDealCounts = computed(() => settings.data?.active_deal_counts || {})
+const stageDealCounts = computed(() => settings.data?.stage_deal_counts || {})
 const canForceArchivePipeline = computed(
   () => settings.data?.can_force_archive || false,
 )
+const ACTIVE_DEAL_STAGE_TYPES = new Set(['Open', 'Ongoing', 'On Hold'])
 
 const dealFields = createResource({
   url: 'crm.api.doc.get_fields',
@@ -812,27 +814,38 @@ async function saveStages() {
 
   savingStages.value = true
   try {
-    for (const stage of stageDrafts.value) {
+    const savedStages = []
+    for (const [index, stage] of stageDrafts.value.entries()) {
       if (!stage.deal_status?.trim()) {
         throw new Error(__('Stage name is required'))
       }
-      await call('crm.api.sales_pipeline.save_stage', {
+      const savedStage = await call('crm.api.sales_pipeline.save_stage', {
         stage: normalizeStage({
           ...stage,
           pipeline: selectedPipelineName.value,
         }),
       })
+      savedStages.push({ ...savedStage, _index: index })
     }
 
-    const savedStageNames = stageDrafts.value
-      .filter((stage) => stage.name)
-      .map((stage) => stage.name)
+    const savedStageNames = savedStages.map((stage) => stage.name)
     if (savedStageNames.length) {
       await call('crm.api.sales_pipeline.reorder_stages', {
         pipeline: selectedPipelineName.value,
         names: savedStageNames,
       })
     }
+
+    stageDrafts.value = stageDrafts.value.map((stage, index) => {
+      const saved = savedStages.find((item) => item._index === index)
+      if (!saved) return stage
+
+      const { _index, ...cleanSavedStage } = saved
+      return {
+        ...stage,
+        ...cleanSavedStage,
+      }
+    })
 
     await settings.reload()
     dealStatuses.reload()
@@ -851,27 +864,48 @@ function openStageArchiveDialog(stage) {
   }
 
   const restoring = Boolean(stage.archived)
+  const isActiveType = ACTIVE_DEAL_STAGE_TYPES.has(stage.type)
+  const activeDeals = isActiveType ? stageDealCounts.value[stage.name] || 0 : 0
+
+  if (!restoring && isActiveType && activeDeals && !canForceArchivePipeline.value) {
+    const message = __(
+      'This stage has {0} active deals. Move them to Won/Lost stages or another stage before archiving.',
+      [activeDeals],
+    )
+    errorMessage.value = message
+    toast.error(message)
+    return
+  }
+
   confirmDialog.value = {
     show: true,
     title: restoring ? __('Restore Stage') : __('Archive Stage'),
     message: restoring
       ? __('This stage will appear in the pipeline kanban again.')
-      : __(
-          'This stage will be hidden from active kanban columns and status dropdowns. Existing deals will stay in the system and keep their current stage.',
-        ),
+      : isActiveType && activeDeals
+        ? __(
+            'This stage has {0} active deals. Force archive will hide it from active kanban columns and status dropdowns. Existing deals will keep their current stage. Continue?',
+            [activeDeals],
+          )
+        : __(
+            'This stage will be hidden from active kanban columns and status dropdowns. Existing deals will stay in the system and keep their current stage.',
+          ),
     onConfirm: async () => {
       confirmDialog.value.show = false
-      await archiveStage(stage)
+      await archiveStage(stage, {
+        force: Boolean(!restoring && isActiveType && activeDeals && canForceArchivePipeline.value),
+      })
     },
   }
 }
 
-async function archiveStage(stage) {
+async function archiveStage(stage, options = {}) {
   savingStages.value = true
   try {
     await call('crm.api.sales_pipeline.archive_stage', {
       name: stage.name,
       archived: stage.archived ? 0 : 1,
+      force: options.force ? 1 : 0,
     })
     await settings.reload()
     dealStatuses.reload()

@@ -228,10 +228,26 @@ def save_stage(stage: dict):
 
 
 @frappe.whitelist()
-def archive_stage(name: str, archived: bool = True):
+def archive_stage(name: str, archived: bool = True, force: bool = False):
 	check_manager_permission()
 	doc = frappe.get_doc("CRM Deal Status", name)
 	doc.archived = frappe.utils.cint(archived)
+
+	if doc.archived and doc.type in ACTIVE_DEAL_STAGE_TYPES:
+		active_deals = get_active_deal_count_for_stage(doc.name)
+		if active_deals and not frappe.utils.cint(force):
+			frappe.throw(
+				_(
+					"Stage {0} has {1} active deals. Move them to Won/Lost stages or another stage before archiving."
+				).format(frappe.bold(doc.deal_status), frappe.bold(active_deals)),
+				frappe.ValidationError,
+			)
+		if active_deals and not can_force_archive_pipeline():
+			frappe.throw(
+				_("Only System Manager or Administrator can force archive a stage with active deals."),
+				frappe.PermissionError,
+			)
+
 	doc.save()
 	return doc.as_dict()
 
@@ -299,3 +315,12 @@ def get_active_deal_counts(pipelines: list[str]):
 		group_by="pipeline",
 	)
 	return {row.pipeline: row.count for row in counts}
+
+
+def get_active_deal_count_for_stage(stage: str):
+	return frappe.db.count(
+		"CRM Deal",
+		{
+			"status": stage,
+		},
+	)

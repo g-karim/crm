@@ -87,7 +87,7 @@ export const statusesStore = defineStore('crm-statuses', () => {
       name = communicationStatuses.data?.[0]?.name
     }
     if (!name) return null
-    return communicationStatuses[name]
+    return communicationStatusesByName[name]
   }
 
   function statusOptions(
