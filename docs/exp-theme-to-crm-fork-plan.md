@@ -214,7 +214,7 @@
 - даты, месяцы, дни недели и time picker должны использовать системную локаль/формат;
 - hardcoded English нужно заменить на переводимые ключи.
 
-Где смотреть: `frontend/src/utils/staticTranslations.js`, компоненты CRM с hardcoded English, `FieldLayout/Field.vue`, `Activities.vue`, event/call/task/note modals, filters, kanban settings, sales pipeline settings.
+Где смотреть: компоненты CRM с hardcoded English, `frontend/src/translation.js`, `FieldLayout/Field.vue`, `Activities.vue`, event/call/task/note modals, filters, kanban settings, sales pipeline settings.
 
 Важно: CRM-форк должен быть переводимым сам по себе, но централизованный русский словарь остается в `exp_theme/translations.py`. Не надо возвращаться к runtime DOM-патчам ради переводов.
 
@@ -359,6 +359,8 @@
 
 ## Изменение 27. Скрытие старого ERPNext CRM
 
+Статус: ✅ Сделано. В CRM добавлен нативный helper `hide_legacy_erpnext_crm()`, install hook и patch, которые скрывают ERPNext `Desktop Icon`/`Workspace` с `CRM`, но не трогают само приложение Frappe/EXP CRM.
+
 Что было в `exp_theme`: скрывался старый ERPNext workspace/module `CRM` через `Desktop Icon`, `Workspace.is_hidden` и bootinfo-фильтр.
 
 Как сделать в форке `crm`: если мы точно хотим, чтобы при установленном Frappe CRM пользователи не видели старый ERPNext CRM, добавить idempotent patch в CRM app:
@@ -376,6 +378,8 @@
 
 ## Изменение 28. Защита пользовательского бренда
 
+Статус: ✅ Сделано. `ensure_crm_branding_defaults()` заменяет только пустые/старые Frappe/exp_theme значения и сохраняет пользовательские `brand_name`, `brand_logo`, `favicon`; поведение покрыто тестами.
+
 Что было в `exp_theme`: setup жестко записывал `brand_name`, `brand_logo`, `favicon` в `FCRM Settings`.
 
 Как сделать в форке `crm`: использовать fallback defaults и миграции, которые не перетирают пользовательские значения. Если поле пустое или равно старому дефолту Frappe, можно заменить на EXP. Если клиент уже поставил свое значение, не трогать.
@@ -385,6 +389,8 @@
 Проверка: кастомный логотип клиента переживает `bench migrate`.
 
 ## Изменение 29. Очистка старых следов exp_theme в существующих БД
+
+Статус: ✅ Сделано. Добавлен идемпотентный cleanup patch, который прогоняет CRM branding defaults, dropdown defaults, скрытие legacy ERPNext CRM и cache clear. Актуальный общий словарь переводов остается в `exp_theme`, поэтому пользовательские/централизованные переводы не удаляются.
 
 Что было в `exp_theme`: в БД могли остаться старые `Translation`, `FCRM Settings`, `Desktop Icon`, `CRM Dropdown Item`.
 
@@ -402,6 +408,8 @@
 Проверка: повторный запуск patch ничего не ломает.
 
 ## Изменение 30. Отказ от MutationObserver-патчей
+
+Статус: ✅ Сделано. CRM больше не подключает `staticTranslations.js` с `MutationObserver`; runtime DOM-патч из `exp_theme` не переносится. Оставшиеся переводы должны идти через `__()` и стандартный `Translation`.
 
 Что было в `exp_theme`: `crm_bootstrap.js` постоянно наблюдал DOM и повторно применял патчи.
 
