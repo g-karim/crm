@@ -16,6 +16,8 @@
 
 ## Изменение 1. Название приложения CRM
 
+Статус: ✅ Сделано в `339ed8c8 feat: centralize EXP CRM branding defaults`.
+
 Что было в `exp_theme`: `crm_bootstrap.js` принудительно ставил `document.title = "EXP CRM"` и заменял видимый текст `Frappe CRM` на `EXP CRM`.
 
 Как сделать в форке `crm`: завести единый источник бренда в самом CRM, например константы `EXP_CRM_APP_NAME = "EXP CRM"` и использовать их там, где CRM формирует title, sidebar, about modal, invitation email и fallback brand.
@@ -27,6 +29,8 @@
 Проверка: при загрузке `/crm` нигде не появляется `Frappe CRM`, включая title вкладки браузера, sidebar и about modal.
 
 ## Изменение 2. Favicon и apple-touch-icon CRM
+
+Статус: ✅ Сделано в `339ed8c8 feat: centralize EXP CRM branding defaults`.
 
 Что было в `exp_theme`: `crm_bootstrap.js` после загрузки страницы заменял `link[rel="icon"]`, `shortcut icon` и `apple-touch-icon` на `/assets/exp_theme/img/exp-favicon.png`.
 
@@ -40,6 +44,8 @@
 
 ## Изменение 3. Логотип CRM
 
+Статус: ✅ Сделано в `339ed8c8 feat: centralize EXP CRM branding defaults`.
+
 Что было в `exp_theme`: картинки из `/assets/crm/manifest/` и `/assets/crm/images/` на лету заменялись на EXP favicon.
 
 Как сделать в форке `crm`: заменить дефолтный `CRMLogo` и fallback brand logo внутри CRM. При этом `FCRM Settings.brand_logo` должен иметь приоритет, чтобы клиент мог поставить свой логотип.
@@ -51,6 +57,8 @@
 Проверка: новый сайт без кастомного бренда показывает EXP CRM логотип; сайт с кастомным `brand_logo` показывает кастомный логотип.
 
 ## Изменение 4. Desktop Icon для CRM
+
+Статус: ✅ Сделано в `339ed8c8 feat: centralize EXP CRM branding defaults`.
 
 Что было в `exp_theme`: `setup.py` менял `Desktop Icon` с именем `Frappe CRM`: label на `EXP CRM`, `app = crm`, `hidden = 0`, `icon_type = App`, `logo_url = /assets/exp_theme/img/exp-favicon.png`.
 
@@ -64,6 +72,8 @@
 
 ## Изменение 5. Dropdown menu пользователя в CRM
 
+Статус: ✅ Сделано в `28db96de feat: customize CRM dropdown menu`.
+
 Что было в `exp_theme`: из `FCRM Settings.dropdown_items` удалялись `app_selector`, `about`, `login_to_fc`; добавлялся пункт `Рабочий стол` с route `/home` и icon `home` перед `settings`.
 
 Как сделать в форке `crm`: изменить стандартные `standard_dropdown_items` в `crm/hooks.py` и добавить patch для существующих сайтов.
@@ -75,6 +85,8 @@
 Проверка: в CRM dropdown есть `Рабочий стол`, `Settings`, separator, `Log out`; нет Apps, About и Login to Frappe Cloud.
 
 ## Изменение 6. Переход на рабочий стол из CRM
+
+Статус: ✅ Сделано в `28db96de feat: customize CRM dropdown menu`.
 
 Что было в `exp_theme`: пункт `Рабочий стол` вел на `/home`.
 
@@ -88,6 +100,8 @@
 
 ## Изменение 7. Onboarding CRM
 
+Статус: ✅ Сделано в `50773d4d feat: remove CRM help sidebar entry`.
+
 Что было в `exp_theme`: `crm_bootstrap.js` писал в localStorage `isOnboardingStepsCompletedfrappecrm + user = true`.
 
 Как сделать в форке `crm`: убрать необходимость runtime localStorage-патча. Варианты: отключить onboarding компонент по умолчанию для нашего форка.
@@ -97,6 +111,8 @@
 Проверка: новый пользователь открывает `/crm` и не видит onboarding steps.
 
 ## Изменение 8. Sales hierarchy / permission banner
+
+Статус: ✅ Сделано. Sidebar больше не подключает `SalesHierarchyBanner`, а boot context больше не отдает `show_sales_hierarchy_banner`.
 
 Что было в `exp_theme`: `crm_bootstrap.js` выставлял `window.show_sales_hierarchy_banner = false`.
 
