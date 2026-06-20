@@ -7,7 +7,7 @@
             v-if="editorOpen"
             variant="ghost"
             icon-left="chevron-left"
-            :label="draft.pipeline_name || __('Sales Pipelines')"
+            :label="displayPipelineName(draft.pipeline_name) || __('Sales Pipelines')"
             size="md"
             class="-ml-4 !max-w-[34rem] !justify-start !pr-0 text-xl font-semibold hover:bg-transparent hover:opacity-70 focus:bg-transparent focus:outline-none focus:ring-0 active:bg-transparent"
             @click="goBack"
@@ -133,7 +133,7 @@
             <div class="min-w-0">
               <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <span class="truncate text-p-base font-medium text-ink-gray-8">
-                  {{ pipeline.pipeline_name }}
+                  {{ displayPipelineName(pipeline.pipeline_name) }}
                 </span>
                 <Badge
                   v-if="pipeline.is_default"
@@ -158,7 +158,7 @@
                 v-if="pipeline.description"
                 class="truncate text-p-sm text-ink-gray-5"
               >
-                {{ pipeline.description }}
+                {{ __(pipeline.description) }}
               </div>
             </div>
           </button>
@@ -631,6 +631,10 @@ watch(selectedPipelineName, syncDrafts)
 
 function getPipeline(name) {
   return pipelines.value.find((pipeline) => pipeline.name === name)
+}
+
+function displayPipelineName(name) {
+  return name ? __(name) : ''
 }
 
 function openEditor(name) {

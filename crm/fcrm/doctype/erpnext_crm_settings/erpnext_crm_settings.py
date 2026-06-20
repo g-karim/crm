@@ -130,7 +130,7 @@ class ERPNextCRMSettings(Document):
 				{
 					"fieldname": "crm_deal",
 					"fieldtype": "Data",
-					"label": "Frappe CRM Deal",
+					"label": "EXP CRM Deal",
 					"read_only": 1,
 					"insert_after": "party_name",
 				}
