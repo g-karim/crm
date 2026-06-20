@@ -5,6 +5,10 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from crm.api.sales_pipeline import archive_pipeline, duplicate_pipeline, get_pipeline_settings
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
+	get_default_deal_stage_label,
+	get_default_pipeline_label,
+)
 
 
 class TestCRMSalesPipeline(IntegrationTestCase):
@@ -98,6 +102,16 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 		).insert()
 
 		self.assertNotEqual(first.name, second.name)
+
+	def test_default_pipeline_seed_labels_follow_russian_locale(self):
+		previous_lang = frappe.db.get_default("lang")
+		try:
+			frappe.db.set_default("lang", "ru")
+			self.assertEqual(get_default_pipeline_label(), "Воронка сделок по умолчанию")
+			self.assertEqual(get_default_deal_stage_label("Qualification"), "Квалификация")
+			self.assertEqual(get_default_deal_stage_label("Won"), "Успешно")
+		finally:
+			frappe.db.set_default("lang", previous_lang or "en")
 
 	def test_default_pipeline_cannot_be_archived(self):
 		pipeline = frappe.get_doc(

@@ -10,7 +10,10 @@ from crm.branding import ensure_crm_branding_defaults
 from crm.dropdown import ensure_crm_dropdown_items
 from crm.fcrm.doctype.crm_dashboard.crm_dashboard import create_default_manager_dashboard
 from crm.fcrm.doctype.crm_products.crm_products import create_product_details_script
-from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_or_create_default_pipeline
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
+	get_default_deal_stage_label,
+	get_or_create_default_pipeline,
+)
 
 
 def before_install():
@@ -143,21 +146,33 @@ def add_default_deal_statuses():
 		},
 	}
 
-	for status in statuses:
-		existing = frappe.db.exists("CRM Deal Status", status)
+	for status, config in statuses.items():
+		stage_label = get_default_deal_stage_label(status)
+		existing = (
+			frappe.db.exists(
+				"CRM Deal Status",
+				{"deal_status": stage_label, "pipeline": default_pipeline},
+			)
+			or frappe.db.exists(
+				"CRM Deal Status",
+				{"deal_status": status, "pipeline": default_pipeline},
+			)
+			or frappe.db.exists("CRM Deal Status", stage_label)
+			or frappe.db.exists("CRM Deal Status", status)
+		)
 		if existing:
 			if not frappe.db.get_value("CRM Deal Status", existing, "pipeline"):
 				frappe.db.set_value("CRM Deal Status", existing, "pipeline", default_pipeline)
 			continue
 
 		doc = frappe.new_doc("CRM Deal Status")
-		doc.name = status
-		doc.deal_status = status
+		doc.name = stage_label
+		doc.deal_status = stage_label
 		doc.pipeline = default_pipeline
-		doc.color = statuses[status]["color"]
-		doc.type = statuses[status]["type"]
-		doc.probability = statuses[status]["probability"]
-		doc.position = statuses[status]["position"]
+		doc.color = config["color"]
+		doc.type = config["type"]
+		doc.probability = config["probability"]
+		doc.position = config["position"]
 		doc.insert()
 
 

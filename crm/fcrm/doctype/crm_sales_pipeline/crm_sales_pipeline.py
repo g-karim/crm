@@ -7,6 +7,16 @@ from frappe.model.document import Document
 
 
 DEFAULT_DEAL_PIPELINE = "Default Deal Pipeline"
+DEFAULT_DEAL_PIPELINE_RU = "Воронка сделок по умолчанию"
+DEFAULT_DEAL_STAGE_LABELS = {
+	"Qualification": "Квалификация",
+	"Demo/Making": "Демонстрация/подготовка",
+	"Proposal/Quotation": "Предложение/расчет",
+	"Negotiation": "Переговоры",
+	"Ready to Close": "Готово к закрытию",
+	"Won": "Успешно",
+	"Lost": "Проиграно",
+}
 
 
 class CRMSalesPipeline(Document):
@@ -134,7 +144,10 @@ def get_default_pipeline() -> str:
 
 
 def get_or_create_default_pipeline() -> str:
-	pipeline = frappe.db.exists("CRM Sales Pipeline", DEFAULT_DEAL_PIPELINE)
+	pipeline_label = get_default_pipeline_label()
+	pipeline = frappe.db.exists("CRM Sales Pipeline", pipeline_label) or frappe.db.exists(
+		"CRM Sales Pipeline", DEFAULT_DEAL_PIPELINE
+	)
 	if pipeline:
 		frappe.db.set_value(
 			"CRM Sales Pipeline",
@@ -157,13 +170,28 @@ def get_or_create_default_pipeline() -> str:
 		return pipeline
 
 	doc = frappe.new_doc("CRM Sales Pipeline")
-	doc.pipeline_name = DEFAULT_DEAL_PIPELINE
+	doc.pipeline_name = pipeline_label
 	doc.enabled = 1
 	doc.is_default = 1
 	doc.position = 1
 	doc.color = "gray"
 	doc.insert(ignore_permissions=True)
 	return doc.name
+
+
+def get_default_pipeline_label() -> str:
+	return DEFAULT_DEAL_PIPELINE_RU if is_russian_site() else DEFAULT_DEAL_PIPELINE
+
+
+def get_default_deal_stage_label(label: str) -> str:
+	if is_russian_site():
+		return DEFAULT_DEAL_STAGE_LABELS.get(label, label)
+	return label
+
+
+def is_russian_site() -> bool:
+	lang = frappe.db.get_default("lang") or getattr(frappe.local, "lang", "") or ""
+	return lang.lower().startswith("ru")
 
 
 def get_default_deal_status(pipeline: str | None = None) -> str | None:

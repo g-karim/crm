@@ -410,7 +410,7 @@ function getOperators() {
 function filterOperatorLabel(label) {
   const key = `Filter Operator ${label}`
   const translated = __(key)
-  return translated === key ? label : translated
+  return translated === key ? __(label) : translated
 }
 
 function getDefaultValue(field) {

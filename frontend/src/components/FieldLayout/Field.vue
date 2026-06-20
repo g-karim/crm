@@ -571,7 +571,7 @@ const getPlaceholder = (field) => {
   }
 
   if (field.fieldtype === 'Select') {
-    return __('Select {0}', [__(field.label)])
+    return __('Select {0}...', [__(field.label)])
   }
 
   return __('Enter {0}', [__(field.label)])

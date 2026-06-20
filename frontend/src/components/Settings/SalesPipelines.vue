@@ -314,7 +314,7 @@
                 :key="field.fieldname"
                 class="flex max-w-full items-center gap-1 rounded bg-surface-gray-2 py-1 pl-2 pr-1 text-p-sm text-ink-gray-7"
               >
-                <span class="truncate">{{ field.label }}</span>
+                <span class="truncate">{{ __(field.label) }}</span>
                 <Button
                   icon="x"
                   variant="ghost"
@@ -341,7 +341,7 @@
                 <div class="flex min-w-0 flex-col gap-0.5 text-ink-gray-9">
                   <div class="truncate">{{ option.label }}</div>
                   <div class="truncate text-sm text-ink-gray-4">
-                    {{ `${option.fieldname} - ${option.fieldtype}` }}
+                    {{ `${option.fieldname} - ${__(option.fieldtype)}` }}
                   </div>
                 </div>
               </template>
