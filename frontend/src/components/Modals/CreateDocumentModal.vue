@@ -27,7 +27,7 @@
         </div>
         <div v-if="tabs.data">
           <FieldLayout :tabs="tabs.data" :data="_data.doc" :doctype="doctype" />
-          <ErrorMessage class="mt-2" :message="error" />
+          <ErrorMessage class="mt-2" :message="__(error)" />
         </div>
       </div>
       <div class="px-4 pb-7 pt-4 sm:px-6">
@@ -81,7 +81,7 @@ const dialogOptions = computed(() => {
     doctype = doctype.replace(/^(CRM |FCRM )/, '')
   }
 
-  let title = __('New {0}', [doctype])
+  let title = __('New {0}', [__(doctype)])
   let size = 'xl'
   let actions = [
     {

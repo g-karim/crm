@@ -689,17 +689,17 @@ function update_activities_details(activity) {
   activity.to = ''
 
   if (activity.activity_type == 'creation') {
-    activity.type = activity.data
+    activity.type = __(activity.data)
   } else if (activity.activity_type == 'added') {
-    activity.type = 'added'
-    activity.value = 'as'
+    activity.type = __('added')
+    activity.value = __('as')
   } else if (activity.activity_type == 'removed') {
-    activity.type = 'removed'
-    activity.value = 'value'
+    activity.type = __('removed')
+    activity.value = __('value')
   } else if (activity.activity_type == 'changed') {
-    activity.type = 'changed'
-    activity.value = 'from'
-    activity.to = 'to'
+    activity.type = __('changed')
+    activity.value = __('from')
+    activity.to = __('to')
   }
 }
 
@@ -729,7 +729,7 @@ const emptyText = computed(() => {
   } else if (title.value == 'WhatsApp') {
     text = 'No WhatsApp Messages Found'
   }
-  return text
+  return __(text)
 })
 
 const emptyTextDescription = computed(() => {
@@ -755,7 +755,7 @@ const emptyTextDescription = computed(() => {
   } else if (title.value == 'WhatsApp') {
     description = 'Start a conversation now!'
   }
-  return description
+  return __(description)
 })
 
 const emptyTextIcon = computed(() => {

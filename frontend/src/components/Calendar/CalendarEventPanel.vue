@@ -497,7 +497,7 @@
     </div>
 
     <div v-if="mode != 'details'" class="px-4.5 py-3">
-      <ErrorMessage class="my-2" :message="error" />
+      <ErrorMessage class="my-2" :message="__(error)" />
       <div class="w-full">
         <Button
           variant="solid"

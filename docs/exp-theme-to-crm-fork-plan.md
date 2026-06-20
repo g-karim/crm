@@ -200,6 +200,8 @@
 
 ## Изменение 15. Русские переводы CRM
 
+Статус: ✅ Сделано. CRM-код в основных сценариях 15-20 теперь пропускает строки через `__()`, а русские формулировки добавлены в общий словарь `exp_theme/translations.py`.
+
 Что было в `exp_theme`: переводы для CRM добавлялись в общий словарь `exp_theme/translations.py`, а затем записывались в `tabTranslation` стандартным setup-кодом `exp_theme`.
 
 Как сделать правильно: оставить русские переводы CRM в `exp_theme/translations.py`. Для нас `exp_theme` является обязательным общим языковым слоем, поэтому удобно, чтобы один словарь закрывал CRM, ERPNext, Desk и общие UI-строки.
@@ -220,6 +222,8 @@
 
 ## Изменение 16. Empty states вкладок сделки
 
+Статус: ✅ Сделано. Empty state заголовки и описания вкладок активности теперь возвращаются через `__()`.
+
 Что было в `exp_theme`: переводились строки вроде `No Emails Found`, `No Comments Found`, `No Call History`, `No Tasks Found`, `No Attachments Found`.
 
 Как сделать в форке `crm`: в компонентах empty state передавать `emptyText` и `emptyTextDescription` через `__()`, а русские формулировки держать в общем словаре `exp_theme/translations.py`.
@@ -229,6 +233,8 @@
 Проверка: вкладки Письма, Комментарии, Звонки, Задачи, Вложения полностью на русском.
 
 ## Изменение 17. Текст активности сделки
+
+Статус: ✅ Сделано. Действия timeline вроде `created this deal`, `added`, `removed`, `changed`, `from/to/as/value` теперь переводятся в CRM перед отображением.
 
 Что было в `exp_theme`: переводились куски вроде `created this deal`.
 
@@ -240,6 +246,8 @@
 
 ## Изменение 18. Модалка события
 
+Статус: ✅ Сделано. Event modal и event side panel используют переводимые labels/placeholders/options, 24-часовой time picker уже включен, недостающие ключи добавлены в общий словарь `exp_theme`.
+
 Что было в `exp_theme`: переводились `Create an Event`, `Add Attendee`, `Private or Public`, `Add Location`, `Add Description`, `Add Notification`, цвета, `Today`, месяцы/дни недели, варианты уведомлений.
 
 Как сделать в форке `crm`: все labels/placeholders/options в Event modal пропускать через `__()`. Даты форматировать системным форматом. Time picker использовать в 24-часовом режиме для русского интерфейса.
@@ -250,6 +258,8 @@
 
 ## Изменение 19. Модалка звонка
 
+Статус: ✅ Сделано. Quick Entry FieldLayout переводит labels, descriptions и select-options, поэтому `CRM Call Log` показывает переводимые `From Number`, `To Number`, статусы и типы звонка.
+
 Что было в `exp_theme`: переводились `Create Call Log`, `From Number`, `To Number`, статусы звонка и типы `Incoming/Outgoing`.
 
 Как сделать в форке `crm`: labels/options CRM Call Log должны проходить через `__()`. Если options приходят из DocType, убедиться, что для них есть ключи в общем словаре `exp_theme/translations.py`.
@@ -259,6 +269,8 @@
 Проверка: создание записи звонка полностью на русском.
 
 ## Изменение 20. Модалки задачи и заметки
+
+Статус: ✅ Сделано. Generic Doctype modal строит переводимые заголовки, FieldLayout переводит options, а task status/priority dropdown labels теперь проходят через `__()`.
 
 Что было в `exp_theme`: переводились `Create Task`, `Create Note`, `Open Deal`, приоритеты `Low/Medium/High`, статусы `Backlog/Todo/In Progress/Done/Canceled`.
 
