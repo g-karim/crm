@@ -1,4 +1,5 @@
 from crm.branding import APP_LOGO_URL, APP_NAME, APP_ROUTE
+from crm.dropdown import STANDARD_DROPDOWN_ITEMS
 
 
 app_name = "crm"
@@ -305,52 +306,8 @@ ignore_links_on_delete = ["Failed Lead Sync Log"]
 after_migrate = [
 	"crm.fcrm.doctype.fcrm_settings.fcrm_settings.after_migrate",
 	"crm.branding.ensure_crm_branding_defaults",
+	"crm.dropdown.ensure_crm_dropdown_items",
 	"crm.api.whatsapp.add_roles",
 ]
 
-standard_dropdown_items = [
-	{
-		"name1": "app_selector",
-		"label": "Apps",
-		"type": "Route",
-		"route": "#",
-		"is_standard": 1,
-	},
-	{
-		"name1": "settings",
-		"label": "Settings",
-		"type": "Route",
-		"icon": "settings",
-		"route": "#",
-		"is_standard": 1,
-	},
-	{
-		"name1": "login_to_fc",
-		"label": "Login to Frappe Cloud",
-		"type": "Route",
-		"route": "#",
-		"is_standard": 1,
-	},
-	{
-		"name1": "about",
-		"label": "About",
-		"type": "Route",
-		"icon": "info",
-		"route": "#",
-		"is_standard": 1,
-	},
-	{
-		"name1": "separator",
-		"label": "",
-		"type": "Separator",
-		"is_standard": 1,
-	},
-	{
-		"name1": "logout",
-		"label": "Log out",
-		"type": "Route",
-		"icon": "log-out",
-		"route": "#",
-		"is_standard": 1,
-	},
-]
+standard_dropdown_items = STANDARD_DROPDOWN_ITEMS
