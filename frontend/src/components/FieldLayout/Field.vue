@@ -583,9 +583,16 @@ const getDescription = (field) => {
 
 function isGeneratedPlaceholder(field) {
   if (!field.placeholder || !field.label) return false
-  return ['Add', 'Select'].some(
-    (prefix) => field.placeholder === `${prefix} ${field.label}...`,
-  )
+
+  const label = field.label
+  const translatedLabel = __(field.label)
+  const placeholders = ['Add', 'Select'].flatMap((prefix) => [
+    `${prefix} ${label}...`,
+    __(`${prefix} {0}...`, [label]),
+    __(`${prefix} {0}...`, [translatedLabel]),
+  ])
+
+  return placeholders.includes(field.placeholder)
 }
 
 const getOptions = (options) => {
