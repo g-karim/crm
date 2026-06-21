@@ -1,7 +1,7 @@
 <template>
   <div class="flex h-full flex-col gap-6 py-8 px-6 text-ink-gray-8">
-    <div class="flex justify-between px-2 text-ink-gray-8">
-      <div class="flex flex-col gap-1">
+    <div class="flex justify-between gap-4 px-2 text-ink-gray-8">
+      <div class="flex min-w-0 flex-col gap-1">
         <h2 class="flex gap-2 text-xl font-semibold leading-none h-5">
           {{ __('System Defaults') }}
         </h2>
@@ -24,10 +24,10 @@
       </div>
     </div>
 
-    <div class="flex-1 flex flex-col overflow-y-auto">
+    <div class="flex-1 flex flex-col overflow-y-auto overflow-x-hidden">
       <div class="flex items-center justify-between gap-4 py-3 px-2">
-        <div class="flex flex-col">
-          <div class="text-p-base font-medium text-ink-gray-7 truncate">
+        <div class="flex min-w-0 flex-col">
+          <div class="text-p-base font-medium text-ink-gray-7">
             {{ __('Currency') }}
           </div>
           <div class="text-p-sm text-ink-gray-5">
@@ -47,8 +47,8 @@
         </div>
       </div>
       <div class="flex items-center justify-between gap-4 py-3 px-2">
-        <div class="flex flex-col">
-          <div class="text-p-base font-medium text-ink-gray-7 truncate">
+        <div class="flex min-w-0 flex-col">
+          <div class="text-p-base font-medium text-ink-gray-7">
             {{ __('Currency Precision') }}
           </div>
           <div class="text-p-sm text-ink-gray-5">
@@ -66,8 +66,8 @@
       </div>
       <div class="h-px border-t mx-2 border-outline-gray-modals" />
       <div class="flex items-center justify-between gap-4 py-3 px-2">
-        <div class="flex flex-col">
-          <div class="text-p-base font-medium text-ink-gray-7 truncate">
+        <div class="flex min-w-0 flex-col">
+          <div class="text-p-base font-medium text-ink-gray-7">
             {{ __('Number Format') }}
           </div>
           <div class="text-p-sm text-ink-gray-5">
@@ -87,8 +87,8 @@
         </div>
       </div>
       <div class="flex items-center justify-between gap-4 py-3 px-2">
-        <div class="flex flex-col">
-          <div class="text-p-base font-medium text-ink-gray-7 truncate">
+        <div class="flex min-w-0 flex-col">
+          <div class="text-p-base font-medium text-ink-gray-7">
             {{ __('Float Precision') }}
           </div>
           <div class="text-p-sm text-ink-gray-5">
@@ -106,8 +106,8 @@
       </div>
       <div class="h-px border-t mx-2 border-outline-gray-modals" />
       <div class="flex items-center justify-between gap-4 py-3 px-2">
-        <div class="flex flex-col">
-          <div class="text-p-base font-medium text-ink-gray-7 truncate">
+        <div class="flex min-w-0 flex-col">
+          <div class="text-p-base font-medium text-ink-gray-7">
             {{ __('Date Format') }}
           </div>
           <div class="text-p-sm text-ink-gray-5">
@@ -123,8 +123,8 @@
         </div>
       </div>
       <div class="flex items-center justify-between gap-4 py-3 px-2">
-        <div class="flex flex-col">
-          <div class="text-p-base font-medium text-ink-gray-7 truncate">
+        <div class="flex min-w-0 flex-col">
+          <div class="text-p-base font-medium text-ink-gray-7">
             {{ __('Time Format') }}
           </div>
           <div class="text-p-sm text-ink-gray-5">
@@ -163,6 +163,15 @@ const isDirty = computed(() => {
 function updateSettings() {
   settings.save.submit(null, {
     onSuccess: () => {
+      window.sysdefaults = {
+        ...(window.sysdefaults || {}),
+        currency: settings.doc.currency,
+        currency_precision: settings.doc.currency_precision,
+        number_format: settings.doc.number_format,
+        float_precision: settings.doc.float_precision,
+        date_format: settings.doc.date_format,
+        time_format: settings.doc.time_format,
+      }
       toast.success(__('Settings updated successfully'))
     },
     onError(error) {

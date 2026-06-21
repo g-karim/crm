@@ -25,7 +25,7 @@
             class="w-max"
             icon-right="refresh-cw"
             :disabled="props.itemIndex > 2"
-            :label="conjunction"
+            :label="__(conjunction)"
             @click="toggleConjunction"
           />
         </div>
@@ -242,7 +242,7 @@ function getValueControl() {
     return h(FormControl, {
       type: 'select',
       options: _options.map((o) => ({
-        label: o,
+        label: __(o),
         value: o,
       })),
     })

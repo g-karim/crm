@@ -335,7 +335,7 @@
             class="w-full"
             variant="outline"
             :modelValue="_event.fromTime"
-            :use12Hour="false"
+            :use12Hour="use12HourTime"
             :placeholder="__('Start Time')"
             @update:modelValue="(time) => updateTime(time, true)"
           />
@@ -344,7 +344,7 @@
             variant="outline"
             :modelValue="_event.toTime"
             :options="toOptions"
-            :use12Hour="false"
+            :use12Hour="use12HourTime"
             :placeholder="__('End Time')"
             placement="bottom-end"
             @update:modelValue="(time) => updateTime(time)"
@@ -619,6 +619,10 @@ const _event = ref({})
 
 const readonly = computed(() => _event.value?.owner?.value !== user)
 const dateDisplayFormat = computed(() => getFormat('', '', true, false, false))
+const use12HourTime = computed(() => {
+  const timeFormat = window.sysdefaults?.time_format || 'HH:mm:ss'
+  return /h|a/i.test(timeFormat) && !timeFormat.includes('HH')
+})
 
 const peoples = computed({
   get() {
@@ -917,13 +921,13 @@ function showDiscardChangesModal(action) {
     ),
     actions: [
       {
-        label: __('Cancel'),
+        label: __('Return to Editing'),
         onClick: (close) => {
           close()
         },
       },
       {
-        label: __('Discard'),
+        label: __('Discard Changes'),
         variant: 'solid',
         onClick: (close) => {
           action()

@@ -103,13 +103,13 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 
 		self.assertNotEqual(first.name, second.name)
 
-	def test_default_pipeline_seed_labels_follow_russian_locale(self):
+	def test_default_pipeline_seed_labels_stay_canonical(self):
 		previous_lang = frappe.db.get_default("lang")
 		try:
 			frappe.db.set_default("lang", "ru")
-			self.assertEqual(get_default_pipeline_label(), "Воронка сделок по умолчанию")
-			self.assertEqual(get_default_deal_stage_label("Qualification"), "Квалификация")
-			self.assertEqual(get_default_deal_stage_label("Won"), "Успешно")
+			self.assertEqual(get_default_pipeline_label(), "Default Deal Pipeline")
+			self.assertEqual(get_default_deal_stage_label("Qualification"), "Qualification")
+			self.assertEqual(get_default_deal_stage_label("Won"), "Won")
 		finally:
 			frappe.db.set_default("lang", previous_lang or "en")
 
@@ -275,9 +275,9 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 				"pipeline_name": f"Duplicate Source {frappe.generate_hash(length=8)}",
 				"enabled": 1,
 				"position": 199,
-				"warn_on_stage_skip": 1,
-				"warn_on_stage_backwards": 1,
-				"warn_on_closing_without_required_fields": 1,
+				"stage_skip_rule": "Warn",
+				"stage_backwards_rule": "Block",
+				"closing_fields_rule": "Warn",
 				"required_fields_before_closing": "contact, expected_closure_date",
 			}
 		).insert()
@@ -314,9 +314,9 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 		self.assertEqual(len(duplicate_stages), 1)
 		self.assertEqual(duplicate_stages[0].deal_status, active_stage.deal_status)
 		self.assertFalse(duplicate_stages[0].archived)
-		self.assertTrue(duplicate.warn_on_stage_skip)
-		self.assertTrue(duplicate.warn_on_stage_backwards)
-		self.assertTrue(duplicate.warn_on_closing_without_required_fields)
+		self.assertEqual(duplicate.stage_skip_rule, "Warn")
+		self.assertEqual(duplicate.stage_backwards_rule, "Block")
+		self.assertEqual(duplicate.closing_fields_rule, "Warn")
 		self.assertEqual(duplicate.required_fields_before_closing, "contact, expected_closure_date")
 
 

@@ -224,6 +224,7 @@
                 v-model="notification.time"
                 class="w-32 shrink-0"
                 :placeholder="__('08:00 pm')"
+                :use12Hour="use12HourTime"
               />
               <Button
                 icon="x"
@@ -272,6 +273,11 @@ const notifications = computed({
 const allDayNotifications = computed({
   get: () => settings.doc.all_day_event_notifications || [],
   set: (val) => (settings.doc.all_day_event_notifications = val),
+})
+
+const use12HourTime = computed(() => {
+  const timeFormat = window.sysdefaults?.time_format || 'HH:mm:ss'
+  return /h|a/i.test(timeFormat) && !timeFormat.includes('HH')
 })
 
 function updateSettings() {

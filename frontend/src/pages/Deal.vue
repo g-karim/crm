@@ -371,7 +371,6 @@ import {
   openWebsite,
   setupCustomizations,
   copyToClipboard,
-  isTranslatable,
 } from '@/utils'
 import { getView } from '@/utils/view'
 import { getSettings } from '@/stores/settings'
@@ -836,8 +835,7 @@ function openEmailBox() {
 
 function statusLabel(status) {
   let label = getDealStatus(status)?.deal_status || status
-  if (isTranslatable('CRM Deal Status')) return __(label)
-  return label
+  return __(label)
 }
 
 const showLostReasonModal = ref(false)

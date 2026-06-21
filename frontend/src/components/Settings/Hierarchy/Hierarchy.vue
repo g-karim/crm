@@ -6,14 +6,6 @@
           <h2 class="flex text-xl font-semibold leading-none h-5">
             {{ __('Sales Hierarchy') }}
           </h2>
-          <Tooltip :text="__('View documentation')">
-            <a
-              href="https://docs.frappe.io/crm/settings/sales-hierarchy"
-              target="_blank"
-            >
-              <LucideCircleQuestionMark class="h-4 w-4 text-ink-gray-6" />
-            </a>
-          </Tooltip>
         </div>
         <p class="text-p-base text-ink-gray-6">
           {{
@@ -250,14 +242,12 @@ import { useDragDrop } from './useDragDrop'
 import { globalStore } from '@/stores/global'
 import { usersStore } from '@/stores/users'
 import LucideNetwork from '~icons/lucide/network'
-import LucideCircleQuestionMark from '~icons/lucide/circle-question-mark'
 import {
   Button,
   Dialog,
   FeatherIcon,
   LoadingIndicator,
   TextInput,
-  Tooltip,
   Tree,
   call,
   createDocumentResource,

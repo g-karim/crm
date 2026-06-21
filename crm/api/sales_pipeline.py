@@ -16,6 +16,9 @@ PIPELINE_FIELDS = [
 	"icon",
 	"archived",
 	"description",
+	"stage_skip_rule",
+	"stage_backwards_rule",
+	"closing_fields_rule",
 	"warn_on_stage_skip",
 	"warn_on_stage_backwards",
 	"warn_on_closing_without_required_fields",
@@ -182,6 +185,9 @@ def duplicate_pipeline(name: str, pipeline_name: str):
 	pipeline.color = source.color
 	pipeline.icon = source.icon
 	pipeline.description = source.description
+	pipeline.stage_skip_rule = source.stage_skip_rule
+	pipeline.stage_backwards_rule = source.stage_backwards_rule
+	pipeline.closing_fields_rule = source.closing_fields_rule
 	pipeline.warn_on_stage_skip = source.warn_on_stage_skip
 	pipeline.warn_on_stage_backwards = source.warn_on_stage_backwards
 	pipeline.warn_on_closing_without_required_fields = source.warn_on_closing_without_required_fields

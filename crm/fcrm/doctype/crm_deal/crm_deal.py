@@ -252,8 +252,16 @@ class CRMDeal(Document):
 		)
 
 	def emit_pipeline_rule_warnings(self):
-		warnings = self.get_pipeline_rule_warnings()
+		warnings, blocks = self.get_pipeline_rule_messages()
 		self._pipeline_rule_warnings = warnings
+		self._pipeline_rule_blocks = blocks
+
+		if blocks:
+			frappe.throw(
+				"<br>".join(blocks),
+				title=_("Pipeline Rules"),
+				exc=frappe.ValidationError,
+			)
 
 		if warnings:
 			frappe.msgprint(
@@ -265,12 +273,16 @@ class CRMDeal(Document):
 			)
 
 	def get_pipeline_rule_warnings(self) -> list[str]:
+		warnings, _blocks = self.get_pipeline_rule_messages()
+		return warnings
+
+	def get_pipeline_rule_messages(self) -> tuple[list[str], list[str]]:
 		if self.is_new() or not self.has_value_changed("status") or not self.pipeline or not self.status:
-			return []
+			return [], []
 
 		previous = self.get_doc_before_save()
 		if not previous or not previous.status or previous.status == self.status:
-			return []
+			return [], []
 
 		rules = frappe.db.get_value(
 			"CRM Sales Pipeline",
@@ -279,61 +291,81 @@ class CRMDeal(Document):
 				"warn_on_stage_skip",
 				"warn_on_stage_backwards",
 				"warn_on_closing_without_required_fields",
+				"stage_skip_rule",
+				"stage_backwards_rule",
+				"closing_fields_rule",
 				"required_fields_before_closing",
 			],
 			as_dict=True,
 		)
-		if not rules or not any(
-			[
-				rules.warn_on_stage_skip,
-				rules.warn_on_stage_backwards,
-				rules.warn_on_closing_without_required_fields,
-			]
-		):
-			return []
+		if not rules:
+			return [], []
+
+		stage_skip_rule = self.get_pipeline_rule_mode(rules, "stage_skip_rule", "warn_on_stage_skip")
+		stage_backwards_rule = self.get_pipeline_rule_mode(
+			rules, "stage_backwards_rule", "warn_on_stage_backwards"
+		)
+		closing_fields_rule = self.get_pipeline_rule_mode(
+			rules,
+			"closing_fields_rule",
+			"warn_on_closing_without_required_fields",
+		)
+
+		if all(rule == "Allow" for rule in [stage_skip_rule, stage_backwards_rule, closing_fields_rule]):
+			return [], []
 
 		stages = self.get_pipeline_stage_order()
 		stage_map = {stage.name: stage for stage in stages}
 		previous_stage = stage_map.get(previous.status)
 		current_stage = stage_map.get(self.status)
 		if not previous_stage or not current_stage:
-			return []
+			return [], []
 
 		warnings = []
+		blocks = []
 		stage_index = {stage.name: index for index, stage in enumerate(stages)}
 		previous_position = stage_index[previous_stage.name]
 		current_position = stage_index[current_stage.name]
 
-		if rules.warn_on_stage_skip and current_position > previous_position + 1:
-			warnings.append(
-				_("Deal moved from {0} to {1}, skipping intermediate stages.").format(
-					frappe.bold(previous_stage.deal_status),
-					frappe.bold(current_stage.deal_status),
-				)
+		if stage_skip_rule != "Allow" and current_position > previous_position + 1:
+			message = _("Deal moved from {0} to {1}, skipping intermediate stages.").format(
+				frappe.bold(previous_stage.deal_status),
+				frappe.bold(current_stage.deal_status),
 			)
+			self.append_pipeline_rule_message(message, stage_skip_rule, warnings, blocks)
 
-		if rules.warn_on_stage_backwards and current_position < previous_position:
-			warnings.append(
-				_("Deal moved backwards from {0} to {1}.").format(
-					frappe.bold(previous_stage.deal_status),
-					frappe.bold(current_stage.deal_status),
-				)
+		if stage_backwards_rule != "Allow" and current_position < previous_position:
+			message = _("Deal moved backwards from {0} to {1}.").format(
+				frappe.bold(previous_stage.deal_status),
+				frappe.bold(current_stage.deal_status),
 			)
+			self.append_pipeline_rule_message(message, stage_backwards_rule, warnings, blocks)
 
 		if (
-			rules.warn_on_closing_without_required_fields
+			closing_fields_rule != "Allow"
 			and current_stage.type in ["Won", "Lost"]
 			and rules.required_fields_before_closing
 		):
 			missing_fields = self.get_missing_pipeline_rule_fields(rules.required_fields_before_closing)
 			if missing_fields:
-				warnings.append(
-					_("Deal was closed without these fields: {0}.").format(
-						", ".join(frappe.bold(field) for field in missing_fields),
-					)
+				message = _("Deal was closed without these fields: {0}.").format(
+					", ".join(frappe.bold(field) for field in missing_fields),
 				)
+				self.append_pipeline_rule_message(message, closing_fields_rule, warnings, blocks)
 
-		return warnings
+		return warnings, blocks
+
+	def get_pipeline_rule_mode(self, rules, fieldname: str, legacy_fieldname: str) -> str:
+		mode = rules.get(fieldname) or ""
+		if mode in ["Allow", "Warn", "Block"]:
+			return mode
+		return "Warn" if rules.get(legacy_fieldname) else "Allow"
+
+	def append_pipeline_rule_message(self, message: str, mode: str, warnings: list[str], blocks: list[str]):
+		if mode == "Block":
+			blocks.append(message)
+		elif mode == "Warn":
+			warnings.append(message)
 
 	def get_missing_pipeline_rule_fields(self, required_fields: str) -> list[str]:
 		fieldnames = []

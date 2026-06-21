@@ -16,7 +16,7 @@
       </ShortcutTooltip>
     </template>
   </LayoutHeader>
-  <div class="flex h-screen overflow-hidden">
+  <div ref="calendarShell" class="flex h-screen overflow-hidden">
     <Calendar
       ref="calendar"
       class="flex-1 overflow-hidden"
@@ -27,6 +27,7 @@
         allowCustomClickEvents: true,
         enableShortcuts: false,
         noBorder: true,
+        timeFormat: calendarTimeFormat,
       }"
       :events="events.data"
       :onClick="showDetails"
@@ -62,7 +63,7 @@
                 <Button
                   variant="ghost"
                   class="text-lg font-medium text-ink-gray-7"
-                  :label="currentMonthYear"
+                  :label="formatCalendarMonthYear(selectedMonthDate, currentMonthYear)"
                   iconRight="chevron-down"
                   @click="togglePopover"
                 />
@@ -166,6 +167,12 @@ import { globalStore } from '@/stores/global'
 import { getSettings } from '@/stores/settings'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import {
+  formatCalendarMonthYear,
+  localizeCalendarText,
+  setupCalendarLocalization,
+  shouldLocalizeCalendar as shouldUseCalendarLocalization,
+} from '@/utils/calendarLocalization'
+import {
   Calendar,
   createListResource,
   dayjs,
@@ -175,7 +182,7 @@ import {
   call,
   toast,
 } from 'frappe-ui'
-import { onMounted, ref, computed, provide, nextTick } from 'vue'
+import { onMounted, onUnmounted, ref, computed, provide, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 const { user } = sessionStore()
@@ -194,9 +201,18 @@ const defaultMode = computed(() => {
   return modeMap[settings.value?.default_calendar_view] || 'Week'
 })
 
+const calendarTimeFormat = computed(() => {
+  let timeFormat = window.sysdefaults?.time_format || 'HH:mm:ss'
+  return /h|a/i.test(timeFormat) && !timeFormat.includes('HH') ? '12h' : '24h'
+})
+
 const calendar = ref(null)
+const calendarShell = ref(null)
+const calendarObserver = ref(null)
 const activeRangeKey = ref('')
 const currentUser = ref(user)
+
+const shouldLocalizeCalendar = computed(() => shouldUseCalendarLocalization())
 
 async function updateUser(u) {
   currentUser.value = u
@@ -452,6 +468,8 @@ onMounted(async () => {
   mode.value = ''
   showEventPanel.value = false
 
+  calendarObserver.value = setupCalendarLocalization()
+
   const { eventId, date } = route.query
   if (eventId && date) {
     await events.promise
@@ -465,6 +483,15 @@ onMounted(async () => {
     showDetails({ id: eventId })
   }
 })
+
+onUnmounted(() => {
+  calendarObserver.value?.disconnect()
+})
+
+watch(
+  () => shouldLocalizeCalendar.value,
+  () => nextTick(localizeCalendarText),
+)
 
 // Global shortcut: Cmd/Ctrl + E -> new event (when not already creating/editing)
 useKeyboardShortcuts({
@@ -558,7 +585,6 @@ function close() {
   removeTempEvents()
 }
 
-// utils
 function getFromToTime(time) {
   const pad = (v) => String(v).padStart(2, '0')
   let now = dayjs()

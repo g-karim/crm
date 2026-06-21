@@ -50,8 +50,8 @@
             !slaPolicyListResource.list.loading &&
             !slaPolicyListResource.list.data?.length
           "
-          title="No SLA Policies Found"
-          description="Add one to get started."
+          :title="__('No SLA Policies Found')"
+          :description="__('Add an SLA policy to get started.')"
           :icon="ShieldCheck"
         />
         <div v-else class="-ml-2">
@@ -79,10 +79,12 @@
                 <div class="text-base text-ink-gray-7 font-medium truncate">
                   {{ sla.name }}
                 </div>
-                <Badge v-if="sla.default" color="gray" size="sm">Default</Badge>
+                <Badge v-if="sla.default" color="gray" size="sm">
+                  {{ __('Default') }}
+                </Badge>
               </div>
               <div class="col-span-1 text-ink-gray-8 text-sm">
-                {{ sla.apply_on == 'CRM Lead' ? 'Lead' : 'Deal' }}
+                {{ getApplyOnLabel(sla.apply_on) }}
               </div>
               <div class="flex justify-between items-center w-full pr-2">
                 <div>
@@ -177,6 +179,9 @@ const duplicateDialog = ref({
 })
 
 const isConfirmingDelete = ref(false)
+
+const getApplyOnLabel = (doctype) =>
+  doctype === 'CRM Lead' ? __('Lead') : __('Deal')
 
 const dropdownOptions = (sla) => [
   {

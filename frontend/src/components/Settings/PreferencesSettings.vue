@@ -60,7 +60,11 @@
               {{ __('Change language of the application.') }}
             </span>
           </div>
-          <Link v-model="user.doc.language" doctype="Language" class="w-40" />
+          <Combobox
+            v-model="user.doc.language"
+            class="w-40"
+            :options="languageOptions"
+          />
         </div>
         <div class="flex items-center justify-between mt-6">
           <div class="flex flex-col gap-1">
@@ -86,7 +90,6 @@
 import CRMLogo from '@/components/Icons/CRMLogo.vue'
 import ThemeSwitcher from '@/components/Settings/ThemeSwitcher.vue'
 import SettingsLayoutBase from '@/components/Layouts/SettingsLayoutBase.vue'
-import Link from '@/components/Controls/Link.vue'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { getSettings } from '@/stores/settings'
 import {
@@ -104,6 +107,13 @@ const { user: sessionUser } = inject('session')
 
 const { brand } = getSettings()
 const user = createDocumentResource({ doctype: 'User', name: sessionUser })
+
+const languageOptions = [
+  { label: 'Русский', value: 'ru' },
+  { label: 'English', value: 'en' },
+  { label: 'Türkçe', value: 'tr' },
+  { label: 'العربية', value: 'ar' },
+]
 
 function save() {
   refreshRequired.value =

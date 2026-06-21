@@ -66,7 +66,7 @@
           v-model="template.subject"
           size="md"
           :label="__('Subject')"
-          :placeholder="__('Payment reminder from Frappé - (#{{ name }})')"
+          :placeholder="__('Payment reminder from EXP CRM - (#{{ name }})')"
           :required="true"
         />
       </div>
@@ -77,8 +77,11 @@
           size="md"
           :label="__('Content Type')"
           default="Rich Text"
-          :options="['Rich Text', 'HTML']"
-          :placeholder="__('Rich Text')"
+          :options="[
+            { label: __('Formatted text'), value: 'Rich Text' },
+            { label: __('HTML'), value: 'HTML' },
+          ]"
+          :placeholder="__('Formatted text')"
         />
       </div>
       <div>
@@ -93,7 +96,7 @@
           :rows="10"
           :placeholder="
             __(
-              '<p>Dear {{ lead_name }},</p>\n\n<p>This is a reminder for the payment of {{ grand_total }}.</p>\n\n<p>Thanks,</p>\n<p>Frappé</p>',
+              '<p>Hello {{ lead_name }},</p>\n\n<p>This is a payment reminder for {{ grand_total }}.</p>\n\n<p>Thanks,</p>\n<p>EXP CRM</p>',
             )
           "
         />
@@ -109,7 +112,7 @@
             :content="template.response"
             :placeholder="
               __(
-                'Dear {{ lead_name }}, \n\nThis is a reminder for the payment of {{ grand_total }}. \n\nThanks, \nFrappé',
+                'Hello {{ lead_name }}, \n\nThis is a payment reminder for {{ grand_total }}. \n\nThanks, \nEXP CRM',
               )
             "
             @change="(val) => (template.response = val)"

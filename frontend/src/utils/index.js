@@ -49,7 +49,7 @@ export function formatDuration(totalSeconds, longForm = false) {
   }
   const s = parseInt(totalSeconds, 10)
   if (isNaN(s)) return ''
-  if (s === 0) return longForm ? '0 seconds' : '0s'
+  if (s === 0) return longForm ? __('0 seconds') : '0s'
 
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
@@ -57,9 +57,9 @@ export function formatDuration(totalSeconds, longForm = false) {
 
   if (longForm) {
     const parts = []
-    if (h) parts.push(h === 1 ? '1 hour' : `${h} hours`)
-    if (m) parts.push(m === 1 ? '1 minute' : `${m} minutes`)
-    if (sec) parts.push(sec === 1 ? '1 second' : `${sec} seconds`)
+    if (h) parts.push(formatDurationPart(h, 'hour', 'hours'))
+    if (m) parts.push(formatDurationPart(m, 'minute', 'minutes'))
+    if (sec) parts.push(formatDurationPart(sec, 'second', 'seconds'))
     return parts.join(' ')
   }
 
@@ -68,6 +68,31 @@ export function formatDuration(totalSeconds, longForm = false) {
   if (m) parts.push(`${m}m`)
   if (sec) parts.push(`${sec}s`)
   return parts.join(' ')
+}
+
+function formatDurationPart(value, singular, plural) {
+  if (!usesRussianPluralRules()) {
+    const unit = value === 1 ? singular : plural
+    return __(`{0} ${unit}`, [value])
+  }
+
+  const context = getRussianPluralContext(value)
+  const unit = context === 'one' ? singular : plural
+  return __(`{0} ${unit}`, [value], context === 'one' ? null : context)
+}
+
+function usesRussianPluralRules() {
+  const lang = globalThis.frappe?.boot?.lang || globalThis.navigator?.language
+  return String(lang || '').toLowerCase().startsWith('ru')
+}
+
+function getRussianPluralContext(value) {
+  const mod10 = value % 10
+  const mod100 = value % 100
+
+  if (mod10 === 1 && mod100 !== 11) return 'one'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'few'
+  return 'many'
 }
 
 export function getFormat(

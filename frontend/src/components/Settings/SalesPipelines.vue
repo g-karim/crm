@@ -1,15 +1,15 @@
 <template>
-  <div class="flex h-full flex-col gap-6 p-6 text-ink-gray-8">
-    <div class="flex items-start justify-between px-2 pt-2">
-      <div class="flex min-w-0 flex-col gap-1">
-        <div class="flex items-center gap-2">
+  <div class="min-h-full space-y-6 p-6 text-ink-gray-8">
+    <div class="flex flex-wrap items-start justify-between gap-3 px-2 pt-2">
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <Button
             v-if="editorOpen"
             variant="ghost"
             icon-left="chevron-left"
             :label="displayPipelineName(draft.pipeline_name) || __('Sales Pipelines')"
             size="md"
-            class="-ml-4 !max-w-[34rem] !justify-start !pr-0 text-xl font-semibold hover:bg-transparent hover:opacity-70 focus:bg-transparent focus:outline-none focus:ring-0 active:bg-transparent"
+            class="-ml-4 min-w-0 !max-w-full !justify-start !pr-0 text-xl font-semibold hover:bg-transparent hover:opacity-70 focus:bg-transparent focus:outline-none focus:ring-0 active:bg-transparent"
             @click="goBack"
           />
           <h2 v-else class="flex h-5 gap-2 text-xl font-semibold leading-none">
@@ -43,13 +43,14 @@
         </p>
         <p v-else class="text-p-base text-ink-gray-6">
           {{ getStageCount(selectedPipelineName) }}
-          {{ __('stages') }}
+          {{ __('Pipeline stages count suffix') }}
           <span v-if="dealCounts[selectedPipelineName]">
-            · {{ dealCounts[selectedPipelineName] }} {{ __('deals') }}
+            · {{ dealCounts[selectedPipelineName] }}
+            {{ __('Pipeline deals count suffix') }}
           </span>
         </p>
       </div>
-      <div class="flex shrink-0 items-center justify-end gap-2">
+      <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
         <template v-if="!editorOpen">
           <div class="flex items-center gap-2">
             <Switch v-model="showArchived" size="sm" />
@@ -93,7 +94,7 @@
       <LoadingIndicator class="size-8" />
     </div>
 
-    <div v-else-if="!editorOpen" class="flex min-h-0 flex-1 flex-col px-2">
+    <div v-else-if="!editorOpen" class="flex flex-col px-2">
       <div
         v-if="!pipelines.length"
         class="flex flex-1 items-center justify-center text-p-base text-ink-gray-5"
@@ -101,7 +102,7 @@
         {{ __('No pipelines yet') }}
       </div>
 
-      <div v-else class="min-h-0 overflow-y-auto overflow-x-hidden">
+      <div v-else class="overflow-x-hidden">
         <div
           class="grid grid-cols-[minmax(260px,1fr)_80px_80px_88px] gap-3 px-3 py-2 text-p-sm font-medium text-ink-gray-5"
         >
@@ -183,93 +184,97 @@
       </div>
     </div>
 
-    <div v-else class="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden px-2">
-      <section class="grid grid-cols-[minmax(0,1fr)_18rem] gap-6">
-        <div class="grid min-w-0 grid-cols-4 gap-3">
-          <FormControl
-            v-model="draft.pipeline_name"
-            :label="__('Pipeline Name')"
-            :placeholder="__('Pipeline Name')"
-            class="col-span-2"
-            required
-          />
-          <FormControl
-            v-model="draft.position"
-            type="number"
-            :label="__('Position')"
-          />
-          <div class="flex min-w-0 flex-col gap-1.5">
-            <div class="text-base text-ink-gray-5">{{ __('Color') }}</div>
-            <Popover placement="bottom-start">
-              <template #target="{ isOpen, togglePopover }">
-                <button
-                  type="button"
-                  class="flex size-8 items-center justify-center rounded bg-surface-gray-2 hover:bg-surface-gray-3"
-                  :class="isOpen ? 'ring-2 ring-outline-gray-3' : ''"
-                  :title="getColorLabel(draft.color)"
-                  :aria-label="getColorLabel(draft.color)"
-                  @click="togglePopover"
-                >
-                  <span
-                    class="size-4 rounded-full border border-outline-gray-2"
-                    :style="{ backgroundColor: getColorValue(draft.color) }"
-                  />
-                </button>
-              </template>
-              <template #body="{ togglePopover }">
-                <div
-                  class="my-1 rounded-lg bg-surface-modal p-2 shadow-2xl ring-1 ring-black ring-opacity-5"
-                >
-                  <div class="grid grid-cols-7 gap-1.5">
-                    <button
-                      v-for="option in colorOptions"
-                      :key="option.value"
-                      type="button"
-                      class="size-5 rounded-full border transition"
-                      :class="
-                        draft.color === option.value
-                          ? 'border-ink-gray-8 shadow-sm ring-2 ring-outline-gray-3'
-                          : 'border-outline-gray-2 hover:border-ink-gray-5'
-                      "
-                      :style="{ backgroundColor: option.hex }"
-                      :title="option.label"
-                      :aria-label="option.label"
-                      @click="selectColor(draft, option.value, togglePopover)"
+    <div v-else class="space-y-5 px-2">
+      <section class="grid grid-cols-[minmax(0,1fr)_18rem] items-start gap-6">
+        <div class="flex min-w-0 flex-col gap-4">
+          <div class="grid min-w-0 grid-cols-[minmax(220px,2fr)_minmax(110px,1fr)_64px] items-start gap-3">
+            <FormControl
+              :model-value="displayPipelineName(draft.pipeline_name)"
+              :label="__('Pipeline Name')"
+              :placeholder="__('Pipeline Name')"
+              required
+              @update:model-value="(value) => (draft.pipeline_name = canonicalPipelineName(value))"
+            />
+            <FormControl
+              v-model="draft.position"
+              type="number"
+              :label="__('Position')"
+            />
+            <div class="flex min-w-0 flex-col gap-1.5">
+              <div class="text-base text-ink-gray-5">{{ __('Color') }}</div>
+              <Popover placement="bottom-start">
+                <template #target="{ isOpen, togglePopover }">
+                  <button
+                    type="button"
+                    class="flex size-8 items-center justify-center rounded bg-surface-gray-2 hover:bg-surface-gray-3"
+                    :class="isOpen ? 'ring-2 ring-outline-gray-3' : ''"
+                    :title="getColorLabel(draft.color)"
+                    :aria-label="getColorLabel(draft.color)"
+                    @click="togglePopover"
+                  >
+                    <span
+                      class="size-4 rounded-full border border-outline-gray-2"
+                      :style="{ backgroundColor: getColorValue(draft.color) }"
                     />
+                  </button>
+                </template>
+                <template #body="{ togglePopover }">
+                  <div
+                    class="my-1 rounded-lg bg-surface-modal p-2 shadow-2xl ring-1 ring-black ring-opacity-5"
+                  >
+                    <div class="grid grid-cols-7 gap-1.5">
+                      <button
+                        v-for="option in colorOptions"
+                        :key="option.value"
+                        type="button"
+                        class="size-5 rounded-full border transition"
+                        :class="
+                          draft.color === option.value
+                            ? 'border-ink-gray-8 shadow-sm ring-2 ring-outline-gray-3'
+                            : 'border-outline-gray-2 hover:border-ink-gray-5'
+                        "
+                        :style="{ backgroundColor: option.hex }"
+                        :title="option.label"
+                        :aria-label="option.label"
+                        @click="selectColor(draft, option.value, togglePopover)"
+                      />
+                    </div>
                   </div>
-                </div>
-              </template>
-            </Popover>
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <div class="text-base text-ink-gray-5">{{ __('Icon') }}</div>
-            <div class="flex gap-2">
-              <IconPicker v-slot="{ togglePopover }" v-model="draft.icon">
-                <button
-                  type="button"
-                  class="flex size-11 items-center justify-center rounded bg-surface-gray-2 text-2xl leading-none hover:bg-surface-gray-3"
-                  @click="togglePopover"
-                >
-                  <span class="block leading-none">
-                    {{ draft.icon || '+' }}
-                  </span>
-                </button>
-              </IconPicker>
-              <Button
-                v-if="draft.icon"
-                icon="x"
-                variant="subtle"
-                class="size-11"
-                @click="draft.icon = ''"
-              />
+                </template>
+              </Popover>
             </div>
           </div>
-          <FormControl
-            v-model="draft.description"
-            type="textarea"
-            :label="__('Description')"
-            class="col-span-3"
-          />
+
+          <div class="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-3">
+            <div class="flex flex-col gap-1.5">
+              <div class="text-base text-ink-gray-5">{{ __('Icon') }}</div>
+              <div class="flex gap-2">
+                <IconPicker v-slot="{ togglePopover }" v-model="draft.icon">
+                  <button
+                    type="button"
+                    class="flex size-11 items-center justify-center rounded bg-surface-gray-2 text-2xl leading-none hover:bg-surface-gray-3"
+                    @click="togglePopover"
+                  >
+                    <span class="block leading-none">
+                      {{ draft.icon || '+' }}
+                    </span>
+                  </button>
+                </IconPicker>
+                <Button
+                  v-if="draft.icon"
+                  icon="x"
+                  variant="subtle"
+                  class="size-11"
+                  @click="draft.icon = ''"
+                />
+              </div>
+            </div>
+            <FormControl
+              v-model="draft.description"
+              type="textarea"
+              :label="__('Description')"
+            />
+          </div>
         </div>
         <div
           class="flex flex-col gap-3 rounded border border-outline-gray-2 p-3"
@@ -283,26 +288,43 @@
             <Switch v-model="draft.is_default" size="sm" />
           </label>
           <div class="border-t border-outline-gray-2" />
-          <div class="text-p-sm font-medium text-ink-gray-8">
-            {{ __('Warnings') }}
-          </div>
-          <label class="flex items-center justify-between gap-2 text-p-sm">
-            <span>{{ __('Stage skipping') }}</span>
-            <Switch v-model="draft.warn_on_stage_skip" size="sm" />
-          </label>
-          <label class="flex items-center justify-between gap-2 text-p-sm">
-            <span>{{ __('Moving backwards') }}</span>
-            <Switch v-model="draft.warn_on_stage_backwards" size="sm" />
-          </label>
-          <label class="flex items-center justify-between gap-2 text-p-sm">
-            <span>{{ __('Closing fields') }}</span>
-            <Switch
-              v-model="draft.warn_on_closing_without_required_fields"
-              size="sm"
-            />
-          </label>
+                  <div class="flex items-center gap-1.5 text-p-sm font-medium text-ink-gray-8">
+                    <span>{{ __('Transition Rules') }}</span>
+                    <div class="group relative flex">
+                      <button
+                        type="button"
+                        class="flex size-5 items-center justify-center rounded-full text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+                        :aria-label="__('Transition Rules Help')"
+                      >
+                        ?
+                      </button>
+                      <div
+                        class="pointer-events-none absolute left-1/2 top-7 z-20 hidden w-72 -translate-x-1/2 rounded-lg border border-outline-gray-2 bg-surface-modal px-3 py-2 text-p-xs font-normal leading-5 text-ink-gray-8 shadow-lg group-hover:block"
+                      >
+                        {{ transitionRulesHelpText }}
+                      </div>
+                    </div>
+                  </div>
+          <FormControl
+            v-model="draft.stage_skip_rule"
+            type="select"
+            :label="__('Stage skipping')"
+            :options="ruleOptions"
+          />
+          <FormControl
+            v-model="draft.stage_backwards_rule"
+            type="select"
+            :label="__('Moving backwards')"
+            :options="ruleOptions"
+          />
+          <FormControl
+            v-model="draft.closing_fields_rule"
+            type="select"
+            :label="__('Required fields for closing deals')"
+            :options="ruleOptions"
+          />
           <div
-            v-if="draft.warn_on_closing_without_required_fields"
+            v-if="draft.closing_fields_rule !== 'Allow'"
             class="flex flex-col gap-1.5"
           >
             <div class="text-base text-ink-gray-5">
@@ -351,7 +373,7 @@
         </div>
       </section>
 
-      <section class="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <section class="flex flex-col">
         <div class="mb-3 flex items-center justify-between">
           <div>
             <h3 class="text-lg font-semibold text-ink-gray-8">
@@ -390,7 +412,7 @@
         </div>
         <div class="h-px border-t border-outline-gray-modals" />
 
-        <div class="min-h-0 overflow-y-auto">
+        <div>
           <div
             v-for="(stage, index) in stageDrafts"
             :key="stage.name || stage.local_id"
@@ -398,8 +420,9 @@
             :class="stage.archived ? 'opacity-60' : ''"
           >
             <FormControl
-              v-model="stage.deal_status"
+              :model-value="displayStageName(stage.deal_status)"
               :placeholder="__('Stage name')"
+              @update:model-value="(value) => (stage.deal_status = canonicalStageName(value))"
             />
             <FormControl
               v-model="stage.type"
@@ -522,6 +545,43 @@ const typeOptions = ['Open', 'Ongoing', 'On Hold', 'Won', 'Lost'].map(
   (type) => ({ label: __(type), value: type }),
 )
 
+const ruleOptions = ['Allow', 'Warn', 'Block'].map((mode) => ({
+  label: __(mode),
+  value: mode,
+}))
+
+const transitionRulesHelpText = __(
+  'Transition rules control what happens when a deal changes stage. Allow lets the move happen, Warn saves the deal and shows a warning, Block prevents the move. Required fields for closing deals checks selected fields before moving a deal to Won or Lost.',
+)
+
+const standardPipelineNames = ['Default Deal Pipeline']
+const standardStageNames = [
+  'Qualification',
+  'Demo/Making',
+  'Proposal/Quotation',
+  'Negotiation',
+  'Ready to Close',
+  'Won',
+  'Lost',
+]
+
+const standardNameAliases = {
+  'Воронка продаж по умолчанию': 'Default Deal Pipeline',
+  'Воронка сделок по умолчанию': 'Default Deal Pipeline',
+  Квалифицирована: 'Qualification',
+  Квалификация: 'Qualification',
+  'Демонстрация/подготовка': 'Demo/Making',
+  'Коммерческое предложение': 'Proposal/Quotation',
+  'Предложение/расчет': 'Proposal/Quotation',
+  Переговоры: 'Negotiation',
+  'Подготовка к закрытию': 'Ready to Close',
+  'Готово к закрытию': 'Ready to Close',
+  'Закрыта успешно': 'Won',
+  Успешно: 'Won',
+  Потеряна: 'Lost',
+  Проиграно: 'Lost',
+}
+
 const showArchived = ref(false)
 const selectedPipelineName = ref('')
 const editorOpen = ref(false)
@@ -636,7 +696,40 @@ function getPipeline(name) {
 }
 
 function displayPipelineName(name) {
-  return name ? __(name) : ''
+  return displayCanonicalName(name, standardPipelineNames)
+}
+
+function displayStageName(name) {
+  return displayCanonicalName(name, standardStageNames)
+}
+
+function displayCanonicalName(name, canonicalNames) {
+  if (!name) return ''
+  const canonicalName = canonicalNameFromDisplay(name, canonicalNames)
+  return canonicalNames.includes(canonicalName) ? __(canonicalName) : name
+}
+
+function canonicalPipelineName(value) {
+  return canonicalNameFromDisplay(value, standardPipelineNames)
+}
+
+function canonicalStageName(value) {
+  return canonicalNameFromDisplay(value, standardStageNames)
+}
+
+function canonicalNameFromDisplay(value, canonicalNames) {
+  const normalizedValue = String(value || '').trim()
+  return (
+    standardNameAliases[normalizedValue] ||
+    canonicalNames.find((name) => __(name) === normalizedValue) ||
+    normalizedValue
+  )
+}
+
+function pipelineRuleMode(pipeline, fieldname, legacyFieldname) {
+  const mode = pipeline?.[fieldname]
+  if (['Allow', 'Warn', 'Block'].includes(mode)) return mode
+  return pipeline?.[legacyFieldname] ? 'Warn' : 'Allow'
 }
 
 function openEditor(name) {
@@ -978,9 +1071,25 @@ function getUniqueStageName(base) {
 }
 
 function normalizePipeline(pipeline) {
+  const stageSkipRule = pipelineRuleMode(
+    pipeline,
+    'stage_skip_rule',
+    'warn_on_stage_skip',
+  )
+  const stageBackwardsRule = pipelineRuleMode(
+    pipeline,
+    'stage_backwards_rule',
+    'warn_on_stage_backwards',
+  )
+  const closingFieldsRule = pipelineRuleMode(
+    pipeline,
+    'closing_fields_rule',
+    'warn_on_closing_without_required_fields',
+  )
+
   return {
     name: pipeline.name,
-    pipeline_name: pipeline.pipeline_name?.trim(),
+    pipeline_name: canonicalPipelineName(pipeline.pipeline_name),
     enabled: pipeline.enabled ? 1 : 0,
     is_default: pipeline.is_default ? 1 : 0,
     position: Number(pipeline.position) || 0,
@@ -988,10 +1097,12 @@ function normalizePipeline(pipeline) {
     icon: pipeline.icon || '',
     archived: pipeline.archived ? 1 : 0,
     description: pipeline.description || '',
-    warn_on_stage_skip: pipeline.warn_on_stage_skip ? 1 : 0,
-    warn_on_stage_backwards: pipeline.warn_on_stage_backwards ? 1 : 0,
-    warn_on_closing_without_required_fields:
-      pipeline.warn_on_closing_without_required_fields ? 1 : 0,
+    stage_skip_rule: stageSkipRule,
+    stage_backwards_rule: stageBackwardsRule,
+    closing_fields_rule: closingFieldsRule,
+    warn_on_stage_skip: stageSkipRule !== 'Allow' ? 1 : 0,
+    warn_on_stage_backwards: stageBackwardsRule !== 'Allow' ? 1 : 0,
+    warn_on_closing_without_required_fields: closingFieldsRule !== 'Allow' ? 1 : 0,
     required_fields_before_closing:
       pipeline.required_fields_before_closing || '',
   }
@@ -1000,7 +1111,7 @@ function normalizePipeline(pipeline) {
 function normalizeStage(stage) {
   return {
     name: stage.name,
-    deal_status: stage.deal_status?.trim(),
+    deal_status: canonicalStageName(stage.deal_status),
     pipeline: stage.pipeline,
     type: stage.type || 'Open',
     position: Number(stage.position) || 0,
@@ -1058,6 +1169,9 @@ function getEmptyPipeline() {
     icon: '',
     archived: 0,
     description: '',
+    stage_skip_rule: 'Allow',
+    stage_backwards_rule: 'Allow',
+    closing_fields_rule: 'Allow',
     warn_on_stage_skip: 0,
     warn_on_stage_backwards: 0,
     warn_on_closing_without_required_fields: 0,

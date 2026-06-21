@@ -323,6 +323,7 @@ import {
 import { flt, formatNumber, formatCurrency } from '@/utils/numberFormat.js'
 import { getMeta } from '@/stores/meta'
 import { parseLinkFilters } from '@/utils/fieldTransforms'
+import { getPlaceholderLabel } from '@/utils/fieldPlaceholders'
 import { usersStore } from '@/stores/users'
 import { useDocument } from '@/data/document'
 
@@ -567,14 +568,14 @@ const getPlaceholder = (field) => {
   }
 
   if (['Link', 'Dynamic Link', 'User'].includes(field.fieldtype)) {
-    return __('Select {0}...', [__(field.label)])
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
   }
 
   if (field.fieldtype === 'Select') {
-    return __('Select {0}...', [__(field.label)])
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
   }
 
-  return __('Enter {0}', [__(field.label)])
+  return __('Enter {0}', [getPlaceholderLabel(field.label)])
 }
 
 const getDescription = (field) => {

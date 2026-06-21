@@ -7,16 +7,6 @@ from frappe.model.document import Document
 
 
 DEFAULT_DEAL_PIPELINE = "Default Deal Pipeline"
-DEFAULT_DEAL_PIPELINE_RU = "Воронка сделок по умолчанию"
-DEFAULT_DEAL_STAGE_LABELS = {
-	"Qualification": "Квалификация",
-	"Demo/Making": "Демонстрация/подготовка",
-	"Proposal/Quotation": "Предложение/расчет",
-	"Negotiation": "Переговоры",
-	"Ready to Close": "Готово к закрытию",
-	"Won": "Успешно",
-	"Lost": "Проиграно",
-}
 
 
 class CRMSalesPipeline(Document):
@@ -52,7 +42,10 @@ class CRMSalesPipeline(Document):
 		is_default: DF.Check
 		pipeline_name: DF.Data
 		position: DF.Int
+		closing_fields_rule: DF.Literal["Allow", "Warn", "Block"]
 		required_fields_before_closing: DF.SmallText | None
+		stage_backwards_rule: DF.Literal["Allow", "Warn", "Block"]
+		stage_skip_rule: DF.Literal["Allow", "Warn", "Block"]
 		warn_on_closing_without_required_fields: DF.Check
 		warn_on_stage_backwards: DF.Check
 		warn_on_stage_skip: DF.Check
@@ -180,18 +173,11 @@ def get_or_create_default_pipeline() -> str:
 
 
 def get_default_pipeline_label() -> str:
-	return DEFAULT_DEAL_PIPELINE_RU if is_russian_site() else DEFAULT_DEAL_PIPELINE
+	return DEFAULT_DEAL_PIPELINE
 
 
 def get_default_deal_stage_label(label: str) -> str:
-	if is_russian_site():
-		return DEFAULT_DEAL_STAGE_LABELS.get(label, label)
 	return label
-
-
-def is_russian_site() -> bool:
-	lang = frappe.db.get_default("lang") or getattr(frappe.local, "lang", "") or ""
-	return lang.lower().startswith("ru")
 
 
 def get_default_deal_status(pipeline: str | None = None) -> str | None:

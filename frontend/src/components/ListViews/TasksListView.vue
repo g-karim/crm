@@ -244,6 +244,7 @@ const shortDateTimeFormat = `${dateFormat} HH:mm`
 
 function getLabel(label, column) {
   if (column.type === 'Duration') return formatDuration(label)
+  if (column.type === 'Select') return __(label)
   if (column.options && isTranslatable(column.options)) return __(label)
   return label
 }

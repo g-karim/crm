@@ -70,9 +70,12 @@
               >
                 <div>
                   {{
-                    priorityOptions.find(
-                      (option) => option.value == assignmentRuleData.priority,
-                    )?.label
+                    __(
+                      priorityOptions.find(
+                        (option) =>
+                          option.value == assignmentRuleData.priority,
+                      )?.label || '',
+                    )
                   }}
                 </div>
                 <FeatherIcon name="chevron-down" class="size-4" />
@@ -93,7 +96,7 @@
                     }
                   "
                 >
-                  {{ option.label }}
+                  {{ __(option.label) }}
                   <FeatherIcon
                     v-if="assignmentRuleData.priority == option.value"
                     name="check"
@@ -127,11 +130,11 @@
             v-model="assignmentRuleData.documentType"
             :options="[
               {
-                label: 'Lead',
+                label: __('Lead'),
                 value: 'CRM Lead',
               },
               {
-                label: 'Deal',
+                label: __('Deal'),
                 value: 'CRM Deal',
               },
             ]"
@@ -151,12 +154,6 @@
                   documentType,
                 ])
               }}
-              <a
-                class="font-medium underline"
-                href="https://docs.frappe.io/crm/assignment-rule"
-                target="_blank"
-                >{{ __('Learn about conditions') }}</a
-              >
             </span>
             <div v-if="isOldSla && step.data">
               <Popover trigger="hover" :hoverDelay="0.25" placement="top-end">
@@ -231,12 +228,6 @@
                   [documentType],
                 )
               }}
-              <a
-                class="font-medium underline"
-                href="https://docs.frappe.io/crm/assignment-rule"
-                target="_blank"
-                >{{ __('Learn about conditions') }}</a
-              >
             </span>
             <div
               v-if="

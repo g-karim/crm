@@ -72,20 +72,6 @@
               {{ __('No Results Found') }}
             </li>
           </ComboboxOptions>
-          <div class="border-t p-1.5 pb-0.5 *:w-full">
-            <Button
-              variant="ghost"
-              icon-left="plus"
-              class="w-full"
-              :label="__('Invite Agent')"
-              @click="
-                () => {
-                  inviteAgent()
-                  togglePopover()
-                }
-              "
-            />
-          </div>
         </div>
       </template>
     </Popover>
@@ -103,13 +89,10 @@ import { useDebounceFn } from '@vueuse/core'
 import { Avatar, Popover } from 'frappe-ui'
 import { computed, inject, ref } from 'vue'
 import { usersStore } from '@/stores/users'
-import { globalStore } from '@/stores/global'
-import { activeSettingsPage } from '@/composables/settings'
 
 const emit = defineEmits(['addAssignee'])
 const query = ref('')
 const { users } = usersStore()
-const { $dialog } = globalStore()
 const assignmentRuleData = inject('assignmentRuleData')
 
 const debouncedQuery = useDebounceFn((val) => {
@@ -146,23 +129,4 @@ const addAssignee = (user) => {
   }
 }
 
-const inviteAgent = () => {
-  $dialog({
-    title: __('Invite Agent'),
-    message: __(
-      'You will be redirected to invite user page, unsaved changes will be lost.',
-    ),
-    variant: 'solid',
-    actions: [
-      {
-        label: __('Go to Invite Page'),
-        variant: 'solid',
-        onClick: (close) => {
-          activeSettingsPage.value = 'Invite User'
-          close()
-        },
-      },
-    ],
-  })
-}
 </script>

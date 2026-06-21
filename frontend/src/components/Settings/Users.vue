@@ -2,37 +2,10 @@
   <div class="flex h-full flex-col gap-6 p-6 text-ink-gray-8">
     <!-- Header -->
     <div class="flex justify-between px-2 pt-2">
-      <div class="flex flex-col gap-1 w-9/12">
+      <div class="flex flex-col gap-1">
         <h2 class="flex gap-2 text-xl font-semibold leading-none h-5">
           {{ __('Users') }}
         </h2>
-        <p class="text-p-base text-ink-gray-6">
-          {{
-            __(
-              'Manage CRM users by adding or inviting them, and assign roles to control their access and permissions',
-            )
-          }}
-        </p>
-      </div>
-      <div class="flex item-center space-x-2 w-3/12 justify-end">
-        <Dropdown
-          :options="[
-            {
-              label: __('Add Existing User'),
-              onClick: () => (showAddExistingModal = true),
-            },
-            {
-              label: __('Invite New User'),
-              onClick: () => (activeSettingsPage = 'Invite User'),
-            },
-          ]"
-          :button="{
-            label: __('New'),
-            iconLeft: 'plus',
-            variant: 'solid',
-          }"
-          placement="right"
-        />
       </div>
     </div>
 
@@ -155,16 +128,10 @@
       </ul>
     </div>
   </div>
-  <AddExistingUserModal
-    v-if="showAddExistingModal"
-    v-model="showAddExistingModal"
-  />
 </template>
 
 <script setup>
-import AddExistingUserModal from '@/components/Modals/AddExistingUserModal.vue'
 import EmptyState from '@/components/ListViews/EmptyState.vue'
-import { activeSettingsPage } from '@/composables/settings'
 import { usersStore } from '@/stores/users'
 import { DropdownOption } from '@/utils'
 import {
@@ -181,7 +148,6 @@ import { ConfirmDelete } from '../../utils'
 
 const { users, isAdmin, isManager } = usersStore()
 
-const showAddExistingModal = ref(false)
 const searchRef = ref(null)
 const search = ref('')
 const currentRole = ref('All')

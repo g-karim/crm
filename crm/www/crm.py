@@ -2,9 +2,10 @@
 # GNU GPLv3 License. See license.txt
 
 import frappe
+import frappe.sessions
 from frappe import _
 from frappe.integrations.frappe_providers.frappecloud_billing import is_fc_site
-from frappe.translate import get_messages_for_boot, get_translated_doctypes
+from frappe.translate import get_messages_for_boot, get_translated_doctypes, get_user_lang
 from frappe.utils import cint, get_system_timezone
 from frappe.utils.telemetry import capture
 
@@ -35,9 +36,13 @@ def get_context_for_dev():
 
 
 def get_boot():
+	lang = get_user_lang()
+	frappe.local.lang = lang
+
 	return frappe._dict(
 		{
 			"frappe_version": frappe.__version__,
+			"lang": lang,
 			"default_route": get_default_route(),
 			"site_name": frappe.local.site,
 			"read_only_mode": frappe.flags.read_only,

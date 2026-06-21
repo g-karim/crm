@@ -262,7 +262,20 @@ function formatTime(time) {
   if (!time) {
     time = '08:00'
   }
-  const [hours, minutes] = time.split(':')
-  return `${hours.padStart(2, '0')}:${minutes}`
+  const [hours = '0', minutes = '0'] = time.split(':')
+  const date = new Date()
+  date.setHours(Number(hours), Number(minutes), 0, 0)
+  const timeFormat = window.sysdefaults?.time_format || 'HH:mm:ss'
+  const uses12Hour = /h|a/i.test(timeFormat) && !timeFormat.includes('HH')
+
+  return new Intl.DateTimeFormat(
+    globalThis.frappe?.boot?.lang === 'ru' ? 'ru-RU' : undefined,
+    {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: timeFormat.includes('ss') ? '2-digit' : undefined,
+      hour12: uses12Hour,
+    },
+  ).format(date)
 }
 </script>

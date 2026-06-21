@@ -2,7 +2,7 @@
   <FormControl
     v-if="filter.fieldtype == 'Check'"
     v-model="filter.value"
-    :label="filter.label"
+    :label="__(filter.label)"
     type="checkbox"
     @change.stop="updateFilter(filter, $event.target.checked)"
   />
@@ -11,15 +11,15 @@
     v-model="filter.value"
     class="form-control cursor-pointer [&_select]:cursor-pointer"
     type="select"
-    :options="filter.options"
-    :placeholder="filter.label"
+    :options="translatedOptions"
+    :placeholder="__(filter.label)"
     @update:modelValue="updateFilter(filter, $event)"
   />
   <Link
     v-else-if="filter.fieldtype === 'Link'"
     :value="filter.value"
     :doctype="filter.options"
-    :placeholder="filter.label"
+    :placeholder="__(filter.label)"
     @change="(data) => updateFilter(filter, data)"
   />
   <component
@@ -27,14 +27,14 @@
     v-else-if="['Date', 'Datetime'].includes(filter.fieldtype)"
     class="border-none"
     :value="filter.value"
-    :placeholder="filter.label"
+    :placeholder="__(filter.label)"
     @change="(v) => updateFilter(filter, v)"
   />
   <FormControl
     v-else
     v-model="filter.value"
     type="text"
-    :placeholder="filter.label"
+    :placeholder="__(filter.label)"
     @input.stop="debouncedFn(filter, $event.target.value)"
   />
 </template>
@@ -42,7 +42,7 @@
 import Link from '@/components/Controls/Link.vue'
 import { FormControl, DatePicker, DateTimePicker } from 'frappe-ui'
 import { useDebounceFn } from '@vueuse/core'
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 
 const props = defineProps({
   filter: { type: Object, required: true },
@@ -61,6 +61,24 @@ watch(
 const debouncedFn = useDebounceFn((f, value) => {
   emit('applyQuickFilter', f, value)
 }, 500)
+
+const translatedOptions = computed(() => {
+  if (!Array.isArray(filter.options)) return filter.options
+
+  return filter.options.map((option) => {
+    if (typeof option === 'string') {
+      return {
+        label: __(option),
+        value: option,
+      }
+    }
+
+    return {
+      ...option,
+      label: __(option.label ?? option.value),
+    }
+  })
+})
 
 function updateFilter(f, value) {
   emit('applyQuickFilter', f, value)

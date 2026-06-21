@@ -3,6 +3,7 @@ import './index.css'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createDialog } from './utils/dialogs'
+import { setupCalendarLocalization } from './utils/calendarLocalization'
 import { initSocket } from './socket'
 import router from './router'
 import translationPlugin from './translation'
@@ -21,6 +22,7 @@ import {
   setConfig,
   frappeRequest,
   FeatherIcon,
+  toast,
 } from 'frappe-ui'
 
 import { telemetryPlugin } from 'frappe-ui/frappe'
@@ -41,8 +43,24 @@ let globalComponents = {
 let pinia = createPinia()
 
 let app = createApp(App)
+let calendarLocalizationObserver = null
 
 setConfig('resourceFetcher', frappeRequest)
+setConfig('serverMessagesHandler', (messages = []) => {
+  messages.forEach((message) => {
+    let text = message
+    try {
+      let parsed = JSON.parse(message)
+      text = parsed?.message || parsed
+    } catch {
+      // message is already plain text
+    }
+
+    if (text) {
+      toast.info(text)
+    }
+  })
+})
 app.use(FrappeUI)
 app.use(pinia)
 app.use(router)
@@ -54,6 +72,11 @@ app.use(telemetryPlugin, { app_name: 'crm' })
 
 app.config.globalProperties.$dialog = createDialog
 
+function mountApp() {
+  app.mount('#app')
+  calendarLocalizationObserver = setupCalendarLocalization()
+}
+
 let socket
 if (import.meta.env.DEV) {
   frappeRequest({ url: '/api/method/crm.www.crm.get_context_for_dev' }).then(
@@ -63,13 +86,13 @@ if (import.meta.env.DEV) {
       }
       socket = initSocket()
       app.config.globalProperties.$socket = socket
-      app.mount('#app')
+      mountApp()
     },
   )
 } else {
   socket = initSocket()
   app.config.globalProperties.$socket = socket
-  app.mount('#app')
+  mountApp()
 }
 
 if (import.meta.env.DEV) {

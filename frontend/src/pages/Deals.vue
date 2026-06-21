@@ -342,7 +342,7 @@ const salesPipelines = createListResource({
 
 const pipelineOptions = computed(() => {
   return (salesPipelines.data || []).map((pipeline) => ({
-    label: pipeline.pipeline_name || pipeline.name,
+    label: __(pipeline.pipeline_name || pipeline.name),
     value: pipeline.name,
   }))
 })
@@ -616,7 +616,7 @@ function parseRows(rows, columns = []) {
         _rows[row] = website(deal.website)
       } else if (row == 'status') {
         _rows[row] = {
-          label: getDealStatus(deal.status)?.deal_status || deal.status,
+          label: __(getDealStatus(deal.status)?.deal_status || deal.status),
           color: getDealStatus(deal.status)?.color,
         }
       } else if (row == 'sla_status') {

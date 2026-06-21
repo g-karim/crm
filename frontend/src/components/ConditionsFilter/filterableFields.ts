@@ -7,9 +7,9 @@ export const filterableFields = createResource({
       .filter((field) => !field.fieldname.startsWith('_'))
       .map((field) => {
         return {
-          label: field.label,
-          value: field.fieldname,
           ...field,
+          label: __(field.label || field.fieldname),
+          value: field.fieldname,
         }
       })
     return data

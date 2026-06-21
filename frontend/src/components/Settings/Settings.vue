@@ -6,9 +6,9 @@
     @close="activeSettingsPage = ''"
   >
     <template #body>
-      <div class="flex h-[calc(100vh_-_8rem)] bg-surface-menu-bar">
+      <div class="flex h-[calc(100vh_-_8rem)] min-h-0 bg-surface-menu-bar">
         <div
-          class="flex flex-col m-1 rounded-l-lg w-56 shrink-0 bg-surface-menu-bar overflow-y-auto"
+          class="m-1 flex min-h-0 w-56 shrink-0 flex-col overflow-y-auto rounded-l-lg bg-surface-menu-bar"
         >
           <template v-for="(tab, i) in tabs" :key="tab.label">
             <div v-if="!tab.hideLabel && i != 0" class="mx-1 mb-0.5 mt-[5px]" />
@@ -35,7 +35,7 @@
             </nav>
           </template>
         </div>
-        <div class="flex flex-col flex-1 overflow-y-auto bg-surface-modal">
+        <div class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-modal">
           <component :is="activeTab.component" v-if="activeTab" />
         </div>
       </div>
@@ -50,13 +50,11 @@ import SlidersIcon from '@/components/Icons/SlidersIcon.vue'
 import CalendarIcon from '@/components/Icons/CalendarIcon.vue'
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
 import ERPNextIcon from '@/components/Icons/ERPNextIcon.vue'
-import Email2Icon from '@/components/Icons/Email2Icon.vue'
 import EmailTemplateIcon from '@/components/Icons/EmailTemplateIcon.vue'
 import SettingsIcon from '@/components/Icons/SettingsIcon.vue'
 import SettingsIcon2 from '@/components/Icons/SettingsIcon2.vue'
 import Users from '@/components/Settings/Users.vue'
 import Hierarchy from '@/components/Settings/Hierarchy/Hierarchy.vue'
-import InviteUserPage from '@/components/Settings/InviteUserPage.vue'
 import ProfilePage from '@/components/Settings/Profile/ProfilePage.vue'
 import PreferencesSettings from '@/components/Settings/PreferencesSettings.vue'
 import WhatsAppSettings from '@/components/Settings/WhatsAppSettings.vue'
@@ -65,11 +63,9 @@ import LeadSyncSourcePage from '@/components/Settings/LeadSyncing/LeadSyncSource
 import DefaultsSettings from '@/components/Settings/DefaultsSettings.vue'
 import CalendarSettings from '@/components/Settings/CalendarSettings.vue'
 import SalesPipelines from '@/components/Settings/SalesPipelines.vue'
-import HomeActions from '@/components/Settings/HomeActions.vue'
 import GeneralSettings from '@/components/Settings/GeneralSettings.vue'
 import DashboardSettings from '@/components/Settings/DashboardSettings.vue'
 import EmailTemplatePage from '@/components/Settings/EmailTemplate/EmailTemplatePage.vue'
-import EmailConfig from '@/components/Settings/EmailConfig.vue'
 import SidebarLink from '@/components/SidebarLink.vue'
 import { usersStore } from '@/stores/users'
 import {
@@ -151,12 +147,6 @@ const tabs = computed(() => {
           condition: () => isManager(),
         },
         {
-          label: __('Invite User'),
-          icon: 'user-plus',
-          component: markRaw(InviteUserPage),
-          condition: () => isManager(),
-        },
-        {
           label: __('Sales Hierarchy'),
           icon: LucideNetwork,
           component: markRaw(Hierarchy),
@@ -166,16 +156,10 @@ const tabs = computed(() => {
       condition: () => isManager(),
     },
     {
-      label: __('Email'),
+      label: __('Templates'),
       items: [
         {
-          label: __('Accounts'),
-          icon: Email2Icon,
-          component: markRaw(EmailConfig),
-          condition: () => isManager(),
-        },
-        {
-          label: __('Templates'),
+          label: __('Email Templates'),
           icon: EmailTemplateIcon,
           component: markRaw(EmailTemplatePage),
         },
@@ -193,17 +177,6 @@ const tabs = computed(() => {
           label: __('SLA Policies'),
           icon: markRaw(h(ShieldCheck)),
           component: markRaw(SlaConfig),
-        },
-      ],
-      condition: () => isManager(),
-    },
-    {
-      label: __('Customization'),
-      items: [
-        {
-          label: __('Home Actions'),
-          component: markRaw(HomeActions),
-          icon: 'home',
         },
       ],
       condition: () => isManager(),

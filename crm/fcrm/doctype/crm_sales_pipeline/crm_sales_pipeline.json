@@ -20,10 +20,13 @@
   "archived",
   "description",
   "rules_section",
+  "stage_skip_rule",
+  "stage_backwards_rule",
+  "closing_fields_rule",
+  "required_fields_before_closing",
   "warn_on_stage_skip",
   "warn_on_stage_backwards",
-  "warn_on_closing_without_required_fields",
-  "required_fields_before_closing"
+  "warn_on_closing_without_required_fields"
  ],
  "fields": [
   {
@@ -99,28 +102,52 @@
   {
    "fieldname": "rules_section",
    "fieldtype": "Section Break",
-   "label": "Warnings"
+   "label": "Transition Rules"
+  },
+  {
+   "default": "Allow",
+   "fieldname": "stage_skip_rule",
+   "fieldtype": "Select",
+   "label": "Stage Skipping Rule",
+   "options": "Allow\nWarn\nBlock"
+  },
+  {
+   "default": "Allow",
+   "fieldname": "stage_backwards_rule",
+   "fieldtype": "Select",
+   "label": "Moving Backwards Rule",
+   "options": "Allow\nWarn\nBlock"
+  },
+  {
+   "default": "Allow",
+   "fieldname": "closing_fields_rule",
+   "fieldtype": "Select",
+   "label": "Closing Fields Rule",
+   "options": "Allow\nWarn\nBlock"
   },
   {
    "default": "0",
    "fieldname": "warn_on_stage_skip",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Warn On Stage Skip"
   },
   {
    "default": "0",
    "fieldname": "warn_on_stage_backwards",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Warn On Moving Backwards"
   },
   {
    "default": "0",
    "fieldname": "warn_on_closing_without_required_fields",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Warn On Closing Without Fields"
   },
   {
-   "depends_on": "eval:doc.warn_on_closing_without_required_fields",
+   "depends_on": "eval:doc.closing_fields_rule && doc.closing_fields_rule != 'Allow'",
    "fieldname": "required_fields_before_closing",
    "fieldtype": "Small Text",
    "label": "Required Fields Before Closing"

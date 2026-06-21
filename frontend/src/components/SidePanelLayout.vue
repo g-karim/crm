@@ -419,6 +419,7 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import SidePanelModal from '@/components/Modals/SidePanelModal.vue'
 import { getMeta } from '@/stores/meta'
 import { parseLinkFilters } from '@/utils/fieldTransforms'
+import { getPlaceholderLabel } from '@/utils/fieldPlaceholders'
 import { usersStore } from '@/stores/users'
 import { isMobileView } from '@/composables/settings'
 import {
@@ -548,15 +549,15 @@ function getPlaceholder(field) {
   }
 
   if (field.fieldtype === 'User') {
-    return __('Select {0}...', [__(field.label)])
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
   }
 
   if (['Link', 'Dynamic Link'].includes(field.fieldtype)) {
-    return __('Select {0}...', [__(field.label)])
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
   }
 
   if (field.fieldtype === 'Select') {
-    return __('Select {0}...', [__(field.label)])
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
   }
 
   return __(field.label)

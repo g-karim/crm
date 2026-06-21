@@ -119,16 +119,16 @@
             "
             class="-mx-2"
           >
-            <div class="flex items-center justify-between pb-3 px-2">
-              <div class="flex flex-col">
-                <div class="text-p-base font-medium text-ink-gray-7 truncate">
+            <div class="flex items-start justify-between gap-6 pb-3 px-2">
+              <div class="flex min-w-0 flex-col">
+                <div class="text-p-base font-medium text-ink-gray-7">
                   {{ __('Company Name') }}
                 </div>
-                <div class="text-p-sm text-ink-gray-5 truncate">
+                <div class="text-p-sm leading-5 text-ink-gray-5">
                   {{ __('Select your EXP ERP company to connect with') }}
                 </div>
               </div>
-              <div class="w-48">
+              <div class="w-72 max-w-[42%] flex-shrink-0">
                 <Autocomplete
                   v-if="!erpnextCRMSettingsResource.isERPNextInstalled.data"
                   :model-value="erpnextCRMSettingsResource.doc.erpnext_company"
@@ -169,7 +169,7 @@
                   :doc="'Company'"
                   :doctype="'Company'"
                   :placeholder="__('Select Company')"
-                  class="w-48 flex-shrink-0"
+                  class="w-full"
                 />
               </div>
             </div>
@@ -179,13 +179,13 @@
             />
             <div
               v-if="erpnextCRMSettingsResource.isERPNextInstalled.data"
-              class="flex items-center justify-between py-3 px-2"
+              class="flex items-start justify-between gap-6 py-3 px-2"
             >
-              <div class="flex flex-col">
-                <div class="text-p-base font-medium text-ink-gray-7 truncate">
+              <div class="flex min-w-0 flex-col">
+                <div class="text-p-base font-medium text-ink-gray-7">
                   {{ __('Sync Products with EXP ERP') }}
                 </div>
-                <div class="text-p-sm text-ink-gray-5 truncate">
+                <div class="text-p-sm leading-5 text-ink-gray-5">
                   {{
                     __(
                       'Bidirectional sync of existing CRM Products and EXP ERP Items. Runs in the background.',
@@ -195,6 +195,7 @@
               </div>
               <Button
                 variant="subtle"
+                class="flex-shrink-0 whitespace-nowrap"
                 :loading="erpnextCRMSettingsResource.runProductSync.loading"
                 @click="runProductSync"
               >
@@ -202,12 +203,12 @@
               </Button>
             </div>
             <div class="h-px border-t border-outline-gray-modals" />
-            <div class="flex items-center justify-between py-3 px-2">
-              <div class="flex flex-col">
-                <div class="text-p-base font-medium text-ink-gray-7 truncate">
+            <div class="flex items-start justify-between gap-6 py-3 px-2">
+              <div class="flex min-w-0 flex-col">
+                <div class="text-p-base font-medium text-ink-gray-7">
                   {{ __('Auto Create Customer') }}
                 </div>
-                <div class="text-p-sm text-ink-gray-5 truncate">
+                <div class="text-p-sm leading-5 text-ink-gray-5">
                   {{
                     __(
                       'Create customer in EXP ERP when the deal status is changed',
@@ -215,7 +216,7 @@
                   }}
                 </div>
               </div>
-              <div>
+              <div class="flex-shrink-0 pt-1">
                 <Switch
                   v-model="
                     erpnextCRMSettingsResource.doc
@@ -230,12 +231,12 @@
                 erpnextCRMSettingsResource.doc.create_customer_on_status_change
               "
             >
-              <div class="flex items-center justify-between py-3 px-2 gap-4">
-                <div class="flex flex-col">
+              <div class="flex items-start justify-between gap-6 py-3 px-2">
+                <div class="flex min-w-0 flex-col">
                   <div class="text-p-base font-medium text-ink-gray-7">
                     {{ __('Deal Status') }}
                   </div>
-                  <div class="text-p-sm text-ink-gray-5">
+                  <div class="text-p-sm leading-5 text-ink-gray-5">
                     {{
                       __(
                         'Select the deal status to trigger the auto customer creation in EXP ERP',
@@ -251,24 +252,21 @@
                     !erpnextCRMSettingsResource.doc
                       .create_customer_on_status_change
                   "
-                  class="w-48 flex-shrink-0"
+                  class="w-72 max-w-[42%] flex-shrink-0"
                 />
               </div>
             </div>
           </div>
         </div>
         <!--  Disabled state -->
-        <div v-else class="relative flex h-full w-full justify-center">
-          <div
-            class="absolute left-1/2 flex w-64 -translate-x-1/2 flex-col items-center gap-3"
-            :style="{ top: '35%' }"
-          >
+        <div v-else class="flex h-full w-full items-center justify-center px-6">
+          <div class="flex w-full max-w-md flex-col items-center gap-3">
             <ERPNextIcon class="size-7.5 text-ink-gray-5" />
             <div class="flex flex-col items-center gap-1.5 text-center">
-              <span class="text-lg font-medium text-ink-gray-8">
+              <span class="max-w-sm text-lg font-medium leading-7 text-ink-gray-8">
                 {{ __('Connect EXP ERP to EXP CRM') }}
               </span>
-              <span class="text-center text-p-base text-ink-gray-6">
+              <span class="max-w-md text-center text-p-base leading-7 text-ink-gray-6">
                 {{
                   __(
                     'Enable the integration to create quotations and auto create customers in EXP ERP.',

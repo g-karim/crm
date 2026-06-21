@@ -216,7 +216,7 @@ class TestCRMDeal(UnitTestCase):
 
 	def test_stage_skip_warning_does_not_block_save(self):
 		"""Test that skipping stages emits a soft warning and still saves the deal"""
-		pipeline = create_test_pipeline("Warning Skip Pipeline", warn_on_stage_skip=1)
+		pipeline = create_test_pipeline("Warning Skip Pipeline", stage_skip_rule="Warn")
 		first_stage = create_test_deal_status("Skip Stage One", pipeline.name, position=1)
 		create_test_deal_status("Skip Stage Two", pipeline.name, position=2)
 		third_stage = create_test_deal_status("Skip Stage Three", pipeline.name, position=3)
@@ -236,7 +236,7 @@ class TestCRMDeal(UnitTestCase):
 
 	def test_stage_skip_warning_uses_stage_order_not_position_gap(self):
 		"""Test that adjacent stages with non-contiguous positions do not warn as skipped"""
-		pipeline = create_test_pipeline("Warning Position Gap Pipeline", warn_on_stage_skip=1)
+		pipeline = create_test_pipeline("Warning Position Gap Pipeline", stage_skip_rule="Warn")
 		first_stage = create_test_deal_status("Gap Stage One", pipeline.name, position=10)
 		second_stage = create_test_deal_status("Gap Stage Two", pipeline.name, position=20)
 		deal = create_test_deal(
@@ -255,7 +255,7 @@ class TestCRMDeal(UnitTestCase):
 
 	def test_stage_backwards_warning_does_not_block_save(self):
 		"""Test that moving backwards emits a soft warning and still saves the deal"""
-		pipeline = create_test_pipeline("Warning Backwards Pipeline", warn_on_stage_backwards=1)
+		pipeline = create_test_pipeline("Warning Backwards Pipeline", stage_backwards_rule="Warn")
 		first_stage = create_test_deal_status("Back Stage One", pipeline.name, position=1)
 		second_stage = create_test_deal_status("Back Stage Two", pipeline.name, position=2)
 		deal = create_test_deal(
@@ -274,7 +274,7 @@ class TestCRMDeal(UnitTestCase):
 		"""Test that closing without configured fields emits a soft warning and still saves"""
 		pipeline = create_test_pipeline(
 			"Warning Closing Pipeline",
-			warn_on_closing_without_required_fields=1,
+			closing_fields_rule="Warn",
 			required_fields_before_closing="contact, expected_closure_date",
 		)
 		open_stage = create_test_deal_status("Closing Open Stage", pipeline.name, position=1)
@@ -291,6 +291,56 @@ class TestCRMDeal(UnitTestCase):
 		self.assertEqual(deal.status, won_stage.name)
 		self.assertTrue(any("closed without these fields" in warning for warning in deal._pipeline_rule_warnings))
 		self.assertTrue(any("Contact" in warning for warning in deal._pipeline_rule_warnings))
+
+	def test_stage_skip_block_prevents_save(self):
+		"""Test that skipping stages can be blocked by pipeline rules"""
+		pipeline = create_test_pipeline("Block Skip Pipeline", stage_skip_rule="Block")
+		first_stage = create_test_deal_status("Block Skip Stage One", pipeline.name, position=1)
+		create_test_deal_status("Block Skip Stage Two", pipeline.name, position=2)
+		third_stage = create_test_deal_status("Block Skip Stage Three", pipeline.name, position=3)
+		deal = create_test_deal(
+			organization="Block Skip Org",
+			pipeline=pipeline.name,
+			status=first_stage.name,
+		)
+
+		deal.status = third_stage.name
+		with self.assertRaises(frappe.ValidationError):
+			deal.save()
+
+	def test_stage_backwards_block_prevents_save(self):
+		"""Test that moving backwards can be blocked by pipeline rules"""
+		pipeline = create_test_pipeline("Block Backwards Pipeline", stage_backwards_rule="Block")
+		first_stage = create_test_deal_status("Block Back Stage One", pipeline.name, position=1)
+		second_stage = create_test_deal_status("Block Back Stage Two", pipeline.name, position=2)
+		deal = create_test_deal(
+			organization="Block Backwards Org",
+			pipeline=pipeline.name,
+			status=second_stage.name,
+		)
+
+		deal.status = first_stage.name
+		with self.assertRaises(frappe.ValidationError):
+			deal.save()
+
+	def test_closing_required_fields_block_prevents_save(self):
+		"""Test that closing without configured fields can be blocked"""
+		pipeline = create_test_pipeline(
+			"Block Closing Pipeline",
+			closing_fields_rule="Block",
+			required_fields_before_closing="contact, expected_closure_date",
+		)
+		open_stage = create_test_deal_status("Block Closing Open Stage", pipeline.name, position=1)
+		won_stage = create_test_deal_status("Block Closing Won Stage", pipeline.name, type="Won", position=2)
+		deal = create_test_deal(
+			organization="Block Closing Org",
+			pipeline=pipeline.name,
+			status=open_stage.name,
+		)
+
+		deal.status = won_stage.name
+		with self.assertRaises(frappe.ValidationError):
+			deal.save()
 
 	def test_set_primary_contact(self):
 		"""Test setting primary contact from contacts table"""
