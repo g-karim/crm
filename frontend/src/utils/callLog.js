@@ -14,12 +14,12 @@ export function getCallLogDetail(row, log, columns = []) {
     }
   } else if (row === 'caller') {
     return {
-      label: log._caller?.label,
+      label: getPartyLabel(log._caller),
       image: log._caller?.image,
     }
   } else if (row === 'receiver') {
     return {
-      label: log._receiver?.label,
+      label: getPartyLabel(log._receiver),
       image: log._receiver?.image,
     }
   } else if (row === 'type') {
@@ -58,6 +58,10 @@ export function getCallLogDetail(row, log, columns = []) {
   }
 
   return log[row]
+}
+
+function getPartyLabel(party) {
+  return party?.label === 'Unknown' ? __('Unknown') : party?.label
 }
 
 export const statusLabelMap = {

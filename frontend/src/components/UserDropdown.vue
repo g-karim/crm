@@ -5,13 +5,17 @@
         class="flex h-16 items-center rounded-md py-2 duration-300 ease-in-out"
         :class="
           isCollapsed
-            ? 'w-auto px-0'
+            ? 'w-8 justify-center px-0 hover:bg-surface-gray-3'
             : open
               ? 'w-full px-0 bg-surface-white shadow-sm'
               : 'w-full px-0 hover:bg-surface-gray-3'
         "
       >
-        <BrandLogo v-model="brand" class="-ml-3 h-14 w-24 flex-shrink-0" />
+        <BrandLogo
+          v-model="brand"
+          class="flex-shrink-0 duration-300 ease-in-out"
+          :class="isCollapsed ? 'h-8 w-8' : '-ml-3 h-14 w-24'"
+        />
         <div
           class="flex flex-1 flex-col text-left duration-300 ease-in-out truncate"
           :class="

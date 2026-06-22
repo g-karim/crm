@@ -301,6 +301,7 @@ async function createDeal() {
       capture('deal_created')
       isDealCreating.value = false
       show.value = false
+      resetDealDoc()
       router.push({ name: 'Deal', params: { dealId: name } })
     },
     onError(err) {
@@ -320,7 +321,7 @@ function openQuickEntryModal() {
   nextTick(() => (show.value = false))
 }
 
-onMounted(() => {
+function setupDealDocDefaults() {
   deal.doc.no_of_employees = '1-10'
   Object.assign(deal.doc, props.defaults)
 
@@ -334,5 +335,17 @@ onMounted(() => {
   if (!deal.doc.status && dealStatuses.value[0]?.value) {
     deal.doc.status = dealStatuses.value[0].value
   }
+}
+
+function resetDealDoc() {
+  deal.doc = {
+    __newDocument: true,
+    doctype: 'CRM Deal',
+  }
+}
+
+onMounted(() => {
+  resetDealDoc()
+  setupDealDocDefaults()
 })
 </script>
