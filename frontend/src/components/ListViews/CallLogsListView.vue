@@ -183,6 +183,7 @@
 import HeartIcon from '@/components/Icons/HeartIcon.vue'
 import ListBulkActions from '@/components/ListBulkActions.vue'
 import ListRows from '@/components/ListViews/ListRows.vue'
+import ListFooter from '@/components/ListViews/ListFooter.vue'
 import RatingInput from '@/components/Controls/RatingInput.vue'
 import { isTranslatable } from '@/utils'
 import {
@@ -192,7 +193,6 @@ import {
   ListHeaderItem,
   ListSelectBanner,
   ListRowItem,
-  ListFooter,
   Tooltip,
   Dropdown,
 } from 'frappe-ui'

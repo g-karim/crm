@@ -188,6 +188,7 @@ import CalendarIcon from '@/components/Icons/CalendarIcon.vue'
 import RatingInput from '@/components/Controls/RatingInput.vue'
 import ListBulkActions from '@/components/ListBulkActions.vue'
 import ListRows from '@/components/ListViews/ListRows.vue'
+import ListFooter from '@/components/ListViews/ListFooter.vue'
 import {
   formatDate,
   getFormat,
@@ -202,7 +203,6 @@ import {
   ListHeaderItem,
   ListSelectBanner,
   ListRowItem,
-  ListFooter,
   Dropdown,
   Tooltip,
 } from 'frappe-ui'
