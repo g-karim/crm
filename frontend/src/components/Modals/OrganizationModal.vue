@@ -97,7 +97,7 @@ async function createOrganization() {
     },
     {
       onError: (err) => {
-        error.value = err.error?.messages?.[0]
+        error.value = __(err.error?.messages?.[0] || 'An error occurred')
         loading.value = false
       },
     },

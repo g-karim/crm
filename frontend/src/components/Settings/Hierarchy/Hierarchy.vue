@@ -277,7 +277,7 @@ const fcrmSettings = createDocumentResource({
   auto: true,
   setValue: {
     onError(error) {
-      toast.error(error?.messages?.[0] || __('Failed to update setting'))
+      toast.error(__(error?.messages?.[0] || 'Failed to update setting'))
     },
   },
 })
@@ -456,7 +456,7 @@ async function reparent(name, newParent) {
     toast.success(__('Updated reports to'))
     nodes.reload()
   } catch (e) {
-    toast.error(e?.messages?.[0] || __('Could not update report to'))
+    toast.error(__(e?.messages?.[0] || 'Could not update report to'))
   }
 }
 
@@ -495,7 +495,7 @@ async function bulkAdd(parent, userIds) {
     }
     if (lastError) {
       toast.error(
-        lastError?.messages?.[0] || __('Some users could not be added'),
+        __(lastError?.messages?.[0] || 'Some users could not be added'),
       )
     }
     await nodes.reload()

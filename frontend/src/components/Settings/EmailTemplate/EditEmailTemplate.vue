@@ -204,8 +204,9 @@ const updateTemplate = async () => {
           toast.success(__('Template updated successfully'))
         },
         onError: (error) => {
-          errorMessage.value =
-            error.messages[0] || __('Failed to update template')
+          errorMessage.value = __(
+            error.messages?.[0] || 'Failed to update template',
+          )
         },
       },
     )
@@ -239,7 +240,7 @@ const renameDoc = createResource({
     toast.success(__('Template renamed successfully'))
   },
   onError: (error) => {
-    errorMessage.value = error.messages[0] || __('Failed to rename template')
+    errorMessage.value = __(error.messages?.[0] || 'Failed to rename template')
   },
 })
 

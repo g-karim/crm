@@ -175,7 +175,7 @@ function updateSettings() {
       toast.success(__('Settings updated successfully'))
     },
     onError(error) {
-      const message = error?.messages?.[0] || __('Failed to save settings')
+      const message = __(error?.messages?.[0] || 'Failed to save settings')
       toast.error(message)
     },
   })

@@ -495,7 +495,7 @@ function updateField(name, value) {
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(err.messages?.[0] || __('Error updating field'))
+      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }

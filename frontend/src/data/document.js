@@ -70,7 +70,7 @@ export function useDocument(doctype, docname, resourceOverrides = {}) {
               }
 
               err.messages?.forEach((msg) => {
-                toast.error(msg)
+                toast.error(__(msg))
               })
 
               if (err.messages?.length === 0) {

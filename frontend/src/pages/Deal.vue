@@ -367,11 +367,7 @@ import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import SidePanelLayout from '@/components/SidePanelLayout.vue'
 import SLASection from '@/components/SLASection.vue'
 import CustomActions from '@/components/CustomActions.vue'
-import {
-  openWebsite,
-  setupCustomizations,
-  copyToClipboard,
-} from '@/utils'
+import { openWebsite, setupCustomizations, copyToClipboard } from '@/utils'
 import { getView } from '@/utils/view'
 import { getSettings } from '@/stores/settings'
 import { globalStore } from '@/stores/global'
@@ -814,7 +810,7 @@ function updateField(name, value) {
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(err.messages?.[0] || __('Error updating field'))
+      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }

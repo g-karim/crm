@@ -190,7 +190,11 @@ function save() {
       toast.success(__('Profile Updated Successfully'))
     },
     onError: (err) => {
-      toast.error(err.message + ': ' + err.messages[0])
+      toast.error(
+        `${__(err.message || 'An error occurred')}: ${__(
+          err.messages?.[0] || 'An error occurred',
+        )}`,
+      )
     },
   })
 }

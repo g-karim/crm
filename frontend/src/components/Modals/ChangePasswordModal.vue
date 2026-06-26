@@ -103,7 +103,7 @@ const updatePassword = createResource({
     confirmPasswordMessage.value = ''
   },
   onError: (err) => {
-    toast.error(err.messages?.[0] || __('Failed to update password'))
+    toast.error(__(err.messages?.[0] || 'Failed to update password'))
   },
 })
 

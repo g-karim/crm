@@ -242,7 +242,7 @@ const insertResource = createResource({
     toast.success(__('Document created successfully'))
   },
   onError: (err) => {
-    err.messages?.forEach((msg) => toast.error(msg))
+    err.messages?.forEach((msg) => toast.error(__(msg)))
   },
 })
 

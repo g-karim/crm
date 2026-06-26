@@ -72,8 +72,7 @@
                   {{
                     __(
                       priorityOptions.find(
-                        (option) =>
-                          option.value == assignmentRuleData.priority,
+                        (option) => option.value == assignmentRuleData.priority,
                       )?.label || '',
                     )
                   }}
@@ -737,9 +736,9 @@ const updateAssignmentRule = async () => {
         : null,
     },
   }).catch((er) => {
-    const error =
-      er?.messages?.[0] ||
-      __('Some error occurred while updating assignment rule')
+    const error = __(
+      er?.messages?.[0] || 'Some error occurred while updating assignment rule',
+    )
     toast.error(error)
     isLoading.value = false
   })
@@ -752,9 +751,10 @@ const updateAssignmentRule = async () => {
       old_name: assignmentRuleData.value.name,
       new_name: assignmentRuleData.value.assignmentRuleName,
     }).catch(async (er) => {
-      const error =
+      const error = __(
         er?.messages?.[0] ||
-        __('Some error occurred while renaming assignment rule')
+          'Some error occurred while renaming assignment rule',
+      )
       toast.error(error)
       // Reset assignment rule to previous state
       await getAssignmentRuleData.reload()

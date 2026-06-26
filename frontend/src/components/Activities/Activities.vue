@@ -610,7 +610,7 @@ function sendTemplate(template) {
     },
     auto: true,
     onError: (error) => {
-      toast.error(error.messages?.[0] || __('Failed to send WhatsApp template'))
+      toast.error(__(error.messages?.[0] || 'Failed to send WhatsApp template'))
     },
     onSuccess: () => whatsappMessages.reload(),
   })

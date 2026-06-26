@@ -242,7 +242,7 @@ function updateRole(user, newRole) {
       users.reload()
     })
     .catch((e) => {
-      toast.error(e?.messages?.[0] || __('Something went wrong'))
+      toast.error(__(e?.messages?.[0] || 'Something went wrong'))
     })
 }
 
@@ -255,7 +255,7 @@ function removeUser(user) {
       users.reload()
     })
     .catch((e) => {
-      toast.error(e?.messages?.[0] || __('Something went wrong'))
+      toast.error(__(e?.messages?.[0] || 'Something went wrong'))
     })
 }
 

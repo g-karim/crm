@@ -166,7 +166,7 @@ function toggleLeadSyncSourceEnabled(source) {
         )
       },
       onError: (error) => {
-        toast.error(error.messages[0] || __('Failed to update source'))
+        toast.error(__(error.messages?.[0] || 'Failed to update source'))
         // Revert the change if there was an error
         source.enabled = !source.enabled
       },
@@ -181,7 +181,9 @@ function deleteLeadSource(source) {
       toast.success(__('Lead sync source deleted successfully'))
     },
     onError: (error) => {
-      toast.error(error.messages[0] || __('Failed to delete lead sync source'))
+      toast.error(
+        __(error.messages?.[0] || 'Failed to delete lead sync source'),
+      )
     },
   })
 }

@@ -263,10 +263,14 @@
           <div class="flex w-full max-w-md flex-col items-center gap-3">
             <ERPNextIcon class="size-7.5 text-ink-gray-5" />
             <div class="flex flex-col items-center gap-1.5 text-center">
-              <span class="max-w-sm text-lg font-medium leading-7 text-ink-gray-8">
+              <span
+                class="max-w-sm text-lg font-medium leading-7 text-ink-gray-8"
+              >
                 {{ __('Connect EXP ERP to EXP CRM') }}
               </span>
-              <span class="max-w-md text-center text-p-base leading-7 text-ink-gray-6">
+              <span
+                class="max-w-md text-center text-p-base leading-7 text-ink-gray-6"
+              >
                 {{
                   __(
                     'Enable the integration to create quotations and auto create customers in EXP ERP.',
@@ -322,7 +326,7 @@ const erpnextCRMSettingsResource = createDocumentResource({
         toast.success(__('Product sync started. Items will appear shortly.'))
       },
       onError(error) {
-        toast.error(error?.messages?.[0] || __('Failed to start sync'))
+        toast.error(__(error?.messages?.[0] || 'Failed to start sync'))
       },
     },
   },
@@ -331,7 +335,7 @@ const erpnextCRMSettingsResource = createDocumentResource({
       toast.success(__('Settings saved'))
     },
     onError(error) {
-      const message = error?.messages?.[0] || __('Failed to save settings')
+      const message = __(error?.messages?.[0] || 'Failed to save settings')
       toast.error(message)
     },
   },
@@ -496,7 +500,7 @@ const validateSiteConnection = () => {
   }
 
   if (error) {
-    toast.error(error)
+    toast.error(__(error))
     return false
   }
   return true
@@ -515,7 +519,7 @@ const validateData = () => {
   }
 
   if (error) {
-    toast.error(error)
+    toast.error(__(error))
     return false
   }
   return true

@@ -247,8 +247,9 @@ const deleteSla = (sla) => {
       toast.success(__('SLA Policy Deleted'))
     },
     onError: (err) => {
-      const message =
-        err.messages?.[0] || __('Something went wrong, try again later')
+      const message = __(
+        err.messages?.[0] || 'Something went wrong, try again later',
+      )
       toast.error(message)
     },
   })

@@ -268,7 +268,7 @@ function updateSource(data) {
         mappingFormDocResource.value.document.save.submit()
       },
       onError(e) {
-        toast.error(e.messages[0] || __('Error updating Lead Sync Source'))
+        toast.error(__(e.messages?.[0] || 'Error updating Lead Sync Source'))
       },
     },
   )
@@ -287,7 +287,9 @@ function createSource() {
         docResource.value = getSourceDocResource(newDoc.name)
       },
       onError(error) {
-        toast.error(error.messages[0] || __('Error creating Lead Sync Source'))
+        toast.error(
+          __(error.messages?.[0] || 'Error creating Lead Sync Source'),
+        )
       },
     },
   )

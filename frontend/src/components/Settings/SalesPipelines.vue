@@ -7,7 +7,9 @@
             v-if="editorOpen"
             variant="ghost"
             icon-left="chevron-left"
-            :label="displayPipelineName(draft.pipeline_name) || __('Sales Pipelines')"
+            :label="
+              displayPipelineName(draft.pipeline_name) || __('Sales Pipelines')
+            "
             size="md"
             class="-ml-4 min-w-0 !max-w-full !justify-start !pr-0 text-xl font-semibold hover:bg-transparent hover:opacity-70 focus:bg-transparent focus:outline-none focus:ring-0 active:bg-transparent"
             @click="goBack"
@@ -187,13 +189,17 @@
     <div v-else class="space-y-5 px-2">
       <section class="grid grid-cols-[minmax(0,1fr)_18rem] items-start gap-6">
         <div class="flex min-w-0 flex-col gap-4">
-          <div class="grid min-w-0 grid-cols-[minmax(220px,2fr)_minmax(110px,1fr)_64px] items-start gap-3">
+          <div
+            class="grid min-w-0 grid-cols-[minmax(220px,2fr)_minmax(110px,1fr)_64px] items-start gap-3"
+          >
             <FormControl
               :model-value="displayPipelineName(draft.pipeline_name)"
               :label="__('Pipeline Name')"
               :placeholder="__('Pipeline Name')"
               required
-              @update:model-value="(value) => (draft.pipeline_name = canonicalPipelineName(value))"
+              @update:model-value="
+                (value) => (draft.pipeline_name = canonicalPipelineName(value))
+              "
             />
             <FormControl
               v-model="draft.position"
@@ -245,7 +251,9 @@
             </div>
           </div>
 
-          <div class="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-3">
+          <div
+            class="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-start gap-3"
+          >
             <div class="flex flex-col gap-1.5">
               <div class="text-base text-ink-gray-5">{{ __('Icon') }}</div>
               <div class="flex gap-2">
@@ -288,23 +296,25 @@
             <Switch v-model="draft.is_default" size="sm" />
           </label>
           <div class="border-t border-outline-gray-2" />
-                  <div class="flex items-center gap-1.5 text-p-sm font-medium text-ink-gray-8">
-                    <span>{{ __('Transition Rules') }}</span>
-                    <div class="group relative flex">
-                      <button
-                        type="button"
-                        class="flex size-5 items-center justify-center rounded-full text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
-                        :aria-label="__('Transition Rules Help')"
-                      >
-                        ?
-                      </button>
-                      <div
-                        class="pointer-events-none absolute left-1/2 top-7 z-20 hidden w-72 -translate-x-1/2 rounded-lg border border-outline-gray-2 bg-surface-modal px-3 py-2 text-p-xs font-normal leading-5 text-ink-gray-8 shadow-lg group-hover:block"
-                      >
-                        {{ transitionRulesHelpText }}
-                      </div>
-                    </div>
-                  </div>
+          <div
+            class="flex items-center gap-1.5 text-p-sm font-medium text-ink-gray-8"
+          >
+            <span>{{ __('Transition Rules') }}</span>
+            <div class="group relative flex">
+              <button
+                type="button"
+                class="flex size-5 items-center justify-center rounded-full text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
+                :aria-label="__('Transition Rules Help')"
+              >
+                ?
+              </button>
+              <div
+                class="pointer-events-none absolute left-1/2 top-7 z-20 hidden w-72 -translate-x-1/2 rounded-lg border border-outline-gray-2 bg-surface-modal px-3 py-2 text-p-xs font-normal leading-5 text-ink-gray-8 shadow-lg group-hover:block"
+              >
+                {{ transitionRulesHelpText }}
+              </div>
+            </div>
+          </div>
           <FormControl
             v-model="draft.stage_skip_rule"
             type="select"
@@ -330,7 +340,10 @@
             <div class="text-base text-ink-gray-5">
               {{ __('Required fields') }}
             </div>
-            <div v-if="requiredClosingFields.length" class="flex flex-wrap gap-1.5">
+            <div
+              v-if="requiredClosingFields.length"
+              class="flex flex-wrap gap-1.5"
+            >
               <div
                 v-for="field in requiredClosingFields"
                 :key="field.fieldname"
@@ -422,7 +435,9 @@
             <FormControl
               :model-value="displayStageName(stage.deal_status)"
               :placeholder="__('Stage name')"
-              @update:model-value="(value) => (stage.deal_status = canonicalStageName(value))"
+              @update:model-value="
+                (value) => (stage.deal_status = canonicalStageName(value))
+              "
             />
             <FormControl
               v-model="stage.type"
@@ -837,9 +852,9 @@ function openPipelineArchiveDialog(pipeline = selectedPipeline.value) {
             'This pipeline has {0} active deals. Force archive will hide the pipeline, but those deals will keep their current stages. Continue?',
             [activeDeals],
           )
-      : __(
-          'This pipeline will be hidden from active pipeline lists. Existing deals will stay in the system and will not be archived.',
-        ),
+        : __(
+            'This pipeline will be hidden from active pipeline lists. Existing deals will stay in the system and will not be archived.',
+          ),
     onConfirm: async () => {
       confirmDialog.value.show = false
       await togglePipelineArchive(pipeline, { force: Boolean(activeDeals) })
@@ -933,7 +948,8 @@ async function saveStages() {
       const saved = savedStages.find((item) => item._index === index)
       if (!saved) return stage
 
-      const { _index, ...cleanSavedStage } = saved
+      const cleanSavedStage = { ...saved }
+      delete cleanSavedStage._index
       return {
         ...stage,
         ...cleanSavedStage,
@@ -960,7 +976,12 @@ function openStageArchiveDialog(stage) {
   const isActiveType = ACTIVE_DEAL_STAGE_TYPES.has(stage.type)
   const activeDeals = isActiveType ? stageDealCounts.value[stage.name] || 0 : 0
 
-  if (!restoring && isActiveType && activeDeals && !canForceArchivePipeline.value) {
+  if (
+    !restoring &&
+    isActiveType &&
+    activeDeals &&
+    !canForceArchivePipeline.value
+  ) {
     const message = __(
       'This stage has {0} active deals. Move them to Won/Lost stages or another stage before archiving.',
       [activeDeals],
@@ -986,7 +1007,12 @@ function openStageArchiveDialog(stage) {
     onConfirm: async () => {
       confirmDialog.value.show = false
       await archiveStage(stage, {
-        force: Boolean(!restoring && isActiveType && activeDeals && canForceArchivePipeline.value),
+        force: Boolean(
+          !restoring &&
+          isActiveType &&
+          activeDeals &&
+          canForceArchivePipeline.value,
+        ),
       })
     },
   }
@@ -1102,7 +1128,8 @@ function normalizePipeline(pipeline) {
     closing_fields_rule: closingFieldsRule,
     warn_on_stage_skip: stageSkipRule !== 'Allow' ? 1 : 0,
     warn_on_stage_backwards: stageBackwardsRule !== 'Allow' ? 1 : 0,
-    warn_on_closing_without_required_fields: closingFieldsRule !== 'Allow' ? 1 : 0,
+    warn_on_closing_without_required_fields:
+      closingFieldsRule !== 'Allow' ? 1 : 0,
     required_fields_before_closing:
       pipeline.required_fields_before_closing || '',
   }
@@ -1208,7 +1235,7 @@ function getColorValue(color) {
 }
 
 function showError(error, fallback) {
-  const message = error?.messages?.[0] || error?.message || fallback
+  const message = __(error?.messages?.[0] || error?.message || fallback)
   errorMessage.value = message
   toast.error(message)
 }

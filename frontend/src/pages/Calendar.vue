@@ -63,7 +63,9 @@
                 <Button
                   variant="ghost"
                   class="text-lg font-medium text-ink-gray-7"
-                  :label="formatCalendarMonthYear(selectedMonthDate, currentMonthYear)"
+                  :label="
+                    formatCalendarMonthYear(selectedMonthDate, currentMonthYear)
+                  "
                   iconRight="chevron-down"
                   @click="togglePopover"
                 />
@@ -182,7 +184,15 @@ import {
   call,
   toast,
 } from 'frappe-ui'
-import { onMounted, onUnmounted, ref, computed, provide, nextTick, watch } from 'vue'
+import {
+  onMounted,
+  onUnmounted,
+  ref,
+  computed,
+  provide,
+  nextTick,
+  watch,
+} from 'vue'
 import { useRoute } from 'vue-router'
 
 const { user } = sessionStore()
@@ -348,7 +358,7 @@ function createEvent(_event) {
       showDetails({ id: e.name })
     },
     onError: (err) => {
-      toast.error(err.messages[0])
+      toast.error(__(err.messages?.[0] || 'Failed creating event'))
       console.error('Failed creating event', err)
     },
   })
@@ -399,7 +409,7 @@ async function updateEvent(_event, afterDrag = false) {
           if (showEventPanel.value) showDetails({ id: e.name }, true)
         },
         onError: (err) => {
-          toast.error(err.messages[0])
+          toast.error(__(err.messages?.[0] || 'Failed updating event'))
           console.error('Failed updating event', err)
         },
       },
@@ -427,7 +437,7 @@ function deleteEvent(eventID) {
               events.reload()
             },
             onError: (err) => {
-              toast.error(err.messages[0])
+              toast.error(__(err.messages?.[0] || 'Failed deleting event'))
               console.error('Failed deleting event', err)
             },
           })

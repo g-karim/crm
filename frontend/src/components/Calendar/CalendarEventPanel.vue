@@ -878,7 +878,7 @@ function updateAttendingStatus(attendee, status) {
       sync()
     })
     .catch((err) => {
-      error.value = err.messages[0] || __('Failed to update attending status')
+      error.value = __(err.messages?.[0] || 'Failed to update attending status')
       toast.error(error.value)
     })
 }

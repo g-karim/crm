@@ -243,7 +243,7 @@ function reactOnMessage(name, emoji) {
     },
     onError(error) {
       toast.error(
-        error.messages?.[0] || __('Failed to add reaction to the message'),
+        __(error.messages?.[0] || 'Failed to add reaction to the message'),
       )
     },
   })

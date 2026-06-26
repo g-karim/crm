@@ -203,7 +203,7 @@ function toggleEmailTemplate(template, enabledVal) {
         send('refresh-email-templates')
       },
       onError: (error) => {
-        toast.error(error.messages[0] || __('Failed to update template'))
+        toast.error(__(error.messages?.[0] || 'Failed to update template'))
         // Revert the change if there was an error
         template.enabled = !enabledVal
       },
@@ -218,7 +218,7 @@ function deleteTemplate(template) {
       toast.success(__('Template Deleted Successfully'))
     },
     onError: (error) => {
-      toast.error(error.messages[0] || __('Failed to delete template'))
+      toast.error(__(error.messages?.[0] || 'Failed to delete template'))
     },
   })
 }

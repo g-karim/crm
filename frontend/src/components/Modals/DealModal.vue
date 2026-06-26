@@ -307,10 +307,10 @@ async function createDeal() {
     onError(err) {
       isDealCreating.value = false
       if (!err.messages) {
-        error.value = err.message
+        error.value = __(err.message || 'An error occurred')
         return
       }
-      error.value = err.messages.join('\n')
+      error.value = err.messages.map((message) => __(message)).join('\n')
     },
   })
 }

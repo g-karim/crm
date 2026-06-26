@@ -57,7 +57,7 @@ setConfig('serverMessagesHandler', (messages = []) => {
     }
 
     if (text) {
-      toast.info(text)
+      toast.info(__(text))
     }
   })
 })

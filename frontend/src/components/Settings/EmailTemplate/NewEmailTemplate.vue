@@ -181,8 +181,9 @@ const createTemplate = () => {
         send('refresh-email-templates')
       },
       onError: (error) => {
-        errorMessage.value =
-          error.messages[0] || __('Failed to create template')
+        errorMessage.value = __(
+          error.messages?.[0] || 'Failed to create template',
+        )
       },
     },
   )

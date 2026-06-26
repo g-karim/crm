@@ -128,7 +128,7 @@ const insertContact = createResource({
     _contact.doc = {}
   },
   onError: (err) => {
-    error.value = err.error?.messages?.[0]
+    error.value = __(err.error?.messages?.[0] || 'An error occurred')
   },
 })
 
