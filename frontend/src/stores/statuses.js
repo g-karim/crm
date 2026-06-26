@@ -2,7 +2,7 @@ import IndicatorIcon from '@/components/Icons/IndicatorIcon.vue'
 import { parseColor, isTranslatable } from '@/utils'
 import { defineStore } from 'pinia'
 import { useTelemetry } from 'frappe-ui/frappe'
-import { createListResource } from 'frappe-ui'
+import { createResource } from 'frappe-ui'
 import { reactive, h } from 'vue'
 
 export const statusesStore = defineStore('crm-statuses', () => {
@@ -12,59 +12,53 @@ export const statusesStore = defineStore('crm-statuses', () => {
 
   const { capture } = useTelemetry()
 
-  const leadStatuses = createListResource({
-    doctype: 'CRM Lead Status',
-    fields: ['name', 'color', 'position', 'type'],
-    orderBy: 'position asc',
-    cache: 'lead-statuses',
+  const leadStatuses = createResource({
+    url: 'crm.api.statuses.get_lead_statuses',
+    cache: 'lead-statuses-v2',
     initialData: [],
     auto: true,
     transform(statuses) {
-      for (let status of statuses) {
-        status.color = parseColor(status.color)
-        leadStatusesByName[status.name] = status
-      }
-      return statuses
+      return setStatusesByName(leadStatusesByName, statuses)
     },
   })
 
-  const dealStatuses = createListResource({
-    doctype: 'CRM Deal Status',
-    fields: [
-      'name',
-      'deal_status',
-      'pipeline',
-      'color',
-      'position',
-      'type',
-      'archived',
-    ],
-    orderBy: 'position asc',
-    cache: 'deal-statuses-v2',
+  const dealStatuses = createResource({
+    url: 'crm.api.statuses.get_deal_statuses',
+    cache: 'deal-statuses-v3',
     initialData: [],
     auto: true,
     transform(statuses) {
-      for (let status of statuses) {
-        status.color = parseColor(status.color)
-        dealStatusesByName[status.name] = status
-      }
-      return statuses
+      return setStatusesByName(dealStatusesByName, statuses)
     },
   })
 
-  const communicationStatuses = createListResource({
-    doctype: 'CRM Communication Status',
-    fields: ['name'],
-    cache: 'communication-statuses',
+  const communicationStatuses = createResource({
+    url: 'crm.api.statuses.get_communication_statuses',
+    cache: 'communication-statuses-v2',
     initialData: [],
     auto: true,
     transform(statuses) {
-      for (let status of statuses) {
-        communicationStatusesByName[status.name] = status
-      }
-      return statuses
+      return setStatusesByName(communicationStatusesByName, statuses, false)
     },
   })
+
+  function setStatusesByName(
+    statusesByName,
+    statuses,
+    parseStatusColor = true,
+  ) {
+    Object.keys(statusesByName).forEach((name) => {
+      delete statusesByName[name]
+    })
+
+    for (let status of statuses) {
+      if (parseStatusColor) {
+        status.color = parseColor(status.color)
+      }
+      statusesByName[status.name] = status
+    }
+    return statuses
+  }
 
   function getLeadStatus(name) {
     if (!name) {
