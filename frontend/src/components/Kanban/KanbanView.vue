@@ -340,15 +340,15 @@ function cardMeta(fields) {
 
 .kanban-card-freeze::after {
   z-index: 2;
-  left: -16px;
-  right: -16px;
-  bottom: -16px;
+  left: 0;
+  right: 0;
+  bottom: -12px;
   height: 42px;
   border-radius: 0;
   opacity: calc(0.74 + var(--freeze-progress) * 0.12);
   background-image: url('../../images/ice-card-edge.png');
   background-position: bottom center;
-  background-size: 100% auto;
+  background-size: calc(100% + 32px) auto;
   background-repeat: no-repeat;
 }
 
@@ -367,8 +367,9 @@ function cardMeta(fields) {
 }
 
 .kanban-card-freeze-2::after {
-  bottom: -18px;
+  bottom: -14px;
   height: 48px;
   opacity: 0.94;
+  background-size: calc(100% + 36px) auto;
 }
 </style>
