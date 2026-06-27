@@ -329,10 +329,16 @@ const millisecondsInDay = 24 * 60 * 60 * 1000
 
 const salesPipelines = createListResource({
   doctype: 'CRM Sales Pipeline',
-  fields: ['name', 'pipeline_name', 'is_default', 'position'],
+  fields: [
+    'name',
+    'pipeline_name',
+    'is_default',
+    'position',
+    'enable_kanban_freeze_effect',
+  ],
   filters: { enabled: 1, archived: 0 },
   orderBy: 'position asc, modified asc',
-  cache: 'crm-sales-pipelines',
+  cache: 'crm-sales-pipelines-v2',
   initialData: [],
   auto: true,
   onSuccess() {
@@ -367,6 +373,12 @@ const pipelineFilterReady = computed(() => {
 })
 
 const pipelineViewKey = computed(() => selectedPipeline.value || 'all')
+
+const selectedPipelineSettings = computed(() => {
+  return salesPipelines.data?.find(
+    (pipeline) => pipeline.name === selectedPipeline.value,
+  )
+})
 
 watch(
   () => salesPipelines.data,
@@ -690,6 +702,11 @@ function getFreezeState(deal) {
   }
 
   if (deals.value?.data?.view_type !== 'kanban') return state
+  let freezeEffectSetting =
+    selectedPipelineSettings.value?.enable_kanban_freeze_effect
+  if (freezeEffectSetting === 0 || freezeEffectSetting === false) {
+    return state
+  }
   if (!deal.modified) return state
 
   let statusType = getDealStatus(deal.status)?.type

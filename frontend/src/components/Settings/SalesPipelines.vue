@@ -283,6 +283,21 @@
               :label="__('Description')"
             />
           </div>
+          <label
+            class="flex items-center justify-between gap-3 rounded border border-outline-gray-2 px-3 py-2.5"
+          >
+            <div class="flex min-w-0 flex-col gap-0.5">
+              <span class="text-p-base font-medium text-ink-gray-7">
+                {{ __('Deal card ice effect') }}
+              </span>
+              <span class="text-p-sm text-ink-gray-5">
+                {{
+                  __('Show ice on inactive deal cards in this pipeline kanban.')
+                }}
+              </span>
+            </div>
+            <Switch v-model="draft.enable_kanban_freeze_effect" size="sm" />
+          </label>
         </div>
         <div
           class="flex flex-col gap-3 rounded border border-outline-gray-2 p-3"
@@ -1123,6 +1138,11 @@ function normalizePipeline(pipeline) {
     icon: pipeline.icon || '',
     archived: pipeline.archived ? 1 : 0,
     description: pipeline.description || '',
+    enable_kanban_freeze_effect:
+      pipeline.enable_kanban_freeze_effect === undefined ||
+      pipeline.enable_kanban_freeze_effect
+        ? 1
+        : 0,
     stage_skip_rule: stageSkipRule,
     stage_backwards_rule: stageBackwardsRule,
     closing_fields_rule: closingFieldsRule,
@@ -1196,6 +1216,7 @@ function getEmptyPipeline() {
     icon: '',
     archived: 0,
     description: '',
+    enable_kanban_freeze_effect: 1,
     stage_skip_rule: 'Allow',
     stage_backwards_rule: 'Allow',
     closing_fields_rule: 'Allow',

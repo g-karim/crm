@@ -4,7 +4,12 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from crm.api.sales_pipeline import archive_pipeline, duplicate_pipeline, get_pipeline_settings
+from crm.api.sales_pipeline import (
+	archive_pipeline,
+	duplicate_pipeline,
+	get_pipeline_settings,
+	save_pipeline,
+)
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 	get_default_deal_stage_label,
 	get_default_pipeline_label,
@@ -217,6 +222,35 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 		self.assertEqual(settings["active_deal_counts"].get(pipeline.name), 1)
 		self.assertTrue(settings["can_force_archive"])
 
+	def test_pipeline_settings_returns_freeze_effect_flag(self):
+		pipeline = create_pipeline("Freeze Flag Pipeline", enable_kanban_freeze_effect=0)
+
+		settings = get_pipeline_settings(show_archived=1)
+		row = next(item for item in settings["pipelines"] if item.name == pipeline.name)
+
+		self.assertEqual(row.enable_kanban_freeze_effect, 0)
+
+	def test_save_pipeline_updates_freeze_effect_flag(self):
+		pipeline = create_pipeline("Save Freeze Flag Pipeline")
+
+		saved = save_pipeline(
+			{
+				"name": pipeline.name,
+				"pipeline_name": pipeline.pipeline_name,
+				"enable_kanban_freeze_effect": 0,
+			}
+		)
+
+		self.assertEqual(saved.enable_kanban_freeze_effect, 0)
+		self.assertEqual(
+			frappe.db.get_value(
+				"CRM Sales Pipeline",
+				pipeline.name,
+				"enable_kanban_freeze_effect",
+			),
+			0,
+		)
+
 	def test_pipeline_with_stages_cannot_be_deleted(self):
 		pipeline = frappe.get_doc(
 			{
@@ -279,6 +313,7 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 				"stage_backwards_rule": "Block",
 				"closing_fields_rule": "Warn",
 				"required_fields_before_closing": "contact, expected_closure_date",
+				"enable_kanban_freeze_effect": 0,
 			}
 		).insert()
 		active_stage = frappe.get_doc(
@@ -318,6 +353,7 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 		self.assertEqual(duplicate.stage_backwards_rule, "Block")
 		self.assertEqual(duplicate.closing_fields_rule, "Warn")
 		self.assertEqual(duplicate.required_fields_before_closing, "contact, expected_closure_date")
+		self.assertEqual(duplicate.enable_kanban_freeze_effect, 0)
 
 
 def create_pipeline(title, **kwargs):

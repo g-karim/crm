@@ -37,6 +37,7 @@ class CRMSalesPipeline(Document):
 			"purple",
 		]
 		description: DF.SmallText | None
+		enable_kanban_freeze_effect: DF.Check
 		enabled: DF.Check
 		icon: DF.Data | None
 		is_default: DF.Check

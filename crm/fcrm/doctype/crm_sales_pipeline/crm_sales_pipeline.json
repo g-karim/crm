@@ -19,6 +19,7 @@
   "icon",
   "archived",
   "description",
+  "enable_kanban_freeze_effect",
   "rules_section",
   "stage_skip_rule",
   "stage_backwards_rule",
@@ -98,6 +99,12 @@
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_kanban_freeze_effect",
+   "fieldtype": "Check",
+   "label": "Enable deal card ice effect"
   },
   {
    "fieldname": "rules_section",

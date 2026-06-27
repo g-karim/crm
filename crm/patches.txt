@@ -39,3 +39,4 @@ crm.patches.v1_0.ensure_exp_crm_branding #20-06-2026
 crm.patches.v1_0.update_crm_dropdown_items #20-06-2026
 crm.patches.v1_0.hide_legacy_erpnext_crm #20-06-2026
 crm.patches.v1_0.cleanup_exp_theme_crm_state #20-06-2026
+crm.patches.v1_0.enable_kanban_freeze_effect_for_pipelines #27-06-2026

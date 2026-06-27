@@ -16,6 +16,7 @@ PIPELINE_FIELDS = [
 	"icon",
 	"archived",
 	"description",
+	"enable_kanban_freeze_effect",
 	"stage_skip_rule",
 	"stage_backwards_rule",
 	"closing_fields_rule",
@@ -185,6 +186,7 @@ def duplicate_pipeline(name: str, pipeline_name: str):
 	pipeline.color = source.color
 	pipeline.icon = source.icon
 	pipeline.description = source.description
+	pipeline.enable_kanban_freeze_effect = source.enable_kanban_freeze_effect
 	pipeline.stage_skip_rule = source.stage_skip_rule
 	pipeline.stage_backwards_rule = source.stage_backwards_rule
 	pipeline.closing_fields_rule = source.closing_fields_rule
