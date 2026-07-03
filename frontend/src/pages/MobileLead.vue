@@ -85,6 +85,12 @@
             />
           </div>
         </div>
+        <LeadConversation
+          v-else-if="tab.name == 'Messenger'"
+          :leadName="leadId"
+          :lead="doc"
+          :phone="doc.mobile_no || doc.phone"
+        />
         <Activities
           v-else
           v-model:reload="reload"
@@ -139,6 +145,7 @@ import IndicatorIcon from '@/components/Icons/IndicatorIcon.vue'
 import LostReasonModal from '@/components/Modals/LostReasonModal.vue'
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import Activities from '@/components/Activities/Activities.vue'
+import LeadConversation from '@/components/LeadMessenger/LeadConversation.vue'
 import AssignTo from '@/components/AssignTo.vue'
 import SidePanelLayout from '@/components/SidePanelLayout.vue'
 import SLASection from '@/components/SLASection.vue'
@@ -293,6 +300,11 @@ const tabs = computed(() => {
     {
       name: 'Comments',
       label: __('Comments'),
+      icon: CommentIcon,
+    },
+    {
+      name: 'Messenger',
+      label: __('Переписка'),
       icon: CommentIcon,
     },
     {
