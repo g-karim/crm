@@ -48,7 +48,11 @@
         v-if="missingPhone"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
-        {{ __('У лида не указан телефон. Добавьте телефон, чтобы начать переписку.') }}
+        {{
+          __(
+            'У лида не указан телефон. Добавьте телефон, чтобы начать переписку.',
+          )
+        }}
       </div>
       <div
         v-if="!channels.length"
@@ -56,8 +60,21 @@
       >
         {{ __('Нет активных каналов для отправки сообщений.') }}
       </div>
+      <div
+        v-if="selectedAvitoCannotStart"
+        class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
+      >
+        {{
+          __(
+            'Нельзя написать первым в Avito: сначала должен прийти входящий чат.',
+          )
+        }}
+      </div>
 
-      <div ref="messagesEl" class="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-10">
+      <div
+        ref="messagesEl"
+        class="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-10"
+      >
         <div
           v-if="!messages.length"
           class="flex h-full min-h-[260px] flex-col items-center justify-center gap-2 text-center"
@@ -76,7 +93,9 @@
             v-for="message in messages"
             :key="message.name"
             class="flex"
-            :class="message.direction === 'outbound' ? 'justify-end' : 'justify-start'"
+            :class="
+              message.direction === 'outbound' ? 'justify-end' : 'justify-start'
+            "
           >
             <div
               class="max-w-[78%] rounded-md px-3 py-2 text-base shadow-sm"
@@ -90,6 +109,7 @@
                 <span class="text-xs font-medium text-ink-gray-5">
                   {{ messageSender(message) }}
                 </span>
+                <Badge variant="subtle" :label="messageSource(message)" />
                 <Badge
                   v-if="message.status === 'failed'"
                   theme="red"
@@ -100,9 +120,16 @@
               <div class="whitespace-pre-wrap break-words">
                 {{ message.text || '' }}
               </div>
-              <div class="mt-1 flex items-center justify-end gap-2 text-xs text-ink-gray-5">
-                <Tooltip v-if="message.message_datetime" :text="formatDate(message.message_datetime)">
-                  <span>{{ formatDate(message.message_datetime, 'HH:mm') }}</span>
+              <div
+                class="mt-1 flex items-center justify-end gap-2 text-xs text-ink-gray-5"
+              >
+                <Tooltip
+                  v-if="message.message_datetime"
+                  :text="formatDate(message.message_datetime)"
+                >
+                  <span>{{
+                    formatDate(message.message_datetime, 'HH:mm')
+                  }}</span>
                 </Tooltip>
                 <span v-if="message.status && message.status !== 'received'">
                   {{ __(message.status) }}
@@ -161,6 +188,11 @@ import CommentIcon from '@/components/Icons/CommentIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import { formatDate } from '@/utils'
 import {
+  buildMessengerChannelOptions,
+  getMessengerChannelType,
+  getMessengerPlatformLabel,
+} from '@/utils/messengerChannels'
+import {
   Badge,
   Button,
   FormControl,
@@ -190,36 +222,84 @@ const integrationNotConfigured = ref(false)
 const genericError = ref('')
 const messagesEl = ref(null)
 
-const leadPhone = computed(() => props.phone || props.lead?.mobile_no || props.lead?.phone || '')
-const missingPhone = computed(() => !leadPhone.value)
+const leadPhone = computed(
+  () => props.phone || props.lead?.mobile_no || props.lead?.phone || '',
+)
 const loading = computed(
-  () => loadingConversation.value || loadingMessages.value || loadingChannels.value,
+  () =>
+    loadingConversation.value || loadingMessages.value || loadingChannels.value,
 )
 const selectedConversation = computed(() => {
   if (!conversations.value.length) return null
+  if (!selectedChannel.value) return conversations.value[0]
   return (
-    conversations.value.find((conversation) => conversation.channel === selectedChannel.value) ||
-    conversations.value[0]
+    conversations.value.find(
+      (conversation) => conversation.channel === selectedChannel.value,
+    ) || null
   )
 })
+const channelByName = computed(() => {
+  let map = {}
+  channels.value.forEach((channel) => {
+    map[channel.name] = channel
+  })
+  conversations.value.forEach((conversation) => {
+    if (conversation.channel && conversation.channel_info) {
+      map[conversation.channel] = {
+        ...(map[conversation.channel] || {}),
+        ...conversation.channel_info,
+      }
+    }
+  })
+  return map
+})
+const conversationByName = computed(() => {
+  let map = {}
+  conversations.value.forEach((conversation) => {
+    map[conversation.name] = conversation
+  })
+  return map
+})
+const selectedChannelDoc = computed(
+  () => channelByName.value[selectedChannel.value] || null,
+)
+const selectedChannelType = computed(() =>
+  getMessengerChannelType(
+    selectedChannelDoc.value || selectedConversation.value,
+  ),
+)
+const missingPhone = computed(
+  () =>
+    Boolean(selectedChannelType.value) &&
+    selectedChannelType.value !== 'avito' &&
+    !leadPhone.value,
+)
+const selectedAvitoCannotStart = computed(
+  () =>
+    selectedChannelType.value === 'avito' &&
+    !selectedConversation.value?.external_chat_id,
+)
 const sendDisabled = computed(
   () =>
     sendingMessage.value ||
     missingPhone.value ||
+    selectedAvitoCannotStart.value ||
     !channels.value.length ||
     !selectedChannel.value,
 )
 const channelOptions = computed(() =>
-  channels.value.map((channel) => ({
-    label: channel.display_name || channel.plain_id || channel.channel_type || channel.name,
-    value: channel.name,
-  })),
+  buildMessengerChannelOptions(channels.value),
 )
 const contactLine = computed(() => {
   let title = props.lead?.lead_name || props.lead?.name || props.leadName
   return leadPhone.value ? `${title} · ${leadPhone.value}` : title
 })
 const composerHint = computed(() => {
+  if (selectedAvitoCannotStart.value) {
+    return __(
+      'Нельзя написать первым в Avito: сначала должен прийти входящий чат.',
+    )
+  }
   if (missingPhone.value) return __('Добавьте телефон в карточке лида.')
   if (!channels.value.length) return __('Нет доступного канала отправки.')
   return __('Enter отправляет сообщение, Shift+Enter добавляет новую строку.')
@@ -245,7 +325,8 @@ async function loadChannels() {
       active_only: 1,
       provider: 'Wazzup',
     })
-    if (!result?.ok) throw new Error(result?.message || __('Не удалось загрузить каналы.'))
+    if (!result?.ok)
+      throw new Error(result?.message || __('Не удалось загрузить каналы.'))
     channels.value = result.channels || []
     ensureSelectedChannel()
   } catch (error) {
@@ -258,12 +339,16 @@ async function loadChannels() {
 async function loadConversations() {
   loadingConversation.value = true
   try {
-    let result = await call('crm_messenger.api.conversations.get_conversations', {
-      reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
-      limit: 50,
-    })
-    if (!result?.ok) throw new Error(result?.message || __('Не удалось загрузить переписку.'))
+    let result = await call(
+      'crm_messenger.api.conversations.get_conversations',
+      {
+        reference_doctype: 'CRM Lead',
+        reference_name: props.leadName,
+        limit: 50,
+      },
+    )
+    if (!result?.ok)
+      throw new Error(result?.message || __('Не удалось загрузить переписку.'))
     conversations.value = result.conversations || []
     ensureSelectedChannel()
   } catch (error) {
@@ -281,7 +366,8 @@ async function loadMessages() {
       reference_name: props.leadName,
       limit: 200,
     })
-    if (!result?.ok) throw new Error(result?.message || __('Не удалось загрузить сообщения.'))
+    if (!result?.ok)
+      throw new Error(result?.message || __('Не удалось загрузить сообщения.'))
     messages.value = result.messages || []
     await nextTick()
     scrollToBottom()
@@ -293,8 +379,12 @@ async function loadMessages() {
 }
 
 function ensureSelectedChannel() {
-  if (selectedChannel.value) return
-  selectedChannel.value = conversations.value.find((row) => row.channel)?.channel || channels.value[0]?.name || ''
+  if (selectedChannel.value && channelByName.value[selectedChannel.value])
+    return
+  selectedChannel.value =
+    conversations.value.find((row) => row.channel)?.channel ||
+    channels.value[0]?.name ||
+    ''
 }
 
 async function sendMessage() {
@@ -306,7 +396,8 @@ async function sendMessage() {
   sendingMessage.value = true
 
   try {
-    let conversation = selectedConversation.value || (await createConversation())
+    let conversation =
+      selectedConversation.value || (await createConversation())
     if (!conversation?.name) return
 
     let result = await call('crm_messenger.api.messages.send_message', {
@@ -331,10 +422,20 @@ async function sendMessage() {
 }
 
 async function createConversation() {
-  let result = await call('crm_messenger.api.conversations.get_or_create_lead_conversation', {
-    reference_name: props.leadName,
-    channel: selectedChannel.value,
-  })
+  if (selectedChannelType.value === 'avito') {
+    genericError.value = __(
+      'Нельзя написать первым в Avito: сначала должен прийти входящий чат.',
+    )
+    return null
+  }
+
+  let result = await call(
+    'crm_messenger.api.conversations.get_or_create_lead_conversation',
+    {
+      reference_name: props.leadName,
+      channel: selectedChannel.value,
+    },
+  )
 
   if (result?.reason === 'missing_phone') {
     genericError.value = __('У лида не указан телефон.')
@@ -345,7 +446,10 @@ async function createConversation() {
   }
 
   let conversation = result.conversation
-  if (conversation?.name && !conversations.value.find((row) => row.name === conversation.name)) {
+  if (
+    conversation?.name &&
+    !conversations.value.find((row) => row.name === conversation.name)
+  ) {
     conversations.value = [conversation, ...conversations.value]
   }
   return conversation
@@ -365,6 +469,16 @@ function scrollToBottom() {
 function messageSender(message) {
   if (message.direction === 'outbound') return __('Вы')
   return message.sender_name || props.lead?.lead_name || props.leadName
+}
+
+function messageSource(message) {
+  let conversation = conversationByName.value[message.conversation]
+  let channel =
+    message.channel_info ||
+    channelByName.value[message.channel] ||
+    conversation?.channel_info ||
+    conversation
+  return __(getMessengerPlatformLabel(channel))
 }
 
 function handleError(error, fallback) {
