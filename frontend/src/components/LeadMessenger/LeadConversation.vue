@@ -35,14 +35,10 @@
         {{ genericError }}
       </div>
       <div
-        v-if="integrationNotConfigured"
+        v-if="sendWarning"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
-        {{
-          __(
-            'Интеграция Wazzup не настроена: включите интеграцию и укажите API token. Сообщение сохранено локально со статусом ошибки.',
-          )
-        }}
+        {{ sendWarning }}
       </div>
       <div
         v-if="missingPhone"
@@ -218,7 +214,7 @@ const messages = ref([])
 const channels = ref([])
 const selectedChannel = ref('')
 const draftText = ref('')
-const integrationNotConfigured = ref(false)
+const sendWarning = ref('')
 const genericError = ref('')
 const messagesEl = ref(null)
 
@@ -268,15 +264,23 @@ const selectedChannelType = computed(() =>
     selectedChannelDoc.value || selectedConversation.value,
   ),
 )
+const selectedIsAvito = computed(() => {
+  let channel = selectedChannelDoc.value || selectedConversation.value || {}
+  return (
+    selectedChannelType.value === 'avito' ||
+    channel.platform === 'avito' ||
+    channel.provider === 'avito_direct'
+  )
+})
 const missingPhone = computed(
   () =>
     Boolean(selectedChannelType.value) &&
-    selectedChannelType.value !== 'avito' &&
+    !selectedIsAvito.value &&
     !leadPhone.value,
 )
 const selectedAvitoCannotStart = computed(
   () =>
-    selectedChannelType.value === 'avito' &&
+    selectedIsAvito.value &&
     !selectedConversation.value?.external_chat_id,
 )
 const sendDisabled = computed(
@@ -314,7 +318,7 @@ watch(
 
 async function loadAll() {
   genericError.value = ''
-  integrationNotConfigured.value = false
+  sendWarning.value = ''
   await Promise.all([loadChannels(), loadConversations(), loadMessages()])
 }
 
@@ -323,7 +327,6 @@ async function loadChannels() {
   try {
     let result = await call('crm_messenger.api.channels.get_channels', {
       active_only: 1,
-      provider: 'Wazzup',
     })
     if (!result?.ok)
       throw new Error(result?.message || __('Не удалось загрузить каналы.'))
@@ -392,7 +395,7 @@ async function sendMessage() {
   if (!text || sendDisabled.value) return
 
   genericError.value = ''
-  integrationNotConfigured.value = false
+  sendWarning.value = ''
   sendingMessage.value = true
 
   try {
@@ -408,8 +411,8 @@ async function sendMessage() {
 
     draftText.value = ''
     if (result?.reason === 'not_configured') {
-      integrationNotConfigured.value = true
-      toast.error(__('Интеграция Wazzup не настроена.'))
+      sendWarning.value = integrationWarningMessage(result)
+      toast.error(sendWarning.value)
     } else if (!result?.ok) {
       throw new Error(result?.message || __('Не удалось отправить сообщение.'))
     }
@@ -421,8 +424,44 @@ async function sendMessage() {
   }
 }
 
+function integrationWarningMessage(result = {}) {
+  let channel =
+    channelByName.value[result.channel] ||
+    selectedChannelDoc.value ||
+    selectedConversation.value?.channel_info ||
+    selectedConversation.value ||
+    {}
+  let provider = (channel.provider || '').toLowerCase()
+  let type = getMessengerChannelType(channel)
+  let resultMessage = `${result.message || ''} ${
+    result.provider_result?.message || ''
+  }`.toLowerCase()
+
+  if (
+    selectedIsAvito.value ||
+    type === 'avito' ||
+    channel.platform === 'avito' ||
+    provider === 'avito_direct' ||
+    resultMessage.includes('avito')
+  ) {
+    return __(
+      'Интеграция Avito не настроена: укажите Avito account id и API token. Сообщение сохранено локально со статусом ошибки.',
+    )
+  }
+
+  if (provider === 'wazzup' || resultMessage.includes('wazzup')) {
+    return __(
+      'Интеграция Wazzup не настроена: включите интеграцию и укажите API token. Сообщение сохранено локально со статусом ошибки.',
+    )
+  }
+
+  return __(
+    'Интеграция мессенджера не настроена. Сообщение сохранено локально со статусом ошибки.',
+  )
+}
+
 async function createConversation() {
-  if (selectedChannelType.value === 'avito') {
+  if (selectedIsAvito.value) {
     genericError.value = __(
       'Нельзя написать первым в Avito: сначала должен прийти входящий чат.',
     )

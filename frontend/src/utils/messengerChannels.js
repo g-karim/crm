@@ -1,5 +1,6 @@
 export function getMessengerChannelType(channel = {}) {
-  return channel?.channel_type || channel?.chat_type || ''
+  if (channel?.provider === 'avito_direct') return 'avito'
+  return channel?.channel_type || channel?.chat_type || channel?.platform || ''
 }
 
 export function getMessengerPlatformLabel(channel = {}) {
