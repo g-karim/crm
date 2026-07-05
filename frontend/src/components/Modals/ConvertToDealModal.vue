@@ -351,6 +351,10 @@ function hasValue(value) {
 }
 
 function prepareDealField(field) {
+  if (field.fieldname == 'pipeline') {
+    field.disable_create = true
+  }
+
   if (field.fieldname == 'status') {
     field.fieldtype = 'Select'
     field.options = dealStatuses.value
@@ -388,6 +392,7 @@ function ensureDealPipelineField(_tabs) {
     label: __('Sales Pipeline'),
     options: 'CRM Sales Pipeline',
     reqd: 1,
+    disable_create: true,
   })
 }
 

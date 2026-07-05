@@ -7,11 +7,13 @@ from frappe.tests import IntegrationTestCase
 from crm.api.sales_pipeline import (
 	archive_pipeline,
 	duplicate_pipeline,
+	get_default_stage_templates,
 	get_pipeline_settings,
 	save_pipeline,
 )
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 	get_default_deal_stage_label,
+	get_default_deal_stage_templates,
 	get_default_pipeline_label,
 )
 
@@ -115,8 +117,30 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 			self.assertEqual(get_default_pipeline_label(), "Default Deal Pipeline")
 			self.assertEqual(get_default_deal_stage_label("Qualification"), "Qualification")
 			self.assertEqual(get_default_deal_stage_label("Won"), "Won")
+			self.assertEqual(
+				[stage["deal_status"] for stage in get_default_deal_stage_templates()],
+				[
+					"Qualification",
+					"Demo/Making",
+					"Proposal/Quotation",
+					"Negotiation",
+					"Ready to Close",
+					"Won",
+					"Lost",
+				],
+			)
 		finally:
 			frappe.db.set_default("lang", previous_lang or "en")
+
+	def test_default_stage_templates_api_returns_standard_stage_config(self):
+		templates = get_default_stage_templates()
+
+		self.assertEqual(len(templates), 7)
+		self.assertEqual(templates[0]["deal_status"], "Qualification")
+		self.assertEqual(templates[0]["type"], "Open")
+		self.assertEqual(templates[0]["position"], 1)
+		self.assertEqual(templates[-1]["deal_status"], "Lost")
+		self.assertEqual(templates[-1]["type"], "Lost")
 
 	def test_default_pipeline_cannot_be_archived(self):
 		pipeline = frappe.get_doc(
