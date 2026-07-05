@@ -410,9 +410,22 @@
           </div>
           <div class="flex items-center gap-2">
             <Button
+              v-if="draftingNewPipeline && stageDrafts.length"
+              :label="__('Clear Stages')"
+              icon-left="trash-2"
+              variant="subtle"
+              @click="clearStageDrafts"
+            />
+            <Button
+              v-if="draftingNewPipeline && !stageDrafts.length"
+              :label="__('Fill Default Stages')"
+              icon-left="plus"
+              @click="fillDefaultStages"
+            />
+            <Button
               :label="__('Add Stage')"
               icon-left="plus"
-              :disabled="!selectedPipelineName"
+              :disabled="!selectedPipelineName && !draftingNewPipeline"
               @click="addStage"
             />
             <Button
@@ -645,6 +658,11 @@ const settings = createResource({
   },
 })
 
+const defaultStageTemplates = createResource({
+  url: 'crm.api.sales_pipeline.get_default_stage_templates',
+  auto: true,
+})
+
 const pipelines = computed(() => settings.data?.pipelines || [])
 const stages = computed(() => settings.data?.stages || [])
 const dealCounts = computed(() => settings.data?.deal_counts || {})
@@ -794,7 +812,10 @@ function createPipeline() {
   stageDrafts.value = []
 }
 
-async function saveSelectedPipeline() {
+async function saveSelectedPipeline(options = {}) {
+  const shouldSaveStageDrafts =
+    options.saveStageDrafts ?? draftingNewPipeline.value
+
   errorMessage.value = ''
   if (!draft.pipeline_name?.trim()) {
     errorMessage.value = __('Pipeline name is required')
@@ -808,9 +829,19 @@ async function saveSelectedPipeline() {
     })
     draftingNewPipeline.value = false
     selectedPipelineName.value = saved.name
+    let savedDraftStages = false
+    if (shouldSaveStageDrafts && stageDrafts.value.length) {
+      await saveStageDraftsForPipeline(saved.name)
+      savedDraftStages = true
+      dealStatuses.reload()
+    }
     await settings.reload()
     editorOpen.value = true
-    toast.success(__('Pipeline saved successfully'))
+    toast.success(
+      savedDraftStages
+        ? __('Pipeline and stages saved successfully')
+        : __('Pipeline saved successfully'),
+    )
   } catch (error) {
     showError(error, __('Failed to save pipeline'))
   } finally {
@@ -904,7 +935,7 @@ async function togglePipelineArchive(pipeline, options = {}) {
 }
 
 function addStage() {
-  if (!selectedPipelineName.value) return
+  if (!selectedPipelineName.value && !draftingNewPipeline.value) return
   stageDrafts.value.push({
     local_id: `new-stage-${Date.now()}-${stageDrafts.value.length}`,
     deal_status: getUniqueStageName(__('New Stage')),
@@ -931,46 +962,13 @@ function moveStage(index, direction) {
 
 async function saveStages() {
   if (!selectedPipelineName.value) {
-    await saveSelectedPipeline()
+    await saveSelectedPipeline({ saveStageDrafts: false })
     if (!selectedPipelineName.value) return
   }
 
   savingStages.value = true
   try {
-    const savedStages = []
-    for (const [index, stage] of stageDrafts.value.entries()) {
-      if (!stage.deal_status?.trim()) {
-        throw new Error(__('Stage name is required'))
-      }
-      const savedStage = await call('crm.api.sales_pipeline.save_stage', {
-        stage: normalizeStage({
-          ...stage,
-          pipeline: selectedPipelineName.value,
-        }),
-      })
-      savedStages.push({ ...savedStage, _index: index })
-    }
-
-    const savedStageNames = savedStages.map((stage) => stage.name)
-    if (savedStageNames.length) {
-      await call('crm.api.sales_pipeline.reorder_stages', {
-        pipeline: selectedPipelineName.value,
-        names: savedStageNames,
-      })
-    }
-
-    stageDrafts.value = stageDrafts.value.map((stage, index) => {
-      const saved = savedStages.find((item) => item._index === index)
-      if (!saved) return stage
-
-      const cleanSavedStage = { ...saved }
-      delete cleanSavedStage._index
-      return {
-        ...stage,
-        ...cleanSavedStage,
-      }
-    })
-
+    await saveStageDraftsForPipeline(selectedPipelineName.value)
     await settings.reload()
     dealStatuses.reload()
     toast.success(__('Stages saved successfully'))
@@ -979,6 +977,50 @@ async function saveStages() {
   } finally {
     savingStages.value = false
   }
+}
+
+async function saveStageDraftsForPipeline(pipeline) {
+  const savedStages = []
+  for (const [index, stage] of stageDrafts.value.entries()) {
+    if (!stage.deal_status?.trim()) {
+      throw new Error(__('Stage name is required'))
+    }
+    const savedStage = await call('crm.api.sales_pipeline.save_stage', {
+      stage: normalizeStage({
+        ...stage,
+        pipeline,
+      }),
+    })
+    savedStages.push({ ...savedStage, _index: index })
+  }
+
+  const savedStageNames = savedStages.map((stage) => stage.name)
+  if (savedStageNames.length) {
+    await call('crm.api.sales_pipeline.reorder_stages', {
+      pipeline,
+      names: savedStageNames,
+    })
+  }
+
+  stageDrafts.value = stageDrafts.value.map((stage, index) => {
+    const saved = savedStages.find((item) => item._index === index)
+    if (!saved) return stage
+
+    const cleanSavedStage = { ...saved }
+    delete cleanSavedStage._index
+    return {
+      ...stage,
+      ...cleanSavedStage,
+    }
+  })
+}
+
+function fillDefaultStages() {
+  stageDrafts.value = getDefaultStageDrafts()
+}
+
+function clearStageDrafts() {
+  stageDrafts.value = []
 }
 
 function openStageArchiveDialog(stage) {
@@ -1166,6 +1208,77 @@ function normalizeStage(stage) {
     color: stage.color || 'gray',
     archived: stage.archived ? 1 : 0,
   }
+}
+
+function getDefaultStageDrafts() {
+  const templates = defaultStageTemplates.data?.length
+    ? defaultStageTemplates.data
+    : getFallbackDefaultStageTemplates()
+  return templates.map((stage, index) => ({
+    local_id: `default-stage-${Date.now()}-${index}`,
+    name: '',
+    deal_status: stage.deal_status,
+    pipeline: selectedPipelineName.value,
+    type: stage.type || 'Open',
+    position: Number(stage.position) || index + 1,
+    probability: Number(stage.probability) || 0,
+    color: stage.color || 'gray',
+    archived: 0,
+  }))
+}
+
+function getFallbackDefaultStageTemplates() {
+  return [
+    {
+      deal_status: 'Qualification',
+      color: 'gray',
+      type: 'Open',
+      probability: 10,
+      position: 1,
+    },
+    {
+      deal_status: 'Demo/Making',
+      color: 'orange',
+      type: 'Ongoing',
+      probability: 25,
+      position: 2,
+    },
+    {
+      deal_status: 'Proposal/Quotation',
+      color: 'blue',
+      type: 'Ongoing',
+      probability: 50,
+      position: 3,
+    },
+    {
+      deal_status: 'Negotiation',
+      color: 'yellow',
+      type: 'Ongoing',
+      probability: 70,
+      position: 4,
+    },
+    {
+      deal_status: 'Ready to Close',
+      color: 'purple',
+      type: 'Ongoing',
+      probability: 90,
+      position: 5,
+    },
+    {
+      deal_status: 'Won',
+      color: 'green',
+      type: 'Won',
+      probability: 100,
+      position: 6,
+    },
+    {
+      deal_status: 'Lost',
+      color: 'red',
+      type: 'Lost',
+      probability: 0,
+      position: 7,
+    },
+  ]
 }
 
 function parseRequiredClosingFields(value) {

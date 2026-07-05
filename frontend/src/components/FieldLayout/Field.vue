@@ -486,7 +486,11 @@ const field = computed(() => {
     })
   }
 
-  if (field.fieldtype === 'Link' && field.options !== 'User') {
+  if (
+    field.fieldtype === 'Link' &&
+    field.options !== 'User' &&
+    !field.disable_create
+  ) {
     if (!field.create) {
       field.create = (value, close) => {
         const callback = (d) => {

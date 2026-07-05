@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_deal_stage_templates
 from crm.utils import is_frappe_version
 
 
@@ -121,6 +122,12 @@ def get_pipeline_settings(show_archived: bool = False):
 		"active_deal_counts": get_active_deal_counts(pipeline_names),
 		"can_force_archive": can_force_archive_pipeline(),
 	}
+
+
+@frappe.whitelist()
+def get_default_stage_templates():
+	check_manager_permission()
+	return get_default_deal_stage_templates()
 
 
 @frappe.whitelist()

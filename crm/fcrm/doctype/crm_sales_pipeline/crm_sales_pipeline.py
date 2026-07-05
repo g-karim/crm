@@ -7,6 +7,57 @@ from frappe.model.document import Document
 
 
 DEFAULT_DEAL_PIPELINE = "Default Deal Pipeline"
+DEFAULT_DEAL_STAGE_TEMPLATES = [
+	{
+		"deal_status": "Qualification",
+		"color": "gray",
+		"type": "Open",
+		"probability": 10,
+		"position": 1,
+	},
+	{
+		"deal_status": "Demo/Making",
+		"color": "orange",
+		"type": "Ongoing",
+		"probability": 25,
+		"position": 2,
+	},
+	{
+		"deal_status": "Proposal/Quotation",
+		"color": "blue",
+		"type": "Ongoing",
+		"probability": 50,
+		"position": 3,
+	},
+	{
+		"deal_status": "Negotiation",
+		"color": "yellow",
+		"type": "Ongoing",
+		"probability": 70,
+		"position": 4,
+	},
+	{
+		"deal_status": "Ready to Close",
+		"color": "purple",
+		"type": "Ongoing",
+		"probability": 90,
+		"position": 5,
+	},
+	{
+		"deal_status": "Won",
+		"color": "green",
+		"type": "Won",
+		"probability": 100,
+		"position": 6,
+	},
+	{
+		"deal_status": "Lost",
+		"color": "red",
+		"type": "Lost",
+		"probability": 0,
+		"position": 7,
+	},
+]
 
 
 class CRMSalesPipeline(Document):
@@ -179,6 +230,16 @@ def get_default_pipeline_label() -> str:
 
 def get_default_deal_stage_label(label: str) -> str:
 	return label
+
+
+def get_default_deal_stage_templates() -> list[dict]:
+	return [
+		{
+			**stage,
+			"deal_status": get_default_deal_stage_label(stage["deal_status"]),
+		}
+		for stage in DEFAULT_DEAL_STAGE_TEMPLATES
+	]
 
 
 def get_default_deal_status(pipeline: str | None = None) -> str | None:

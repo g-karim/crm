@@ -12,7 +12,7 @@ from crm.dropdown import ensure_crm_dropdown_items
 from crm.fcrm.doctype.crm_dashboard.crm_dashboard import create_default_manager_dashboard
 from crm.fcrm.doctype.crm_products.crm_products import create_product_details_script
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
-	get_default_deal_stage_label,
+	get_default_deal_stage_templates,
 	get_or_create_default_pipeline,
 )
 
@@ -103,53 +103,9 @@ def add_default_sales_pipeline():
 
 def add_default_deal_statuses():
 	default_pipeline = get_or_create_default_pipeline()
-	statuses = {
-		"Qualification": {
-			"color": "gray",
-			"type": "Open",
-			"probability": 10,
-			"position": 1,
-		},
-		"Demo/Making": {
-			"color": "orange",
-			"type": "Ongoing",
-			"probability": 25,
-			"position": 2,
-		},
-		"Proposal/Quotation": {
-			"color": "blue",
-			"type": "Ongoing",
-			"probability": 50,
-			"position": 3,
-		},
-		"Negotiation": {
-			"color": "yellow",
-			"type": "Ongoing",
-			"probability": 70,
-			"position": 4,
-		},
-		"Ready to Close": {
-			"color": "purple",
-			"type": "Ongoing",
-			"probability": 90,
-			"position": 5,
-		},
-		"Won": {
-			"color": "green",
-			"type": "Won",
-			"probability": 100,
-			"position": 6,
-		},
-		"Lost": {
-			"color": "red",
-			"type": "Lost",
-			"probability": 0,
-			"position": 7,
-		},
-	}
 
-	for status, config in statuses.items():
-		stage_label = get_default_deal_stage_label(status)
+	for config in get_default_deal_stage_templates():
+		stage_label = config["deal_status"]
 		existing = (
 			frappe.db.exists(
 				"CRM Deal Status",
@@ -157,10 +113,9 @@ def add_default_deal_statuses():
 			)
 			or frappe.db.exists(
 				"CRM Deal Status",
-				{"deal_status": status, "pipeline": default_pipeline},
+				{"deal_status": stage_label, "pipeline": default_pipeline},
 			)
 			or frappe.db.exists("CRM Deal Status", stage_label)
-			or frappe.db.exists("CRM Deal Status", status)
 		)
 		if existing:
 			if not frappe.db.get_value("CRM Deal Status", existing, "pipeline"):
