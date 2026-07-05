@@ -1,6 +1,8 @@
 import {
   buildMessengerChannelOptions,
   getMessengerChannelType,
+  getMessengerDeliveryLabel,
+  getMessengerDeliveryState,
   getMessengerPlatformLabel,
 } from '@/utils/messengerChannels'
 
@@ -8,28 +10,31 @@ describe('messengerChannels', () => {
   it('normalizes known platform labels', () => {
     expect(
       getMessengerPlatformLabel({
-        channel_type: 'avito',
-        display_name: 'Avito Test',
+        platform: 'avito',
       }),
     ).toBe('Avito')
     expect(
       getMessengerPlatformLabel({
-        channel_type: 'whatsapp',
-        display_name: 'WhatsApp Test',
+        platform: 'whatsapp',
       }),
     ).toBe('WhatsApp')
-  })
-
-  it('falls back to display name for unknown channel types', () => {
     expect(
       getMessengerPlatformLabel({
-        channel_type: 'other',
-        display_name: 'Custom Channel',
+        platform: 'telegram',
       }),
-    ).toBe('Custom Channel')
+    ).toBe('Telegram')
   })
 
-  it('reads channel type from channel_type or chat_type', () => {
+  it('humanizes custom platform labels', () => {
+    expect(
+      getMessengerPlatformLabel({
+        platform: 'custom_platform',
+      }),
+    ).toBe('Custom Platform')
+  })
+
+  it('reads channel type from platform, channel_type, or chat_type', () => {
+    expect(getMessengerChannelType({ platform: 'telegram' })).toBe('telegram')
     expect(getMessengerChannelType({ channel_type: 'avito' })).toBe('avito')
     expect(getMessengerChannelType({ chat_type: 'whatsapp' })).toBe('whatsapp')
   })
@@ -37,22 +42,56 @@ describe('messengerChannels', () => {
   it('builds unique select labels without technical names', () => {
     expect(
       buildMessengerChannelOptions([
-        { name: 'ch-1', channel_type: 'avito', display_name: 'Avito Test' },
-        {
-          name: 'ch-2',
-          channel_type: 'avito',
-          display_name: 'Avito Production',
-        },
-        {
-          name: 'ch-3',
-          channel_type: 'whatsapp',
-          display_name: 'WhatsApp Test',
-        },
+        { name: 'ch-1', platform: 'avito' },
+        { name: 'ch-2', platform: 'avito' },
+        { name: 'ch-3', platform: 'whatsapp' },
       ]),
     ).toEqual([
       { label: 'Avito', value: 'ch-1' },
       { label: 'Avito 2', value: 'ch-2' },
       { label: 'WhatsApp', value: 'ch-3' },
     ])
+  })
+
+  it('maps delivery states only for outbound messages', () => {
+    expect(
+      getMessengerDeliveryState({
+        direction: 'outbound',
+        delivery_status: 'queued',
+      }),
+    ).toBe('queued')
+    expect(
+      getMessengerDeliveryState({
+        direction: 'outbound',
+        delivery_status: 'read',
+      }),
+    ).toBe('read')
+    expect(
+      getMessengerDeliveryState({
+        direction: 'outbound',
+        status: 'sent',
+      }),
+    ).toBe('sent')
+    expect(
+      getMessengerDeliveryState({
+        direction: 'inbound',
+        delivery_status: 'read',
+      }),
+    ).toBe('')
+    expect(
+      getMessengerDeliveryState({
+        direction: 'outbound',
+        delivery_status: 'provider_custom',
+      }),
+    ).toBe('')
+  })
+
+  it('returns delivery labels', () => {
+    expect(
+      getMessengerDeliveryLabel({
+        direction: 'outbound',
+        delivery_status: 'failed',
+      }),
+    ).toBe('Ошибка')
   })
 })

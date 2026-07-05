@@ -119,24 +119,49 @@
               <div
                 class="mt-1 flex items-center justify-end gap-2 text-xs text-ink-gray-5"
               >
-                <Tooltip
-                  v-if="message.message_datetime"
-                  :text="formatDate(message.message_datetime)"
-                >
-                  <span>{{
-                    formatDate(message.message_datetime, 'HH:mm')
-                  }}</span>
-                </Tooltip>
-                <span v-if="message.status && message.status !== 'received'">
-                  {{ __(message.status) }}
-                </span>
-              </div>
-              <div
-                v-if="message.error"
-                class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
-              >
-                {{ message.error }}
-              </div>
+	                <Tooltip
+	                  v-if="message.message_datetime"
+	                  :text="formatDate(message.message_datetime)"
+	                >
+	                  <span>{{
+	                    formatDate(message.message_datetime, 'HH:mm')
+	                  }}</span>
+	                </Tooltip>
+	                <Tooltip
+	                  v-if="deliveryState(message)"
+	                  :text="deliveryTooltip(message)"
+	                >
+	                  <span
+	                    class="inline-flex items-center"
+	                    :class="deliveryIconClass(message)"
+	                  >
+	                    <ClockIcon
+	                      v-if="deliveryState(message) === 'queued'"
+	                      class="size-4"
+	                    />
+	                    <CheckIcon
+	                      v-else-if="deliveryState(message) === 'sent'"
+	                      class="size-4"
+	                    />
+	                    <DoubleCheckIcon
+	                      v-else-if="
+	                        ['delivered', 'read'].includes(deliveryState(message))
+	                      "
+	                      class="size-4"
+	                    />
+	                    <CircleAlertIcon
+	                      v-else-if="deliveryState(message) === 'failed'"
+	                      class="size-4"
+	                    />
+	                  </span>
+	                </Tooltip>
+	              </div>
+	              <div
+	                v-if="messageFailureReason(message)"
+	                class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
+	              >
+	                {{ messageFailureReason(message) }}
+	              </div>
             </div>
           </div>
         </div>
@@ -180,12 +205,16 @@
 </template>
 
 <script setup>
+import CheckIcon from '@/components/Icons/CheckIcon.vue'
 import CommentIcon from '@/components/Icons/CommentIcon.vue'
+import DoubleCheckIcon from '@/components/Icons/DoubleCheckIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import { formatDate } from '@/utils'
 import {
   buildMessengerChannelOptions,
   getMessengerChannelType,
+  getMessengerDeliveryLabel,
+  getMessengerDeliveryState,
   getMessengerPlatformLabel,
 } from '@/utils/messengerChannels'
 import {
@@ -198,6 +227,8 @@ import {
   toast,
 } from 'frappe-ui'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import CircleAlertIcon from '~icons/lucide/circle-alert'
+import ClockIcon from '~icons/lucide/clock-3'
 
 const props = defineProps({
   leadName: { type: String, required: true },
@@ -518,6 +549,27 @@ function messageSource(message) {
     conversation?.channel_info ||
     conversation
   return __(getMessengerPlatformLabel(channel))
+}
+
+function deliveryState(message) {
+  return getMessengerDeliveryState(message)
+}
+
+function deliveryTooltip(message) {
+  let label = getMessengerDeliveryLabel(message)
+  let reason = messageFailureReason(message)
+  return reason ? `${__(label)}: ${reason}` : __(label)
+}
+
+function deliveryIconClass(message) {
+  let state = deliveryState(message)
+  if (state === 'read') return 'text-ink-blue-2'
+  if (state === 'failed') return 'text-ink-red-4'
+  return 'text-ink-gray-5'
+}
+
+function messageFailureReason(message) {
+  return message.failure_reason || message.error || ''
 }
 
 function handleError(error, fallback) {

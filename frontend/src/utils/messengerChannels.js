@@ -1,21 +1,30 @@
+const PLATFORM_LABELS = {
+  avito: 'Avito',
+  whatsapp: 'WhatsApp',
+  telegram: 'Telegram',
+}
+
+const DELIVERY_LABELS = {
+  queued: 'В очереди',
+  sent: 'Отправлено',
+  delivered: 'Доставлено',
+  read: 'Прочитано',
+  failed: 'Ошибка',
+}
+
+const DELIVERY_STATES = Object.keys(DELIVERY_LABELS)
+
 export function getMessengerChannelType(channel = {}) {
   if (channel?.provider === 'avito_direct') return 'avito'
-  return channel?.channel_type || channel?.chat_type || channel?.platform || ''
+  return normalizePlatform(
+    channel?.platform || channel?.channel_type || channel?.chat_type || '',
+  )
 }
 
 export function getMessengerPlatformLabel(channel = {}) {
   let type = getMessengerChannelType(channel)
 
-  if (type === 'avito') return 'Avito'
-  if (type === 'whatsapp') return 'WhatsApp'
-
-  return (
-    channel?.display_name ||
-    channel?.plain_id ||
-    type ||
-    channel?.name ||
-    'Wazzup'
-  )
+  return PLATFORM_LABELS[type] || humanizePlatform(type) || channel?.name || 'Messenger'
 }
 
 export function buildMessengerChannelOptions(channels = []) {
@@ -38,4 +47,27 @@ export function buildMessengerChannelOptions(channels = []) {
       value: channel.name,
     }
   })
+}
+
+export function getMessengerDeliveryState(message = {}) {
+  if (message?.direction !== 'outbound') return ''
+
+  let status = normalizePlatform(message?.delivery_status || message?.status || '')
+  return DELIVERY_STATES.includes(status) ? status : ''
+}
+
+export function getMessengerDeliveryLabel(message = {}) {
+  return DELIVERY_LABELS[getMessengerDeliveryState(message)] || ''
+}
+
+function normalizePlatform(value) {
+  return `${value || ''}`.trim().toLowerCase()
+}
+
+function humanizePlatform(value) {
+  return `${value || ''}`
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
