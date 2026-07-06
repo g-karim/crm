@@ -6,6 +6,7 @@ import json
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from crm.fcrm.doctype.crm_fields_layout.crm_fields_layout import get_fields_layout
 from crm.patches.v1_0.reorganize_deal_data_layouts import execute
 
 
@@ -52,6 +53,28 @@ class TestCRMFieldsLayout(IntegrationTestCase):
 		self.assertIn("pipeline", fields)
 		self.assertIn("status", fields)
 
+	def test_get_fields_layout_hides_deal_import_fields(self):
+		custom_layout = [
+			{
+				"label": "Custom",
+				"name": "custom_section",
+				"columns": [
+					{
+						"name": "custom_column",
+						"fields": ["deal_name", "external_source", "status_label"],
+					}
+				],
+			}
+		]
+		upsert_fields_layout("CRM Deal-Data Fields", "Data Fields", custom_layout)
+
+		layout = get_fields_layout("CRM Deal", "Data Fields")
+		fields = get_layout_fieldnames(layout)
+
+		self.assertIn("deal_name", fields)
+		self.assertNotIn("external_source", fields)
+		self.assertNotIn("status_label", fields)
+
 
 def upsert_fields_layout(name, layout_type, layout):
 	if frappe.db.exists("CRM Fields Layout", name):
@@ -72,6 +95,13 @@ def get_layout_fields(layout):
 		for section in iter_layout_sections(layout)
 		for column in section.get("columns") or []
 		for field in column.get("fields") or []
+	]
+
+
+def get_layout_fieldnames(layout):
+	return [
+		field.get("fieldname") if isinstance(field, dict) else field
+		for field in get_layout_fields(layout)
 	]
 
 

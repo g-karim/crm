@@ -6,6 +6,10 @@ from frappe import _
 from frappe.model.naming import make_autoname
 from frappe.model.document import Document
 
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import (
+	STAGE_EXTERNAL_DOCTYPE,
+	set_external_reference,
+)
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_pipeline
 
 
@@ -77,6 +81,25 @@ class CRMDealStatus(Document):
 		self.validate_external_pipeline_id()
 		self.validate_unique_status_in_pipeline()
 		self.validate_unique_external_status_in_pipeline()
+
+	def on_update(self):
+		self.sync_external_reference()
+
+	def after_insert(self):
+		self.sync_external_reference()
+
+	def sync_external_reference(self):
+		if not self.external_source or not self.external_status_id:
+			return
+
+		set_external_reference(
+			"CRM Deal Status",
+			self.name,
+			self.external_source,
+			self.external_status_id,
+			STAGE_EXTERNAL_DOCTYPE,
+			external_parent_id=self.external_pipeline_id,
+		)
 
 	def validate_external_source_required(self):
 		if (self.external_pipeline_id or self.external_status_id) and not self.external_source:

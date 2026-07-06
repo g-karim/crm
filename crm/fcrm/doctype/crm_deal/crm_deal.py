@@ -6,6 +6,11 @@ from frappe import _
 from frappe.model.document import Document
 
 from crm.api.exchange_rate import get_exchange_rate
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import (
+	DEAL_EXTERNAL_DOCTYPE,
+	find_external_reference,
+	set_external_reference,
+)
 from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 	get_default_deal_status,
@@ -15,6 +20,15 @@ from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 )
 from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import add_status_change_log
 from crm.fcrm.doctype.utils import add_or_remove_lost_reason_section_in_sidepanel
+
+TECHNICAL_IMPORT_FIELDS = [
+	"pipeline_label",
+	"status_label",
+	"external_source",
+	"external_pipeline_id",
+	"external_status_id",
+	"external_record_id",
+]
 
 try:
 	from frappe.desk.form.assign_to import _add as assign
@@ -105,6 +119,7 @@ class CRMDeal(Document):
 		self.validate_status()
 		self.validate_status_pipeline()
 		self.validate_external_record_id()
+		self.validate_external_record_reference()
 		self.set_primary_contact()
 		self.set_primary_email_mobile_no()
 		if not self.is_new() and self.has_value_changed("deal_owner") and self.deal_owner:
@@ -124,46 +139,71 @@ class CRMDeal(Document):
 			if self.deal_owner != frappe.session.user:
 				self.share_with_agent(self.deal_owner)
 			self.assign_agent(self.deal_owner)
+		self.sync_external_reference()
+
+	def on_update(self):
+		self.sync_external_reference()
 
 	def before_save(self):
 		self.apply_sla()
 
 	def normalize_import_fields(self):
-		resolved_pipeline = resolve_sales_pipeline(
-			self.pipeline_label,
-			self.external_pipeline_id,
-			self.external_source,
-		)
-		if resolved_pipeline:
-			if self.pipeline and self.pipeline != resolved_pipeline:
-				frappe.throw(
-					_("Pipeline {0} does not match imported pipeline {1}.").format(
-						frappe.bold(self.pipeline),
-						frappe.bold(resolved_pipeline),
-					),
-					frappe.ValidationError,
-				)
-			self.pipeline = resolved_pipeline
+		if self.should_normalize_import_fields(
+			"pipeline_label",
+			"external_pipeline_id",
+			"external_source",
+		):
+			resolved_pipeline = resolve_sales_pipeline(
+				self.pipeline_label,
+				self.external_pipeline_id,
+				self.external_source,
+			)
+			if resolved_pipeline:
+				if self.pipeline and self.pipeline != resolved_pipeline:
+					frappe.throw(
+						_("Pipeline {0} does not match imported pipeline {1}.").format(
+							frappe.bold(self.pipeline),
+							frappe.bold(resolved_pipeline),
+						),
+						frappe.ValidationError,
+					)
+				self.pipeline = resolved_pipeline
 
-		resolved_status = resolve_deal_status(
-			self.status_label,
-			self.pipeline,
-			self.external_status_id,
-			self.external_source,
-		)
-		if resolved_status:
-			if self.status and self.status != resolved_status:
-				frappe.throw(
-					_("Deal stage {0} does not match imported stage {1}.").format(
-						frappe.bold(self.status),
-						frappe.bold(resolved_status),
-					),
-					frappe.ValidationError,
-				)
-			self.status = resolved_status
+		if self.should_normalize_import_fields(
+			"status_label",
+			"external_status_id",
+			"external_source",
+		):
+			resolved_status = resolve_deal_status(
+				self.status_label,
+				self.pipeline,
+				self.external_status_id,
+				self.external_source,
+			)
+			if resolved_status:
+				if self.status and self.status != resolved_status:
+					frappe.throw(
+						_("Deal stage {0} does not match imported stage {1}.").format(
+							frappe.bold(self.status),
+							frappe.bold(resolved_status),
+						),
+						frappe.ValidationError,
+					)
+				self.status = resolved_status
+
+		self.clear_import_labels()
 
 		if self.status and not self.pipeline:
 			self.pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
+
+	def should_normalize_import_fields(self, *fieldnames: str) -> bool:
+		if self.is_new():
+			return True
+		return any(self.has_value_changed(fieldname) for fieldname in fieldnames)
+
+	def clear_import_labels(self):
+		self.pipeline_label = None
+		self.status_label = None
 
 	def validate_status(self):
 		if self.status and self.pipeline and self.has_value_changed("pipeline") and not self.has_value_changed("status"):
@@ -242,6 +282,50 @@ class CRMDeal(Document):
 				),
 				frappe.DuplicateEntryError,
 			)
+
+	def validate_external_record_reference(self):
+		if not self.external_source or not self.external_record_id:
+			return
+
+		external_reference = find_external_reference(
+			self.external_source,
+			self.external_record_id,
+			DEAL_EXTERNAL_DOCTYPE,
+		)
+		if (
+			external_reference
+			and (
+				external_reference.reference_doctype != "CRM Deal"
+				or external_reference.reference_name != self.name
+			)
+		):
+			frappe.throw(
+				_("External record ID {0} is already linked to deal {1}.").format(
+					frappe.bold(self.external_record_id),
+					frappe.bold(external_reference.reference_name),
+				),
+				frappe.DuplicateEntryError,
+			)
+
+	def sync_external_reference(self):
+		if not self.external_source or not self.external_record_id:
+			return
+
+		set_external_reference(
+			"CRM Deal",
+			self.name,
+			self.external_source,
+			self.external_record_id,
+			DEAL_EXTERNAL_DOCTYPE,
+		)
+
+	@staticmethod
+	def get_hidden_fields():
+		return TECHNICAL_IMPORT_FIELDS
+
+	@staticmethod
+	def get_non_filterable_fields():
+		return TECHNICAL_IMPORT_FIELDS
 
 	def get_pipeline_stage_order(self):
 		return frappe.get_all(

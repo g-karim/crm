@@ -5,6 +5,14 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import (
+	PIPELINE_EXTERNAL_DOCTYPE,
+	STAGE_EXTERNAL_DOCTYPE,
+	find_external_reference,
+	get_external_reference,
+	set_external_reference,
+)
+
 
 DEFAULT_DEAL_PIPELINE = "Default Deal Pipeline"
 DEFAULT_DEAL_STAGE_TEMPLATES = [
@@ -165,6 +173,22 @@ class CRMSalesPipeline(Document):
 				0,
 				update_modified=False,
 			)
+		self.sync_external_reference()
+
+	def after_insert(self):
+		self.sync_external_reference()
+
+	def sync_external_reference(self):
+		if not self.external_source or not self.external_pipeline_id:
+			return
+
+		set_external_reference(
+			"CRM Sales Pipeline",
+			self.name,
+			self.external_source,
+			self.external_pipeline_id,
+			PIPELINE_EXTERNAL_DOCTYPE,
+		)
 
 	def on_trash(self):
 		if frappe.db.exists("CRM Deal Status", {"pipeline": self.name}):
@@ -289,14 +313,24 @@ def resolve_sales_pipeline(
 				),
 				frappe.ValidationError,
 			)
+
+		external_reference = find_external_reference(
+			external_source,
+			external_pipeline_id,
+			PIPELINE_EXTERNAL_DOCTYPE,
+		)
+		if external_reference:
+			resolved_from_external_id = external_reference.reference_name
+
 		filters = {"external_pipeline_id": external_pipeline_id}
 		filters["external_source"] = external_source
 
-		resolved_from_external_id = get_single_value(
-			"CRM Sales Pipeline",
-			filters,
-			_("external pipeline ID {0}").format(frappe.bold(external_pipeline_id)),
-		)
+		if not resolved_from_external_id:
+			resolved_from_external_id = get_single_value(
+				"CRM Sales Pipeline",
+				filters,
+				_("external pipeline ID {0}").format(frappe.bold(external_pipeline_id)),
+			)
 
 	resolved_from_value = None
 	if value:
@@ -348,16 +382,32 @@ def resolve_deal_status(
 				),
 				frappe.ValidationError,
 			)
+		external_parent_id = get_reference_external_id(
+			"CRM Sales Pipeline",
+			pipeline,
+			external_source,
+			PIPELINE_EXTERNAL_DOCTYPE,
+		)
+		external_reference = find_external_reference(
+			external_source,
+			external_status_id,
+			STAGE_EXTERNAL_DOCTYPE,
+			external_parent_id,
+		)
+		if external_reference:
+			resolved_from_external_id = external_reference.reference_name
+
 		filters = {"external_status_id": external_status_id}
 		if pipeline:
 			filters["pipeline"] = pipeline
 		filters["external_source"] = external_source
 
-		resolved_from_external_id = get_single_value(
-			"CRM Deal Status",
-			filters,
-			_("external status ID {0}").format(frappe.bold(external_status_id)),
-		)
+		if not resolved_from_external_id:
+			resolved_from_external_id = get_single_value(
+				"CRM Deal Status",
+				filters,
+				_("external status ID {0}").format(frappe.bold(external_status_id)),
+			)
 
 	resolved_from_value = None
 	if value:
@@ -401,6 +451,30 @@ def resolve_deal_status(
 		)
 
 	return resolved_from_value or resolved_from_external_id
+
+
+def get_reference_external_id(
+	reference_doctype: str,
+	reference_name: str | None,
+	external_source: str | None,
+	external_doctype: str,
+) -> str | None:
+	if not reference_name or not external_source:
+		return None
+
+	external_reference = get_external_reference(
+		reference_doctype,
+		reference_name,
+		external_source,
+		external_doctype,
+	)
+	if external_reference:
+		return external_reference.external_id
+
+	if reference_doctype == "CRM Sales Pipeline":
+		return frappe.db.get_value("CRM Sales Pipeline", reference_name, "external_pipeline_id")
+
+	return None
 
 
 def get_single_value(

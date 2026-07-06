@@ -4,7 +4,14 @@
 import frappe
 from frappe.tests import UnitTestCase
 
-from crm.api.doc import get_data
+from crm.api.doc import (
+	get_data,
+	get_filterable_fields,
+	get_group_by_fields,
+	get_quick_filters,
+	sort_options,
+)
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
 from crm.fcrm.doctype.crm_deal.crm_deal import (
 	add_contact,
 	create_deal,
@@ -136,6 +143,8 @@ class TestCRMDeal(UnitTestCase):
 
 		self.assertEqual(deal.pipeline, first_pipeline.name)
 		self.assertEqual(deal.status, first_stage.name)
+		self.assertIsNone(deal.pipeline_label)
+		self.assertIsNone(deal.status_label)
 
 	def test_import_stage_label_without_pipeline_rejects_ambiguous_stage(self):
 		"""Test that duplicate stage labels require pipeline context during import"""
@@ -150,6 +159,48 @@ class TestCRMDeal(UnitTestCase):
 				organization="Ambiguous Import Org",
 				status_label=stage_label,
 			)
+
+	def test_import_stage_label_rejects_conflicting_new_deal_status(self):
+		"""Test that import labels still reject conflicting values on new deals"""
+		pipeline = create_test_pipeline("Import Conflict Pipeline")
+		imported_stage = create_test_deal_status("Imported Conflict Stage", pipeline.name)
+		selected_stage = create_test_deal_status("Selected Conflict Stage", pipeline.name)
+
+		with self.assertRaises(frappe.exceptions.ValidationError):
+			create_test_deal(
+				organization="Import Conflict Org",
+				pipeline=pipeline.name,
+				status=selected_stage.name,
+				status_label=imported_stage.deal_status,
+			)
+
+	def test_legacy_import_label_does_not_block_manual_status_change(self):
+		"""Test that old import labels do not control normal saves after import"""
+		pipeline = create_test_pipeline("Legacy Import Label Pipeline")
+		old_stage = create_test_deal_status("Legacy Old Stage", pipeline.name)
+		new_stage = create_test_deal_status("Legacy New Stage", pipeline.name)
+		deal = create_test_deal(
+			organization="Legacy Import Label Org",
+			pipeline=pipeline.name,
+			status=old_stage.name,
+		)
+		frappe.db.set_value(
+			"CRM Deal",
+			deal.name,
+			{
+				"pipeline_label": pipeline.pipeline_name,
+				"status_label": old_stage.deal_status,
+			},
+			update_modified=False,
+		)
+
+		deal.reload()
+		deal.status = new_stage.name
+		deal.save()
+
+		self.assertEqual(deal.status, new_stage.name)
+		self.assertIsNone(deal.pipeline_label)
+		self.assertIsNone(deal.status_label)
 
 	def test_import_external_ids_resolve_pipeline_and_stage(self):
 		"""Test that external IDs can resolve the deal pipeline and stage"""
@@ -213,6 +264,90 @@ class TestCRMDeal(UnitTestCase):
 		)
 
 		self.assertNotEqual(first.name, second.name)
+
+	def test_external_record_id_writes_external_reference(self):
+		"""Test that imported deal IDs are mirrored to CRM External Reference"""
+		external_record_id = f"external-deal-{frappe.generate_hash(length=8)}"
+		deal = create_test_deal(
+			organization="External Reference Deal Org",
+			external_source="amocrm",
+			external_record_id=external_record_id,
+		)
+
+		reference = find_external_reference("amocrm", external_record_id, "CRM Deal")
+
+		self.assertEqual(reference.reference_doctype, "CRM Deal")
+		self.assertEqual(reference.reference_name, deal.name)
+
+	def test_external_record_reference_blocks_duplicate_imported_deal(self):
+		"""Test that new external reference mappings are used for duplicate checks"""
+		external_record_id = f"external-deal-{frappe.generate_hash(length=8)}"
+		first = create_test_deal(
+			organization="External Reference Unique Org",
+			external_source="amocrm",
+			external_record_id=external_record_id,
+		)
+		frappe.db.set_value(
+			"CRM Deal",
+			first.name,
+			"external_record_id",
+			None,
+			update_modified=False,
+		)
+
+		with self.assertRaises(frappe.DuplicateEntryError):
+			create_test_deal(
+				organization="External Reference Duplicate Org",
+				external_source="amocrm",
+				external_record_id=external_record_id,
+			)
+
+	def test_deal_technical_import_fields_are_hidden_from_metadata_apis(self):
+		"""Test that import fields remain technical and are not offered in user field pickers"""
+		technical_fields = {
+			"pipeline_label",
+			"status_label",
+			"external_source",
+			"external_pipeline_id",
+			"external_status_id",
+			"external_record_id",
+		}
+
+		self.assertFalse(
+			technical_fields & {field.get("fieldname") for field in get_filterable_fields("CRM Deal")}
+		)
+		self.assertFalse(technical_fields & {field.get("fieldname") for field in sort_options("CRM Deal")})
+		self.assertFalse(
+			technical_fields & {field.get("fieldname") for field in get_group_by_fields("CRM Deal")}
+		)
+
+	def test_deal_technical_import_fields_are_hidden_from_quick_filters(self):
+		"""Test that saved quick filter settings cannot expose import fields"""
+		settings_name = frappe.db.exists(
+			"CRM Global Settings",
+			{"dt": "CRM Deal", "type": "Quick Filters"},
+		)
+		settings = (
+			frappe.get_doc("CRM Global Settings", settings_name)
+			if settings_name
+			else frappe.get_doc(
+				{
+					"doctype": "CRM Global Settings",
+					"dt": "CRM Deal",
+					"type": "Quick Filters",
+				}
+			).insert(ignore_permissions=True)
+		)
+		original_json = settings.json or "[]"
+		settings.json = '["external_source", "status"]'
+		settings.save(ignore_permissions=True)
+
+		try:
+			quick_filters = get_quick_filters("CRM Deal", cached=False)
+			self.assertNotIn("external_source", {field.get("fieldname") for field in quick_filters})
+			self.assertIn("status", {field.get("fieldname") for field in quick_filters})
+		finally:
+			frappe.db.set_value("CRM Global Settings", settings.name, "json", original_json)
 
 	def test_stage_skip_warning_does_not_block_save(self):
 		"""Test that skipping stages emits a soft warning and still saves the deal"""

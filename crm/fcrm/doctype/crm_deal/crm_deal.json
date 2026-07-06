@@ -198,28 +198,24 @@
    "fieldname": "external_source",
    "fieldtype": "Data",
    "hidden": 1,
-   "in_standard_filter": 1,
    "label": "External Source"
   },
   {
    "fieldname": "external_pipeline_id",
    "fieldtype": "Data",
    "hidden": 1,
-   "in_standard_filter": 1,
    "label": "External Pipeline ID"
   },
   {
    "fieldname": "external_status_id",
    "fieldtype": "Data",
    "hidden": 1,
-   "in_standard_filter": 1,
    "label": "External Status ID"
   },
   {
    "fieldname": "external_record_id",
    "fieldtype": "Data",
    "hidden": 1,
-   "in_standard_filter": 1,
    "label": "External Record ID"
   },
   {

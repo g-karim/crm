@@ -4,7 +4,8 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_pipeline
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_pipeline, resolve_deal_status
 
 
 class TestCRMDealStatus(IntegrationTestCase):
@@ -138,3 +139,77 @@ class TestCRMDealStatus(IntegrationTestCase):
 
 		self.assertEqual(stage.external_source, "bitrix24")
 		self.assertEqual(stage.external_pipeline_id, external_pipeline_id)
+
+	def test_external_status_id_writes_external_reference(self):
+		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
+		external_status_id = f"external-status-{frappe.generate_hash(length=8)}"
+		pipeline = frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"External Reference Pipeline {frappe.generate_hash(length=8)}",
+				"external_source": "bitrix24",
+				"external_pipeline_id": external_pipeline_id,
+				"enabled": 1,
+				"position": 99,
+			}
+		).insert()
+		stage = frappe.get_doc(
+			{
+				"doctype": "CRM Deal Status",
+				"deal_status": f"External Reference Stage {frappe.generate_hash(length=8)}",
+				"pipeline": pipeline.name,
+				"external_status_id": external_status_id,
+				"type": "Open",
+				"position": 99,
+			}
+		).insert()
+
+		reference = find_external_reference(
+			"bitrix24",
+			external_status_id,
+			"CRM Deal Status",
+			external_pipeline_id,
+		)
+
+		self.assertEqual(reference.reference_doctype, "CRM Deal Status")
+		self.assertEqual(reference.reference_name, stage.name)
+		self.assertEqual(reference.external_parent_id, external_pipeline_id)
+
+	def test_resolve_status_reads_external_reference_before_legacy_fields(self):
+		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
+		external_status_id = f"external-status-{frappe.generate_hash(length=8)}"
+		pipeline = frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"External Resolve Pipeline {frappe.generate_hash(length=8)}",
+				"external_source": "bitrix24",
+				"external_pipeline_id": external_pipeline_id,
+				"enabled": 1,
+				"position": 99,
+			}
+		).insert()
+		stage = frappe.get_doc(
+			{
+				"doctype": "CRM Deal Status",
+				"deal_status": f"External Resolve Stage {frappe.generate_hash(length=8)}",
+				"pipeline": pipeline.name,
+				"external_status_id": external_status_id,
+				"type": "Open",
+				"position": 99,
+			}
+		).insert()
+		frappe.db.set_value(
+			"CRM Deal Status",
+			stage.name,
+			"external_status_id",
+			None,
+			update_modified=False,
+		)
+
+		resolved = resolve_deal_status(
+			pipeline=pipeline.name,
+			external_status_id=external_status_id,
+			external_source="bitrix24",
+		)
+
+		self.assertEqual(resolved, stage.name)
