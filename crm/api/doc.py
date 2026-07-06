@@ -21,8 +21,16 @@ COUNT_NAME = (
 )
 
 
+def get_hidden_fields(doctype: str) -> list[str]:
+	c = get_controller(doctype)
+	if hasattr(c, "get_hidden_fields"):
+		return c.get_hidden_fields()
+	return []
+
+
 @frappe.whitelist()
 def sort_options(doctype: str):
+	hidden_fields = get_hidden_fields(doctype)
 	fields = frappe.get_meta(doctype).fields
 	fields = [field for field in fields if field.fieldtype not in no_value_fields]
 	fields = [
@@ -32,7 +40,7 @@ def sort_options(doctype: str):
 			"fieldname": field.fieldname,
 		}
 		for field in fields
-		if field.label and field.fieldname
+		if field.label and field.fieldname and field.fieldname not in hidden_fields and not field.hidden
 	]
 
 	standard_fields = [
@@ -73,9 +81,9 @@ def get_filterable_fields(doctype: str):
 	]
 
 	c = get_controller(doctype)
-	restricted_fields = []
+	restricted_fields = get_hidden_fields(doctype)
 	if hasattr(c, "get_non_filterable_fields"):
-		restricted_fields = c.get_non_filterable_fields()
+		restricted_fields = list(set(restricted_fields + c.get_non_filterable_fields()))
 
 	fields = []
 
@@ -100,7 +108,11 @@ def get_filterable_fields(doctype: str):
 	]
 
 	for field in standard_fields + meta.get("fields", []):
-		if field.get("fieldname") not in restricted_fields and field.get("fieldtype") in allowed_fieldtypes:
+		if (
+			field.get("fieldname") not in restricted_fields
+			and field.get("fieldtype") in allowed_fieldtypes
+			and not field.get("hidden")
+		):
 			field["name"] = field.get("fieldname")
 			field["label"] = _(field.get("label"))
 			field["value"] = field.get("fieldname")
@@ -125,11 +137,15 @@ def get_group_by_fields(doctype: str):
 		"Datetime",
 	]
 
+	hidden_fields = get_hidden_fields(doctype)
 	fields = frappe.get_meta(doctype).fields
 	fields = [
 		field
 		for field in fields
-		if field.fieldtype not in no_value_fields and field.fieldtype in allowed_fieldtypes
+		if field.fieldtype not in no_value_fields
+		and field.fieldtype in allowed_fieldtypes
+		and field.fieldname not in hidden_fields
+		and not field.hidden
 	]
 	fields = [
 		{
@@ -163,6 +179,7 @@ def get_group_by_fields(doctype: str):
 @frappe.whitelist()
 def get_quick_filters(doctype: str, cached: bool = True):
 	meta = frappe.get_meta(doctype, cached)
+	hidden_fields = get_hidden_fields(doctype)
 	quick_filters = []
 
 	if global_settings := frappe.db.exists("CRM Global Settings", {"dt": doctype, "type": "Quick Filters"}):
@@ -176,11 +193,15 @@ def get_quick_filters(doctype: str, cached: bool = True):
 				fields.append({"label": "Name", "fieldname": "name", "fieldtype": "Data"})
 			else:
 				field = next((f for f in meta.fields if f.fieldname == filter), None)
-				if field:
+				if field and field.fieldname not in hidden_fields and not field.hidden:
 					fields.append(field)
 
 	else:
-		fields = [field for field in meta.fields if field.in_standard_filter]
+		fields = [
+			field
+			for field in meta.fields
+			if field.in_standard_filter and field.fieldname not in hidden_fields and not field.hidden
+		]
 
 	for field in fields:
 		options = field.get("options")
@@ -208,6 +229,9 @@ def get_quick_filters(doctype: str, cached: bool = True):
 def update_quick_filters(quick_filters: str, old_filters: str, doctype: str):
 	quick_filters = json.loads(quick_filters)
 	old_filters = json.loads(old_filters)
+	hidden_fields = get_hidden_fields(doctype)
+	quick_filters = [field for field in quick_filters if field not in hidden_fields]
+	old_filters = [field for field in old_filters if field not in hidden_fields]
 
 	new_filters = [filter for filter in quick_filters if filter not in old_filters]
 	removed_filters = [filter for filter in old_filters if filter not in quick_filters]
@@ -304,6 +328,7 @@ def get_data(
 		default_rows = _list.default_list_data().get("rows")
 
 	meta = frappe.get_meta(doctype)
+	hidden_fields = set(get_hidden_fields(doctype))
 
 	if view_type != "kanban":
 		if columns or rows:
@@ -337,8 +362,16 @@ def get_data(
 			rows = default_rows
 			columns = _list.default_list_data().get("columns")
 
+		rows = [row for row in rows or [] if row not in hidden_fields]
+		columns = [column for column in columns or [] if column.get("key") not in hidden_fields]
+
+		visible_columns = []
 		# check if rows has all keys from columns if not add them
 		for column in columns:
+			column_meta = meta.get_field(column.get("key"))
+			if column_meta and column_meta.get("hidden"):
+				continue
+
 			if column.get("key") not in rows:
 				rows.append(column.get("key"))
 			column["label"] = _(column.get("label"))
@@ -346,12 +379,12 @@ def get_data(
 			if column.get("key") == "_liked_by" and column.get("width") == "10rem":
 				column["width"] = "50px"
 
-			# remove column if column.hidden is True
-			column_meta = meta.get_field(column.get("key"))
-			if column_meta and column_meta.get("hidden"):
-				columns.remove(column)
+			visible_columns.append(column)
+		columns = visible_columns
 
 		# check if rows has group_by_field if not add it
+		if group_by_field in hidden_fields:
+			group_by_field = None
 		if group_by_field and group_by_field not in rows:
 			rows.append(group_by_field)
 
@@ -370,6 +403,7 @@ def get_data(
 	if view_type == "kanban":
 		if not rows:
 			rows = default_rows
+		rows = [row for row in rows or [] if row not in hidden_fields]
 
 		if doctype == "CRM Deal" and column_field == "status" and filters.get("pipeline"):
 			kanban_columns = get_deal_pipeline_kanban_columns(filters.get("pipeline"), kanban_columns)
@@ -396,6 +430,7 @@ def get_data(
 			kanban_fields = ["name"]
 			if hasattr(_list, "default_kanban_settings"):
 				kanban_fields = json.loads(_list.default_kanban_settings().get("kanban_fields"))
+		kanban_fields = [field for field in kanban_fields if field not in hidden_fields]
 
 		for field in kanban_fields:
 			if field not in rows:
@@ -460,7 +495,7 @@ def get_data(
 			"options": field.options,
 		}
 		for field in fields
-		if field.label and field.fieldname
+		if field.label and field.fieldname and field.fieldname not in hidden_fields and not field.hidden
 	]
 
 	std_fields = [
@@ -673,11 +708,12 @@ def get_fields(doctype: str, allow_all_fieldtypes: bool = False):
 	if allow_all_fieldtypes:
 		not_allowed_fieldtypes = []
 	fields = frappe.get_meta(doctype).fields
+	hidden_fields = set(get_hidden_fields(doctype))
 
 	_fields = []
 
 	for field in fields:
-		if field.fieldtype not in not_allowed_fieldtypes and field.fieldname:
+		if field.fieldtype not in not_allowed_fieldtypes and field.fieldname and field.fieldname not in hidden_fields:
 			_fields.append(field)
 
 	return _fields

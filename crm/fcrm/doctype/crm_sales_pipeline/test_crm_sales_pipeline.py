@@ -15,7 +15,9 @@ from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 	get_default_deal_stage_label,
 	get_default_deal_stage_templates,
 	get_default_pipeline_label,
+	resolve_sales_pipeline,
 )
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
 
 
 class TestCRMSalesPipeline(IntegrationTestCase):
@@ -109,6 +111,55 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 		).insert()
 
 		self.assertNotEqual(first.name, second.name)
+
+	def test_external_pipeline_id_writes_external_reference(self):
+		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
+		pipeline = frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"External Reference Pipeline {frappe.generate_hash(length=8)}",
+				"external_source": "bitrix24",
+				"external_pipeline_id": external_pipeline_id,
+				"enabled": 1,
+				"position": 99,
+			}
+		).insert()
+
+		reference = find_external_reference(
+			"bitrix24",
+			external_pipeline_id,
+			"CRM Sales Pipeline",
+		)
+
+		self.assertEqual(reference.reference_doctype, "CRM Sales Pipeline")
+		self.assertEqual(reference.reference_name, pipeline.name)
+
+	def test_resolve_pipeline_reads_external_reference_before_legacy_fields(self):
+		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
+		pipeline = frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"External Resolve Pipeline {frappe.generate_hash(length=8)}",
+				"external_source": "bitrix24",
+				"external_pipeline_id": external_pipeline_id,
+				"enabled": 1,
+				"position": 99,
+			}
+		).insert()
+		frappe.db.set_value(
+			"CRM Sales Pipeline",
+			pipeline.name,
+			"external_pipeline_id",
+			None,
+			update_modified=False,
+		)
+
+		resolved = resolve_sales_pipeline(
+			external_pipeline_id=external_pipeline_id,
+			external_source="bitrix24",
+		)
+
+		self.assertEqual(resolved, pipeline.name)
 
 	def test_default_pipeline_seed_labels_stay_canonical(self):
 		previous_lang = frappe.db.get_default("lang")
