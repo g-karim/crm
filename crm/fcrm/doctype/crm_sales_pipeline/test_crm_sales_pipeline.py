@@ -161,6 +161,38 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 
 		self.assertEqual(resolved, pipeline.name)
 
+	def test_external_reference_blocks_duplicate_pipeline_after_legacy_field_cleared(self):
+		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
+		first = frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"External Reference Unique {frappe.generate_hash(length=8)}",
+				"external_source": "bitrix24",
+				"external_pipeline_id": external_pipeline_id,
+				"enabled": 1,
+				"position": 99,
+			}
+		).insert()
+		frappe.db.set_value(
+			"CRM Sales Pipeline",
+			first.name,
+			"external_pipeline_id",
+			None,
+			update_modified=False,
+		)
+
+		with self.assertRaises(frappe.DuplicateEntryError):
+			frappe.get_doc(
+				{
+					"doctype": "CRM Sales Pipeline",
+					"pipeline_name": f"External Reference Duplicate {frappe.generate_hash(length=8)}",
+					"external_source": "bitrix24",
+					"external_pipeline_id": external_pipeline_id,
+					"enabled": 1,
+					"position": 100,
+				}
+			).insert()
+
 	def test_default_pipeline_seed_labels_stay_canonical(self):
 		previous_lang = frappe.db.get_default("lang")
 		try:

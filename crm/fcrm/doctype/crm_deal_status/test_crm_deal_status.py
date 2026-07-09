@@ -140,6 +140,41 @@ class TestCRMDealStatus(IntegrationTestCase):
 		self.assertEqual(stage.external_source, "bitrix24")
 		self.assertEqual(stage.external_pipeline_id, external_pipeline_id)
 
+	def test_external_pipeline_id_is_inherited_from_pipeline_reference(self):
+		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
+		pipeline = frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"External Reference Pipeline {frappe.generate_hash(length=8)}",
+				"external_source": "bitrix24",
+				"external_pipeline_id": external_pipeline_id,
+				"enabled": 1,
+				"position": 99,
+			}
+		).insert()
+		frappe.db.set_value(
+			"CRM Sales Pipeline",
+			pipeline.name,
+			{
+				"external_source": None,
+				"external_pipeline_id": None,
+			},
+			update_modified=False,
+		)
+
+		stage = frappe.get_doc(
+			{
+				"doctype": "CRM Deal Status",
+				"deal_status": f"External Reference Inherited Stage {frappe.generate_hash(length=8)}",
+				"pipeline": pipeline.name,
+				"type": "Open",
+				"position": 99,
+			}
+		).insert()
+
+		self.assertEqual(stage.external_source, "bitrix24")
+		self.assertEqual(stage.external_pipeline_id, external_pipeline_id)
+
 	def test_external_status_id_writes_external_reference(self):
 		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
 		external_status_id = f"external-status-{frappe.generate_hash(length=8)}"
@@ -213,3 +248,46 @@ class TestCRMDealStatus(IntegrationTestCase):
 		)
 
 		self.assertEqual(resolved, stage.name)
+
+	def test_external_reference_blocks_duplicate_status_after_legacy_field_cleared(self):
+		external_pipeline_id = f"external-pipeline-{frappe.generate_hash(length=8)}"
+		external_status_id = f"external-status-{frappe.generate_hash(length=8)}"
+		pipeline = frappe.get_doc(
+			{
+				"doctype": "CRM Sales Pipeline",
+				"pipeline_name": f"External Reference Duplicate Pipeline {frappe.generate_hash(length=8)}",
+				"external_source": "bitrix24",
+				"external_pipeline_id": external_pipeline_id,
+				"enabled": 1,
+				"position": 99,
+			}
+		).insert()
+		first = frappe.get_doc(
+			{
+				"doctype": "CRM Deal Status",
+				"deal_status": f"External Reference Unique Stage {frappe.generate_hash(length=8)}",
+				"pipeline": pipeline.name,
+				"external_status_id": external_status_id,
+				"type": "Open",
+				"position": 99,
+			}
+		).insert()
+		frappe.db.set_value(
+			"CRM Deal Status",
+			first.name,
+			"external_status_id",
+			None,
+			update_modified=False,
+		)
+
+		with self.assertRaises(frappe.DuplicateEntryError):
+			frappe.get_doc(
+				{
+					"doctype": "CRM Deal Status",
+					"deal_status": f"External Reference Duplicate Stage {frappe.generate_hash(length=8)}",
+					"pipeline": pipeline.name,
+					"external_status_id": external_status_id,
+					"type": "Open",
+					"position": 100,
+				}
+			).insert()
