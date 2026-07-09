@@ -37,7 +37,9 @@
       <template #item="{ item, close }">
         <button
           class="group flex text-ink-gray-6 gap-4 h-7 w-full justify-between items-center rounded px-2 text-base hover:bg-surface-gray-3"
-          @click="item.onClick"
+          @pointerdown="selectViewItem($event, item, close)"
+          @keydown.enter.prevent="selectViewItem($event, item, close)"
+          @keydown.space.prevent="selectViewItem($event, item, close)"
         >
           <div class="flex items-center">
             <FeatherIcon
@@ -68,7 +70,8 @@
                 <Button
                   variant="ghost"
                   class="group-hover:!w-auto !w-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
-                  icon="more-horizontal"
+                  icon="lucide-more-horizontal"
+                  @pointerdown.stop
                   @click.stop
                 />
               </template>
@@ -96,5 +99,13 @@ const viewControls = defineModel({ type: Object, default: () => ({}) })
 
 const isCurrentView = (item) => {
   return item.name === viewControls.value.currentView.name
+}
+
+function selectViewItem(event, item, close) {
+  if (event.type === 'pointerdown' && event.button !== 0) return
+
+  event.preventDefault()
+  item.onClick?.()
+  close?.()
 }
 </script>
