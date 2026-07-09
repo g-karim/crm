@@ -7,7 +7,10 @@ from frappe.model.naming import make_autoname
 from frappe.model.document import Document
 
 from crm.fcrm.doctype.crm_external_reference.crm_external_reference import (
+	PIPELINE_EXTERNAL_DOCTYPE,
 	STAGE_EXTERNAL_DOCTYPE,
+	find_external_reference,
+	get_external_reference,
 	set_external_reference,
 )
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_pipeline
@@ -66,15 +69,10 @@ class CRMDealStatus(Document):
 			self.pipeline = get_default_pipeline()
 
 		if self.pipeline and (not self.external_source or not self.external_pipeline_id):
-			pipeline_external = frappe.db.get_value(
-				"CRM Sales Pipeline",
-				self.pipeline,
-				["external_source", "external_pipeline_id"],
-				as_dict=True,
-			)
+			pipeline_external = get_pipeline_external_reference(self.pipeline, self.external_source)
 			if pipeline_external:
 				self.external_source = self.external_source or pipeline_external.external_source
-				self.external_pipeline_id = self.external_pipeline_id or pipeline_external.external_pipeline_id
+				self.external_pipeline_id = self.external_pipeline_id or pipeline_external.external_id
 
 	def validate(self):
 		self.validate_external_source_required()
@@ -112,16 +110,11 @@ class CRMDealStatus(Document):
 		if not self.pipeline or not self.external_pipeline_id:
 			return
 
-		pipeline_external = frappe.db.get_value(
-			"CRM Sales Pipeline",
-			self.pipeline,
-			["external_source", "external_pipeline_id"],
-			as_dict=True,
-		)
+		pipeline_external = get_pipeline_external_reference(self.pipeline, self.external_source)
 		if not pipeline_external:
 			return
 
-		if pipeline_external.external_pipeline_id and pipeline_external.external_pipeline_id != self.external_pipeline_id:
+		if pipeline_external.external_id and pipeline_external.external_id != self.external_pipeline_id:
 			frappe.throw(
 				_("External pipeline ID {0} does not match pipeline {1}.").format(
 					frappe.bold(self.external_pipeline_id),
@@ -167,6 +160,28 @@ class CRMDealStatus(Document):
 		if not self.pipeline or not self.external_status_id:
 			return
 
+		if self.external_pipeline_id:
+			external_reference = find_external_reference(
+				self.external_source,
+				self.external_status_id,
+				STAGE_EXTERNAL_DOCTYPE,
+				self.external_pipeline_id,
+			)
+			if (
+				external_reference
+				and (
+					external_reference.reference_doctype != "CRM Deal Status"
+					or external_reference.reference_name != self.name
+				)
+			):
+				frappe.throw(
+					_("External status ID {0} already exists in pipeline {1}.").format(
+						frappe.bold(self.external_status_id),
+						frappe.bold(self.pipeline),
+					),
+					frappe.DuplicateEntryError,
+				)
+
 		filters = {
 			"name": ["!=", self.name],
 			"pipeline": self.pipeline,
@@ -184,6 +199,33 @@ class CRMDealStatus(Document):
 				),
 				frappe.DuplicateEntryError,
 			)
+
+
+def get_pipeline_external_reference(pipeline, external_source=None):
+	external_reference = get_external_reference(
+		"CRM Sales Pipeline",
+		pipeline,
+		external_source,
+		PIPELINE_EXTERNAL_DOCTYPE,
+	)
+	if external_reference:
+		return external_reference
+
+	pipeline_external = frappe.db.get_value(
+		"CRM Sales Pipeline",
+		pipeline,
+		["external_source", "external_pipeline_id"],
+		as_dict=True,
+	)
+	if pipeline_external and pipeline_external.external_pipeline_id:
+		return frappe._dict(
+			{
+				"external_source": pipeline_external.external_source,
+				"external_id": pipeline_external.external_pipeline_id,
+			}
+		)
+
+	return None
 
 
 def on_doctype_update():
