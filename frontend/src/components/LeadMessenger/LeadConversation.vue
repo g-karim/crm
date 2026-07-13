@@ -57,14 +57,10 @@
         {{ __('Нет активных каналов для отправки сообщений.') }}
       </div>
       <div
-        v-if="selectedAvitoCannotStart"
+        v-if="selectedRequiresInbound"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
-        {{
-          __(
-            'Нельзя написать первым в Avito: сначала должен прийти входящий чат.',
-          )
-        }}
+        {{ __('Сначала должно прийти входящее сообщение в выбранном канале.') }}
       </div>
 
       <div
@@ -119,49 +115,49 @@
               <div
                 class="mt-1 flex items-center justify-end gap-2 text-xs text-ink-gray-5"
               >
-	                <Tooltip
-	                  v-if="message.message_datetime"
-	                  :text="formatDate(message.message_datetime)"
-	                >
-	                  <span>{{
-	                    formatDate(message.message_datetime, 'HH:mm')
-	                  }}</span>
-	                </Tooltip>
-	                <Tooltip
-	                  v-if="deliveryState(message)"
-	                  :text="deliveryTooltip(message)"
-	                >
-	                  <span
-	                    class="inline-flex items-center"
-	                    :class="deliveryIconClass(message)"
-	                  >
-	                    <ClockIcon
-	                      v-if="deliveryState(message) === 'queued'"
-	                      class="size-4"
-	                    />
-	                    <CheckIcon
-	                      v-else-if="deliveryState(message) === 'sent'"
-	                      class="size-4"
-	                    />
-	                    <DoubleCheckIcon
-	                      v-else-if="
-	                        ['delivered', 'read'].includes(deliveryState(message))
-	                      "
-	                      class="size-4"
-	                    />
-	                    <CircleAlertIcon
-	                      v-else-if="deliveryState(message) === 'failed'"
-	                      class="size-4"
-	                    />
-	                  </span>
-	                </Tooltip>
-	              </div>
-	              <div
-	                v-if="messageFailureReason(message)"
-	                class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
-	              >
-	                {{ messageFailureReason(message) }}
-	              </div>
+                <Tooltip
+                  v-if="message.message_datetime"
+                  :text="formatDate(message.message_datetime)"
+                >
+                  <span>{{
+                    formatDate(message.message_datetime, 'HH:mm')
+                  }}</span>
+                </Tooltip>
+                <Tooltip
+                  v-if="deliveryState(message)"
+                  :text="deliveryTooltip(message)"
+                >
+                  <span
+                    class="inline-flex items-center"
+                    :class="deliveryIconClass(message)"
+                  >
+                    <ClockIcon
+                      v-if="deliveryState(message) === 'queued'"
+                      class="size-4"
+                    />
+                    <CheckIcon
+                      v-else-if="deliveryState(message) === 'sent'"
+                      class="size-4"
+                    />
+                    <DoubleCheckIcon
+                      v-else-if="
+                        ['delivered', 'read'].includes(deliveryState(message))
+                      "
+                      class="size-4"
+                    />
+                    <CircleAlertIcon
+                      v-else-if="deliveryState(message) === 'failed'"
+                      class="size-4"
+                    />
+                  </span>
+                </Tooltip>
+              </div>
+              <div
+                v-if="messageFailureReason(message)"
+                class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
+              >
+                {{ messageFailureReason(message) }}
+              </div>
             </div>
           </div>
         </div>
@@ -213,6 +209,7 @@ import { formatDate } from '@/utils'
 import {
   buildMessengerChannelOptions,
   getMessengerChannelType,
+  getMessengerCapabilities,
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
   getMessengerPlatformLabel,
@@ -245,6 +242,7 @@ const messages = ref([])
 const channels = ref([])
 const selectedChannel = ref('')
 const draftText = ref('')
+const clientRequestId = ref('')
 const sendWarning = ref('')
 const genericError = ref('')
 const messagesEl = ref(null)
@@ -295,30 +293,27 @@ const selectedChannelType = computed(() =>
     selectedChannelDoc.value || selectedConversation.value,
   ),
 )
-const selectedIsAvito = computed(() => {
-  let channel = selectedChannelDoc.value || selectedConversation.value || {}
-  return (
-    selectedChannelType.value === 'avito' ||
-    channel.platform === 'avito' ||
-    channel.provider === 'avito_direct'
-  )
-})
+const selectedCapabilities = computed(() =>
+  getMessengerCapabilities(
+    selectedChannelDoc.value || selectedConversation.value || {},
+  ),
+)
 const missingPhone = computed(
   () =>
     Boolean(selectedChannelType.value) &&
-    !selectedIsAvito.value &&
+    selectedCapabilities.value.requires_phone &&
     !leadPhone.value,
 )
-const selectedAvitoCannotStart = computed(
+const selectedRequiresInbound = computed(
   () =>
-    selectedIsAvito.value &&
+    selectedCapabilities.value.requires_inbound &&
     !selectedConversation.value?.external_chat_id,
 )
 const sendDisabled = computed(
   () =>
     sendingMessage.value ||
     missingPhone.value ||
-    selectedAvitoCannotStart.value ||
+    selectedRequiresInbound.value ||
     !channels.value.length ||
     !selectedChannel.value,
 )
@@ -330,10 +325,8 @@ const contactLine = computed(() => {
   return leadPhone.value ? `${title} · ${leadPhone.value}` : title
 })
 const composerHint = computed(() => {
-  if (selectedAvitoCannotStart.value) {
-    return __(
-      'Нельзя написать первым в Avito: сначала должен прийти входящий чат.',
-    )
+  if (selectedRequiresInbound.value) {
+    return __('Сначала должно прийти входящее сообщение в выбранном канале.')
   }
   if (missingPhone.value) return __('Добавьте телефон в карточке лида.')
   if (!channels.value.length) return __('Нет доступного канала отправки.')
@@ -438,9 +431,13 @@ async function sendMessage() {
       conversation: conversation.name,
       text,
       channel: selectedChannel.value,
+      client_request_id:
+        clientRequestId.value ||
+        (clientRequestId.value = makeClientRequestId()),
     })
 
     draftText.value = ''
+    clientRequestId.value = ''
     if (result?.reason === 'not_configured') {
       sendWarning.value = integrationWarningMessage(result)
       toast.error(sendWarning.value)
@@ -469,7 +466,6 @@ function integrationWarningMessage(result = {}) {
   }`.toLowerCase()
 
   if (
-    selectedIsAvito.value ||
     type === 'avito' ||
     channel.platform === 'avito' ||
     provider === 'avito_direct' ||
@@ -492,9 +488,9 @@ function integrationWarningMessage(result = {}) {
 }
 
 async function createConversation() {
-  if (selectedIsAvito.value) {
+  if (selectedCapabilities.value.requires_inbound) {
     genericError.value = __(
-      'Нельзя написать первым в Avito: сначала должен прийти входящий чат.',
+      'Сначала должно прийти входящее сообщение в выбранном канале.',
     )
     return null
   }
@@ -523,6 +519,11 @@ async function createConversation() {
     conversations.value = [conversation, ...conversations.value]
   }
   return conversation
+}
+
+function makeClientRequestId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 function sendOnEnter(event) {

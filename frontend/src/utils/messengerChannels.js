@@ -2,6 +2,8 @@ const PLATFORM_LABELS = {
   avito: 'Avito',
   whatsapp: 'WhatsApp',
   telegram: 'Telegram',
+  vk: 'VK',
+  max: 'MAX',
 }
 
 const DELIVERY_LABELS = {
@@ -24,7 +26,12 @@ export function getMessengerChannelType(channel = {}) {
 export function getMessengerPlatformLabel(channel = {}) {
   let type = getMessengerChannelType(channel)
 
-  return PLATFORM_LABELS[type] || humanizePlatform(type) || channel?.name || 'Messenger'
+  return (
+    PLATFORM_LABELS[type] ||
+    humanizePlatform(type) ||
+    channel?.name ||
+    'Messenger'
+  )
 }
 
 export function buildMessengerChannelOptions(channels = []) {
@@ -52,12 +59,23 @@ export function buildMessengerChannelOptions(channels = []) {
 export function getMessengerDeliveryState(message = {}) {
   if (message?.direction !== 'outbound') return ''
 
-  let status = normalizePlatform(message?.delivery_status || message?.status || '')
+  let status = normalizePlatform(
+    message?.delivery_status || message?.status || '',
+  )
   return DELIVERY_STATES.includes(status) ? status : ''
 }
 
 export function getMessengerDeliveryLabel(message = {}) {
   return DELIVERY_LABELS[getMessengerDeliveryState(message)] || ''
+}
+
+export function getMessengerCapabilities(channel = {}) {
+  return {
+    can_start_conversation:
+      channel?.capabilities?.can_start_conversation ?? true,
+    requires_inbound: Boolean(channel?.capabilities?.requires_inbound),
+    requires_phone: Boolean(channel?.capabilities?.requires_phone),
+  }
 }
 
 function normalizePlatform(value) {

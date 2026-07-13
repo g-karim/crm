@@ -3,6 +3,7 @@ import {
   getMessengerChannelType,
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
+  getMessengerCapabilities,
   getMessengerPlatformLabel,
 } from '@/utils/messengerChannels'
 
@@ -23,6 +24,8 @@ describe('messengerChannels', () => {
         platform: 'telegram',
       }),
     ).toBe('Telegram')
+    expect(getMessengerPlatformLabel({ platform: 'vk' })).toBe('VK')
+    expect(getMessengerPlatformLabel({ platform: 'max' })).toBe('MAX')
   })
 
   it('humanizes custom platform labels', () => {
@@ -93,5 +96,26 @@ describe('messengerChannels', () => {
         delivery_status: 'failed',
       }),
     ).toBe('Ошибка')
+  })
+
+  it('reads provider capabilities with safe defaults', () => {
+    expect(getMessengerCapabilities({})).toEqual({
+      can_start_conversation: true,
+      requires_inbound: false,
+      requires_phone: false,
+    })
+    expect(
+      getMessengerCapabilities({
+        capabilities: {
+          can_start_conversation: false,
+          requires_inbound: true,
+          requires_phone: false,
+        },
+      }),
+    ).toEqual({
+      can_start_conversation: false,
+      requires_inbound: true,
+      requires_phone: false,
+    })
   })
 })
