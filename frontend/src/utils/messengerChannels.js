@@ -8,6 +8,9 @@ const PLATFORM_LABELS = {
 
 const DELIVERY_LABELS = {
   queued: 'В очереди',
+  sending: 'Отправляется',
+  retrying: 'Повторная попытка',
+  unknown: 'Результат неизвестен',
   sent: 'Отправлено',
   delivered: 'Доставлено',
   read: 'Прочитано',
@@ -75,6 +78,11 @@ export function getMessengerCapabilities(channel = {}) {
       channel?.capabilities?.can_start_conversation ?? true,
     requires_inbound: Boolean(channel?.capabilities?.requires_inbound),
     requires_phone: Boolean(channel?.capabilities?.requires_phone),
+    supports_attachments: Boolean(
+      channel?.capabilities?.supports_attachments,
+    ),
+    supported_attachment_types:
+      channel?.capabilities?.supported_attachment_types || [],
   }
 }
 

@@ -110,7 +110,25 @@
                 />
               </div>
               <div class="whitespace-pre-wrap break-words">
-                {{ message.text || '' }}
+                {{ message.status === 'deleted' ? __('Сообщение удалено') : message.text || '' }}
+              </div>
+              <div v-if="message.attachments?.length" class="mt-2 grid gap-2">
+                <a
+                  v-for="attachment in message.attachments"
+                  :key="attachment.name"
+                  :href="attachment.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block max-w-sm break-all text-sm text-ink-blue-link"
+                >
+                  <img
+                    v-if="attachment.attachment_type === 'image' && attachment.url"
+                    :src="attachment.url"
+                    :alt="attachment.file_name || __('Изображение')"
+                    class="max-h-64 rounded object-contain"
+                  />
+                  <span v-else>{{ attachment.file_name || attachment.url || __('Вложение недоступно') }}</span>
+                </a>
               </div>
               <div
                 class="mt-1 flex items-center justify-end gap-2 text-xs text-ink-gray-5"
@@ -132,7 +150,7 @@
                     :class="deliveryIconClass(message)"
                   >
                     <ClockIcon
-                      v-if="deliveryState(message) === 'queued'"
+                      v-if="['queued', 'sending', 'retrying'].includes(deliveryState(message))"
                       class="size-4"
                     />
                     <CheckIcon
@@ -146,7 +164,7 @@
                       class="size-4"
                     />
                     <CircleAlertIcon
-                      v-else-if="deliveryState(message) === 'failed'"
+                      v-else-if="['failed', 'unknown'].includes(deliveryState(message))"
                       class="size-4"
                     />
                   </span>
@@ -183,17 +201,43 @@
           />
         </div>
         <div class="flex items-center justify-between gap-3">
-          <div class="truncate text-sm text-ink-gray-5">
-            {{ composerHint }}
+          <div class="min-w-0 text-sm text-ink-gray-5">
+            <div class="truncate">{{ composerHint }}</div>
+            <div v-if="pendingAttachments.length" class="mt-1 flex flex-wrap gap-1">
+              <span
+                v-for="file in pendingAttachments"
+                :key="file.name"
+                class="inline-flex items-center gap-1"
+              >
+                <Badge variant="subtle" :label="file.file_name" />
+                <Button variant="ghost" icon="x" @click="removeAttachment(file.name)" />
+              </span>
+            </div>
           </div>
-          <Button
-            variant="solid"
-            :label="__('Отправить')"
-            iconLeft="send"
-            :loading="sendingMessage"
-            :disabled="sendDisabled || !draftText.trim()"
-            @click="sendMessage"
-          />
+          <div class="flex items-center gap-2">
+            <FileUploader
+              v-if="selectedCapabilities.supports_attachments"
+              :upload-args="{ private: true }"
+              @success="addAttachment"
+            >
+              <template #default="{ openFileSelector }">
+                <Button
+                  variant="ghost"
+                  icon="paperclip"
+                  :disabled="sendDisabled || pendingAttachments.length >= 10"
+                  @click="openFileSelector()"
+                />
+              </template>
+            </FileUploader>
+            <Button
+              variant="solid"
+              :label="__('Отправить')"
+              iconLeft="send"
+              :loading="sendingMessage"
+              :disabled="sendDisabled || (!draftText.trim() && !pendingAttachments.length)"
+              @click="sendMessage"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -217,6 +261,7 @@ import {
 import {
   Badge,
   Button,
+  FileUploader,
   FormControl,
   Textarea,
   Tooltip,
@@ -243,6 +288,7 @@ const channels = ref([])
 const selectedChannel = ref('')
 const draftText = ref('')
 const clientRequestId = ref('')
+const pendingAttachments = ref([])
 const sendWarning = ref('')
 const genericError = ref('')
 const messagesEl = ref(null)
@@ -416,7 +462,7 @@ function ensureSelectedChannel() {
 
 async function sendMessage() {
   let text = draftText.value.trim()
-  if (!text || sendDisabled.value) return
+  if ((!text && !pendingAttachments.value.length) || sendDisabled.value) return
 
   genericError.value = ''
   sendWarning.value = ''
@@ -434,9 +480,11 @@ async function sendMessage() {
       client_request_id:
         clientRequestId.value ||
         (clientRequestId.value = makeClientRequestId()),
+      attachments: pendingAttachments.value.map((file) => file.name),
     })
 
     draftText.value = ''
+    pendingAttachments.value = []
     clientRequestId.value = ''
     if (result?.reason === 'not_configured') {
       sendWarning.value = integrationWarningMessage(result)
@@ -450,6 +498,35 @@ async function sendMessage() {
     sendingMessage.value = false
     await Promise.all([loadConversations(), loadMessages()])
   }
+}
+
+function addAttachment(file) {
+  if (!file?.name || pendingAttachments.value.length >= 10) return
+  if (selectedChannelType.value === 'max') {
+    let isImage = isImageFile(file)
+    let existingAreImages = pendingAttachments.value.every(isImageFile)
+    if (
+      (!isImage && pendingAttachments.value.length) ||
+      (isImage && pendingAttachments.value.length && !existingAreImages)
+    ) {
+      toast.error(
+        __('MAX поддерживает до 10 изображений либо один файл/аудио без смешивания.'),
+      )
+      return
+    }
+  }
+  pendingAttachments.value = [...pendingAttachments.value, file]
+}
+
+function isImageFile(file) {
+  let mime = `${file.file_type || file.mime_type || ''}`.toLowerCase()
+  return mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|heic)$/i.test(file.file_name || '')
+}
+
+function removeAttachment(name) {
+  pendingAttachments.value = pendingAttachments.value.filter(
+    (file) => file.name !== name,
+  )
 }
 
 function integrationWarningMessage(result = {}) {
@@ -565,7 +642,7 @@ function deliveryTooltip(message) {
 function deliveryIconClass(message) {
   let state = deliveryState(message)
   if (state === 'read') return 'text-ink-blue-2'
-  if (state === 'failed') return 'text-ink-red-4'
+  if (['failed', 'unknown'].includes(state)) return 'text-ink-red-4'
   return 'text-ink-gray-5'
 }
 

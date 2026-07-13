@@ -84,6 +84,12 @@ describe('messengerChannels', () => {
     expect(
       getMessengerDeliveryState({
         direction: 'outbound',
+        delivery_status: 'unknown',
+      }),
+    ).toBe('unknown')
+    expect(
+      getMessengerDeliveryState({
+        direction: 'outbound',
         delivery_status: 'provider_custom',
       }),
     ).toBe('')
@@ -103,6 +109,8 @@ describe('messengerChannels', () => {
       can_start_conversation: true,
       requires_inbound: false,
       requires_phone: false,
+      supports_attachments: false,
+      supported_attachment_types: [],
     })
     expect(
       getMessengerCapabilities({
@@ -110,12 +118,16 @@ describe('messengerChannels', () => {
           can_start_conversation: false,
           requires_inbound: true,
           requires_phone: false,
+          supports_attachments: true,
+          supported_attachment_types: ['image', 'file'],
         },
       }),
     ).toEqual({
       can_start_conversation: false,
       requires_inbound: true,
       requires_phone: false,
+      supports_attachments: true,
+      supported_attachment_types: ['image', 'file'],
     })
   })
 })
