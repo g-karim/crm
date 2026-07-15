@@ -5,6 +5,7 @@ import {
   getMessengerDeliveryState,
   getMessengerCapabilities,
   getMessengerPlatformLabel,
+  shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 
 describe('messengerChannels', () => {
@@ -77,6 +78,13 @@ describe('messengerChannels', () => {
     ).toBe('sent')
     expect(
       getMessengerDeliveryState({
+        direction: 'outbound',
+        status: 'read',
+        delivery_status: 'sent',
+      }),
+    ).toBe('read')
+    expect(
+      getMessengerDeliveryState({
         direction: 'inbound',
         delivery_status: 'read',
       }),
@@ -93,6 +101,13 @@ describe('messengerChannels', () => {
         delivery_status: 'provider_custom',
       }),
     ).toBe('')
+  })
+
+  it('shows text only for content or a deleted placeholder', () => {
+    expect(shouldShowMessengerText({ text: null })).toBe(false)
+    expect(shouldShowMessengerText({ text: '   ' })).toBe(false)
+    expect(shouldShowMessengerText({ text: 'caption' })).toBe(true)
+    expect(shouldShowMessengerText({ status: 'deleted', text: null })).toBe(true)
   })
 
   it('returns delivery labels', () => {

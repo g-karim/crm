@@ -109,7 +109,10 @@
                   :label="__('Ошибка')"
                 />
               </div>
-              <div class="whitespace-pre-wrap break-words">
+              <div
+                v-if="shouldShowMessengerText(message)"
+                class="whitespace-pre-wrap break-words"
+              >
                 {{ message.status === 'deleted' ? __('Сообщение удалено') : message.text || '' }}
               </div>
               <div v-if="message.attachments?.length" class="mt-2 grid gap-2">
@@ -257,6 +260,7 @@ import {
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
   getMessengerPlatformLabel,
+  shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 import {
   Badge,

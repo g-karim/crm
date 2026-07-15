@@ -63,9 +63,14 @@ export function getMessengerDeliveryState(message = {}) {
   if (message?.direction !== 'outbound') return ''
 
   let status = normalizePlatform(
-    message?.delivery_status || message?.status || '',
+    message?.status || message?.delivery_status || '',
   )
   return DELIVERY_STATES.includes(status) ? status : ''
+}
+
+export function shouldShowMessengerText(message = {}) {
+  if (message?.status === 'deleted') return true
+  return Boolean(String(message?.text || '').trim())
 }
 
 export function getMessengerDeliveryLabel(message = {}) {
