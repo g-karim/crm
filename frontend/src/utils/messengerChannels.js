@@ -1,3 +1,5 @@
+import { dayjsLocal } from 'frappe-ui'
+
 const PLATFORM_LABELS = {
   avito: 'Avito',
   whatsapp: 'WhatsApp',
@@ -18,6 +20,64 @@ const DELIVERY_LABELS = {
 }
 
 const DELIVERY_STATES = Object.keys(DELIVERY_LABELS)
+
+const RUSSIAN_MONTHS = [
+  'января',
+  'февраля',
+  'марта',
+  'апреля',
+  'мая',
+  'июня',
+  'июля',
+  'августа',
+  'сентября',
+  'октября',
+  'ноября',
+  'декабря',
+]
+
+export function getMessengerDayKey(messageDatetime) {
+  if (!messageDatetime) return ''
+
+  let date = getLocalDate(messageDatetime)
+  return date?.isValid() ? date.format('YYYY-MM-DD') : ''
+}
+
+export function getMessengerDateLabel(messageDatetime, now = dayjsLocal()) {
+  if (!messageDatetime) return ''
+
+  let date = getLocalDate(messageDatetime)
+  let currentDate = isDayjsValue(now) ? now : getLocalDate(now)
+  if (!date?.isValid() || !currentDate?.isValid()) return ''
+
+  let dayKey = date.format('YYYY-MM-DD')
+  if (dayKey === currentDate.format('YYYY-MM-DD')) return 'Сегодня'
+  if (dayKey === currentDate.subtract(1, 'day').format('YYYY-MM-DD')) {
+    return 'Вчера'
+  }
+
+  let label = `${date.date()} ${RUSSIAN_MONTHS[date.month()]}`
+  return date.year() === currentDate.year() ? label : `${label} ${date.year()}`
+}
+
+export function buildMessengerMessageItems(messages = [], now = dayjsLocal()) {
+  let previousDayKey = ''
+
+  return messages.map((message) => {
+    let dayKey = getMessengerDayKey(message?.message_datetime)
+    let dateLabel =
+      dayKey && dayKey !== previousDayKey
+        ? getMessengerDateLabel(message.message_datetime, now)
+        : ''
+    previousDayKey = dayKey
+
+    return {
+      message,
+      dayKey,
+      dateLabel,
+    }
+  })
+}
 
 export function getMessengerChannelType(channel = {}) {
   if (channel?.provider === 'avito_direct') return 'avito'
@@ -101,4 +161,16 @@ function humanizePlatform(value) {
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function isDayjsValue(value) {
+  return Boolean(value?.isValid && value?.format)
+}
+
+function getLocalDate(value) {
+  try {
+    return dayjsLocal(value)
+  } catch {
+    return null
+  }
 }

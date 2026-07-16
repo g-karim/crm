@@ -1,5 +1,11 @@
+import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
 import {
+  buildMessengerMessageItems,
   buildMessengerChannelOptions,
+  getMessengerDateLabel,
+  getMessengerDayKey,
   getMessengerChannelType,
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
@@ -7,6 +13,16 @@ import {
   getMessengerPlatformLabel,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+vi.mock('frappe-ui', () => ({
+  dayjsLocal(value) {
+    if (!value) return dayjs().tz('Europe/Moscow')
+    return dayjs.tz(value, 'UTC').tz('Europe/Moscow')
+  },
+}))
 
 describe('messengerChannels', () => {
   it('normalizes known platform labels', () => {
@@ -144,5 +160,85 @@ describe('messengerChannels', () => {
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
     })
+  })
+
+  it('adds one date separator for several messages on the same day', () => {
+    let messages = [
+      { name: 'message-1', message_datetime: '2026-07-16 07:00:00' },
+      { name: 'message-2', message_datetime: '2026-07-16 08:00:00' },
+    ]
+
+    let items = buildMessengerMessageItems(messages, '2026-07-16 09:00:00')
+
+    expect(items.map((item) => item.message)).toEqual(messages)
+    expect(items.map((item) => item.dateLabel)).toEqual(['Сегодня', ''])
+  })
+
+  it('adds a new date separator when the next calendar day starts', () => {
+    let items = buildMessengerMessageItems(
+      [
+        { name: 'message-1', message_datetime: '2026-07-15 18:00:00' },
+        { name: 'message-2', message_datetime: '2026-07-16 07:00:00' },
+      ],
+      '2026-07-16 09:00:00',
+    )
+
+    expect(items.map((item) => item.dateLabel)).toEqual(['Вчера', 'Сегодня'])
+  })
+
+  it('formats today and yesterday labels', () => {
+    let now = '2026-07-16 09:00:00'
+
+    expect(getMessengerDateLabel('2026-07-16 08:00:00', now)).toBe('Сегодня')
+    expect(getMessengerDateLabel('2026-07-15 08:00:00', now)).toBe('Вчера')
+  })
+
+  it('formats current-year dates without a year', () => {
+    expect(
+      getMessengerDateLabel('2026-07-15 08:00:00', '2026-08-01 09:00:00'),
+    ).toBe('15 июля')
+  })
+
+  it('formats dates from another year with a year', () => {
+    expect(
+      getMessengerDateLabel('2025-07-15 08:00:00', '2026-07-16 09:00:00'),
+    ).toBe('15 июля 2025')
+  })
+
+  it('uses the configured user timezone near midnight', () => {
+    expect(getMessengerDayKey('2026-07-15 20:30:00')).toBe('2026-07-15')
+    expect(getMessengerDayKey('2026-07-15 21:30:00')).toBe('2026-07-16')
+
+    let items = buildMessengerMessageItems(
+      [
+        { name: 'message-1', message_datetime: '2026-07-15 20:30:00' },
+        { name: 'message-2', message_datetime: '2026-07-15 21:30:00' },
+      ],
+      '2026-07-16 09:00:00',
+    )
+
+    expect(items.map((item) => item.dateLabel)).toEqual(['Вчера', 'Сегодня'])
+  })
+
+  it('handles an empty message list', () => {
+    expect(buildMessengerMessageItems([])).toEqual([])
+  })
+
+  it('ignores missing or invalid message datetimes', () => {
+    let messages = [
+      { name: 'message-1' },
+      { name: 'message-2', message_datetime: 'not-a-date' },
+    ]
+
+    expect(
+      buildMessengerMessageItems(messages).map((item) => ({
+        message: item.message,
+        dayKey: item.dayKey,
+        dateLabel: item.dateLabel,
+      })),
+    ).toEqual([
+      { message: messages[0], dayKey: '', dateLabel: '' },
+      { message: messages[1], dayKey: '', dateLabel: '' },
+    ])
   })
 })

@@ -81,106 +81,142 @@
         </div>
 
         <div v-else class="flex flex-col gap-3">
-          <div
-            v-for="message in messages"
-            :key="message.name"
-            class="flex"
-            :class="
-              message.direction === 'outbound' ? 'justify-end' : 'justify-start'
-            "
-          >
+          <template v-for="item in messageItems" :key="item.message.name">
             <div
-              class="max-w-[78%] rounded-md px-3 py-2 text-base shadow-sm"
+              v-if="item.dateLabel"
+              class="flex items-center justify-center py-1"
+            >
+              <span class="text-xs font-medium text-ink-gray-5">
+                {{ item.dateLabel }}
+              </span>
+            </div>
+            <div
+              class="flex"
               :class="
-                message.direction === 'outbound'
-                  ? 'bg-surface-blue-1 text-ink-gray-9'
-                  : 'bg-surface-gray-1 text-ink-gray-9'
+                item.message.direction === 'outbound'
+                  ? 'justify-end'
+                  : 'justify-start'
               "
             >
-              <div class="mb-1 flex items-center gap-2">
-                <span class="text-xs font-medium text-ink-gray-5">
-                  {{ messageSender(message) }}
-                </span>
-                <Badge variant="subtle" :label="messageSource(message)" />
-                <Badge
-                  v-if="message.status === 'failed'"
-                  theme="red"
-                  variant="subtle"
-                  :label="__('Ошибка')"
-                />
-              </div>
               <div
-                v-if="shouldShowMessengerText(message)"
-                class="whitespace-pre-wrap break-words"
+                class="max-w-[78%] rounded-md px-3 py-2 text-base shadow-sm"
+                :class="
+                  item.message.direction === 'outbound'
+                    ? 'bg-surface-blue-1 text-ink-gray-9'
+                    : 'bg-surface-gray-1 text-ink-gray-9'
+                "
               >
-                {{ message.status === 'deleted' ? __('Сообщение удалено') : message.text || '' }}
-              </div>
-              <div v-if="message.attachments?.length" class="mt-2 grid gap-2">
-                <a
-                  v-for="attachment in message.attachments"
-                  :key="attachment.name"
-                  :href="attachment.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="block max-w-sm break-all text-sm text-ink-blue-link"
-                >
-                  <img
-                    v-if="attachment.attachment_type === 'image' && attachment.url"
-                    :src="attachment.url"
-                    :alt="attachment.file_name || __('Изображение')"
-                    class="max-h-64 rounded object-contain"
-                  />
-                  <span v-else>{{ attachment.file_name || attachment.url || __('Вложение недоступно') }}</span>
-                </a>
-              </div>
-              <div
-                class="mt-1 flex items-center justify-end gap-2 text-xs text-ink-gray-5"
-              >
-                <Tooltip
-                  v-if="message.message_datetime"
-                  :text="formatDate(message.message_datetime)"
-                >
-                  <span>{{
-                    formatDate(message.message_datetime, 'HH:mm')
-                  }}</span>
-                </Tooltip>
-                <Tooltip
-                  v-if="deliveryState(message)"
-                  :text="deliveryTooltip(message)"
-                >
-                  <span
-                    class="inline-flex items-center"
-                    :class="deliveryIconClass(message)"
-                  >
-                    <ClockIcon
-                      v-if="['queued', 'sending', 'retrying'].includes(deliveryState(message))"
-                      class="size-4"
-                    />
-                    <CheckIcon
-                      v-else-if="deliveryState(message) === 'sent'"
-                      class="size-4"
-                    />
-                    <DoubleCheckIcon
-                      v-else-if="
-                        ['delivered', 'read'].includes(deliveryState(message))
-                      "
-                      class="size-4"
-                    />
-                    <CircleAlertIcon
-                      v-else-if="['failed', 'unknown'].includes(deliveryState(message))"
-                      class="size-4"
-                    />
+                <div class="mb-1 flex items-center gap-2">
+                  <span class="text-xs font-medium text-ink-gray-5">
+                    {{ messageSender(item.message) }}
                   </span>
-                </Tooltip>
-              </div>
-              <div
-                v-if="messageFailureReason(message)"
-                class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
-              >
-                {{ messageFailureReason(message) }}
+                  <Badge
+                    variant="subtle"
+                    :label="messageSource(item.message)"
+                  />
+                  <Badge
+                    v-if="item.message.status === 'failed'"
+                    theme="red"
+                    variant="subtle"
+                    :label="__('Ошибка')"
+                  />
+                </div>
+                <div
+                  v-if="shouldShowMessengerText(item.message)"
+                  class="whitespace-pre-wrap break-words"
+                >
+                  {{
+                    item.message.status === 'deleted'
+                      ? __('Сообщение удалено')
+                      : item.message.text || ''
+                  }}
+                </div>
+                <div
+                  v-if="item.message.attachments?.length"
+                  class="mt-2 grid gap-2"
+                >
+                  <a
+                    v-for="attachment in item.message.attachments"
+                    :key="attachment.name"
+                    :href="attachment.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="block max-w-sm break-all text-sm text-ink-blue-link"
+                  >
+                    <img
+                      v-if="
+                        attachment.attachment_type === 'image' && attachment.url
+                      "
+                      :src="attachment.url"
+                      :alt="attachment.file_name || __('Изображение')"
+                      class="max-h-64 rounded object-contain"
+                    />
+                    <span v-else>{{
+                      attachment.file_name ||
+                      attachment.url ||
+                      __('Вложение недоступно')
+                    }}</span>
+                  </a>
+                </div>
+                <div
+                  class="mt-1 flex items-center justify-end gap-2 text-xs text-ink-gray-5"
+                >
+                  <Tooltip
+                    v-if="item.message.message_datetime"
+                    :text="formatDate(item.message.message_datetime)"
+                  >
+                    <span>{{
+                      formatDate(item.message.message_datetime, 'HH:mm')
+                    }}</span>
+                  </Tooltip>
+                  <Tooltip
+                    v-if="deliveryState(item.message)"
+                    :text="deliveryTooltip(item.message)"
+                  >
+                    <span
+                      class="inline-flex items-center"
+                      :class="deliveryIconClass(item.message)"
+                    >
+                      <ClockIcon
+                        v-if="
+                          ['queued', 'sending', 'retrying'].includes(
+                            deliveryState(item.message),
+                          )
+                        "
+                        class="size-4"
+                      />
+                      <CheckIcon
+                        v-else-if="deliveryState(item.message) === 'sent'"
+                        class="size-4"
+                      />
+                      <DoubleCheckIcon
+                        v-else-if="
+                          ['delivered', 'read'].includes(
+                            deliveryState(item.message),
+                          )
+                        "
+                        class="size-4"
+                      />
+                      <CircleAlertIcon
+                        v-else-if="
+                          ['failed', 'unknown'].includes(
+                            deliveryState(item.message),
+                          )
+                        "
+                        class="size-4"
+                      />
+                    </span>
+                  </Tooltip>
+                </div>
+                <div
+                  v-if="messageFailureReason(item.message)"
+                  class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
+                >
+                  {{ messageFailureReason(item.message) }}
+                </div>
               </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
 
@@ -254,6 +290,7 @@ import DoubleCheckIcon from '@/components/Icons/DoubleCheckIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import { formatDate } from '@/utils'
 import {
+  buildMessengerMessageItems,
   buildMessengerChannelOptions,
   getMessengerChannelType,
   getMessengerCapabilities,
@@ -370,6 +407,7 @@ const sendDisabled = computed(
 const channelOptions = computed(() =>
   buildMessengerChannelOptions(channels.value),
 )
+const messageItems = computed(() => buildMessengerMessageItems(messages.value))
 const contactLine = computed(() => {
   let title = props.lead?.lead_name || props.lead?.name || props.leadName
   return leadPhone.value ? `${title} · ${leadPhone.value}` : title
