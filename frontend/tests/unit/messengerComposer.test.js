@@ -57,6 +57,39 @@ describe('messenger composer attachments', () => {
     expect(current.controller.getItems()).toEqual([])
   })
 
+  it('handles the same bubbling paste event only once', async () => {
+    let image = file('single.png', 'image/png')
+    let current = harness()
+    let event = {
+      clipboardData: {
+        items: [{ kind: 'file', getAsFile: () => image }],
+      },
+      preventDefault: vi.fn(),
+    }
+
+    expect(current.controller.handlePaste(event)).toBe(true)
+    expect(current.controller.handlePaste(event)).toBe(true)
+    await vi.waitFor(() => expect(current.controller.readyFileNames()).toHaveLength(1))
+    expect(current.upload).toHaveBeenCalledOnce()
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('treats two separate paste events as two attachments', async () => {
+    let image = file('twice.png', 'image/png')
+    let current = harness()
+    let makeEvent = () => ({
+      clipboardData: {
+        items: [{ kind: 'file', getAsFile: () => image }],
+      },
+      preventDefault: vi.fn(),
+    })
+
+    current.controller.handlePaste(makeEvent())
+    current.controller.handlePaste(makeEvent())
+    await vi.waitFor(() => expect(current.controller.readyFileNames()).toHaveLength(2))
+    expect(current.upload).toHaveBeenCalledTimes(2)
+  })
+
   it('uses the same pipeline for drag-and-drop', async () => {
     let current = harness()
     let event = {

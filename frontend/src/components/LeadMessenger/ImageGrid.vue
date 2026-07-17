@@ -1,11 +1,15 @@
 <template>
-  <div class="grid grid-cols-2 gap-1 overflow-hidden rounded-lg">
+  <div
+    class="grid w-[min(28rem,calc(100vw-3rem))] max-w-full gap-1 overflow-hidden rounded-lg"
+    :class="images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'"
+  >
     <button
       v-for="(image, index) in visibleImages"
       :key="image.id"
       type="button"
       class="relative min-h-28 overflow-hidden bg-surface-gray-2 text-left"
       :class="getImageGridCellClass(images.length, index)"
+      :style="cellStyle(image)"
       :disabled="!image.url || !getAttachmentState(image).active"
       @click="open(image)"
     >
@@ -13,7 +17,8 @@
         v-if="image.url && getAttachmentState(image).active"
         :src="image.url"
         :alt="image.file_name || __('Изображение')"
-        class="size-full object-cover"
+        class="size-full"
+        :class="images.length === 1 ? 'object-contain' : 'object-cover'"
         loading="lazy"
       />
       <div
@@ -47,6 +52,7 @@
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import {
   getAttachmentState,
+  getImageAspectRatio,
   getImageGridCellClass,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
@@ -71,5 +77,10 @@ function open(image) {
   if (index < 0) return
   lightboxIndex.value = index
   lightboxOpen.value = true
+}
+
+function cellStyle(image) {
+  if (props.images.length !== 1) return undefined
+  return { aspectRatio: getImageAspectRatio(image) }
 }
 </script>

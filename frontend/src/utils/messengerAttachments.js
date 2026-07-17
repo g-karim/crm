@@ -49,10 +49,17 @@ export function getAttachmentAction(attachment = {}) {
 }
 
 export function getImageGridCellClass(count, index) {
-  if (count <= 1) return 'col-span-2 max-h-96'
+  if (count <= 1) return 'max-h-[22rem]'
   if (count === 2) return 'aspect-square'
   if (count === 3 && index === 0) return 'row-span-2 min-h-56'
   return 'aspect-square'
+}
+
+export function getImageAspectRatio(image = {}) {
+  let width = Number(image.width || 0)
+  let height = Number(image.height || 0)
+  if (!width || !height) return 4 / 3
+  return Math.max(0.75, Math.min(width / height, 1.8))
 }
 
 export function visibleImageAttachments(attachments = []) {
@@ -71,4 +78,13 @@ export function formatAttachmentDuration(milliseconds) {
   let seconds = Math.max(Math.round(Number(milliseconds || 0) / 1000), 0)
   if (!seconds) return ''
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+export function canRenderInlineVideo(attachment = {}) {
+  return (
+    attachment.type === 'video' &&
+    getAttachmentState(attachment).active &&
+    Boolean(attachment.url) &&
+    attachment.mime_type?.startsWith('video/')
+  )
 }

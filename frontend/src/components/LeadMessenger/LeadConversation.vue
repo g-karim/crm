@@ -63,11 +63,12 @@
         {{ __('Сначала должно прийти входящее сообщение в выбранном канале.') }}
       </div>
 
-      <div
-        ref="messagesEl"
-        class="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-10"
-        @scroll.passive="handleMessagesScroll"
-      >
+      <div class="relative min-h-0 flex-1">
+        <div
+          ref="messagesEl"
+          class="h-full overflow-y-auto px-4 py-5 sm:px-10"
+          @scroll.passive="handleMessagesScroll"
+        >
         <div
           v-if="loadingHistory"
           class="flex justify-center pb-3 text-ink-gray-4"
@@ -106,7 +107,7 @@
               "
             >
               <div
-                class="max-w-[78%] rounded-md px-3 py-2 text-base shadow-sm"
+                class="min-w-0 max-w-[94%] rounded-md px-3 py-2 text-base shadow-sm sm:max-w-[78%]"
                 :class="
                   item.message.direction === 'outbound'
                     ? 'bg-surface-blue-1 text-ink-gray-9'
@@ -199,19 +200,20 @@
             </div>
           </template>
         </div>
-      </div>
+        </div>
 
-      <div
-        v-if="newMessageCount"
-        class="pointer-events-none absolute bottom-28 left-0 right-0 flex justify-center"
-      >
-        <Button
-          class="pointer-events-auto shadow-md"
-          variant="solid"
-          iconLeft="arrow-down"
-          :label="__('Новые сообщения: {0}', [newMessageCount])"
-          @click="scrollToBottom"
-        />
+        <div
+          v-if="newMessageCount"
+          class="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3"
+        >
+          <Button
+            class="pointer-events-auto max-w-full shadow-md"
+            variant="solid"
+            iconLeft="arrow-down"
+            :label="__('Новые сообщения: {0}', [newMessageCount])"
+            @click="scrollToBottom"
+          />
+        </div>
       </div>
 
       <div
@@ -242,7 +244,7 @@
             :disabled="baseSendDisabled"
             :placeholder="__('Введите сообщение...')"
             @keydown.enter.stop="sendOnEnter"
-            @paste="handleComposerPaste"
+            @paste.stop="handleComposerPaste"
           />
         </div>
         <ComposerAttachments

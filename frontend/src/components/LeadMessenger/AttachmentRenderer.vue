@@ -1,5 +1,5 @@
 <template>
-  <div v-if="attachments.length" class="mt-2 grid gap-2">
+  <div v-if="attachments.length" class="mt-2 grid w-full max-w-[28rem] gap-2">
     <ImageGrid v-if="groups.images.length" :images="groups.images" />
 
     <div
@@ -27,8 +27,12 @@
     </div>
 
     <template v-for="attachment in groups.other" :key="attachment.id">
-      <AudioPlayer
+      <MessengerAudioPlayer
         v-if="attachment.type === 'audio'"
+        :attachment="attachment"
+      />
+      <VideoAttachment
+        v-else-if="attachment.type === 'video'"
         :attachment="attachment"
       />
       <AttachmentCard v-else :attachment="attachment" />
@@ -43,8 +47,9 @@ import {
 } from '@/utils/messengerAttachments'
 import { computed } from 'vue'
 import AttachmentCard from './AttachmentCard.vue'
-import AudioPlayer from './AudioPlayer.vue'
 import ImageGrid from './ImageGrid.vue'
+import MessengerAudioPlayer from './MessengerAudioPlayer.vue'
+import VideoAttachment from './VideoAttachment.vue'
 
 const props = defineProps({
   attachments: { type: Array, default: () => [] },

@@ -1,8 +1,10 @@
 import {
+  canRenderInlineVideo,
   formatAttachmentDuration,
   getAttachmentAction,
   getAttachmentState,
   getImageGridCellClass,
+  getImageAspectRatio,
   groupMessengerAttachments,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
@@ -27,7 +29,7 @@ describe('messenger attachment contract v1', () => {
   })
 
   it('builds layouts for one, two, three, four and more images', () => {
-    expect(getImageGridCellClass(1, 0)).toContain('col-span-2')
+    expect(getImageGridCellClass(1, 0)).toContain('max-h')
     expect(getImageGridCellClass(2, 1)).toBe('aspect-square')
     expect(getImageGridCellClass(3, 0)).toContain('row-span-2')
     expect(getImageGridCellClass(3, 1)).toBe('aspect-square')
@@ -35,6 +37,8 @@ describe('messenger attachment contract v1', () => {
     expect(
       visibleImageAttachments(Array.from({ length: 6 }, (_, id) => ({ id }))),
     ).toHaveLength(4)
+    expect(getImageAspectRatio({ width: 200, height: 100 })).toBe(1.8)
+    expect(getImageAspectRatio({ width: 100, height: 300 })).toBe(0.75)
   })
 
   it('maps all attachment states and blocks unavailable actions', () => {
@@ -70,5 +74,24 @@ describe('messenger attachment contract v1', () => {
     }
     expect(getAttachmentState(attachment).unsupported).toBe(true)
     expect(getAttachmentAction(attachment)).toBe('')
+  })
+
+  it('renders inline video only from an active private stream URL', () => {
+    expect(
+      canRenderInlineVideo({
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        url: '/api/method/crm_messenger.api.attachments.stream?attachment=A-1',
+      }),
+    ).toBe(true)
+    expect(
+      canRenderInlineVideo({
+        type: 'video',
+        status: 'external',
+        mime_type: 'image/jpeg',
+        open_url: '/redirect',
+      }),
+    ).toBe(false)
   })
 })

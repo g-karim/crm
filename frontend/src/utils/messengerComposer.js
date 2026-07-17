@@ -1,5 +1,6 @@
 export function createComposerAttachmentController(options) {
   let items = []
+  let handledPasteEvents = new WeakMap()
 
   function notify() {
     options.onChange?.([...items])
@@ -82,11 +83,18 @@ export function createComposerAttachmentController(options) {
   }
 
   function handlePaste(event) {
+    if (event && typeof event === 'object' && handledPasteEvents.has(event)) {
+      return handledPasteEvents.get(event)
+    }
     let files = Array.from(event?.clipboardData?.items || [])
       .filter((item) => item.kind === 'file')
       .map((item) => item.getAsFile())
       .filter((file) => file?.type?.startsWith('image/'))
-    if (!files.length) return false
+    if (!files.length) {
+      if (event && typeof event === 'object') handledPasteEvents.set(event, false)
+      return false
+    }
+    if (event && typeof event === 'object') handledPasteEvents.set(event, true)
     event.preventDefault()
     addFiles(files)
     return true

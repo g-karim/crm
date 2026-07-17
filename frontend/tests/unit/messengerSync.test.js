@@ -234,4 +234,21 @@ describe('messenger sync', () => {
     expect(result.messages[0].attachments[0].status).toBe('available')
     expect(result.messages).toHaveLength(1)
   })
+
+  it('replaces one attachment with a complete five-photo delta', () => {
+    let message = {
+      name: 'M-PHOTOS',
+      attachments: [{ id: 'A-1', type: 'image' }],
+    }
+    let attachments = Array.from({ length: 5 }, (_, index) => ({
+      id: `A-${index + 1}`,
+      type: 'image',
+    }))
+
+    let result = mergeMessengerMessages([message], [{ ...message, attachments }])
+
+    expect(result.messages).toHaveLength(1)
+    expect(result.messages[0].attachments).toEqual(attachments)
+    expect(result.updated).toEqual(['M-PHOTOS'])
+  })
 })
