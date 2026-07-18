@@ -29,22 +29,25 @@
     <template v-if="attachment.url && state.active">
       <div
         v-if="bars.length"
-        class="flex h-11 cursor-pointer items-center gap-px rounded px-1 outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+        class="flex h-8 touch-none cursor-pointer items-center gap-[2px] rounded px-1 outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
         role="slider"
         tabindex="0"
         :aria-label="__('Позиция воспроизведения')"
         :aria-valuemin="0"
         :aria-valuemax="Math.round(duration)"
         :aria-valuenow="Math.round(currentTime)"
-        @pointerdown="seekFromPointer"
+        @pointerdown="seekDrag.pointerDown"
+        @pointermove="seekDrag.pointerMove"
+        @pointerup="seekDrag.pointerUp"
+        @pointercancel="seekDrag.pointerCancel"
         @keydown="seekFromKeyboard"
       >
         <span
           v-for="(bar, index) in bars"
           :key="index"
-          class="min-h-1 flex-1 rounded-full"
+          class="flex-1 rounded-full"
           :class="barProgress(index) <= progress ? 'bg-surface-blue-3' : 'bg-surface-gray-4'"
-          :style="{ height: `${Math.max(10, (bar / 255) * 100)}%` }"
+          :style="{ height: `${2 + bar * 22}px` }"
         />
       </div>
       <input
@@ -110,9 +113,10 @@
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import {
   clampAudioFraction,
-  downsampleWaveform,
+  createAudioSeekDrag,
   formatAudioTime,
   normalizeAudioVolume,
+  prepareWaveform,
 } from '@/utils/messengerAudio'
 import { getAttachmentState } from '@/utils/messengerAttachments'
 import { Button } from 'frappe-ui'
@@ -132,7 +136,7 @@ const muted = ref(false)
 let previousVolume = 1
 
 const state = computed(() => getAttachmentState(props.attachment))
-const bars = computed(() => downsampleWaveform(props.attachment.waveform, 64))
+const bars = computed(() => prepareWaveform(props.attachment.waveform, 64))
 const duration = computed(
   () => metadataDuration.value || Number(props.attachment.duration_ms || 0) / 1000,
 )
@@ -193,11 +197,7 @@ function seekToFraction(value) {
   currentTime.value = next
 }
 
-function seekFromPointer(event) {
-  let bounds = event.currentTarget.getBoundingClientRect()
-  if (!bounds.width) return
-  seekToFraction((event.clientX - bounds.left) / bounds.width)
-}
+const seekDrag = createAudioSeekDrag(seekToFraction)
 
 function seekFromKeyboard(event) {
   if (!duration.value) return
@@ -242,5 +242,8 @@ function barProgress(index) {
   return (index + 1) / bars.value.length
 }
 
-onBeforeUnmount(() => audio.value?.pause())
+onBeforeUnmount(() => {
+  seekDrag.cancel()
+  audio.value?.pause()
+})
 </script>
