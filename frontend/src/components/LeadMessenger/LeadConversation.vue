@@ -69,137 +69,101 @@
           class="h-full overflow-y-auto px-4 py-5 sm:px-10"
           @scroll.passive="handleMessagesScroll"
         >
-        <div
-          v-if="loadingHistory"
-          class="flex justify-center pb-3 text-ink-gray-4"
-        >
-          <LoadingIndicator class="size-5" />
-        </div>
-        <div
-          v-if="!messages.length"
-          class="flex h-full min-h-[260px] flex-col items-center justify-center gap-2 text-center"
-        >
-          <CommentIcon class="size-8 text-ink-gray-4" />
-          <div class="text-lg font-medium text-ink-gray-8">
-            {{ __('Переписки пока нет') }}
+          <div
+            v-if="loadingHistory"
+            class="flex justify-center pb-3 text-ink-gray-4"
+          >
+            <LoadingIndicator class="size-5" />
           </div>
-          <div class="max-w-md text-base text-ink-gray-5">
-            {{ __('Выберите канал и отправьте первое сообщение этому лиду.') }}
-          </div>
-        </div>
-
-        <div v-else class="flex flex-col gap-3">
-          <template v-for="item in messageItems" :key="item.message.name">
-            <div
-              v-if="item.dateLabel"
-              class="flex items-center justify-center py-1"
-            >
-              <span class="text-xs font-medium text-ink-gray-5">
-                {{ item.dateLabel }}
-              </span>
+          <div
+            v-if="!messages.length"
+            class="flex h-full min-h-[260px] flex-col items-center justify-center gap-2 text-center"
+          >
+            <CommentIcon class="size-8 text-ink-gray-4" />
+            <div class="text-lg font-medium text-ink-gray-8">
+              {{ __('Переписки пока нет') }}
             </div>
-            <div
-              class="flex"
-              :class="
-                item.message.direction === 'outbound'
-                  ? 'justify-end'
-                  : 'justify-start'
-              "
-            >
+            <div class="max-w-md text-base text-ink-gray-5">
+              {{
+                __('Выберите канал и отправьте первое сообщение этому лиду.')
+              }}
+            </div>
+          </div>
+
+          <div v-else class="flex flex-col gap-3">
+            <template v-for="item in messageItems" :key="item.message.name">
               <div
-                class="min-w-0 max-w-[94%] rounded-md px-3 py-2 text-base shadow-sm sm:max-w-[78%]"
+                v-if="item.dateLabel"
+                class="flex items-center justify-center py-1"
+              >
+                <span class="text-xs font-medium text-ink-gray-5">
+                  {{ item.dateLabel }}
+                </span>
+              </div>
+              <div
+                class="flex"
                 :class="
                   item.message.direction === 'outbound'
-                    ? 'bg-surface-blue-1 text-ink-gray-9'
-                    : 'bg-surface-gray-1 text-ink-gray-9'
+                    ? 'justify-end'
+                    : 'justify-start'
                 "
               >
-                <div class="mb-1 flex items-center gap-2">
-                  <span class="text-xs font-medium text-ink-gray-5">
-                    {{ messageSender(item.message) }}
-                  </span>
-                  <Badge
-                    variant="subtle"
-                    :label="messageSource(item.message)"
+                <div
+                  class="min-w-0 max-w-[94%] rounded-md px-3 py-2 text-base shadow-sm sm:max-w-[78%]"
+                  :class="[
+                    item.message.direction === 'outbound'
+                      ? 'bg-surface-blue-1 text-ink-gray-9'
+                      : 'bg-surface-gray-1 text-ink-gray-9',
+                    messageBubbleWidthClass(item.message),
+                  ]"
+                >
+                  <MessageMetadata
+                    :message="item.message"
+                    :sender="messageSender(item.message)"
+                    :source="messageSource(item.message)"
+                    :failed="item.message.status === 'failed'"
+                    :editing="
+                      messageActionState.editingMessage === item.message.name
+                    "
+                    :loading="
+                      messageActionState.pendingMessage === item.message.name
+                    "
+                    @start-edit="startMessageEdit(item.message)"
+                    @delete="confirmDeleteMessage(item.message)"
                   />
-                  <Badge
-                    v-if="item.message.status === 'failed'"
-                    theme="red"
-                    variant="subtle"
-                    :label="__('Ошибка')"
+                  <MessageContent
+                    :message="item.message"
+                    :editing="
+                      messageActionState.editingMessage === item.message.name
+                    "
+                    :draft="messageActionState.draft"
+                    :loading="
+                      messageActionState.pendingMessage === item.message.name
+                    "
+                    :error="messageActionState.errors[item.message.name] || ''"
+                    :shouldShowText="shouldShowMessengerText(item.message)"
+                    @update:draft="messageActions.setDraft"
+                    @save-edit="messageActions.saveEdit(item.message)"
+                    @cancel-edit="messageActions.cancelEdit"
+                    @editor-element="
+                      setEditorElement(item.message.name, $event)
+                    "
                   />
-                </div>
-                <div
-                  v-if="shouldShowMessengerText(item.message)"
-                  class="whitespace-pre-wrap break-words"
-                >
-                  {{
-                    item.message.status === 'deleted'
-                      ? __('Сообщение удалено')
-                      : item.message.text || ''
-                  }}
-                </div>
-                <AttachmentRenderer :attachments="item.message.attachments" />
-                <div
-                  class="mt-1 flex items-center justify-end gap-2 text-xs text-ink-gray-5"
-                >
-                  <Tooltip
-                    v-if="item.message.message_datetime"
-                    :text="formatDate(item.message.message_datetime)"
+                  <AttachmentRenderer
+                    v-if="item.message.status !== 'deleted'"
+                    :attachments="item.message.attachments"
+                  />
+                  <MessageFooterMetadata :message="item.message" />
+                  <div
+                    v-if="messageFailureReason(item.message)"
+                    class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
                   >
-                    <span>{{
-                      formatDate(item.message.message_datetime, 'HH:mm')
-                    }}</span>
-                  </Tooltip>
-                  <Tooltip
-                    v-if="deliveryState(item.message)"
-                    :text="deliveryTooltip(item.message)"
-                  >
-                    <span
-                      class="inline-flex items-center"
-                      :class="deliveryIconClass(item.message)"
-                    >
-                      <ClockIcon
-                        v-if="
-                          ['queued', 'sending', 'retrying'].includes(
-                            deliveryState(item.message),
-                          )
-                        "
-                        class="size-4"
-                      />
-                      <CheckIcon
-                        v-else-if="deliveryState(item.message) === 'sent'"
-                        class="size-4"
-                      />
-                      <DoubleCheckIcon
-                        v-else-if="
-                          ['delivered', 'read'].includes(
-                            deliveryState(item.message),
-                          )
-                        "
-                        class="size-4"
-                      />
-                      <CircleAlertIcon
-                        v-else-if="
-                          ['failed', 'unknown'].includes(
-                            deliveryState(item.message),
-                          )
-                        "
-                        class="size-4"
-                      />
-                    </span>
-                  </Tooltip>
-                </div>
-                <div
-                  v-if="messageFailureReason(item.message)"
-                  class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
-                >
-                  {{ messageFailureReason(item.message) }}
+                    {{ messageFailureReason(item.message) }}
+                  </div>
                 </div>
               </div>
-            </div>
-          </template>
-        </div>
+            </template>
+          </div>
         </div>
 
         <div
@@ -270,7 +234,10 @@
               :label="__('Отправить')"
               iconLeft="send"
               :loading="sendingMessage"
-              :disabled="sendDisabled || (!draftText.trim() && !pendingAttachments.length)"
+              :disabled="
+                sendDisabled ||
+                (!draftText.trim() && !pendingAttachments.length)
+              "
               @click="sendMessage"
             />
           </div>
@@ -281,45 +248,34 @@
 </template>
 
 <script setup>
-import CheckIcon from '@/components/Icons/CheckIcon.vue'
 import CommentIcon from '@/components/Icons/CommentIcon.vue'
-import DoubleCheckIcon from '@/components/Icons/DoubleCheckIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
 import ComposerAttachments from '@/components/LeadMessenger/ComposerAttachments.vue'
+import MessageContent from '@/components/LeadMessenger/MessageContent.vue'
+import MessageFooterMetadata from '@/components/LeadMessenger/MessageFooterMetadata.vue'
+import MessageMetadata from '@/components/LeadMessenger/MessageMetadata.vue'
 import { globalStore } from '@/stores/global'
-import { formatDate } from '@/utils'
 import {
   buildMessengerMessageItems,
   buildMessengerChannelOptions,
   getMessengerChannelType,
   getMessengerCapabilities,
-  getMessengerDeliveryLabel,
-  getMessengerDeliveryState,
   getMessengerPlatformLabel,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
+import {
+  getSingleImageBubbleWidthClass,
+  isSingleImageAttachmentSet,
+} from '@/utils/messengerAttachments'
 import { createMessengerSyncController } from '@/utils/messengerSync'
 import { validateComposerFileMix } from '@/utils/messengerComposer'
 import {
-  Badge,
-  Button,
-  FormControl,
-  Textarea,
-  Tooltip,
-  call,
-  toast,
-} from 'frappe-ui'
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from 'vue'
-import CircleAlertIcon from '~icons/lucide/circle-alert'
-import ClockIcon from '~icons/lucide/clock-3'
+  createMessengerMessageActions,
+  openMessengerMessageEditor,
+} from '@/utils/messengerMessageActions'
+import { Button, FormControl, Textarea, call, toast } from 'frappe-ui'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   leadName: { type: String, required: true },
@@ -346,9 +302,17 @@ const messagesEl = ref(null)
 const newMessageCount = ref(0)
 const composerAttachments = ref(null)
 const draggingFiles = ref(false)
+const messageActionState = ref({
+  editingMessage: '',
+  draft: '',
+  pendingMessage: '',
+  pendingAction: '',
+  errors: {},
+})
+const messageEditorElements = new Map()
 let scrollSnapshot = null
 
-const { $socket } = globalStore()
+const { $dialog, $socket } = globalStore()
 
 const leadPhone = computed(
   () => props.phone || props.lead?.mobile_no || props.lead?.phone || '',
@@ -473,8 +437,12 @@ const messageSync = createMessengerSyncController({
     await nextTick()
     if (change.kind === 'snapshot') {
       scrollToBottom()
-    } else if (change.kind === 'history' && scrollSnapshot?.kind === 'history') {
-      let addedHeight = (messagesEl.value?.scrollHeight || 0) - scrollSnapshot.height
+    } else if (
+      change.kind === 'history' &&
+      scrollSnapshot?.kind === 'history'
+    ) {
+      let addedHeight =
+        (messagesEl.value?.scrollHeight || 0) - scrollSnapshot.height
       if (messagesEl.value) {
         messagesEl.value.scrollTop = scrollSnapshot.top + addedHeight
       }
@@ -488,7 +456,8 @@ const messageSync = createMessengerSyncController({
     if (
       incoming.some(
         (message) =>
-          message.conversation && !conversationByName.value[message.conversation],
+          message.conversation &&
+          !conversationByName.value[message.conversation],
       )
     ) {
       loadConversations()
@@ -498,6 +467,31 @@ const messageSync = createMessengerSyncController({
     handleError(error, __('Не удалось синхронизировать сообщения.'))
   },
 })
+
+const messageActions = createMessengerMessageActions({
+  call,
+  sync: () => messageSync.syncDelta(),
+  onChange(state) {
+    messageActionState.value = state
+  },
+  onError(message) {
+    toast.error(__(message))
+  },
+})
+
+function setEditorElement(messageName, element) {
+  if (element) messageEditorElements.set(messageName, element)
+  else messageEditorElements.delete(messageName)
+}
+
+function startMessageEdit(message) {
+  return openMessengerMessageEditor(message, {
+    startEdit: messageActions.startEdit,
+    nextTick,
+    scrollContainer: () => messagesEl.value,
+    getEditorElement: (messageName) => messageEditorElements.get(messageName),
+  })
+}
 
 onMounted(initialize)
 
@@ -522,6 +516,8 @@ async function initialize(leadChanged = false) {
     composerAttachments.value?.clear()
     clientRequestId.value = ''
     clientRequestFingerprint.value = ''
+    messageEditorElements.clear()
+    messageActions.cancelEdit()
   }
   try {
     await Promise.all([
@@ -536,6 +532,26 @@ async function initialize(leadChanged = false) {
   } finally {
     loadingMessages.value = false
   }
+}
+
+function confirmDeleteMessage(message) {
+  if (!message?.can_delete || messageActionState.value.pendingMessage) return
+  $dialog({
+    title: __('Удалить сообщение для всех?'),
+    message: __(
+      'VK удалит сообщение у всех участников. В CRM останется отметка об удалении.',
+    ),
+    actions: [
+      {
+        label: __('Удалить для всех'),
+        variant: 'solid',
+        theme: 'red',
+        onClick: async (close) => {
+          if (await messageActions.deleteMessage(message)) close()
+        },
+      },
+    ],
+  })
 }
 
 async function loadAll() {
@@ -623,7 +639,10 @@ async function sendMessage() {
       text,
       attachments: attachmentNames,
     })
-    if (!clientRequestId.value || clientRequestFingerprint.value !== fingerprint) {
+    if (
+      !clientRequestId.value ||
+      clientRequestFingerprint.value !== fingerprint
+    ) {
       clientRequestId.value = makeClientRequestId()
       clientRequestFingerprint.value = fingerprint
     }
@@ -803,21 +822,9 @@ function messageSource(message) {
   return __(getMessengerPlatformLabel(channel))
 }
 
-function deliveryState(message) {
-  return getMessengerDeliveryState(message)
-}
-
-function deliveryTooltip(message) {
-  let label = getMessengerDeliveryLabel(message)
-  let reason = messageFailureReason(message)
-  return reason ? `${__(label)}: ${reason}` : __(label)
-}
-
-function deliveryIconClass(message) {
-  let state = deliveryState(message)
-  if (state === 'read') return 'text-ink-blue-2'
-  if (['failed', 'unknown'].includes(state)) return 'text-ink-red-4'
-  return 'text-ink-gray-5'
+function messageBubbleWidthClass(message) {
+  if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
+  return getSingleImageBubbleWidthClass(message.attachments[0])
 }
 
 function messageFailureReason(message) {

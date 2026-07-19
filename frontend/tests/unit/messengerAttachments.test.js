@@ -4,8 +4,10 @@ import {
   getAttachmentAction,
   getAttachmentState,
   getImageGridCellClass,
-  getImageAspectRatio,
+  getSingleImageBubbleWidthClass,
+  getSingleImageMediaWidthClass,
   groupMessengerAttachments,
+  isSingleImageAttachmentSet,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
 import { describe, expect, it } from 'vitest'
@@ -28,8 +30,54 @@ describe('messenger attachment contract v1', () => {
     expect(formatAttachmentDuration(65000)).toBe('1:05')
   })
 
-  it('builds layouts for one, two, three, four and more images', () => {
-    expect(getImageGridCellClass(1, 0)).toContain('max-h')
+  it('classifies only a single standalone image as single-image layout', () => {
+    expect(isSingleImageAttachmentSet([{ id: 'I-1', type: 'image' }])).toBe(
+      true,
+    )
+    expect(
+      isSingleImageAttachmentSet([
+        { id: 'I-1', type: 'image' },
+        { id: 'I-2', type: 'image' },
+      ]),
+    ).toBe(false)
+    expect(
+      isSingleImageAttachmentSet([
+        { id: 'I-1', type: 'image' },
+        { id: 'F-1', type: 'file' },
+      ]),
+    ).toBe(false)
+    expect(isSingleImageAttachmentSet([{ id: 'S-1', type: 'sticker' }])).toBe(
+      false,
+    )
+  })
+
+  it('selects presentation width from image orientation, not intrinsic size', () => {
+    expect(getSingleImageBubbleWidthClass({ width: 100, height: 200 })).toBe(
+      'w-[18rem]',
+    )
+    expect(getSingleImageBubbleWidthClass({ width: 64, height: 64 })).toBe(
+      'w-[24rem]',
+    )
+    expect(getSingleImageBubbleWidthClass({ width: 400, height: 200 })).toBe(
+      'w-[29.5rem]',
+    )
+    expect(getSingleImageBubbleWidthClass({ width: 100, height: 95 })).toBe(
+      'w-[24rem]',
+    )
+    expect(getSingleImageBubbleWidthClass({})).toBe('w-[24rem]')
+
+    expect(getSingleImageMediaWidthClass({ width: 100, height: 200 })).toBe(
+      'w-[16.5rem]',
+    )
+    expect(getSingleImageMediaWidthClass({ width: 64, height: 64 })).toBe(
+      'w-[22.5rem]',
+    )
+    expect(getSingleImageMediaWidthClass({ width: 400, height: 200 })).toBe(
+      'w-[28rem]',
+    )
+  })
+
+  it('builds grid layouts for two, three, four and more images', () => {
     expect(getImageGridCellClass(2, 1)).toBe('aspect-square')
     expect(getImageGridCellClass(3, 0)).toContain('row-span-2')
     expect(getImageGridCellClass(3, 1)).toBe('aspect-square')
@@ -37,8 +85,6 @@ describe('messenger attachment contract v1', () => {
     expect(
       visibleImageAttachments(Array.from({ length: 6 }, (_, id) => ({ id }))),
     ).toHaveLength(4)
-    expect(getImageAspectRatio({ width: 200, height: 100 })).toBe(1.8)
-    expect(getImageAspectRatio({ width: 100, height: 300 })).toBe(0.75)
   })
 
   it('maps all attachment states and blocks unavailable actions', () => {

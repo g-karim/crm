@@ -31,6 +31,35 @@ export function groupMessengerAttachments(attachments = []) {
   )
 }
 
+export function isSingleImageAttachmentSet(attachments = []) {
+  return attachments.length === 1 && attachments[0]?.type === 'image'
+}
+
+export function getSingleImageBubbleWidthClass(image = {}) {
+  let orientation = getImagePresentationOrientation(image)
+  if (orientation === 'portrait') return 'w-[18rem]'
+  if (orientation === 'landscape') return 'w-[29.5rem]'
+  return 'w-[24rem]'
+}
+
+export function getSingleImageMediaWidthClass(image = {}) {
+  let orientation = getImagePresentationOrientation(image)
+  if (orientation === 'portrait') return 'w-[16.5rem]'
+  if (orientation === 'landscape') return 'w-[28rem]'
+  return 'w-[22.5rem]'
+}
+
+function getImagePresentationOrientation(image = {}) {
+  let width = Number(image.width || 0)
+  let height = Number(image.height || 0)
+  if (!width || !height) return 'square'
+
+  let ratio = width / height
+  if (ratio < 0.9) return 'portrait'
+  if (ratio > 1.1) return 'landscape'
+  return 'square'
+}
+
 export function getAttachmentState(attachment = {}) {
   let status = attachment.status || 'unsupported'
   return {
@@ -49,17 +78,9 @@ export function getAttachmentAction(attachment = {}) {
 }
 
 export function getImageGridCellClass(count, index) {
-  if (count <= 1) return 'max-h-[22rem]'
   if (count === 2) return 'aspect-square'
   if (count === 3 && index === 0) return 'row-span-2 min-h-56'
   return 'aspect-square'
-}
-
-export function getImageAspectRatio(image = {}) {
-  let width = Number(image.width || 0)
-  let height = Number(image.height || 0)
-  if (!width || !height) return 4 / 3
-  return Math.max(0.75, Math.min(width / height, 1.8))
 }
 
 export function visibleImageAttachments(attachments = []) {

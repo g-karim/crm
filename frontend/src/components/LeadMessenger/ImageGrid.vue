@@ -1,7 +1,39 @@
 <template>
+  <button
+    v-if="singleImage"
+    data-single-image
+    type="button"
+    class="inline-flex max-w-full justify-self-start overflow-hidden rounded-md bg-surface-gray-2 text-left"
+    :class="getSingleImageMediaWidthClass(singleImage)"
+    :disabled="!singleImage.url || !getAttachmentState(singleImage).active"
+    @click="open(singleImage)"
+  >
+    <img
+      v-if="singleImage.url && getAttachmentState(singleImage).active"
+      :src="singleImage.url"
+      :alt="singleImage.file_name || __('Изображение')"
+      :width="imageDimension(singleImage.width)"
+      :height="imageDimension(singleImage.height)"
+      class="block h-auto w-full max-w-full object-contain"
+      loading="lazy"
+    />
+    <div
+      v-else
+      class="flex min-h-28 w-full max-w-full flex-col items-center justify-center gap-2 p-3 text-center text-xs text-ink-gray-5"
+    >
+      <LoadingIndicator
+        v-if="getAttachmentState(singleImage).busy"
+        class="size-5"
+      />
+      <ImageOffIcon v-else class="size-5" />
+      <span>{{ __(getAttachmentState(singleImage).label) }}</span>
+    </div>
+  </button>
+
   <div
-    class="grid w-[min(28rem,calc(100vw-3rem))] max-w-full gap-1 overflow-hidden rounded-lg"
-    :class="images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'"
+    v-else-if="images.length"
+    data-image-grid
+    class="grid w-[min(28rem,calc(100vw-3rem))] max-w-full grid-cols-2 gap-1 overflow-hidden rounded-lg"
   >
     <button
       v-for="(image, index) in visibleImages"
@@ -9,7 +41,6 @@
       type="button"
       class="relative min-h-28 overflow-hidden bg-surface-gray-2 text-left"
       :class="getImageGridCellClass(images.length, index)"
-      :style="cellStyle(image)"
       :disabled="!image.url || !getAttachmentState(image).active"
       @click="open(image)"
     >
@@ -17,8 +48,7 @@
         v-if="image.url && getAttachmentState(image).active"
         :src="image.url"
         :alt="image.file_name || __('Изображение')"
-        class="size-full"
-        :class="images.length === 1 ? 'object-contain' : 'object-cover'"
+        class="size-full object-cover"
         loading="lazy"
       />
       <div
@@ -52,8 +82,8 @@
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import {
   getAttachmentState,
-  getImageAspectRatio,
   getImageGridCellClass,
+  getSingleImageMediaWidthClass,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
 import { computed, ref } from 'vue'
@@ -65,11 +95,12 @@ const props = defineProps({
 })
 const lightboxOpen = ref(false)
 const lightboxIndex = ref(0)
+const singleImage = computed(() =>
+  props.images.length === 1 ? props.images[0] : null,
+)
 const visibleImages = computed(() => visibleImageAttachments(props.images))
 const availableImages = computed(() =>
-  props.images.filter(
-    (image) => image.url && getAttachmentState(image).active,
-  ),
+  props.images.filter((image) => image.url && getAttachmentState(image).active),
 )
 
 function open(image) {
@@ -79,8 +110,8 @@ function open(image) {
   lightboxOpen.value = true
 }
 
-function cellStyle(image) {
-  if (props.images.length !== 1) return undefined
-  return { aspectRatio: getImageAspectRatio(image) }
+function imageDimension(value) {
+  let dimension = Number(value || 0)
+  return dimension > 0 ? dimension : undefined
 }
 </script>
