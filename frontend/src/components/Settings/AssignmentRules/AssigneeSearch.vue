@@ -9,7 +9,7 @@
           @click="togglePopover()"
         />
       </template>
-      <template #body="{ togglePopover }">
+      <template #body>
         <div
           class="mt-1 rounded-lg bg-surface-white py-1 text-base shadow-2xl w-60"
         >

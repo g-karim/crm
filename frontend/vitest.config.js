@@ -1,7 +1,9 @@
+import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
 import path from 'path'
 
 export default defineConfig({
+  plugins: [vue()],
   test: {
     globals: true,
     environment: 'happy-dom',
@@ -23,6 +25,18 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+      '~icons/lucide/circle-alert': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
+      '~icons/lucide/clock-3': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
+      '~icons/lucide/image-off': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
     },
   },
 })
