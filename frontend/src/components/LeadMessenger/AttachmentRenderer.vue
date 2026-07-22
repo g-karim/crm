@@ -56,6 +56,7 @@
       <VideoAttachment
         v-else-if="attachment.type === 'video'"
         :attachment="attachment"
+        :playback-scope="playbackScope"
       />
       <AttachmentCard v-else :attachment="attachment" />
     </template>
@@ -76,6 +77,7 @@ import VideoAttachment from './VideoAttachment.vue'
 
 const props = defineProps({
   attachments: { type: Array, default: () => [] },
+  playbackScope: { type: String, default: '' },
 })
 const groups = computed(() => groupMessengerAttachments(props.attachments))
 const singleImage = computed(() =>

@@ -91,7 +91,8 @@ export function createComposerAttachmentController(options) {
       .map((item) => item.getAsFile())
       .filter((file) => file?.type?.startsWith('image/'))
     if (!files.length) {
-      if (event && typeof event === 'object') handledPasteEvents.set(event, false)
+      if (event && typeof event === 'object')
+        handledPasteEvents.set(event, false)
       return false
     }
     if (event && typeof event === 'object') handledPasteEvents.set(event, true)
@@ -116,8 +117,7 @@ export function createComposerAttachmentController(options) {
     handlePaste,
     handleDrop,
     getItems: () => [...items],
-    hasBlockingItems: () =>
-      items.some((item) => item.status !== 'uploaded'),
+    hasBlockingItems: () => items.some((item) => item.status !== 'uploaded'),
     readyFileNames: () =>
       items
         .filter((item) => item.status === 'uploaded')
@@ -130,10 +130,9 @@ export function validateComposerFileMix(files, existing, context = {}) {
   if (!context.supportsAttachments) {
     return { files: [], error: 'Выбранный канал не поддерживает вложения.' }
   }
-  let combined = [
-    ...existing.map((item) => item.file),
-    ...files,
-  ].filter(Boolean)
+  let combined = [...existing.map((item) => item.file), ...files].filter(
+    Boolean,
+  )
   if (context.channelType !== 'max') return { files }
 
   let imageFlags = combined.map(isImageFile)
@@ -152,6 +151,13 @@ export function isImageFile(file = {}) {
   return (
     file.type?.startsWith('image/') ||
     /\.(png|jpe?g|gif|webp|heic)$/i.test(file.name || '')
+  )
+}
+
+export function isVideoFile(file = {}) {
+  return (
+    ['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type) ||
+    /\.(mp4|webm|mov)$/i.test(file.name || '')
   )
 }
 

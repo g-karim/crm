@@ -97,6 +97,36 @@ describe('messenger sync', () => {
     expect(
       harness.socket.handlers.get('crm_messenger:conversation_changed'),
     ).toEqual([])
+		expect(harness.socket.handlers.get('crm_messenger:typing')).toEqual([])
+  })
+
+  it('routes only typing events for the active Lead', async () => {
+    let typing = []
+    let harness = createHarness({ get_message_page: snapshot() })
+    harness.controller.stop()
+    harness.controller = createMessengerSyncController({
+      socket: harness.socket,
+      call: vi.fn(async () => snapshot()),
+      visibilityTarget: harness.visibility,
+      onTyping: (payload) => typing.push(payload),
+    })
+    await harness.controller.start('LEAD-1')
+    harness.socket.emit('crm_messenger:typing', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-2',
+      conversation: 'CONV-2',
+    })
+    harness.socket.emit('crm_messenger:typing', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONV-1',
+      active: true,
+      expires_in_ms: 6000,
+    })
+    expect(typing).toHaveLength(1)
+    expect(typing[0].conversation).toBe('CONV-1')
   })
 
   it('merges delta changes by message name without duplicates', async () => {

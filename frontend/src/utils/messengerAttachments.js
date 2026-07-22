@@ -105,7 +105,14 @@ export function canRenderInlineVideo(attachment = {}) {
   return (
     attachment.type === 'video' &&
     getAttachmentState(attachment).active &&
-    Boolean(attachment.url) &&
+    (!attachment.video_source || attachment.video_source === 'local_file') &&
+    Boolean(attachment.playback_url || attachment.url) &&
     attachment.mime_type?.startsWith('video/')
   )
+}
+
+export function getVideoPlaybackUrl(attachment = {}) {
+  return canRenderInlineVideo(attachment)
+    ? attachment.playback_url || attachment.url || ''
+    : ''
 }

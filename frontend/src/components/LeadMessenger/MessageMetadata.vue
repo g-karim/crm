@@ -52,21 +52,20 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['start-edit', 'delete'])
+const emit = defineEmits(['start-edit', 'delete', 'retry', 'reply'])
 
 const menuOptions = computed(() =>
-  getMessengerMessageActions(props.message).map((action) =>
-    action === 'edit'
-      ? {
-          label: __('Редактировать'),
-          icon: 'edit-3',
-          onClick: () => emit('start-edit'),
-        }
-      : {
-          label: __('Удалить для всех'),
-          icon: 'trash-2',
-          onClick: () => emit('delete'),
-        },
-  ),
+  getMessengerMessageActions(props.message).map((action) => {
+    if (action === 'reply') {
+      return { label: __('Ответить'), icon: 'corner-up-left', onClick: () => emit('reply') }
+    }
+    if (action === 'retry') {
+      return { label: __('Повторить отправку'), icon: 'refresh-cw', onClick: () => emit('retry') }
+    }
+    if (action === 'edit') {
+      return { label: __('Редактировать'), icon: 'edit-3', onClick: () => emit('start-edit') }
+    }
+    return { label: __('Удалить для всех'), icon: 'trash-2', onClick: () => emit('delete') }
+  }),
 )
 </script>

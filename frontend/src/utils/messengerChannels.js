@@ -138,16 +138,23 @@ export function getMessengerDeliveryLabel(message = {}) {
 }
 
 export function getMessengerCapabilities(channel = {}) {
+  let video = channel?.capabilities?.video || {}
   return {
     can_start_conversation:
       channel?.capabilities?.can_start_conversation ?? true,
     requires_inbound: Boolean(channel?.capabilities?.requires_inbound),
     requires_phone: Boolean(channel?.capabilities?.requires_phone),
-    supports_attachments: Boolean(
-      channel?.capabilities?.supports_attachments,
-    ),
+    supports_attachments: Boolean(channel?.capabilities?.supports_attachments),
     supported_attachment_types:
       channel?.capabilities?.supported_attachment_types || [],
+    video: {
+      receive: Boolean(video.receive),
+      download: Boolean(video.download_to_private ?? video.download),
+      inline_playback: Boolean(video.inline_playback),
+      embed: Boolean(video.embed),
+      native_send: Boolean(video.native_send),
+      send_fallback: video.send_fallback || '',
+    },
   }
 }
 

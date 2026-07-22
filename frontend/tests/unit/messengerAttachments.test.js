@@ -3,6 +3,7 @@ import {
   formatAttachmentDuration,
   getAttachmentAction,
   getAttachmentState,
+  getVideoPlaybackUrl,
   getImageGridCellClass,
   getSingleImageBubbleWidthClass,
   getSingleImageMediaWidthClass,
@@ -132,11 +133,29 @@ describe('messenger attachment contract v1', () => {
       }),
     ).toBe(true)
     expect(
+      getVideoPlaybackUrl({
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        mime_type: 'video/webm',
+        playback_url: '/private-video-stream',
+      }),
+    ).toBe('/private-video-stream')
+    expect(
       canRenderInlineVideo({
         type: 'video',
         status: 'external',
         mime_type: 'image/jpeg',
         open_url: '/redirect',
+      }),
+    ).toBe(false)
+    expect(
+      canRenderInlineVideo({
+        type: 'video',
+        status: 'external',
+        video_source: 'provider_embed',
+        mime_type: 'video/mp4',
+        url: 'https://temporary.provider/video.mp4',
       }),
     ).toBe(false)
   })

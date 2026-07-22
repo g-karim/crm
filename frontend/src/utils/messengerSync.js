@@ -1,4 +1,5 @@
 const EVENT_NAME = 'crm_messenger:conversation_changed'
+const TYPING_EVENT_NAME = 'crm_messenger:typing'
 const REFERENCE_DOCTYPE = 'CRM Lead'
 
 export function compareMessengerMessages(left = {}, right = {}) {
@@ -198,6 +199,16 @@ export function createMessengerSyncController(options) {
     syncDelta().catch(() => {})
   }
 
+  function onTyping(payload = {}) {
+    if (
+      payload.version !== 1 ||
+      payload.reference_doctype !== REFERENCE_DOCTYPE ||
+      payload.reference_name !== leadName
+    )
+      return
+    options.onTyping?.(payload)
+  }
+
   function onConnect() {
     if (!leadName) return
     subscribe(leadName)
@@ -234,6 +245,7 @@ export function createMessengerSyncController(options) {
     if (!started) {
       started = true
       socket?.on(EVENT_NAME, onRealtime)
+      socket?.on(TYPING_EVENT_NAME, onTyping)
       socket?.on('connect', onConnect)
       visibilityTarget?.addEventListener?.(
         'visibilitychange',
@@ -250,6 +262,7 @@ export function createMessengerSyncController(options) {
     if (!started) return
     started = false
     socket?.off(EVENT_NAME, onRealtime)
+    socket?.off(TYPING_EVENT_NAME, onTyping)
     socket?.off('connect', onConnect)
     visibilityTarget?.removeEventListener?.(
       'visibilitychange',

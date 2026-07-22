@@ -46,6 +46,31 @@ describe('messenger message actions', () => {
     ).toEqual([])
   })
 
+  it('adds reply and retry only from backend flags', () => {
+    expect(
+      getMessengerMessageActions(
+        editable({ can_reply: true, can_retry: true }),
+      ),
+    ).toEqual(['reply', 'retry', 'edit', 'delete'])
+    expect(
+      getMessengerMessageActions(
+        editable({ can_reply: false, can_retry: false }),
+      ),
+    ).toEqual(['edit', 'delete'])
+  })
+
+  it('retries the same backend message with explicit unknown confirmation', async () => {
+    let message = editable({ can_retry: true, status: 'unknown' })
+    let { controller, call, sync } = harness()
+
+    expect(await controller.retryMessage(message, true)).toBe(true)
+    expect(call).toHaveBeenCalledWith(
+      'crm_messenger.api.messages.retry_outbound_message',
+      { message: 'MSG-1', confirm_unknown: 1 },
+    )
+    expect(sync).toHaveBeenCalledOnce()
+  })
+
   it('exposes tombstone and edited marker display states', () => {
     expect(getMessengerMessageDisplay(editable({ is_edited: 1 }))).toEqual({
       tombstone: false,

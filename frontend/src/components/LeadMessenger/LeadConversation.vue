@@ -101,11 +101,17 @@
                 </span>
               </div>
               <div
+                :data-message-id="item.message.name"
                 class="flex"
                 :class="
-                  item.message.direction === 'outbound'
-                    ? 'justify-end'
-                    : 'justify-start'
+                  [
+                    item.message.direction === 'outbound'
+                      ? 'justify-end'
+                      : 'justify-start',
+                    highlightedMessage === item.message.name
+                      ? 'rounded ring-2 ring-outline-blue-2'
+                      : '',
+                  ]
                 "
               >
                 <div
@@ -130,6 +136,15 @@
                     "
                     @start-edit="startMessageEdit(item.message)"
                     @delete="confirmDeleteMessage(item.message)"
+                    @retry="retryMessage(item.message)"
+                    @reply="startReply(item.message)"
+                  />
+                  <MessageReplyQuote
+                    v-if="item.message.reply_context"
+                    class="mb-2"
+                    :context="item.message.reply_context"
+                    :client-name="clientDisplayName"
+                    @navigate="navigateToReply"
                   />
                   <MessageContent
                     :message="item.message"
@@ -152,6 +167,7 @@
                   <AttachmentRenderer
                     v-if="item.message.status !== 'deleted'"
                     :attachments="item.message.attachments"
+                    :playback-scope="videoPlaybackScope"
                   />
                   <MessageFooterMetadata :message="item.message" />
                   <div
@@ -163,6 +179,12 @@
                 </div>
               </div>
             </template>
+            <div
+              v-if="typingActive"
+              class="w-fit rounded-md bg-surface-gray-1 px-3 py-2 text-sm italic text-ink-gray-5"
+            >
+              {{ __('{0} печатает…', [clientDisplayName]) }}
+            </div>
           </div>
         </div>
 
@@ -186,6 +208,20 @@
         @dragleave="draggingFiles = false"
         @drop="handleComposerDrop"
       >
+        <div v-if="replyTarget" class="mb-2 flex items-start gap-2">
+          <MessageReplyQuote
+            class="min-w-0 flex-1"
+            :context="replyComposerContext"
+            :client-name="clientDisplayName"
+            @navigate="navigateToReply"
+          />
+          <Button
+            variant="ghost"
+            icon="x"
+            :aria-label="__('Отменить ответ')"
+            @click="cancelReply"
+          />
+        </div>
         <div
           v-if="draggingFiles"
           class="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-outline-blue-2 bg-surface-blue-1/90 text-sm font-medium text-ink-blue-3"
@@ -255,6 +291,7 @@ import ComposerAttachments from '@/components/LeadMessenger/ComposerAttachments.
 import MessageContent from '@/components/LeadMessenger/MessageContent.vue'
 import MessageFooterMetadata from '@/components/LeadMessenger/MessageFooterMetadata.vue'
 import MessageMetadata from '@/components/LeadMessenger/MessageMetadata.vue'
+import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
 import { globalStore } from '@/stores/global'
 import {
   buildMessengerMessageItems,
@@ -269,7 +306,9 @@ import {
   isSingleImageAttachmentSet,
 } from '@/utils/messengerAttachments'
 import { createMessengerSyncController } from '@/utils/messengerSync'
-import { validateComposerFileMix } from '@/utils/messengerComposer'
+import { isVideoFile, validateComposerFileMix } from '@/utils/messengerComposer'
+import { createMessengerReadController } from '@/utils/messengerRead'
+import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
 import {
   createMessengerMessageActions,
   openMessengerMessageEditor,
@@ -281,6 +320,7 @@ const props = defineProps({
   leadName: { type: String, required: true },
   lead: { type: Object, default: () => ({}) },
   phone: { type: String, default: '' },
+  active: { type: Boolean, default: true },
 })
 
 const loadingConversation = ref(false)
@@ -301,7 +341,11 @@ const genericError = ref('')
 const messagesEl = ref(null)
 const newMessageCount = ref(0)
 const composerAttachments = ref(null)
+const textareaRef = ref(null)
 const draggingFiles = ref(false)
+const replyTarget = ref(null)
+const typingActive = ref(false)
+const highlightedMessage = ref('')
 const messageActionState = ref({
   editingMessage: '',
   draft: '',
@@ -311,6 +355,8 @@ const messageActionState = ref({
 })
 const messageEditorElements = new Map()
 let scrollSnapshot = null
+let typingTimer = null
+let highlightTimer = null
 
 const { $dialog, $socket } = globalStore()
 
@@ -403,9 +449,20 @@ const channelOptions = computed(() =>
   buildMessengerChannelOptions(channels.value),
 )
 const messageItems = computed(() => buildMessengerMessageItems(messages.value))
+const videoPlaybackScope = computed(
+  () =>
+    `${props.leadName}:${selectedConversation.value?.name || ''}:${props.active}`,
+)
+const clientDisplayName = computed(() =>
+  getMessengerClientDisplayName({
+    lead: props.lead,
+    conversation: selectedConversation.value,
+  }),
+)
 const contactLine = computed(() => {
-  let title = props.lead?.lead_name || props.lead?.name || props.leadName
-  return leadPhone.value ? `${title} · ${leadPhone.value}` : title
+  return leadPhone.value
+    ? `${clientDisplayName.value} · ${leadPhone.value}`
+    : clientDisplayName.value
 })
 const composerHint = computed(() => {
   if (attachmentMixError.value) return __(attachmentMixError.value)
@@ -414,7 +471,30 @@ const composerHint = computed(() => {
   }
   if (missingPhone.value) return __('Добавьте телефон в карточке лида.')
   if (!channels.value.length) return __('Нет доступного канала отправки.')
+  if (
+    selectedCapabilities.value.video.send_fallback === 'document' &&
+    pendingAttachments.value.some((item) => isVideoFile(item.file))
+  ) {
+    return __(
+      'VK отправит видео как документ: получателю потребуется скачать файл; нативного плеера VK не будет.',
+    )
+  }
   return __('Enter отправляет сообщение, Shift+Enter добавляет новую строку.')
+})
+const replyComposerContext = computed(() => {
+  if (!replyTarget.value) return null
+  return {
+    message: replyTarget.value.name,
+    state: 'available',
+    snapshot: {
+      version: 1,
+      direction: replyTarget.value.direction,
+      sender_name: messageSender(replyTarget.value),
+      text: `${replyTarget.value.text || ''}`.slice(0, 500) || null,
+      message_type: replyTarget.value.message_type || 'text',
+      attachment_types: (replyTarget.value.attachments || []).map((item) => item.type),
+    },
+  }
 })
 
 const messageSync = createMessengerSyncController({
@@ -456,6 +536,15 @@ const messageSync = createMessengerSyncController({
     if (
       incoming.some(
         (message) =>
+          message.conversation === selectedConversation.value?.name &&
+          message.direction === 'inbound',
+      )
+    ) {
+      clearTyping()
+    }
+    if (
+      incoming.some(
+        (message) =>
           message.conversation &&
           !conversationByName.value[message.conversation],
       )
@@ -465,6 +554,29 @@ const messageSync = createMessengerSyncController({
   },
   onError(error) {
     handleError(error, __('Не удалось синхронизировать сообщения.'))
+  },
+  onTyping(payload) {
+    if (payload.conversation !== selectedConversation.value?.name) return
+    if (!props.active || document.visibilityState !== 'visible') return
+    if (payload.active === false) clearTyping()
+    else showTyping(payload.expires_in_ms)
+  },
+})
+
+const readController = createMessengerReadController({
+  call,
+  isEnabled: () =>
+    props.active && document.visibilityState === 'visible' && isNearBottom(),
+  getConversation: () => selectedConversation.value,
+  getMessages: () => messages.value,
+  onConfirmed(result) {
+    let conversation = conversations.value.find(
+      (item) => item.name === result.conversation,
+    )
+    if (conversation) conversation.unread_count = result.unread_count
+  },
+  onError(error) {
+    toast.error(__(error?.message || 'Не удалось отметить сообщения прочитанными.'))
   },
 })
 
@@ -493,10 +605,17 @@ function startMessageEdit(message) {
   })
 }
 
-onMounted(initialize)
+onMounted(() => {
+  initialize()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
 
 onBeforeUnmount(() => {
   messageSync.stop()
+  readController.stop()
+  clearTyping()
+  clearTimeout(highlightTimer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 watch(
@@ -518,6 +637,8 @@ async function initialize(leadChanged = false) {
     clientRequestFingerprint.value = ''
     messageEditorElements.clear()
     messageActions.cancelEdit()
+    cancelReply()
+    clearTyping()
   }
   try {
     await Promise.all([
@@ -638,6 +759,7 @@ async function sendMessage() {
       channel: selectedChannel.value,
       text,
       attachments: attachmentNames,
+      reply: replyTarget.value?.name || '',
     })
     if (
       !clientRequestId.value ||
@@ -652,11 +774,13 @@ async function sendMessage() {
       channel: selectedChannel.value,
       client_request_id: clientRequestId.value,
       attachments: attachmentNames,
+      reply_to_message: replyTarget.value?.name || undefined,
     })
 
     if (result?.reason === 'not_configured') {
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
+      cancelReply()
       sendWarning.value = integrationWarningMessage(result)
       toast.error(sendWarning.value)
     } else if (!result?.ok) {
@@ -668,6 +792,7 @@ async function sendMessage() {
       composerAttachments.value?.clear()
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
+      cancelReply()
     }
   } catch (error) {
     handleError(error, __('Не удалось отправить сообщение.'))
@@ -776,6 +901,7 @@ function scrollToBottom() {
   if (!messagesEl.value) return
   messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   newMessageCount.value = 0
+  readController.schedule()
 }
 
 function isNearBottom() {
@@ -789,7 +915,10 @@ function isNearBottom() {
 }
 
 async function handleMessagesScroll() {
-  if (isNearBottom()) newMessageCount.value = 0
+  if (isNearBottom()) {
+    newMessageCount.value = 0
+    readController.schedule()
+  }
   if (
     !messagesEl.value ||
     messagesEl.value.scrollTop > 80 ||
@@ -807,9 +936,86 @@ async function handleMessagesScroll() {
   }
 }
 
+function startReply(message) {
+  if (!message?.can_reply || messageActionState.value.pendingMessage) return
+  replyTarget.value = message
+  nextTick(() => textareaRef.value?.el?.focus?.())
+}
+
+function cancelReply() {
+  replyTarget.value = null
+}
+
+function retryMessage(message) {
+  if (!message?.can_retry || messageActionState.value.pendingMessage) return
+  if (!message.retry_requires_confirmation) {
+    messageActions.retryMessage(message)
+    return
+  }
+  $dialog({
+    title: __('Повторить отправку?'),
+    message: __('VK мог уже принять сообщение. Повторная отправка использует тот же идентификатор запроса.'),
+    actions: [
+      {
+        label: __('Повторить отправку'),
+        variant: 'solid',
+        onClick: async (close) => {
+          if (await messageActions.retryMessage(message, true)) close()
+        },
+      },
+    ],
+  })
+}
+
+async function navigateToReply(messageName) {
+  if (!messageName || !messages.value.some((item) => item.name === messageName)) return
+  await nextTick()
+  let selector = `[data-message-id="${CSS.escape(messageName)}"]`
+  let element = messagesEl.value?.querySelector(selector)
+  element?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  highlightedMessage.value = messageName
+  clearTimeout(highlightTimer)
+  highlightTimer = setTimeout(() => (highlightedMessage.value = ''), 1400)
+}
+
+function showTyping(expiresInMs = 6000) {
+  typingActive.value = true
+  clearTimeout(typingTimer)
+  typingTimer = setTimeout(clearTyping, Math.min(Math.max(Number(expiresInMs) || 6000, 1000), 15000))
+}
+
+function clearTyping() {
+  clearTimeout(typingTimer)
+  typingTimer = null
+  typingActive.value = false
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState !== 'visible') clearTyping()
+  else readController.schedule()
+}
+
+watch(
+  () => props.active,
+  (active) => {
+    if (!active) clearTyping()
+    else readController.schedule()
+  },
+)
+
+watch(
+  () => selectedConversation.value?.name,
+  () => {
+    cancelReply()
+    clearTyping()
+    readController.reset()
+    readController.schedule()
+  },
+)
+
 function messageSender(message) {
   if (message.direction === 'outbound') return __('Вы')
-  return message.sender_name || props.lead?.lead_name || props.leadName
+  return clientDisplayName.value
 }
 
 function messageSource(message) {

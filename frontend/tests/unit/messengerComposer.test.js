@@ -1,5 +1,6 @@
 import {
   createComposerAttachmentController,
+  isVideoFile,
   validateComposerFileMix,
 } from '@/utils/messengerComposer'
 import { describe, expect, it, vi } from 'vitest'
@@ -8,7 +9,9 @@ function file(name, type = 'application/octet-stream') {
   return new File(['content'], name, { type })
 }
 
-function harness(upload = vi.fn(async (value) => ({ name: `FILE-${value.name}` }))) {
+function harness(
+  upload = vi.fn(async (value) => ({ name: `FILE-${value.name}` })),
+) {
   let urls = []
   let revoked = []
   let changes = []
@@ -27,6 +30,12 @@ function harness(upload = vi.fn(async (value) => ({ name: `FILE-${value.name}` }
 }
 
 describe('messenger composer attachments', () => {
+  it('recognizes VK document fallback video formats by MIME or extension', () => {
+    expect(isVideoFile(file('clip.bin', 'video/mp4'))).toBe(true)
+    expect(isVideoFile(file('clip.MOV'))).toBe(true)
+    expect(isVideoFile(file('clip.avi', 'video/x-msvideo'))).toBe(false)
+  })
+
   it('adds an image from clipboard and uploads it', async () => {
     let image = file('paste.png', 'image/png')
     let current = harness()
@@ -69,7 +78,9 @@ describe('messenger composer attachments', () => {
 
     expect(current.controller.handlePaste(event)).toBe(true)
     expect(current.controller.handlePaste(event)).toBe(true)
-    await vi.waitFor(() => expect(current.controller.readyFileNames()).toHaveLength(1))
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toHaveLength(1),
+    )
     expect(current.upload).toHaveBeenCalledOnce()
     expect(event.preventDefault).toHaveBeenCalledOnce()
   })
@@ -86,7 +97,9 @@ describe('messenger composer attachments', () => {
 
     current.controller.handlePaste(makeEvent())
     current.controller.handlePaste(makeEvent())
-    await vi.waitFor(() => expect(current.controller.readyFileNames()).toHaveLength(2))
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toHaveLength(2),
+    )
     expect(current.upload).toHaveBeenCalledTimes(2)
   })
 
@@ -98,14 +111,18 @@ describe('messenger composer attachments', () => {
     }
 
     expect(current.controller.handleDrop(event)).toBe(true)
-    await vi.waitFor(() => expect(current.controller.readyFileNames()).toEqual(['FILE-drop.pdf']))
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toEqual(['FILE-drop.pdf']),
+    )
     expect(current.upload).toHaveBeenCalledOnce()
   })
 
   it('removes local state and revokes preview without deleting a Frappe File', async () => {
     let current = harness()
     let [item] = current.controller.addFiles([file('remove.png', 'image/png')])
-    await vi.waitFor(() => expect(current.controller.readyFileNames()).toHaveLength(1))
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toHaveLength(1),
+    )
 
     current.controller.remove(item.id)
 
@@ -120,7 +137,9 @@ describe('messenger composer attachments', () => {
       .mockResolvedValueOnce({ name: 'FILE-retry' })
     let current = harness(upload)
     let [item] = current.controller.addFiles([file('retry.jpg', 'image/jpeg')])
-    await vi.waitFor(() => expect(current.controller.getItems()[0].status).toBe('failed'))
+    await vi.waitFor(() =>
+      expect(current.controller.getItems()[0].status).toBe('failed'),
+    )
 
     await current.controller.retry(item.id)
 
