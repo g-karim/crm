@@ -103,16 +103,14 @@
               <div
                 :data-message-id="item.message.name"
                 class="flex"
-                :class="
-                  [
-                    item.message.direction === 'outbound'
-                      ? 'justify-end'
-                      : 'justify-start',
-                    highlightedMessage === item.message.name
-                      ? 'rounded ring-2 ring-outline-blue-2'
-                      : '',
-                  ]
-                "
+                :class="[
+                  item.message.direction === 'outbound'
+                    ? 'justify-end'
+                    : 'justify-start',
+                  highlightedMessage === item.message.name
+                    ? 'rounded ring-2 ring-outline-blue-2'
+                    : '',
+                ]"
               >
                 <div
                   class="min-w-0 max-w-[94%] rounded-md px-3 py-2 text-base shadow-sm sm:max-w-[78%]"
@@ -233,7 +231,7 @@
             v-model="selectedChannel"
             type="select"
             :options="channelOptions"
-            :disabled="!channels.length || sendingMessage"
+            :disabled="!channels.length || sendingMessage || voiceActive"
             :placeholder="__('Платформа')"
           />
           <Textarea
@@ -251,7 +249,24 @@
           ref="composerAttachments"
           :supportsAttachments="selectedCapabilities.supports_attachments"
           :channelType="selectedChannelType"
+          :disabled="voiceActive"
           @change="pendingAttachments = $event"
+        />
+        <ComposerVoiceRecorder
+          v-if="selectedCapabilities.voice.send"
+          ref="voiceRecorder"
+          :conversation="selectedConversation?.name || ''"
+          :channel="selectedChannel"
+          :reply-to-message="replyTarget?.name || ''"
+          :disabled="baseSendDisabled || Boolean(pendingAttachments.length)"
+          :show-trigger="false"
+          :max-duration-seconds="
+            selectedCapabilities.voice.max_duration_seconds
+          "
+          :max-size-bytes="selectedCapabilities.voice.max_size_bytes"
+          :scope-key="voiceScopeKey"
+          @active-change="voiceActive = $event"
+          @queued="voiceQueued"
         />
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0 text-sm text-ink-gray-5">
@@ -259,10 +274,26 @@
           </div>
           <div class="flex items-center gap-2">
             <Button
+              v-if="selectedCapabilities.voice.send"
+              variant="ghost"
+              icon="mic"
+              :aria-label="__('Записать голосовое сообщение')"
+              :disabled="
+                baseSendDisabled ||
+                voiceActive ||
+                Boolean(pendingAttachments.length)
+              "
+              @click="voiceRecorder?.start()"
+            />
+            <Button
               v-if="selectedCapabilities.supports_attachments"
               variant="ghost"
               icon="paperclip"
-              :disabled="baseSendDisabled || pendingAttachments.length >= 10"
+              :disabled="
+                baseSendDisabled ||
+                voiceActive ||
+                pendingAttachments.length >= 10
+              "
               @click="composerAttachments?.openFileSelector()"
             />
             <Button
@@ -272,6 +303,7 @@
               :loading="sendingMessage"
               :disabled="
                 sendDisabled ||
+                voiceActive ||
                 (!draftText.trim() && !pendingAttachments.length)
               "
               @click="sendMessage"
@@ -288,6 +320,7 @@ import CommentIcon from '@/components/Icons/CommentIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
 import ComposerAttachments from '@/components/LeadMessenger/ComposerAttachments.vue'
+import ComposerVoiceRecorder from '@/components/LeadMessenger/ComposerVoiceRecorder.vue'
 import MessageContent from '@/components/LeadMessenger/MessageContent.vue'
 import MessageFooterMetadata from '@/components/LeadMessenger/MessageFooterMetadata.vue'
 import MessageMetadata from '@/components/LeadMessenger/MessageMetadata.vue'
@@ -336,11 +369,13 @@ const draftText = ref('')
 const clientRequestId = ref('')
 const clientRequestFingerprint = ref('')
 const pendingAttachments = ref([])
+const voiceActive = ref(false)
 const sendWarning = ref('')
 const genericError = ref('')
 const messagesEl = ref(null)
 const newMessageCount = ref(0)
 const composerAttachments = ref(null)
+const voiceRecorder = ref(null)
 const textareaRef = ref(null)
 const draggingFiles = ref(false)
 const replyTarget = ref(null)
@@ -453,6 +488,12 @@ const videoPlaybackScope = computed(
   () =>
     `${props.leadName}:${selectedConversation.value?.name || ''}:${props.active}`,
 )
+const voiceScopeKey = computed(
+  () =>
+    `${props.leadName}:${selectedChannel.value}:${
+      selectedConversation.value?.name || ''
+    }:${props.active}`,
+)
 const clientDisplayName = computed(() =>
   getMessengerClientDisplayName({
     lead: props.lead,
@@ -492,7 +533,9 @@ const replyComposerContext = computed(() => {
       sender_name: messageSender(replyTarget.value),
       text: `${replyTarget.value.text || ''}`.slice(0, 500) || null,
       message_type: replyTarget.value.message_type || 'text',
-      attachment_types: (replyTarget.value.attachments || []).map((item) => item.type),
+      attachment_types: (replyTarget.value.attachments || []).map(
+        (item) => item.type,
+      ),
     },
   }
 })
@@ -576,7 +619,9 @@ const readController = createMessengerReadController({
     if (conversation) conversation.unread_count = result.unread_count
   },
   onError(error) {
-    toast.error(__(error?.message || 'Не удалось отметить сообщения прочитанными.'))
+    toast.error(
+      __(error?.message || 'Не удалось отметить сообщения прочитанными.'),
+    )
   },
 })
 
@@ -742,7 +787,12 @@ function ensureSelectedChannel() {
 
 async function sendMessage() {
   let text = draftText.value.trim()
-  if ((!text && !pendingAttachments.value.length) || sendDisabled.value) return
+  if (
+    voiceActive.value ||
+    (!text && !pendingAttachments.value.length) ||
+    sendDisabled.value
+  )
+    return
 
   genericError.value = ''
   sendWarning.value = ''
@@ -883,10 +933,12 @@ function sendOnEnter(event) {
 }
 
 function handleComposerPaste(event) {
+  if (voiceActive.value) return
   composerAttachments.value?.handlePaste(event)
 }
 
 function handleComposerDragOver(event) {
+  if (voiceActive.value) return
   if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return
   event.preventDefault()
   draggingFiles.value = true
@@ -894,7 +946,13 @@ function handleComposerDragOver(event) {
 
 function handleComposerDrop(event) {
   draggingFiles.value = false
+  if (voiceActive.value) return
   composerAttachments.value?.handleDrop(event)
+}
+
+async function voiceQueued() {
+  cancelReply()
+  await Promise.all([loadConversations(), messageSync.syncDelta()])
 }
 
 function scrollToBottom() {
@@ -954,7 +1012,9 @@ function retryMessage(message) {
   }
   $dialog({
     title: __('Повторить отправку?'),
-    message: __('VK мог уже принять сообщение. Повторная отправка использует тот же идентификатор запроса.'),
+    message: __(
+      'VK мог уже принять сообщение. Повторная отправка использует тот же идентификатор запроса.',
+    ),
     actions: [
       {
         label: __('Повторить отправку'),
@@ -968,7 +1028,8 @@ function retryMessage(message) {
 }
 
 async function navigateToReply(messageName) {
-  if (!messageName || !messages.value.some((item) => item.name === messageName)) return
+  if (!messageName || !messages.value.some((item) => item.name === messageName))
+    return
   await nextTick()
   let selector = `[data-message-id="${CSS.escape(messageName)}"]`
   let element = messagesEl.value?.querySelector(selector)
@@ -981,7 +1042,10 @@ async function navigateToReply(messageName) {
 function showTyping(expiresInMs = 6000) {
   typingActive.value = true
   clearTimeout(typingTimer)
-  typingTimer = setTimeout(clearTyping, Math.min(Math.max(Number(expiresInMs) || 6000, 1000), 15000))
+  typingTimer = setTimeout(
+    clearTyping,
+    Math.min(Math.max(Number(expiresInMs) || 6000, 1000), 15000),
+  )
 }
 
 function clearTyping() {

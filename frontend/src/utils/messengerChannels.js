@@ -139,6 +139,7 @@ export function getMessengerDeliveryLabel(message = {}) {
 
 export function getMessengerCapabilities(channel = {}) {
   let video = channel?.capabilities?.video || {}
+  let voice = channel?.capabilities?.voice || {}
   return {
     can_start_conversation:
       channel?.capabilities?.can_start_conversation ?? true,
@@ -147,6 +148,11 @@ export function getMessengerCapabilities(channel = {}) {
     supports_attachments: Boolean(channel?.capabilities?.supports_attachments),
     supported_attachment_types:
       channel?.capabilities?.supported_attachment_types || [],
+    voice: {
+      send: Boolean(voice.send),
+      max_duration_seconds: Number(voice.max_duration_seconds || 300),
+      max_size_bytes: Number(voice.max_size_bytes || 10 * 1024 * 1024),
+    },
     video: {
       receive: Boolean(video.receive),
       download: Boolean(video.download_to_private ?? video.download),

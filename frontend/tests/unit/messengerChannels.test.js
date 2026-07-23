@@ -144,6 +144,11 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: false,
       supported_attachment_types: [],
+      voice: {
+        send: false,
+        max_duration_seconds: 300,
+        max_size_bytes: 10485760,
+      },
       video: {
         receive: false,
         download: false,
@@ -161,6 +166,11 @@ describe('messengerChannels', () => {
           requires_phone: false,
           supports_attachments: true,
           supported_attachment_types: ['image', 'file'],
+          voice: {
+            send: true,
+            max_duration_seconds: 120,
+            max_size_bytes: 2048,
+          },
           video: { receive: true, embed: true, send_fallback: 'document' },
         },
       }),
@@ -170,6 +180,11 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
+      voice: {
+        send: true,
+        max_duration_seconds: 120,
+        max_size_bytes: 2048,
+      },
       video: {
         receive: true,
         download: false,
