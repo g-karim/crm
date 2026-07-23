@@ -18,6 +18,20 @@ export function getMessengerMessageDisplay(message = {}) {
   }
 }
 
+export function canSaveMessengerMessageEdit(message = {}, draft = '') {
+  if (!message.can_edit) return false
+  let text = `${draft || ''}`.trim()
+  if (text === `${message.text || ''}`.trim()) return false
+  if (text) return true
+  let attachments = message.attachments || []
+  return (
+    attachments.length > 0 &&
+    attachments.every((attachment) =>
+      ['image', 'file'].includes(attachment.attachment_type || attachment.type),
+    )
+  )
+}
+
 export async function openMessengerMessageEditor(message, options) {
   if (!options.startEdit(message)) return false
   await options.nextTick()
@@ -84,12 +98,13 @@ export function createMessengerMessageActions(options) {
 
   async function saveEdit(message) {
     let text = state.draft.trim()
-    if (!message?.can_edit || state.editingMessage !== message.name || !text)
+    if (!message?.can_edit || state.editingMessage !== message.name)
       return false
     if (text === `${message.text || ''}`.trim()) {
       cancelEdit()
       return true
     }
+    if (!canSaveMessengerMessageEdit(message, text)) return false
     let ok = await run('edit', message, { text })
     if (ok) {
       state.editingMessage = ''
@@ -118,7 +133,10 @@ export function createMessengerMessageActions(options) {
     clearError(message.name)
     notify()
     try {
-      let method = action === 'retry_outbound' ? 'retry_outbound_message' : `${action}_message`
+      let method =
+        action === 'retry_outbound'
+          ? 'retry_outbound_message'
+          : `${action}_message`
       let result = await options.call(`${API_PREFIX}.${method}`, {
         message: message.name,
         ...extra,
@@ -174,7 +192,8 @@ function providerError(result, action) {
 }
 
 function fallbackMessage(action) {
-  if (action === 'retry_outbound') return 'Не удалось повторить отправку сообщения.'
+  if (action === 'retry_outbound')
+    return 'Не удалось повторить отправку сообщения.'
   return action === 'edit'
     ? 'Не удалось отредактировать сообщение.'
     : 'Не удалось удалить сообщение для всех.'
