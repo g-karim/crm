@@ -1,4 +1,5 @@
 import {
+  canSaveMessengerMessageEdit,
   createMessengerMessageActions,
   getMessengerMessageActions,
   getMessengerMessageDisplay,
@@ -44,6 +45,31 @@ describe('messenger message actions', () => {
         editable({ can_edit: false, can_delete: false }),
       ),
     ).toEqual([])
+  })
+
+  it('adds reply and retry only from backend flags', () => {
+    expect(
+      getMessengerMessageActions(
+        editable({ can_reply: true, can_retry: true }),
+      ),
+    ).toEqual(['reply', 'retry', 'edit', 'delete'])
+    expect(
+      getMessengerMessageActions(
+        editable({ can_reply: false, can_retry: false }),
+      ),
+    ).toEqual(['edit', 'delete'])
+  })
+
+  it('retries the same backend message with explicit unknown confirmation', async () => {
+    let message = editable({ can_retry: true, status: 'unknown' })
+    let { controller, call, sync } = harness()
+
+    expect(await controller.retryMessage(message, true)).toBe(true)
+    expect(call).toHaveBeenCalledWith(
+      'crm_messenger.api.messages.retry_outbound_message',
+      { message: 'MSG-1', confirm_unknown: 1 },
+    )
+    expect(sync).toHaveBeenCalledOnce()
   })
 
   it('exposes tombstone and edited marker display states', () => {
@@ -98,6 +124,29 @@ describe('messenger message actions', () => {
     expect(sync).toHaveBeenCalledOnce()
     expect(message.text).toBe('original')
     expect(message.attachments).toEqual(originalAttachments)
+  })
+
+  it('removes a photo or file caption but keeps empty text messages blocked', async () => {
+    let message = editable({
+      message_type: 'image',
+      attachments: [
+        { id: 'ATT-1', type: 'image' },
+        { id: 'ATT-2', attachment_type: 'file' },
+      ],
+    })
+    let { controller, call, sync } = harness()
+
+    expect(canSaveMessengerMessageEdit(message, '')).toBe(true)
+    expect(canSaveMessengerMessageEdit(editable(), '')).toBe(false)
+    expect(controller.startEdit(message)).toBe(true)
+    controller.setDraft('   ')
+    expect(await controller.saveEdit(message)).toBe(true)
+
+    expect(call).toHaveBeenCalledWith(
+      'crm_messenger.api.messages.edit_message',
+      { message: 'MSG-1', text: '' },
+    )
+    expect(sync).toHaveBeenCalledOnce()
   })
 
   it('deletes without optimistic mutation and waits for delta', async () => {

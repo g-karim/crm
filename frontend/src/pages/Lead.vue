@@ -53,6 +53,7 @@
           :leadName="leadId"
           :lead="doc"
           :phone="doc.mobile_no || doc.phone"
+          :active="tabs[tabIndex]?.name === 'Messenger'"
         />
         <Activities
           v-else

@@ -3,6 +3,8 @@ const EDITOR_SCROLL_MARGIN = 16
 
 export function getMessengerMessageActions(message = {}) {
   let actions = []
+  if (message.can_reply) actions.push('reply')
+  if (message.can_retry) actions.push('retry')
   if (message.can_edit) actions.push('edit')
   if (message.can_delete) actions.push('delete')
   return actions
@@ -14,6 +16,20 @@ export function getMessengerMessageDisplay(message = {}) {
     edited: message.status !== 'deleted' && Boolean(message.is_edited),
     text: message.status === 'deleted' ? '' : message.text || '',
   }
+}
+
+export function canSaveMessengerMessageEdit(message = {}, draft = '') {
+  if (!message.can_edit) return false
+  let text = `${draft || ''}`.trim()
+  if (text === `${message.text || ''}`.trim()) return false
+  if (text) return true
+  let attachments = message.attachments || []
+  return (
+    attachments.length > 0 &&
+    attachments.every((attachment) =>
+      ['image', 'file'].includes(attachment.attachment_type || attachment.type),
+    )
+  )
 }
 
 export async function openMessengerMessageEditor(message, options) {
@@ -82,12 +98,13 @@ export function createMessengerMessageActions(options) {
 
   async function saveEdit(message) {
     let text = state.draft.trim()
-    if (!message?.can_edit || state.editingMessage !== message.name || !text)
+    if (!message?.can_edit || state.editingMessage !== message.name)
       return false
     if (text === `${message.text || ''}`.trim()) {
       cancelEdit()
       return true
     }
+    if (!canSaveMessengerMessageEdit(message, text)) return false
     let ok = await run('edit', message, { text })
     if (ok) {
       state.editingMessage = ''
@@ -102,6 +119,13 @@ export function createMessengerMessageActions(options) {
     return run('delete', message)
   }
 
+  async function retryMessage(message, confirmUnknown = false) {
+    if (!message?.can_retry) return false
+    return run('retry_outbound', message, {
+      confirm_unknown: confirmUnknown ? 1 : 0,
+    })
+  }
+
   async function run(action, message, extra = {}) {
     if (state.pendingMessage) return false
     state.pendingMessage = message.name
@@ -109,7 +133,11 @@ export function createMessengerMessageActions(options) {
     clearError(message.name)
     notify()
     try {
-      let result = await options.call(`${API_PREFIX}.${action}_message`, {
+      let method =
+        action === 'retry_outbound'
+          ? 'retry_outbound_message'
+          : `${action}_message`
+      let result = await options.call(`${API_PREFIX}.${method}`, {
         message: message.name,
         ...extra,
       })
@@ -141,6 +169,7 @@ export function createMessengerMessageActions(options) {
     cancelEdit,
     saveEdit,
     deleteMessage,
+    retryMessage,
     getState: () => ({ ...state, errors: { ...state.errors } }),
   }
 }
@@ -163,6 +192,8 @@ function providerError(result, action) {
 }
 
 function fallbackMessage(action) {
+  if (action === 'retry_outbound')
+    return 'Не удалось повторить отправку сообщения.'
   return action === 'edit'
     ? 'Не удалось отредактировать сообщение.'
     : 'Не удалось удалить сообщение для всех.'

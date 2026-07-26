@@ -1,6 +1,7 @@
 const ACTIVE_STATUSES = new Set(['available', 'external', 'uploaded'])
 const BUSY_STATUSES = new Set([
   'pending',
+  'processing',
   'downloading',
   'retrying',
   'uploading',
@@ -8,6 +9,7 @@ const BUSY_STATUSES = new Set([
 
 const STATUS_LABELS = {
   pending: 'Ожидает загрузки',
+  processing: 'Обрабатывается',
   downloading: 'Загружается',
   retrying: 'Повторная загрузка',
   available: 'Доступно',
@@ -62,13 +64,15 @@ function getImagePresentationOrientation(image = {}) {
 
 export function getAttachmentState(attachment = {}) {
   let status = attachment.status || 'unsupported'
+  let playableFailedVoice =
+    status === 'failed' && attachment.is_voice && Boolean(attachment.url)
   return {
     status,
     label: STATUS_LABELS[status] || status,
     busy: BUSY_STATUSES.has(status),
     failed: status === 'failed',
     unsupported: status === 'unsupported',
-    active: ACTIVE_STATUSES.has(status),
+    active: ACTIVE_STATUSES.has(status) || playableFailedVoice,
   }
 }
 
@@ -105,7 +109,14 @@ export function canRenderInlineVideo(attachment = {}) {
   return (
     attachment.type === 'video' &&
     getAttachmentState(attachment).active &&
-    Boolean(attachment.url) &&
+    (!attachment.video_source || attachment.video_source === 'local_file') &&
+    Boolean(attachment.playback_url || attachment.url) &&
     attachment.mime_type?.startsWith('video/')
   )
+}
+
+export function getVideoPlaybackUrl(attachment = {}) {
+  return canRenderInlineVideo(attachment)
+    ? attachment.playback_url || attachment.url || ''
+    : ''
 }

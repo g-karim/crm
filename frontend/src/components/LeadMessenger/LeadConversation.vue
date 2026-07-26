@@ -101,12 +101,16 @@
                 </span>
               </div>
               <div
+                :data-message-id="item.message.name"
                 class="flex"
-                :class="
+                :class="[
                   item.message.direction === 'outbound'
                     ? 'justify-end'
-                    : 'justify-start'
-                "
+                    : 'justify-start',
+                  highlightedMessage === item.message.name
+                    ? 'rounded ring-2 ring-outline-blue-2'
+                    : '',
+                ]"
               >
                 <div
                   class="min-w-0 max-w-[94%] rounded-md px-3 py-2 text-base shadow-sm sm:max-w-[78%]"
@@ -130,6 +134,15 @@
                     "
                     @start-edit="startMessageEdit(item.message)"
                     @delete="confirmDeleteMessage(item.message)"
+                    @retry="retryMessage(item.message)"
+                    @reply="startReply(item.message)"
+                  />
+                  <MessageReplyQuote
+                    v-if="item.message.reply_context"
+                    class="mb-2"
+                    :context="item.message.reply_context"
+                    :client-name="clientDisplayName"
+                    @navigate="navigateToReply"
                   />
                   <MessageContent
                     :message="item.message"
@@ -152,6 +165,7 @@
                   <AttachmentRenderer
                     v-if="item.message.status !== 'deleted'"
                     :attachments="item.message.attachments"
+                    :playback-scope="videoPlaybackScope"
                   />
                   <MessageFooterMetadata :message="item.message" />
                   <div
@@ -163,6 +177,12 @@
                 </div>
               </div>
             </template>
+            <div
+              v-if="typingActive"
+              class="w-fit rounded-md bg-surface-gray-1 px-3 py-2 text-sm italic text-ink-gray-5"
+            >
+              {{ __('{0} печатает…', [clientDisplayName]) }}
+            </div>
           </div>
         </div>
 
@@ -186,6 +206,20 @@
         @dragleave="draggingFiles = false"
         @drop="handleComposerDrop"
       >
+        <div v-if="replyTarget" class="mb-2 flex items-start gap-2">
+          <MessageReplyQuote
+            class="min-w-0 flex-1"
+            :context="replyComposerContext"
+            :client-name="clientDisplayName"
+            @navigate="navigateToReply"
+          />
+          <Button
+            variant="ghost"
+            icon="x"
+            :aria-label="__('Отменить ответ')"
+            @click="cancelReply"
+          />
+        </div>
         <div
           v-if="draggingFiles"
           class="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-outline-blue-2 bg-surface-blue-1/90 text-sm font-medium text-ink-blue-3"
@@ -197,7 +231,7 @@
             v-model="selectedChannel"
             type="select"
             :options="channelOptions"
-            :disabled="!channels.length || sendingMessage"
+            :disabled="!channels.length || sendingMessage || voiceActive"
             :placeholder="__('Платформа')"
           />
           <Textarea
@@ -215,7 +249,24 @@
           ref="composerAttachments"
           :supportsAttachments="selectedCapabilities.supports_attachments"
           :channelType="selectedChannelType"
+          :disabled="voiceActive"
           @change="pendingAttachments = $event"
+        />
+        <ComposerVoiceRecorder
+          v-if="selectedCapabilities.voice.send"
+          ref="voiceRecorder"
+          :conversation="selectedConversation?.name || ''"
+          :channel="selectedChannel"
+          :reply-to-message="replyTarget?.name || ''"
+          :disabled="baseSendDisabled || Boolean(pendingAttachments.length)"
+          :show-trigger="false"
+          :max-duration-seconds="
+            selectedCapabilities.voice.max_duration_seconds
+          "
+          :max-size-bytes="selectedCapabilities.voice.max_size_bytes"
+          :scope-key="voiceScopeKey"
+          @active-change="voiceActive = $event"
+          @queued="voiceQueued"
         />
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0 text-sm text-ink-gray-5">
@@ -223,10 +274,26 @@
           </div>
           <div class="flex items-center gap-2">
             <Button
+              v-if="selectedCapabilities.voice.send"
+              variant="ghost"
+              icon="mic"
+              :aria-label="__('Записать голосовое сообщение')"
+              :disabled="
+                baseSendDisabled ||
+                voiceActive ||
+                Boolean(pendingAttachments.length)
+              "
+              @click="voiceRecorder?.start()"
+            />
+            <Button
               v-if="selectedCapabilities.supports_attachments"
               variant="ghost"
               icon="paperclip"
-              :disabled="baseSendDisabled || pendingAttachments.length >= 10"
+              :disabled="
+                baseSendDisabled ||
+                voiceActive ||
+                pendingAttachments.length >= 10
+              "
               @click="composerAttachments?.openFileSelector()"
             />
             <Button
@@ -236,6 +303,7 @@
               :loading="sendingMessage"
               :disabled="
                 sendDisabled ||
+                voiceActive ||
                 (!draftText.trim() && !pendingAttachments.length)
               "
               @click="sendMessage"
@@ -252,9 +320,11 @@ import CommentIcon from '@/components/Icons/CommentIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
 import ComposerAttachments from '@/components/LeadMessenger/ComposerAttachments.vue'
+import ComposerVoiceRecorder from '@/components/LeadMessenger/ComposerVoiceRecorder.vue'
 import MessageContent from '@/components/LeadMessenger/MessageContent.vue'
 import MessageFooterMetadata from '@/components/LeadMessenger/MessageFooterMetadata.vue'
 import MessageMetadata from '@/components/LeadMessenger/MessageMetadata.vue'
+import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
 import { globalStore } from '@/stores/global'
 import {
   buildMessengerMessageItems,
@@ -269,7 +339,9 @@ import {
   isSingleImageAttachmentSet,
 } from '@/utils/messengerAttachments'
 import { createMessengerSyncController } from '@/utils/messengerSync'
-import { validateComposerFileMix } from '@/utils/messengerComposer'
+import { isVideoFile, validateComposerFileMix } from '@/utils/messengerComposer'
+import { createMessengerReadController } from '@/utils/messengerRead'
+import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
 import {
   createMessengerMessageActions,
   openMessengerMessageEditor,
@@ -281,6 +353,7 @@ const props = defineProps({
   leadName: { type: String, required: true },
   lead: { type: Object, default: () => ({}) },
   phone: { type: String, default: '' },
+  active: { type: Boolean, default: true },
 })
 
 const loadingConversation = ref(false)
@@ -296,12 +369,18 @@ const draftText = ref('')
 const clientRequestId = ref('')
 const clientRequestFingerprint = ref('')
 const pendingAttachments = ref([])
+const voiceActive = ref(false)
 const sendWarning = ref('')
 const genericError = ref('')
 const messagesEl = ref(null)
 const newMessageCount = ref(0)
 const composerAttachments = ref(null)
+const voiceRecorder = ref(null)
+const textareaRef = ref(null)
 const draggingFiles = ref(false)
+const replyTarget = ref(null)
+const typingActive = ref(false)
+const highlightedMessage = ref('')
 const messageActionState = ref({
   editingMessage: '',
   draft: '',
@@ -311,6 +390,8 @@ const messageActionState = ref({
 })
 const messageEditorElements = new Map()
 let scrollSnapshot = null
+let typingTimer = null
+let highlightTimer = null
 
 const { $dialog, $socket } = globalStore()
 
@@ -403,9 +484,26 @@ const channelOptions = computed(() =>
   buildMessengerChannelOptions(channels.value),
 )
 const messageItems = computed(() => buildMessengerMessageItems(messages.value))
+const videoPlaybackScope = computed(
+  () =>
+    `${props.leadName}:${selectedConversation.value?.name || ''}:${props.active}`,
+)
+const voiceScopeKey = computed(
+  () =>
+    `${props.leadName}:${selectedChannel.value}:${
+      selectedConversation.value?.name || ''
+    }:${props.active}`,
+)
+const clientDisplayName = computed(() =>
+  getMessengerClientDisplayName({
+    lead: props.lead,
+    conversation: selectedConversation.value,
+  }),
+)
 const contactLine = computed(() => {
-  let title = props.lead?.lead_name || props.lead?.name || props.leadName
-  return leadPhone.value ? `${title} · ${leadPhone.value}` : title
+  return leadPhone.value
+    ? `${clientDisplayName.value} · ${leadPhone.value}`
+    : clientDisplayName.value
 })
 const composerHint = computed(() => {
   if (attachmentMixError.value) return __(attachmentMixError.value)
@@ -414,7 +512,32 @@ const composerHint = computed(() => {
   }
   if (missingPhone.value) return __('Добавьте телефон в карточке лида.')
   if (!channels.value.length) return __('Нет доступного канала отправки.')
+  if (
+    selectedCapabilities.value.video.send_fallback === 'document' &&
+    pendingAttachments.value.some((item) => isVideoFile(item.file))
+  ) {
+    return __(
+      'VK отправит видео как документ: получателю потребуется скачать файл; нативного плеера VK не будет.',
+    )
+  }
   return __('Enter отправляет сообщение, Shift+Enter добавляет новую строку.')
+})
+const replyComposerContext = computed(() => {
+  if (!replyTarget.value) return null
+  return {
+    message: replyTarget.value.name,
+    state: 'available',
+    snapshot: {
+      version: 1,
+      direction: replyTarget.value.direction,
+      sender_name: messageSender(replyTarget.value),
+      text: `${replyTarget.value.text || ''}`.slice(0, 500) || null,
+      message_type: replyTarget.value.message_type || 'text',
+      attachment_types: (replyTarget.value.attachments || []).map(
+        (item) => item.type,
+      ),
+    },
+  }
 })
 
 const messageSync = createMessengerSyncController({
@@ -456,6 +579,15 @@ const messageSync = createMessengerSyncController({
     if (
       incoming.some(
         (message) =>
+          message.conversation === selectedConversation.value?.name &&
+          message.direction === 'inbound',
+      )
+    ) {
+      clearTyping()
+    }
+    if (
+      incoming.some(
+        (message) =>
           message.conversation &&
           !conversationByName.value[message.conversation],
       )
@@ -465,6 +597,31 @@ const messageSync = createMessengerSyncController({
   },
   onError(error) {
     handleError(error, __('Не удалось синхронизировать сообщения.'))
+  },
+  onTyping(payload) {
+    if (payload.conversation !== selectedConversation.value?.name) return
+    if (!props.active || document.visibilityState !== 'visible') return
+    if (payload.active === false) clearTyping()
+    else showTyping(payload.expires_in_ms)
+  },
+})
+
+const readController = createMessengerReadController({
+  call,
+  isEnabled: () =>
+    props.active && document.visibilityState === 'visible' && isNearBottom(),
+  getConversation: () => selectedConversation.value,
+  getMessages: () => messages.value,
+  onConfirmed(result) {
+    let conversation = conversations.value.find(
+      (item) => item.name === result.conversation,
+    )
+    if (conversation) conversation.unread_count = result.unread_count
+  },
+  onError(error) {
+    toast.error(
+      __(error?.message || 'Не удалось отметить сообщения прочитанными.'),
+    )
   },
 })
 
@@ -493,10 +650,17 @@ function startMessageEdit(message) {
   })
 }
 
-onMounted(initialize)
+onMounted(() => {
+  initialize()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
 
 onBeforeUnmount(() => {
   messageSync.stop()
+  readController.stop()
+  clearTyping()
+  clearTimeout(highlightTimer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 watch(
@@ -518,6 +682,8 @@ async function initialize(leadChanged = false) {
     clientRequestFingerprint.value = ''
     messageEditorElements.clear()
     messageActions.cancelEdit()
+    cancelReply()
+    clearTyping()
   }
   try {
     await Promise.all([
@@ -621,7 +787,12 @@ function ensureSelectedChannel() {
 
 async function sendMessage() {
   let text = draftText.value.trim()
-  if ((!text && !pendingAttachments.value.length) || sendDisabled.value) return
+  if (
+    voiceActive.value ||
+    (!text && !pendingAttachments.value.length) ||
+    sendDisabled.value
+  )
+    return
 
   genericError.value = ''
   sendWarning.value = ''
@@ -638,6 +809,7 @@ async function sendMessage() {
       channel: selectedChannel.value,
       text,
       attachments: attachmentNames,
+      reply: replyTarget.value?.name || '',
     })
     if (
       !clientRequestId.value ||
@@ -652,11 +824,13 @@ async function sendMessage() {
       channel: selectedChannel.value,
       client_request_id: clientRequestId.value,
       attachments: attachmentNames,
+      reply_to_message: replyTarget.value?.name || undefined,
     })
 
     if (result?.reason === 'not_configured') {
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
+      cancelReply()
       sendWarning.value = integrationWarningMessage(result)
       toast.error(sendWarning.value)
     } else if (!result?.ok) {
@@ -668,6 +842,7 @@ async function sendMessage() {
       composerAttachments.value?.clear()
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
+      cancelReply()
     }
   } catch (error) {
     handleError(error, __('Не удалось отправить сообщение.'))
@@ -758,10 +933,12 @@ function sendOnEnter(event) {
 }
 
 function handleComposerPaste(event) {
+  if (voiceActive.value) return
   composerAttachments.value?.handlePaste(event)
 }
 
 function handleComposerDragOver(event) {
+  if (voiceActive.value) return
   if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return
   event.preventDefault()
   draggingFiles.value = true
@@ -769,13 +946,20 @@ function handleComposerDragOver(event) {
 
 function handleComposerDrop(event) {
   draggingFiles.value = false
+  if (voiceActive.value) return
   composerAttachments.value?.handleDrop(event)
+}
+
+async function voiceQueued() {
+  cancelReply()
+  await Promise.all([loadConversations(), messageSync.syncDelta()])
 }
 
 function scrollToBottom() {
   if (!messagesEl.value) return
   messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   newMessageCount.value = 0
+  readController.schedule()
 }
 
 function isNearBottom() {
@@ -789,7 +973,10 @@ function isNearBottom() {
 }
 
 async function handleMessagesScroll() {
-  if (isNearBottom()) newMessageCount.value = 0
+  if (isNearBottom()) {
+    newMessageCount.value = 0
+    readController.schedule()
+  }
   if (
     !messagesEl.value ||
     messagesEl.value.scrollTop > 80 ||
@@ -807,9 +994,92 @@ async function handleMessagesScroll() {
   }
 }
 
+function startReply(message) {
+  if (!message?.can_reply || messageActionState.value.pendingMessage) return
+  replyTarget.value = message
+  nextTick(() => textareaRef.value?.el?.focus?.())
+}
+
+function cancelReply() {
+  replyTarget.value = null
+}
+
+function retryMessage(message) {
+  if (!message?.can_retry || messageActionState.value.pendingMessage) return
+  if (!message.retry_requires_confirmation) {
+    messageActions.retryMessage(message)
+    return
+  }
+  $dialog({
+    title: __('Повторить отправку?'),
+    message: __(
+      'VK мог уже принять сообщение. Повторная отправка использует тот же идентификатор запроса.',
+    ),
+    actions: [
+      {
+        label: __('Повторить отправку'),
+        variant: 'solid',
+        onClick: async (close) => {
+          if (await messageActions.retryMessage(message, true)) close()
+        },
+      },
+    ],
+  })
+}
+
+async function navigateToReply(messageName) {
+  if (!messageName || !messages.value.some((item) => item.name === messageName))
+    return
+  await nextTick()
+  let selector = `[data-message-id="${CSS.escape(messageName)}"]`
+  let element = messagesEl.value?.querySelector(selector)
+  element?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  highlightedMessage.value = messageName
+  clearTimeout(highlightTimer)
+  highlightTimer = setTimeout(() => (highlightedMessage.value = ''), 1400)
+}
+
+function showTyping(expiresInMs = 6000) {
+  typingActive.value = true
+  clearTimeout(typingTimer)
+  typingTimer = setTimeout(
+    clearTyping,
+    Math.min(Math.max(Number(expiresInMs) || 6000, 1000), 15000),
+  )
+}
+
+function clearTyping() {
+  clearTimeout(typingTimer)
+  typingTimer = null
+  typingActive.value = false
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState !== 'visible') clearTyping()
+  else readController.schedule()
+}
+
+watch(
+  () => props.active,
+  (active) => {
+    if (!active) clearTyping()
+    else readController.schedule()
+  },
+)
+
+watch(
+  () => selectedConversation.value?.name,
+  () => {
+    cancelReply()
+    clearTyping()
+    readController.reset()
+    readController.schedule()
+  },
+)
+
 function messageSender(message) {
   if (message.direction === 'outbound') return __('Вы')
-  return message.sender_name || props.lead?.lead_name || props.leadName
+  return clientDisplayName.value
 }
 
 function messageSource(message) {

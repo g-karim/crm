@@ -123,7 +123,9 @@ describe('messengerChannels', () => {
     expect(shouldShowMessengerText({ text: null })).toBe(false)
     expect(shouldShowMessengerText({ text: '   ' })).toBe(false)
     expect(shouldShowMessengerText({ text: 'caption' })).toBe(true)
-    expect(shouldShowMessengerText({ status: 'deleted', text: null })).toBe(true)
+    expect(shouldShowMessengerText({ status: 'deleted', text: null })).toBe(
+      true,
+    )
   })
 
   it('returns delivery labels', () => {
@@ -142,6 +144,19 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: false,
       supported_attachment_types: [],
+      voice: {
+        send: false,
+        max_duration_seconds: 300,
+        max_size_bytes: 10485760,
+      },
+      video: {
+        receive: false,
+        download: false,
+        inline_playback: false,
+        embed: false,
+        native_send: false,
+        send_fallback: '',
+      },
     })
     expect(
       getMessengerCapabilities({
@@ -151,6 +166,12 @@ describe('messengerChannels', () => {
           requires_phone: false,
           supports_attachments: true,
           supported_attachment_types: ['image', 'file'],
+          voice: {
+            send: true,
+            max_duration_seconds: 120,
+            max_size_bytes: 2048,
+          },
+          video: { receive: true, embed: true, send_fallback: 'document' },
         },
       }),
     ).toEqual({
@@ -159,6 +180,19 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
+      voice: {
+        send: true,
+        max_duration_seconds: 120,
+        max_size_bytes: 2048,
+      },
+      video: {
+        receive: true,
+        download: false,
+        inline_playback: false,
+        embed: true,
+        native_send: false,
+        send_fallback: 'document',
+      },
     })
   })
 

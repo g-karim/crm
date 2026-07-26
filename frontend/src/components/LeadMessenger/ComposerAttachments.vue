@@ -5,6 +5,7 @@
       type="file"
       class="hidden"
       multiple
+      :disabled="disabled"
       @change="onFileInput"
     />
     <div
@@ -78,6 +79,7 @@ import FileIcon from '~icons/lucide/file'
 const props = defineProps({
   supportsAttachments: { type: Boolean, default: false },
   channelType: { type: String, default: '' },
+  disabled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['change'])
 const fileInput = ref(null)
@@ -109,12 +111,22 @@ function uploadFile(file, onProgress) {
 }
 
 function onFileInput(event) {
+  if (props.disabled) return
   controller.addFiles(event.target.files)
   event.target.value = ''
 }
 
 function openFileSelector() {
+  if (props.disabled) return
   fileInput.value?.click()
+}
+
+function handlePaste(event) {
+  if (!props.disabled) controller.handlePaste(event)
+}
+
+function handleDrop(event) {
+  if (!props.disabled) controller.handleDrop(event)
 }
 
 function itemStatus(item) {
@@ -128,8 +140,8 @@ onBeforeUnmount(() => controller.clear())
 
 defineExpose({
   openFileSelector,
-  handlePaste: controller.handlePaste,
-  handleDrop: controller.handleDrop,
+  handlePaste,
+  handleDrop,
   clear: controller.clear,
   hasBlockingItems: controller.hasBlockingItems,
   readyFileNames: controller.readyFileNames,

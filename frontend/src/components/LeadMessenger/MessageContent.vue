@@ -25,7 +25,7 @@
           :label="__('Сохранить')"
           variant="solid"
           :loading="loading"
-          :disabled="!draft.trim()"
+          :disabled="!canSaveMessengerMessageEdit(message, draft)"
           @click="$emit('save-edit')"
         />
       </div>
@@ -48,7 +48,10 @@
 </template>
 
 <script setup>
-import { getMessengerMessageDisplay } from '@/utils/messengerMessageActions'
+import {
+  canSaveMessengerMessageEdit,
+  getMessengerMessageDisplay,
+} from '@/utils/messengerMessageActions'
 import { Button, Textarea } from 'frappe-ui'
 import { computed } from 'vue'
 

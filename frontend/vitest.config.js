@@ -37,6 +37,10 @@ export default defineConfig({
         __dirname,
         'tests/stubs/IconStub.vue',
       ),
+      '~icons/lucide/play': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
     },
   },
 })
