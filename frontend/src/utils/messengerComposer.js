@@ -28,9 +28,14 @@ export function createComposerAttachmentController(options) {
 
   function addFiles(fileList) {
     let files = Array.from(fileList || []).filter(Boolean)
-    let available = Math.max((options.maxFiles || 10) - items.length, 0)
+    let maxFiles = Number(
+      typeof options.maxFiles === 'function'
+        ? options.maxFiles()
+        : options.maxFiles || 10,
+    )
+    let available = Math.max(maxFiles - items.length, 0)
     if (files.length > available) {
-      options.onError?.('Можно выбрать не более 10 вложений.')
+      options.onError?.(`Можно выбрать не более ${maxFiles} вложений.`)
     }
     let validation = options.validateFiles?.(files, [...items]) || {}
     if (validation.error) options.onError?.(validation.error)
@@ -133,17 +138,27 @@ export function validateComposerFileMix(files, existing, context = {}) {
   let combined = [...existing.map((item) => item.file), ...files].filter(
     Boolean,
   )
+  let maxFiles = Number(
+    context.maxAttachmentCount || (context.channelType === 'max' ? 12 : 10),
+  )
+  if (combined.length > maxFiles) {
+    return {
+      files: [],
+      error: `Можно выбрать не более ${maxFiles} вложений.`,
+    }
+  }
   if (context.channelType !== 'max') return { files }
 
-  let imageFlags = combined.map(isImageFile)
+  let mediaFlags = combined.map(
+    (file) => isImageFile(file) || isVideoFile(file),
+  )
   let valid =
-    (imageFlags.every(Boolean) && combined.length <= 10) ||
-    (combined.length === 1 && !imageFlags[0])
+    (mediaFlags.every(Boolean) && combined.length <= maxFiles) ||
+    (combined.length === 1 && !mediaFlags[0])
   if (valid) return { files }
   return {
     files: [],
-    error:
-      'MAX поддерживает до 10 изображений либо один файл/аудио без смешивания.',
+    error: `MAX поддерживает до ${maxFiles} изображений/видео либо один файл/аудио без смешивания.`,
   }
 }
 

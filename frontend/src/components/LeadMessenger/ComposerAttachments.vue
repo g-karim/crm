@@ -8,10 +8,7 @@
       :disabled="disabled"
       @change="onFileInput"
     />
-    <div
-      v-if="items.length"
-      class="mb-2 flex gap-2 overflow-x-auto pb-1"
-    >
+    <div v-if="items.length" class="mb-2 flex gap-2 overflow-x-auto pb-1">
       <div
         v-for="item in items"
         :key="item.id"
@@ -35,7 +32,9 @@
           </div>
           <div
             class="mt-1 truncate text-xs"
-            :class="item.status === 'failed' ? 'text-ink-red-4' : 'text-ink-gray-5'"
+            :class="
+              item.status === 'failed' ? 'text-ink-red-4' : 'text-ink-gray-5'
+            "
           >
             {{ itemStatus(item) }}
           </div>
@@ -79,6 +78,7 @@ import FileIcon from '~icons/lucide/file'
 const props = defineProps({
   supportsAttachments: { type: Boolean, default: false },
   channelType: { type: String, default: '' },
+  maxFiles: { type: Number, default: 10 },
   disabled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['change'])
@@ -86,6 +86,7 @@ const fileInput = ref(null)
 const items = ref([])
 
 const controller = createComposerAttachmentController({
+  maxFiles: () => props.maxFiles,
   upload: uploadFile,
   createObjectURL: (file) => URL.createObjectURL(file),
   revokeObjectURL: (url) => URL.revokeObjectURL(url),
@@ -93,6 +94,7 @@ const controller = createComposerAttachmentController({
     return validateComposerFileMix(files, existing, {
       supportsAttachments: props.supportsAttachments,
       channelType: props.channelType,
+      maxAttachmentCount: props.maxFiles,
     })
   },
   onError: (message) => toast.error(__(message)),

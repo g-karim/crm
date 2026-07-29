@@ -259,6 +259,7 @@
           ref="composerAttachments"
           :supportsAttachments="selectedCapabilities.supports_attachments"
           :channelType="selectedChannelType"
+          :maxFiles="selectedCapabilities.max_attachment_count"
           :disabled="voiceActive"
           @change="pendingAttachments = $event"
         />
@@ -327,7 +328,8 @@
               :disabled="
                 baseSendDisabled ||
                 voiceActive ||
-                pendingAttachments.length >= 10
+                pendingAttachments.length >=
+                  selectedCapabilities.max_attachment_count
               "
               @click="composerAttachments?.openFileSelector()"
             />
@@ -532,6 +534,7 @@ const attachmentMixError = computed(() => {
     validateComposerFileMix([], pendingAttachments.value, {
       supportsAttachments: selectedCapabilities.value.supports_attachments,
       channelType: selectedChannelType.value,
+      maxAttachmentCount: selectedCapabilities.value.max_attachment_count,
     }).error || ''
   )
 })

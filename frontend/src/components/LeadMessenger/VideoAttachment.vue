@@ -108,7 +108,7 @@
         rel="noopener noreferrer"
         class="shrink-0 text-ink-blue-3 hover:underline"
       >
-        {{ __('Открыть в VK') }}
+        {{ __('Открыть источник') }}
       </a>
     </div>
   </div>

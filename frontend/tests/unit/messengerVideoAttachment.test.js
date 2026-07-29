@@ -42,7 +42,7 @@ function mountVideo(attachment) {
 }
 
 describe('external messenger video', () => {
-  it('shows the saved preview and metadata before opening VK', () => {
+  it('shows the saved preview and metadata with a neutral source action', () => {
     let root = mountVideo({
       id: 'VIDEO-1',
       type: 'video',
@@ -61,7 +61,8 @@ describe('external messenger video', () => {
     )
     expect(root.textContent).toContain('Видео клиента')
     expect(root.textContent).toContain('1:05')
-    expect(root.textContent).toContain('Открыть в VK')
+    expect(root.textContent).toContain('Открыть источник')
+    expect(root.textContent).not.toContain('Открыть в VK')
     expect(root.querySelector('a')?.getAttribute('href')).toBe('/api/open-vk')
     expect(root.querySelector('video')).toBeNull()
     expect(root.querySelector('iframe')).toBeNull()

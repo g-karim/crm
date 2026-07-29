@@ -13,7 +13,8 @@ vi.mock('@/components/LeadMessenger/ImageLightbox.vue', () => ({
 vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
   default: {
     props: ['attachment'],
-    template: '<div data-test-attachment-card>{{ attachment.file_name }}</div>',
+    template:
+      '<div data-test-attachment-card>{{ attachment.fallback_text || attachment.file_name }}</div>',
   },
 }))
 
@@ -138,6 +139,30 @@ describe('messenger image layout', () => {
       true,
     )
     expect(grid.textContent).toContain('+1')
+  })
+
+  it('renders a downloaded MAX sticker and a code-only fallback', () => {
+    let root = mountRenderer([
+      {
+        id: 'S-1',
+        type: 'sticker',
+        status: 'available',
+        mime_type: 'image/webp',
+        url: '/media/sticker.webp',
+      },
+      {
+        id: 'S-2',
+        type: 'sticker',
+        status: 'unsupported',
+        file_name: 'max-sticker',
+        fallback_text: 'Стикер MAX недоступен для загрузки',
+      },
+    ])
+
+    expect(root.querySelector('img')?.getAttribute('src')).toBe(
+      '/media/sticker.webp',
+    )
+    expect(root.textContent).toContain('Стикер MAX недоступен для загрузки')
   })
 
   it('keeps pending media disabled and opens available media in lightbox', async () => {

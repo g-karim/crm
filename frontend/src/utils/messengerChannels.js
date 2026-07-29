@@ -148,6 +148,10 @@ export function getMessengerCapabilities(channel = {}) {
     supports_attachments: Boolean(channel?.capabilities?.supports_attachments),
     supported_attachment_types:
       channel?.capabilities?.supported_attachment_types || [],
+    max_attachment_count: Math.max(
+      1,
+      Number(channel?.capabilities?.max_attachment_count || 10),
+    ),
     voice: {
       send: Boolean(voice.send),
       max_duration_seconds: Number(voice.max_duration_seconds || 300),

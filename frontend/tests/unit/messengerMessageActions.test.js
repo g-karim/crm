@@ -58,6 +58,15 @@ describe('messenger message actions', () => {
         editable({ can_reply: false, can_retry: false }),
       ),
     ).toEqual(['edit', 'delete'])
+    expect(
+      getMessengerMessageActions({
+        provider: 'max_direct',
+        can_reply: true,
+        can_retry: false,
+        can_edit: false,
+        can_delete: false,
+      }),
+    ).toEqual(['reply'])
   })
 
   it('retries the same backend message with explicit unknown confirmation', async () => {

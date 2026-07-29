@@ -144,6 +144,7 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: false,
       supported_attachment_types: [],
+      max_attachment_count: 10,
       voice: {
         send: false,
         max_duration_seconds: 300,
@@ -180,6 +181,7 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
+      max_attachment_count: 10,
       voice: {
         send: true,
         max_duration_seconds: 120,
