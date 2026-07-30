@@ -10,6 +10,7 @@
         :modelValue="draft"
         :rows="3"
         :disabled="loading"
+        :maxlength="message.edit_max_length || undefined"
         :placeholder="__('Введите сообщение...')"
         @update:modelValue="$emit('update:draft', $event)"
         @keydown.esc.stop="$emit('cancel-edit')"
