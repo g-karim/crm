@@ -12,6 +12,7 @@
       preload="none"
       playsinline
       @canplay="loading = false"
+      @loadedmetadata="handleLoadedMetadata"
       @play="announcePlayback"
       @error="handleLocalError"
     />
@@ -47,6 +48,19 @@
         :alt="title"
         class="max-h-[22rem] w-full object-contain"
         loading="lazy"
+      />
+      <video
+        v-else-if="previewPlaybackUrl && !previewFailed"
+        data-video-preview
+        :src="previewPlaybackUrl"
+        class="pointer-events-none aspect-video max-h-[22rem] w-full bg-black object-contain"
+        muted
+        preload="metadata"
+        playsinline
+        aria-hidden="true"
+        tabindex="-1"
+        @loadedmetadata="handlePreviewMetadata"
+        @error="previewFailed = true"
       />
       <span v-else class="block aspect-video w-full bg-black/80" />
       <span
@@ -129,6 +143,7 @@ import AttachmentCard from './AttachmentCard.vue'
 const props = defineProps({
   attachment: { type: Object, required: true },
   playbackScope: { type: String, default: '' },
+  provider: { type: String, default: '' },
 })
 
 const instanceId = `messenger-video-${Math.random().toString(36).slice(2)}`
@@ -136,8 +151,14 @@ const videoElement = ref(null)
 const mode = ref('')
 const loading = ref(false)
 const localFailed = ref(false)
+const previewFailed = ref(false)
+const actualDurationMs = ref(0)
 const state = computed(() => getAttachmentState(props.attachment))
 const playbackUrl = computed(() => getVideoPlaybackUrl(props.attachment))
+const previewPlaybackUrl = computed(() => {
+  if (!playbackUrl.value) return ''
+  return `${playbackUrl.value.split('#', 1)[0]}#t=0.001`
+})
 const embedAvailable = computed(
   () =>
     state.value.active &&
@@ -147,7 +168,9 @@ const embedAvailable = computed(
 const playable = computed(() =>
   Boolean((playbackUrl.value && !localFailed.value) || embedAvailable.value),
 )
-const action = computed(() => getAttachmentAction(props.attachment))
+const action = computed(() =>
+  props.provider === 'max_direct' ? '' : getAttachmentAction(props.attachment),
+)
 const title = computed(
   () =>
     props.attachment.title ||
@@ -155,7 +178,9 @@ const title = computed(
     __('Видеосообщение'),
 )
 const duration = computed(() =>
-  formatAttachmentDuration(props.attachment.duration_ms),
+  formatAttachmentDuration(
+    actualDurationMs.value || props.attachment.duration_ms,
+  ),
 )
 const statusLabel = computed(() => {
   if (state.value.busy) return state.value.label
@@ -203,6 +228,24 @@ function handleLocalError() {
   }
 }
 
+function handleLoadedMetadata(event) {
+  const seconds = Number(event.currentTarget?.duration)
+  actualDurationMs.value =
+    Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0
+}
+
+function handlePreviewMetadata(event) {
+  handleLoadedMetadata(event)
+  const preview = event.currentTarget
+  const seconds = Number(preview?.duration)
+  if (!preview || !Number.isFinite(seconds) || seconds <= 0) return
+  try {
+    preview.currentTime = Math.min(0.1, seconds / 2)
+  } catch {
+    // The media fragment still requests the first decodable frame.
+  }
+}
+
 function retryLocal() {
   localFailed.value = false
   activate()
@@ -210,6 +253,13 @@ function retryLocal() {
 
 window.addEventListener('crm-messenger-video-play', handleOtherPlayback)
 watch(() => props.playbackScope, stopPlayback)
+watch(
+  () => [props.attachment.id, playbackUrl.value],
+  () => {
+    actualDurationMs.value = 0
+    previewFailed.value = false
+  },
+)
 onBeforeUnmount(() => {
   stopPlayback()
   window.removeEventListener('crm-messenger-video-play', handleOtherPlayback)

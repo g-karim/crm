@@ -141,6 +141,25 @@ describe('messenger image layout', () => {
     expect(grid.textContent).toContain('+1')
   })
 
+  it('reserves the full presentation width before video playback starts', () => {
+    let root = mountRenderer([
+      {
+        id: 'MAX-VIDEO-1',
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        playback_url: '/api/max-video',
+        file_name: 'max-video.mp4',
+      },
+    ])
+    let renderer = root.querySelector('[data-attachment-renderer]')
+
+    expect(renderer.className).toContain('w-[28rem]')
+    expect(renderer.className).toContain('max-w-full')
+    expect(renderer.className.split(/\s+/)).not.toContain('w-full')
+    expect(root.querySelector('[data-test-video]')).not.toBeNull()
+  })
+
   it('renders a downloaded MAX sticker and a code-only fallback', () => {
     let root = mountRenderer([
       {

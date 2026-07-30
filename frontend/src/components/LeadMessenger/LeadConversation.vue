@@ -41,6 +41,17 @@
         {{ sendWarning }}
       </div>
       <div
+        v-if="conversationNotice.message"
+        class="mx-4 mt-4 rounded border px-3 py-2 text-sm sm:mx-10"
+        :class="
+          conversationNotice.type === 'warning'
+            ? 'border-outline-red-1 bg-surface-red-1 text-ink-red-3'
+            : 'border-outline-gray-1 bg-surface-gray-1 text-ink-gray-7'
+        "
+      >
+        {{ __(conversationNotice.message) }}
+      </div>
+      <div
         v-if="missingPhone"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
@@ -166,11 +177,13 @@
                     v-if="item.message.status !== 'deleted'"
                     :attachments="item.message.attachments"
                     :playback-scope="videoPlaybackScope"
+                    :provider="item.message.provider"
                   />
                   <MessageFooterMetadata :message="item.message" />
                   <div
                     v-if="messageFailureReason(item.message)"
-                    class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
+                    class="mt-1 border-t border-outline-gray-1 pt-1 text-xs"
+                    :class="messageStatusNoteClass(item.message)"
                   >
                     {{ messageFailureReason(item.message) }}
                   </div>
@@ -368,6 +381,7 @@ import {
   buildMessengerChannelOptions,
   getMessengerChannelType,
   getMessengerCapabilities,
+  getMessengerConversationNotice,
   getMessengerPlatformLabel,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
@@ -498,6 +512,9 @@ const selectedCapabilities = computed(() =>
     selectedChannelDoc.value || selectedConversation.value || {},
   ),
 )
+const conversationNotice = computed(() =>
+  getMessengerConversationNotice(selectedConversation.value || {}),
+)
 const missingPhone = computed(
   () =>
     Boolean(selectedChannelType.value) &&
@@ -519,6 +536,7 @@ const baseSendDisabled = computed(
     missingPhone.value ||
     selectedRequiresInbound.value ||
     needsConversationChoice.value ||
+    conversationNotice.value.blocksSend ||
     !channels.value.length ||
     !selectedChannel.value,
 )
@@ -573,6 +591,8 @@ const contactLine = computed(() => {
 })
 const composerHint = computed(() => {
   if (attachmentMixError.value) return __(attachmentMixError.value)
+  if (conversationNotice.value.blocksSend)
+    return __(conversationNotice.value.message)
   if (needsConversationChoice.value)
     return __('Выберите конкретный внешний чат.')
   if (selectedRequiresInbound.value) {
@@ -671,6 +691,9 @@ const messageSync = createMessengerSyncController({
     if (!props.active || document.visibilityState !== 'visible') return
     if (payload.active === false) clearTyping()
     else showTyping(payload.expires_in_ms)
+  },
+  onConversationStateChanged() {
+    loadConversations()
   },
 })
 
@@ -1293,6 +1316,12 @@ function messageBubbleWidthClass(message) {
 
 function messageFailureReason(message) {
   return message.failure_reason || message.error || ''
+}
+
+function messageStatusNoteClass(message) {
+  return ['failed', 'unknown'].includes(message?.status)
+    ? 'text-ink-red-4'
+    : 'text-ink-gray-5'
 }
 
 function handleError(error, fallback) {

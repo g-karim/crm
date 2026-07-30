@@ -150,6 +150,35 @@ describe('messenger sync', () => {
     expect(harness.controller.getMessages()).toHaveLength(1)
   })
 
+  it('notifies the conversation layer about lifecycle realtime changes', async () => {
+    let stateChanges = []
+    let harness = createHarness({
+      get_message_page: snapshot(),
+      get_message_changes: delta(),
+    })
+    harness.controller.stop()
+    harness.controller = createMessengerSyncController({
+      socket: harness.socket,
+      call: vi.fn(async (method) =>
+        method.endsWith('get_message_page') ? snapshot() : delta(),
+      ),
+      visibilityTarget: harness.visibility,
+      onConversationStateChanged: (payload) => stateChanges.push(payload),
+    })
+    await harness.controller.start('LEAD-1')
+
+    harness.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONV-1',
+      conversation_state_changed: true,
+    })
+
+    expect(stateChanges).toHaveLength(1)
+    expect(stateChanges[0].conversation).toBe('CONV-1')
+  })
+
   it('coalesces a repeated realtime event and remains idempotent', async () => {
     let resolveDelta
     let changesCall = new Promise((resolve) => (resolveDelta = resolve))

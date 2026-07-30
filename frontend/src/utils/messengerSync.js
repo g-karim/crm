@@ -196,6 +196,9 @@ export function createMessengerSyncController(options) {
       payload.reference_name !== leadName
     )
       return
+    if (payload.conversation_state_changed) {
+      options.onConversationStateChanged?.(payload)
+    }
     syncDelta().catch(() => {})
   }
 

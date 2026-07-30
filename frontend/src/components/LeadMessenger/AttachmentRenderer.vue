@@ -3,7 +3,9 @@
     v-if="attachments.length"
     data-attachment-renderer
     class="mt-2 grid max-w-full gap-2"
-    :class="singleImage ? 'w-full' : 'w-full max-w-[28rem]'"
+    :class="
+      singleImage ? 'w-full' : hasVideo ? 'w-[28rem]' : 'w-full max-w-[28rem]'
+    "
   >
     <div
       v-if="groups.images.length === 1 && !singleImage"
@@ -57,6 +59,7 @@
         v-else-if="attachment.type === 'video'"
         :attachment="attachment"
         :playback-scope="playbackScope"
+        :provider="provider"
       />
       <AttachmentCard v-else :attachment="attachment" />
     </template>
@@ -78,10 +81,14 @@ import VideoAttachment from './VideoAttachment.vue'
 const props = defineProps({
   attachments: { type: Array, default: () => [] },
   playbackScope: { type: String, default: '' },
+  provider: { type: String, default: '' },
 })
 const groups = computed(() => groupMessengerAttachments(props.attachments))
 const singleImage = computed(() =>
   isSingleImageAttachmentSet(props.attachments),
+)
+const hasVideo = computed(() =>
+  props.attachments.some((attachment) => attachment.type === 'video'),
 )
 
 function state(attachment) {
