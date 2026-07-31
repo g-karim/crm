@@ -9,6 +9,7 @@ import {
   getMessengerChannelType,
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
+  getMessengerConversationNotice,
   getMessengerCapabilities,
   getMessengerPlatformLabel,
   shouldShowMessengerText,
@@ -135,6 +136,34 @@ describe('messengerChannels', () => {
         delivery_status: 'failed',
       }),
     ).toBe('Ошибка')
+
+    expect(
+      getMessengerDeliveryLabel({
+        provider: 'max_direct',
+        direction: 'outbound',
+        status: 'retrying',
+        provider_status: 'attachment.not.ready',
+        message_type: 'video',
+      }),
+    ).toBe('MAX обрабатывает видео')
+  })
+
+  it('describes MAX lifecycle states without affecting other providers', () => {
+    expect(
+      getMessengerConversationNotice({
+        provider: 'max_direct',
+        provider_state: 'removed',
+      }),
+    ).toMatchObject({ type: 'warning', blocksSend: true })
+    expect(
+      getMessengerConversationNotice({
+        provider: 'max_direct',
+        provider_history_cleared_at: '2026-07-30 18:00:00',
+      }),
+    ).toMatchObject({ type: 'info', blocksSend: false })
+    expect(
+      getMessengerConversationNotice({ provider: 'vk_direct' }),
+    ).toEqual({ type: '', message: '', blocksSend: false })
   })
 
   it('reads provider capabilities with safe defaults', () => {
@@ -144,6 +173,7 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: false,
       supported_attachment_types: [],
+      max_attachment_count: 10,
       voice: {
         send: false,
         max_duration_seconds: 300,
@@ -180,6 +210,7 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
+      max_attachment_count: 10,
       voice: {
         send: true,
         max_duration_seconds: 120,

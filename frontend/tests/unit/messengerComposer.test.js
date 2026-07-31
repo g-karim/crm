@@ -157,4 +157,45 @@ describe('messenger composer attachments', () => {
     expect(result.files).toEqual([])
     expect(result.error).toContain('MAX')
   })
+
+  it('allows 12 mixed MAX images and videos but rejects the thirteenth', () => {
+    let media = Array.from({ length: 12 }, (_, index) =>
+      file(
+        index % 2 ? `video-${index}.mp4` : `image-${index}.jpg`,
+        index % 2 ? 'video/mp4' : 'image/jpeg',
+      ),
+    )
+    let context = {
+      supportsAttachments: true,
+      channelType: 'max',
+      maxAttachmentCount: 12,
+    }
+
+    expect(validateComposerFileMix(media, [], context).error).toBeUndefined()
+    expect(
+      validateComposerFileMix(
+        [...media, file('extra.webp', 'image/webp')],
+        [],
+        context,
+      ).files,
+    ).toEqual([])
+  })
+
+  it('applies the capability attachment limit to every provider', () => {
+    let result = validateComposerFileMix(
+      [file('third.jpg', 'image/jpeg')],
+      [
+        { file: file('first.jpg', 'image/jpeg') },
+        { file: file('second.jpg', 'image/jpeg') },
+      ],
+      {
+        supportsAttachments: true,
+        channelType: 'custom',
+        maxAttachmentCount: 2,
+      },
+    )
+
+    expect(result.files).toEqual([])
+    expect(result.error).toContain('2')
+  })
 })

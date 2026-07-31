@@ -41,6 +41,17 @@
         {{ sendWarning }}
       </div>
       <div
+        v-if="conversationNotice.message"
+        class="mx-4 mt-4 rounded border px-3 py-2 text-sm sm:mx-10"
+        :class="
+          conversationNotice.type === 'warning'
+            ? 'border-outline-red-1 bg-surface-red-1 text-ink-red-3'
+            : 'border-outline-gray-1 bg-surface-gray-1 text-ink-gray-7'
+        "
+      >
+        {{ __(conversationNotice.message) }}
+      </div>
+      <div
         v-if="missingPhone"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
@@ -166,11 +177,13 @@
                     v-if="item.message.status !== 'deleted'"
                     :attachments="item.message.attachments"
                     :playback-scope="videoPlaybackScope"
+                    :provider="item.message.provider"
                   />
                   <MessageFooterMetadata :message="item.message" />
                   <div
                     v-if="messageFailureReason(item.message)"
-                    class="mt-1 border-t border-outline-gray-1 pt-1 text-xs text-ink-red-4"
+                    class="mt-1 border-t border-outline-gray-1 pt-1 text-xs"
+                    :class="messageStatusNoteClass(item.message)"
                   >
                     {{ messageFailureReason(item.message) }}
                   </div>
@@ -226,29 +239,40 @@
         >
           {{ __('Перетащите файлы сюда') }}
         </div>
-        <div class="mb-2 grid gap-2 sm:grid-cols-[220px_minmax(0,1fr)]">
+        <div class="mb-2 grid gap-2 sm:grid-cols-2">
           <FormControl
             v-model="selectedChannel"
             type="select"
             :options="channelOptions"
-            :disabled="!channels.length || sendingMessage || voiceActive"
+            :disabled="
+              !channels.length || sendingMessage || voiceActive || replyTarget
+            "
             :placeholder="__('Платформа')"
           />
-          <Textarea
-            ref="textareaRef"
-            v-model="draftText"
-            class="min-h-20 w-full"
-            :rows="3"
-            :disabled="baseSendDisabled"
-            :placeholder="__('Введите сообщение...')"
-            @keydown.enter.stop="sendOnEnter"
-            @paste.stop="handleComposerPaste"
+          <FormControl
+            v-if="conversationCandidates.length > 1"
+            v-model="selectedConversationName"
+            type="select"
+            :options="conversationOptions"
+            :disabled="sendingMessage || voiceActive || Boolean(replyTarget)"
+            :placeholder="__('Внешний чат')"
           />
         </div>
+        <Textarea
+          ref="textareaRef"
+          v-model="draftText"
+          class="mb-2 min-h-20 w-full"
+          :rows="3"
+          :disabled="baseSendDisabled"
+          :placeholder="__('Введите сообщение...')"
+          @keydown.enter.stop="sendOnEnter"
+          @paste.stop="handleComposerPaste"
+        />
         <ComposerAttachments
           ref="composerAttachments"
           :supportsAttachments="selectedCapabilities.supports_attachments"
           :channelType="selectedChannelType"
+          :maxFiles="selectedCapabilities.max_attachment_count"
           :disabled="voiceActive"
           @change="pendingAttachments = $event"
         />
@@ -257,6 +281,8 @@
           ref="voiceRecorder"
           :conversation="selectedConversation?.name || ''"
           :channel="selectedChannel"
+          reference-doctype="CRM Lead"
+          :reference-name="props.leadName"
           :reply-to-message="replyTarget?.name || ''"
           :disabled="baseSendDisabled || Boolean(pendingAttachments.length)"
           :show-trigger="false"
@@ -268,6 +294,29 @@
           @active-change="voiceActive = $event"
           @queued="voiceQueued"
         />
+        <div
+          v-if="handoffChannelOptions.length"
+          class="mb-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+        >
+          <FormControl
+            v-model="handoffTargetChannel"
+            type="select"
+            :options="handoffChannelOptions"
+            :disabled="handoffLoading || sendingMessage || voiceActive"
+            :placeholder="__('Перейти в другой мессенджер')"
+          />
+          <Button
+            :label="__('Подготовить переход')"
+            :loading="handoffLoading"
+            :disabled="
+              !handoffTargetChannel ||
+              !selectedConversation ||
+              sendingMessage ||
+              voiceActive
+            "
+            @click="prepareHandoff"
+          />
+        </div>
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0 text-sm text-ink-gray-5">
             <div class="truncate">{{ composerHint }}</div>
@@ -292,7 +341,8 @@
               :disabled="
                 baseSendDisabled ||
                 voiceActive ||
-                pendingAttachments.length >= 10
+                pendingAttachments.length >=
+                  selectedCapabilities.max_attachment_count
               "
               @click="composerAttachments?.openFileSelector()"
             />
@@ -331,6 +381,7 @@ import {
   buildMessengerChannelOptions,
   getMessengerChannelType,
   getMessengerCapabilities,
+  getMessengerConversationNotice,
   getMessengerPlatformLabel,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
@@ -346,6 +397,17 @@ import {
   createMessengerMessageActions,
   openMessengerMessageEditor,
 } from '@/utils/messengerMessageActions'
+import {
+  messengerConversationOption,
+  messengerConversationsForChannel,
+  resolveMessengerHandoffAction,
+  resolveMessengerConversationSelection,
+  resolveMessengerReplyConversation,
+} from '@/utils/messengerRouting'
+import {
+  isMessengerViewportNearBottom,
+  shouldFollowMessengerTyping,
+} from '@/utils/messengerViewport'
 import { Button, FormControl, Textarea, call, toast } from 'frappe-ui'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
@@ -365,6 +427,9 @@ const conversations = ref([])
 const messages = ref([])
 const channels = ref([])
 const selectedChannel = ref('')
+const selectedConversationName = ref('')
+const handoffTargetChannel = ref('')
+const handoffLoading = ref(false)
 const draftText = ref('')
 const clientRequestId = ref('')
 const clientRequestFingerprint = ref('')
@@ -402,12 +467,13 @@ const loading = computed(
   () =>
     loadingConversation.value || loadingMessages.value || loadingChannels.value,
 )
+const conversationCandidates = computed(() =>
+  messengerConversationsForChannel(conversations.value, selectedChannel.value),
+)
 const selectedConversation = computed(() => {
-  if (!conversations.value.length) return null
-  if (!selectedChannel.value) return conversations.value[0]
   return (
-    conversations.value.find(
-      (conversation) => conversation.channel === selectedChannel.value,
+    conversationCandidates.value.find(
+      (conversation) => conversation.name === selectedConversationName.value,
     ) || null
   )
 })
@@ -446,15 +512,22 @@ const selectedCapabilities = computed(() =>
     selectedChannelDoc.value || selectedConversation.value || {},
   ),
 )
+const conversationNotice = computed(() =>
+  getMessengerConversationNotice(selectedConversation.value || {}),
+)
 const missingPhone = computed(
   () =>
     Boolean(selectedChannelType.value) &&
     selectedCapabilities.value.requires_phone &&
     !leadPhone.value,
 )
+const needsConversationChoice = computed(
+  () => conversationCandidates.value.length > 1 && !selectedConversation.value,
+)
 const selectedRequiresInbound = computed(
   () =>
     selectedCapabilities.value.requires_inbound &&
+    !conversationCandidates.value.length &&
     !selectedConversation.value?.external_chat_id,
 )
 const baseSendDisabled = computed(
@@ -462,6 +535,8 @@ const baseSendDisabled = computed(
     sendingMessage.value ||
     missingPhone.value ||
     selectedRequiresInbound.value ||
+    needsConversationChoice.value ||
+    conversationNotice.value.blocksSend ||
     !channels.value.length ||
     !selectedChannel.value,
 )
@@ -477,11 +552,20 @@ const attachmentMixError = computed(() => {
     validateComposerFileMix([], pendingAttachments.value, {
       supportsAttachments: selectedCapabilities.value.supports_attachments,
       channelType: selectedChannelType.value,
+      maxAttachmentCount: selectedCapabilities.value.max_attachment_count,
     }).error || ''
   )
 })
 const channelOptions = computed(() =>
   buildMessengerChannelOptions(channels.value),
+)
+const conversationOptions = computed(() =>
+  conversationCandidates.value.map(messengerConversationOption),
+)
+const handoffChannelOptions = computed(() =>
+  buildMessengerChannelOptions(
+    channels.value.filter((channel) => channel.name !== selectedChannel.value),
+  ),
 )
 const messageItems = computed(() => buildMessengerMessageItems(messages.value))
 const videoPlaybackScope = computed(
@@ -507,6 +591,10 @@ const contactLine = computed(() => {
 })
 const composerHint = computed(() => {
   if (attachmentMixError.value) return __(attachmentMixError.value)
+  if (conversationNotice.value.blocksSend)
+    return __(conversationNotice.value.message)
+  if (needsConversationChoice.value)
+    return __('Выберите конкретный внешний чат.')
   if (selectedRequiresInbound.value) {
     return __('Сначала должно прийти входящее сообщение в выбранном канале.')
   }
@@ -604,6 +692,9 @@ const messageSync = createMessengerSyncController({
     if (payload.active === false) clearTyping()
     else showTyping(payload.expires_in_ms)
   },
+  onConversationStateChanged() {
+    loadConversations()
+  },
 })
 
 const readController = createMessengerReadController({
@@ -676,6 +767,9 @@ async function initialize(leadChanged = false) {
   if (leadChanged) {
     messages.value = []
     conversations.value = []
+    selectedChannel.value = ''
+    selectedConversationName.value = ''
+    handoffTargetChannel.value = ''
     draftText.value = ''
     composerAttachments.value?.clear()
     clientRequestId.value = ''
@@ -705,7 +799,7 @@ function confirmDeleteMessage(message) {
   $dialog({
     title: __('Удалить сообщение для всех?'),
     message: __(
-      'VK удалит сообщение у всех участников. В CRM останется отметка об удалении.',
+      'Сообщение будет удалено у всех участников. В CRM останется отметка об удалении.',
     ),
     actions: [
       {
@@ -777,12 +871,22 @@ async function loadConversations() {
 }
 
 function ensureSelectedChannel() {
-  if (selectedChannel.value && channelByName.value[selectedChannel.value])
-    return
-  selectedChannel.value =
-    conversations.value.find((row) => row.channel)?.channel ||
-    channels.value[0]?.name ||
-    ''
+  if (!selectedChannel.value || !channelByName.value[selectedChannel.value]) {
+    selectedChannel.value =
+      conversations.value.find((row) => row.channel)?.channel ||
+      channels.value[0]?.name ||
+      ''
+  }
+  ensureSelectedConversation()
+}
+
+function ensureSelectedConversation() {
+  let resolved = resolveMessengerConversationSelection({
+    conversations: conversations.value,
+    channel: selectedChannel.value,
+    selectedConversation: selectedConversationName.value,
+  })
+  selectedConversationName.value = resolved.conversation?.name || ''
 }
 
 async function sendMessage() {
@@ -799,8 +903,7 @@ async function sendMessage() {
   sendingMessage.value = true
 
   try {
-    let conversation =
-      selectedConversation.value || (await createConversation())
+    let conversation = await resolveConversationForSend()
     if (!conversation?.name) return
 
     let attachmentNames = composerAttachments.value?.readyFileNames() || []
@@ -825,6 +928,8 @@ async function sendMessage() {
       client_request_id: clientRequestId.value,
       attachments: attachmentNames,
       reply_to_message: replyTarget.value?.name || undefined,
+      reference_doctype: 'CRM Lead',
+      reference_name: props.leadName,
     })
 
     if (result?.reason === 'not_configured') {
@@ -849,6 +954,89 @@ async function sendMessage() {
   } finally {
     sendingMessage.value = false
     await Promise.all([loadConversations(), messageSync.syncDelta()])
+  }
+}
+
+async function resolveConversationForSend() {
+  if (selectedConversation.value && !replyTarget.value)
+    return selectedConversation.value
+
+  let result = await call(
+    'crm_messenger.api.conversations.resolve_send_target',
+    {
+      reference_doctype: 'CRM Lead',
+      reference_name: props.leadName,
+      channel: selectedChannel.value,
+      reply_to_message: replyTarget.value?.name || undefined,
+    },
+  )
+  if (result?.ok && result.conversation?.name) {
+    selectedChannel.value =
+      result.conversation.channel ||
+      result.channel?.name ||
+      selectedChannel.value
+    selectedConversationName.value = result.conversation.name
+    return (
+      conversations.value.find(
+        (conversation) => conversation.name === result.conversation.name,
+      ) || result.conversation
+    )
+  }
+  if (result?.reason === 'missing_channel_conversation' && result.can_create)
+    return createConversation()
+
+  genericError.value =
+    result?.reason === 'ambiguous_conversation'
+      ? __('Выберите конкретный внешний чат.')
+      : result?.message ||
+        __('Для выбранного канала ещё нет переписки с этим лидом.')
+  return null
+}
+
+async function prepareHandoff() {
+  if (!handoffTargetChannel.value || !selectedConversation.value) return
+  genericError.value = ''
+  let handoffAction = resolveMessengerHandoffAction(
+    conversations.value,
+    handoffTargetChannel.value,
+  )
+  if (handoffAction.state === 'switch') {
+    selectedChannel.value = handoffTargetChannel.value
+    selectedConversationName.value = handoffAction.conversation.name
+    handoffTargetChannel.value = ''
+    toast.success(__('Переключились на существующий внешний чат.'))
+    return
+  }
+  if (handoffAction.state === 'ambiguous') {
+    selectedChannel.value = handoffTargetChannel.value
+    selectedConversationName.value = ''
+    handoffTargetChannel.value = ''
+    genericError.value = __('Выберите конкретный внешний чат.')
+    return
+  }
+  if (draftText.value.trim() || pendingAttachments.value.length) {
+    genericError.value = __(
+      'Очистите текущий черновик и вложения перед подготовкой перехода.',
+    )
+    return
+  }
+
+  handoffLoading.value = true
+  try {
+    let result = await call('crm_messenger.api.handoffs.create_handoff', {
+      reference_name: props.leadName,
+      source_conversation: selectedConversation.value.name,
+      target_channel: handoffTargetChannel.value,
+    })
+    if (!result?.ok)
+      throw new Error(result?.message || __('Не удалось подготовить переход.'))
+    draftText.value = result.message || ''
+    handoffTargetChannel.value = ''
+    nextTick(() => textareaRef.value?.el?.focus?.())
+  } catch (error) {
+    handleError(error, __('Не удалось подготовить переход.'))
+  } finally {
+    handoffLoading.value = false
   }
 }
 
@@ -918,6 +1106,9 @@ async function createConversation() {
   ) {
     conversations.value = [conversation, ...conversations.value]
   }
+  if (conversation?.name) {
+    selectedConversationName.value = conversation.name
+  }
   return conversation
 }
 
@@ -963,13 +1154,7 @@ function scrollToBottom() {
 }
 
 function isNearBottom() {
-  if (!messagesEl.value) return true
-  return (
-    messagesEl.value.scrollHeight -
-      messagesEl.value.scrollTop -
-      messagesEl.value.clientHeight <
-    96
-  )
+  return isMessengerViewportNearBottom(messagesEl.value)
 }
 
 async function handleMessagesScroll() {
@@ -996,6 +1181,18 @@ async function handleMessagesScroll() {
 
 function startReply(message) {
   if (!message?.can_reply || messageActionState.value.pendingMessage) return
+  let conversation = resolveMessengerReplyConversation(
+    conversations.value,
+    message,
+  )
+  if (!conversation) {
+    genericError.value = __(
+      'Не удалось определить внешний чат исходного сообщения.',
+    )
+    return
+  }
+  selectedChannel.value = conversation.channel
+  selectedConversationName.value = conversation.name
   replyTarget.value = message
   nextTick(() => textareaRef.value?.el?.focus?.())
 }
@@ -1039,13 +1236,21 @@ async function navigateToReply(messageName) {
   highlightTimer = setTimeout(() => (highlightedMessage.value = ''), 1400)
 }
 
-function showTyping(expiresInMs = 6000) {
+async function showTyping(expiresInMs = 6000) {
+  let followTyping = shouldFollowMessengerTyping({
+    active: true,
+    wasNearBottom: isNearBottom(),
+  })
   typingActive.value = true
   clearTimeout(typingTimer)
   typingTimer = setTimeout(
     clearTyping,
     Math.min(Math.max(Number(expiresInMs) || 6000, 1000), 15000),
   )
+  if (followTyping) {
+    await nextTick()
+    scrollToBottom()
+  }
 }
 
 function clearTyping() {
@@ -1069,11 +1274,23 @@ watch(
 
 watch(
   () => selectedConversation.value?.name,
-  () => {
-    cancelReply()
+  (conversationName) => {
+    if (
+      replyTarget.value &&
+      replyTarget.value.conversation !== conversationName
+    )
+      cancelReply()
     clearTyping()
     readController.reset()
     readController.schedule()
+  },
+)
+
+watch(
+  () => selectedChannel.value,
+  () => {
+    ensureSelectedConversation()
+    handoffTargetChannel.value = ''
   },
 )
 
@@ -1099,6 +1316,12 @@ function messageBubbleWidthClass(message) {
 
 function messageFailureReason(message) {
   return message.failure_reason || message.error || ''
+}
+
+function messageStatusNoteClass(message) {
+  return ['failed', 'unknown'].includes(message?.status)
+    ? 'text-ink-red-4'
+    : 'text-ink-gray-5'
 }
 
 function handleError(error, fallback) {

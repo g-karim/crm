@@ -31,10 +31,10 @@ afterEach(() => {
   mounted = []
 })
 
-function mountVideo(attachment) {
+function mountVideo(attachment, provider = '') {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(VideoAttachment, { attachment })
+  let app = createApp(VideoAttachment, { attachment, provider })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
   mounted.push({ app, root })
@@ -42,7 +42,7 @@ function mountVideo(attachment) {
 }
 
 describe('external messenger video', () => {
-  it('shows the saved preview and metadata before opening VK', () => {
+  it('shows the saved preview and metadata with a neutral source action', () => {
     let root = mountVideo({
       id: 'VIDEO-1',
       type: 'video',
@@ -61,11 +61,114 @@ describe('external messenger video', () => {
     )
     expect(root.textContent).toContain('Видео клиента')
     expect(root.textContent).toContain('1:05')
-    expect(root.textContent).toContain('Открыть в VK')
+    expect(root.textContent).toContain('Открыть источник')
+    expect(root.textContent).not.toContain('Открыть в VK')
     expect(root.querySelector('a')?.getAttribute('href')).toBe('/api/open-vk')
     expect(root.querySelector('video')).toBeNull()
     expect(root.querySelector('iframe')).toBeNull()
     expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+  })
+
+  it('hides the source action only for MAX video', () => {
+    let maxRoot = mountVideo(
+      {
+        id: 'MAX-VIDEO-1',
+        type: 'video',
+        status: 'external',
+        video_source: 'external',
+        file_name: 'max-video.mp4',
+        preview_url: '/api/private-preview',
+        open_url: '/api/open-max',
+      },
+      'max_direct',
+    )
+    let vkRoot = mountVideo(
+      {
+        id: 'VK-VIDEO-1',
+        type: 'video',
+        status: 'external',
+        video_source: 'external',
+        file_name: 'vk-video.mp4',
+        preview_url: '/api/private-preview',
+        open_url: '/api/open-vk',
+      },
+      'vk_direct',
+    )
+
+    expect(maxRoot.textContent).not.toContain('Открыть источник')
+    expect(maxRoot.querySelector('a')).toBeNull()
+    expect(vkRoot.textContent).toContain('Открыть источник')
+    expect(vkRoot.querySelector('a')?.getAttribute('href')).toBe('/api/open-vk')
+  })
+
+  it('uses browser metadata as the local duration fallback', async () => {
+    let root = mountVideo(
+      {
+        id: 'MAX-VIDEO-2',
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        mime_type: 'video/mp4',
+        file_name: 'max-video.mp4',
+        playback_url: '/api/max-video',
+        duration_ms: 4000000,
+      },
+      'max_direct',
+    )
+
+    expect(root.textContent).toContain('66:40')
+    root.querySelector('button')?.click()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    let video = root.querySelector('video')
+    Object.defineProperty(video, 'duration', { configurable: true, value: 4 })
+    video.dispatchEvent(new Event('loadedmetadata'))
+    window.dispatchEvent(
+      new CustomEvent('crm-messenger-video-play', { detail: 'another-video' }),
+    )
+    await Promise.resolve()
+
+    expect(root.textContent).toContain('0:04')
+    expect(root.textContent).not.toContain('66:40')
+    expect(root.textContent).not.toContain('Открыть источник')
+  })
+
+  it('shows a local first-frame preview before playback', async () => {
+    let root = mountVideo(
+      {
+        id: 'MAX-VIDEO-PREVIEW',
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        mime_type: 'video/mp4',
+        file_name: 'max-video.mp4',
+        playback_url: '/api/max-video',
+        duration_ms: 4000,
+      },
+      'max_direct',
+    )
+
+    let preview = root.querySelector('[data-video-preview]')
+    expect(preview).not.toBeNull()
+    expect(preview.getAttribute('src')).toBe('/api/max-video#t=0.001')
+    expect(preview.getAttribute('preload')).toBe('metadata')
+    expect(preview.controls).toBe(false)
+    expect(preview.muted).toBe(true)
+
+    Object.defineProperty(preview, 'duration', {
+      configurable: true,
+      value: 4,
+    })
+    preview.dispatchEvent(new Event('loadedmetadata'))
+    expect(preview.currentTime).toBe(0.1)
+
+    root.querySelector('button')?.click()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(root.querySelector('[data-video-preview]')).toBeNull()
+    expect(root.querySelector('video')?.controls).toBe(true)
   })
 
   it('uses the unavailable card when no preview or player exists', () => {

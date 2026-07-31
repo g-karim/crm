@@ -119,6 +119,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 const props = defineProps({
   conversation: { type: String, default: '' },
   channel: { type: String, default: '' },
+  referenceDoctype: { type: String, default: '' },
+  referenceName: { type: String, default: '' },
   replyToMessage: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
   showTrigger: { type: Boolean, default: true },
@@ -188,6 +190,9 @@ async function send() {
   form.append('file', state.value.blob, voiceFilename(state.value.mimeType))
   form.append('conversation', props.conversation)
   form.append('channel', props.channel)
+  if (props.referenceDoctype)
+    form.append('reference_doctype', props.referenceDoctype)
+  if (props.referenceName) form.append('reference_name', props.referenceName)
   form.append('client_request_id', clientRequestId)
   form.append('duration_ms', `${state.value.durationMs}`)
   form.append('waveform', JSON.stringify(state.value.waveform || []))

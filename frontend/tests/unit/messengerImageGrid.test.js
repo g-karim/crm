@@ -13,7 +13,8 @@ vi.mock('@/components/LeadMessenger/ImageLightbox.vue', () => ({
 vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
   default: {
     props: ['attachment'],
-    template: '<div data-test-attachment-card>{{ attachment.file_name }}</div>',
+    template:
+      '<div data-test-attachment-card>{{ attachment.fallback_text || attachment.file_name }}</div>',
   },
 }))
 
@@ -138,6 +139,49 @@ describe('messenger image layout', () => {
       true,
     )
     expect(grid.textContent).toContain('+1')
+  })
+
+  it('reserves the full presentation width before video playback starts', () => {
+    let root = mountRenderer([
+      {
+        id: 'MAX-VIDEO-1',
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        playback_url: '/api/max-video',
+        file_name: 'max-video.mp4',
+      },
+    ])
+    let renderer = root.querySelector('[data-attachment-renderer]')
+
+    expect(renderer.className).toContain('w-[28rem]')
+    expect(renderer.className).toContain('max-w-full')
+    expect(renderer.className.split(/\s+/)).not.toContain('w-full')
+    expect(root.querySelector('[data-test-video]')).not.toBeNull()
+  })
+
+  it('renders a downloaded MAX sticker and a code-only fallback', () => {
+    let root = mountRenderer([
+      {
+        id: 'S-1',
+        type: 'sticker',
+        status: 'available',
+        mime_type: 'image/webp',
+        url: '/media/sticker.webp',
+      },
+      {
+        id: 'S-2',
+        type: 'sticker',
+        status: 'unsupported',
+        file_name: 'max-sticker',
+        fallback_text: 'Стикер MAX недоступен для загрузки',
+      },
+    ])
+
+    expect(root.querySelector('img')?.getAttribute('src')).toBe(
+      '/media/sticker.webp',
+    )
+    expect(root.textContent).toContain('Стикер MAX недоступен для загрузки')
   })
 
   it('keeps pending media disabled and opens available media in lightbox', async () => {

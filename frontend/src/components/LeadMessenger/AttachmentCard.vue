@@ -63,8 +63,8 @@ const size = computed(() => formatAttachmentSize(props.attachment.size_bytes))
 const title = computed(
   () =>
     props.attachment.title ||
-    props.attachment.file_name ||
     props.attachment.fallback_text ||
+    props.attachment.file_name ||
     fallbackTitle(props.attachment.type),
 )
 const cardIcon = computed(() => {

@@ -134,7 +134,48 @@ export function shouldShowMessengerText(message = {}) {
 }
 
 export function getMessengerDeliveryLabel(message = {}) {
+  if (isMaxVideoProcessingMessage(message)) return 'MAX обрабатывает видео'
   return DELIVERY_LABELS[getMessengerDeliveryState(message)] || ''
+}
+
+export function isMaxVideoProcessingMessage(message = {}) {
+  return Boolean(
+    message?.provider === 'max_direct' &&
+    getMessengerDeliveryState(message) === 'retrying' &&
+    message?.provider_status === 'attachment.not.ready' &&
+    (message?.message_type === 'video' ||
+      message?.attachments?.some((attachment) => attachment?.type === 'video')),
+  )
+}
+
+export function getMessengerConversationNotice(conversation = {}) {
+  if (conversation?.provider !== 'max_direct') {
+    return { type: '', message: '', blocksSend: false }
+  }
+  if (conversation?.provider_state === 'removed') {
+    return {
+      type: 'warning',
+      message:
+        'Клиент удалил диалог MAX. Отправка недоступна до повторного запуска бота.',
+      blocksSend: true,
+    }
+  }
+  if (conversation?.provider_state === 'stopped') {
+    return {
+      type: 'warning',
+      message:
+        'Клиент остановил бота MAX. Отправка недоступна до возобновления диалога.',
+      blocksSend: true,
+    }
+  }
+  if (conversation?.provider_history_cleared_at) {
+    return {
+      type: 'info',
+      message: 'Клиент очистил историю диалога в MAX. История в CRM сохранена.',
+      blocksSend: false,
+    }
+  }
+  return { type: '', message: '', blocksSend: false }
 }
 
 export function getMessengerCapabilities(channel = {}) {
@@ -148,6 +189,10 @@ export function getMessengerCapabilities(channel = {}) {
     supports_attachments: Boolean(channel?.capabilities?.supports_attachments),
     supported_attachment_types:
       channel?.capabilities?.supported_attachment_types || [],
+    max_attachment_count: Math.max(
+      1,
+      Number(channel?.capabilities?.max_attachment_count || 10),
+    ),
     voice: {
       send: Boolean(voice.send),
       max_duration_seconds: Number(voice.max_duration_seconds || 300),

@@ -22,14 +22,10 @@ export function canSaveMessengerMessageEdit(message = {}, draft = '') {
   if (!message.can_edit) return false
   let text = `${draft || ''}`.trim()
   if (text === `${message.text || ''}`.trim()) return false
+  let maxLength = Number(message.edit_max_length || 0)
+  if (maxLength > 0 && text.length > maxLength) return false
   if (text) return true
-  let attachments = message.attachments || []
-  return (
-    attachments.length > 0 &&
-    attachments.every((attachment) =>
-      ['image', 'file'].includes(attachment.attachment_type || attachment.type),
-    )
-  )
+  return Boolean(message.can_edit_empty)
 }
 
 export async function openMessengerMessageEditor(message, options) {

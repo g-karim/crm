@@ -14,6 +14,8 @@ const editable = (overrides = {}) => ({
   status: 'sent',
   can_edit: true,
   can_delete: true,
+  can_edit_empty: false,
+  edit_max_length: 9000,
   ...overrides,
 })
 
@@ -58,6 +60,15 @@ describe('messenger message actions', () => {
         editable({ can_reply: false, can_retry: false }),
       ),
     ).toEqual(['edit', 'delete'])
+    expect(
+      getMessengerMessageActions({
+        provider: 'max_direct',
+        can_reply: true,
+        can_retry: false,
+        can_edit: false,
+        can_delete: false,
+      }),
+    ).toEqual(['reply'])
   })
 
   it('retries the same backend message with explicit unknown confirmation', async () => {
@@ -105,6 +116,7 @@ describe('messenger message actions', () => {
   it('edits a photo caption without sending or mutating attachments', async () => {
     let message = editable({
       message_type: 'image',
+      can_edit_empty: true,
       attachments: [
         { id: 'ATT-1', type: 'image' },
         { id: 'ATT-2', type: 'image' },
@@ -126,9 +138,25 @@ describe('messenger message actions', () => {
     expect(message.attachments).toEqual(originalAttachments)
   })
 
+  it('uses backend edit length and empty-caption capabilities for MAX', () => {
+    let message = editable({
+      provider: 'max_direct',
+      message_type: 'video',
+      text: 'caption',
+      attachments: [{ id: 'ATT-1', type: 'video' }],
+      can_edit_empty: true,
+      edit_max_length: 4000,
+    })
+
+    expect(canSaveMessengerMessageEdit(message, '')).toBe(true)
+    expect(canSaveMessengerMessageEdit(message, 'x'.repeat(4000))).toBe(true)
+    expect(canSaveMessengerMessageEdit(message, 'x'.repeat(4001))).toBe(false)
+  })
+
   it('removes a photo or file caption but keeps empty text messages blocked', async () => {
     let message = editable({
       message_type: 'image',
+      can_edit_empty: true,
       attachments: [
         { id: 'ATT-1', type: 'image' },
         { id: 'ATT-2', attachment_type: 'file' },
