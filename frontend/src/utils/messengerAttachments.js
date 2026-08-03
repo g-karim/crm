@@ -33,6 +33,29 @@ export function groupMessengerAttachments(attachments = []) {
   )
 }
 
+export function buildMessengerAttachmentSegments(attachments = []) {
+  let segments = []
+  attachments.forEach((attachment, index) => {
+    if (attachment?.type === 'image') {
+      let previous = segments.at(-1)
+      if (previous?.type === 'images') previous.items.push(attachment)
+      else
+        segments.push({
+          type: 'images',
+          key: `images-${attachment.id || index}`,
+          items: [attachment],
+        })
+      return
+    }
+    segments.push({
+      type: attachment?.type || 'unsupported',
+      key: `${attachment?.id || attachment?.type || 'attachment'}-${index}`,
+      attachment,
+    })
+  })
+  return segments
+}
+
 export function isSingleImageAttachmentSet(attachments = []) {
   return attachments.length === 1 && attachments[0]?.type === 'image'
 }

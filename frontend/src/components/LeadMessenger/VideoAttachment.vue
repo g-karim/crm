@@ -2,43 +2,36 @@
   <div
     class="w-full max-w-[28rem] overflow-hidden rounded-lg bg-surface-gray-2"
   >
-    <video
-      v-if="mode === 'local'"
-      ref="videoElement"
-      :src="playbackUrl"
-      :poster="attachment.preview_url || undefined"
-      class="max-h-[22rem] w-full bg-black object-contain"
-      controls
-      preload="none"
-      playsinline
-      @canplay="loading = false"
-      @loadedmetadata="handleLoadedMetadata"
-      @play="announcePlayback"
-      @error="handleLocalError"
-    />
     <div
-      v-else-if="mode === 'embed'"
-      class="relative aspect-video w-full bg-black"
+      v-if="mode === 'local'"
+      data-video-frame
+      class="relative w-full overflow-hidden bg-black"
+      :style="mediaAspectStyle"
     >
       <LoadingIndicator
         v-if="loading"
         class="absolute left-1/2 top-1/2 z-10 size-6 -translate-x-1/2 -translate-y-1/2 text-white"
       />
-      <iframe
-        :src="attachment.embed_url"
-        :title="title"
-        class="size-full border-0"
-        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-        sandbox="allow-scripts allow-same-origin allow-presentation"
-        referrerpolicy="no-referrer"
-        allowfullscreen
-        @load="loading = false"
+      <video
+        ref="videoElement"
+        :src="playbackUrl"
+        :poster="attachment.preview_url || undefined"
+        class="absolute inset-0 size-full bg-black object-contain"
+        controls
+        preload="none"
+        playsinline
+        @canplay="loading = false"
+        @loadedmetadata="handleLoadedMetadata"
+        @play="announcePlayback"
+        @error="handleLocalError"
       />
     </div>
     <button
       v-else-if="playable"
       type="button"
-      class="group relative block min-h-40 w-full overflow-hidden text-left"
+      data-video-frame
+      class="group relative block w-full overflow-hidden bg-black text-left"
+      :style="mediaAspectStyle"
       :aria-label="__('Воспроизвести видео')"
       @click="activate"
     >
@@ -46,14 +39,14 @@
         v-if="attachment.preview_url"
         :src="attachment.preview_url"
         :alt="title"
-        class="max-h-[22rem] w-full object-contain"
+        class="absolute inset-0 size-full object-contain"
         loading="lazy"
       />
       <video
         v-else-if="previewPlaybackUrl && !previewFailed"
         data-video-preview
         :src="previewPlaybackUrl"
-        class="pointer-events-none aspect-video max-h-[22rem] w-full bg-black object-contain"
+        class="pointer-events-none absolute inset-0 size-full bg-black object-contain"
         muted
         preload="metadata"
         playsinline
@@ -62,7 +55,7 @@
         @loadedmetadata="handlePreviewMetadata"
         @error="previewFailed = true"
       />
-      <span v-else class="block aspect-video w-full bg-black/80" />
+      <span v-else class="absolute inset-0 bg-black/80" />
       <span
         class="absolute inset-0 flex items-center justify-center bg-black/15 transition-colors group-hover:bg-black/25"
       >
@@ -79,11 +72,16 @@
         {{ duration }}
       </span>
     </button>
-    <div v-else-if="attachment.preview_url" class="relative">
+    <div
+      v-else-if="attachment.preview_url"
+      data-video-frame
+      class="relative w-full overflow-hidden bg-black"
+      :style="mediaAspectStyle"
+    >
       <img
         :src="attachment.preview_url"
         :alt="title"
-        class="max-h-[22rem] w-full object-contain"
+        class="absolute inset-0 size-full object-contain"
         loading="lazy"
       />
       <span
@@ -93,7 +91,7 @@
         {{ duration }}
       </span>
     </div>
-    <AttachmentCard v-else :attachment="attachment" />
+    <AttachmentCard v-else :attachment="cardAttachment" />
 
     <div
       v-if="title || action || localFailed"
@@ -122,7 +120,7 @@
         rel="noopener noreferrer"
         class="shrink-0 text-ink-blue-3 hover:underline"
       >
-        {{ __('Открыть источник') }}
+        {{ actionLabel }}
       </a>
     </div>
   </div>
@@ -154,23 +152,31 @@ const localFailed = ref(false)
 const previewFailed = ref(false)
 const actualDurationMs = ref(0)
 const state = computed(() => getAttachmentState(props.attachment))
-const playbackUrl = computed(() => getVideoPlaybackUrl(props.attachment))
+const playbackUrl = computed(() => {
+  if (
+    props.provider === 'vk_direct' &&
+    props.attachment.mime_type !== 'video/mp4'
+  )
+    return ''
+  return getVideoPlaybackUrl(props.attachment)
+})
 const previewPlaybackUrl = computed(() => {
   if (!playbackUrl.value) return ''
   return `${playbackUrl.value.split('#', 1)[0]}#t=0.001`
 })
-const embedAvailable = computed(
-  () =>
-    state.value.active &&
-    props.attachment.embed_available &&
-    Boolean(props.attachment.embed_url),
-)
 const playable = computed(() =>
-  Boolean((playbackUrl.value && !localFailed.value) || embedAvailable.value),
+  Boolean(playbackUrl.value && !localFailed.value),
 )
 const action = computed(() =>
-  props.provider === 'max_direct' ? '' : getAttachmentAction(props.attachment),
+  props.provider === 'max_direct' || playable.value
+    ? ''
+    : getAttachmentAction(props.attachment),
 )
+const cardAttachment = computed(() => ({
+  ...props.attachment,
+  open_url: '',
+  url: '',
+}))
 const title = computed(
   () =>
     props.attachment.title ||
@@ -182,15 +188,30 @@ const duration = computed(() =>
     actualDurationMs.value || props.attachment.duration_ms,
   ),
 )
+const mediaAspectStyle = computed(() => {
+  let width = Number(props.attachment.width || 0)
+  let height = Number(props.attachment.height || 0)
+  let ratio = width > 0 && height > 0 ? width / height : 16 / 9
+  if (!Number.isFinite(ratio) || ratio <= 0) ratio = 16 / 9
+  return { aspectRatio: String(Math.min(Math.max(ratio, 0.5), 2)) }
+})
+const actionLabel = computed(() =>
+  props.provider === 'vk_direct'
+    ? __('Смотреть в VK Видео')
+    : __('Открыть источник'),
+)
 const statusLabel = computed(() => {
   if (state.value.busy) return state.value.label
   if (state.value.unsupported) return __('Формат видео не поддерживается')
+  if (props.provider === 'vk_direct' && !playable.value && action.value)
+    return __('Видео доступно только во VK')
   if (!playable.value && !action.value) return __('Видео недоступно')
   return ''
 })
 
 async function activate() {
-  mode.value = playbackUrl.value && !localFailed.value ? 'local' : 'embed'
+  if (!playbackUrl.value || localFailed.value) return
+  mode.value = 'local'
   loading.value = true
   announcePlayback()
   if (mode.value === 'local') {
@@ -220,12 +241,7 @@ function handleOtherPlayback(event) {
 function handleLocalError() {
   localFailed.value = true
   loading.value = false
-  if (embedAvailable.value) {
-    mode.value = 'embed'
-    loading.value = true
-  } else {
-    mode.value = ''
-  }
+  mode.value = ''
 }
 
 function handleLoadedMetadata(event) {

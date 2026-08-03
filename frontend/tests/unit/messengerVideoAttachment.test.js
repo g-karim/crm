@@ -97,7 +97,8 @@ describe('external messenger video', () => {
 
     expect(maxRoot.textContent).not.toContain('Открыть источник')
     expect(maxRoot.querySelector('a')).toBeNull()
-    expect(vkRoot.textContent).toContain('Открыть источник')
+    expect(vkRoot.textContent).toContain('Видео доступно только во VK')
+    expect(vkRoot.textContent).toContain('Смотреть в VK Видео')
     expect(vkRoot.querySelector('a')?.getAttribute('href')).toBe('/api/open-vk')
   })
 
@@ -149,6 +150,8 @@ describe('external messenger video', () => {
       'max_direct',
     )
 
+    let previewFrame = root.querySelector('[data-video-frame]')
+    let previewFrameStyle = previewFrame.getAttribute('style')
     let preview = root.querySelector('[data-video-preview]')
     expect(preview).not.toBeNull()
     expect(preview.getAttribute('src')).toBe('/api/max-video#t=0.001')
@@ -169,6 +172,52 @@ describe('external messenger video', () => {
 
     expect(root.querySelector('[data-video-preview]')).toBeNull()
     expect(root.querySelector('video')?.controls).toBe(true)
+    expect(root.querySelector('[data-video-frame]').getAttribute('style')).toBe(
+      previewFrameStyle,
+    )
+  })
+
+  it('does not imitate a VK player for preview-only or embed video', () => {
+    let root = mountVideo(
+      {
+        id: 'VK-EMBED-1',
+        type: 'video',
+        status: 'external',
+        video_source: 'provider_embed',
+        mime_type: 'image/jpeg',
+        preview_url: '/api/private-preview',
+        embed_available: true,
+        embed_url: 'https://vk.com/video_ext.php?id=1',
+        open_url: 'https://vk.com/video1_1',
+      },
+      'vk_direct',
+    )
+
+    expect(root.querySelector('iframe')).toBeNull()
+    expect(root.querySelector('[data-test-play-icon]')).toBeNull()
+    expect(root.querySelector('button')).toBeNull()
+    expect(root.textContent).toContain('Видео доступно только во VK')
+    expect(root.textContent).toContain('Смотреть в VK Видео')
+  })
+
+  it('uses inline playback for VK only when the local file is MP4', () => {
+    let root = mountVideo(
+      {
+        id: 'VK-WEBM-1',
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        mime_type: 'video/webm',
+        playback_url: '/api/local-webm',
+        preview_url: '/api/private-preview',
+        open_url: 'https://vk.com/video1_2',
+      },
+      'vk_direct',
+    )
+
+    expect(root.querySelector('video')).toBeNull()
+    expect(root.querySelector('[data-test-play-icon]')).toBeNull()
+    expect(root.textContent).toContain('Видео доступно только во VK')
   })
 
   it('uses the unavailable card when no preview or player exists', () => {

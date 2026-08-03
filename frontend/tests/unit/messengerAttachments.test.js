@@ -1,4 +1,5 @@
 import {
+  buildMessengerAttachmentSegments,
   canRenderInlineVideo,
   formatAttachmentDuration,
   getAttachmentAction,
@@ -14,6 +15,27 @@ import {
 import { describe, expect, it } from 'vitest'
 
 describe('messenger attachment contract v1', () => {
+  it('groups only adjacent images and preserves provider order', () => {
+    let segments = buildMessengerAttachmentSegments([
+      { id: 'V-1', type: 'video' },
+      { id: 'V-2', type: 'video' },
+      { id: 'I-1', type: 'image' },
+      { id: 'I-2', type: 'image' },
+      { id: 'F-1', type: 'file' },
+      { id: 'I-3', type: 'image' },
+    ])
+
+    expect(segments.map((segment) => segment.type)).toEqual([
+      'video',
+      'video',
+      'images',
+      'file',
+      'images',
+    ])
+    expect(segments[2].items.map((item) => item.id)).toEqual(['I-1', 'I-2'])
+    expect(segments[4].items.map((item) => item.id)).toEqual(['I-3'])
+  })
+
   it('groups voice/audio, sticker, images and unsupported', () => {
     let groups = groupMessengerAttachments([
       { id: 'I-1', type: 'image' },

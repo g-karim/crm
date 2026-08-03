@@ -181,6 +181,39 @@ describe('messenger composer attachments', () => {
     ).toEqual([])
   })
 
+  it('rejects 13 MAX files as one batch with one warning', () => {
+    let onError = vi.fn()
+    let upload = vi.fn()
+    let context = {
+      supportsAttachments: true,
+      channelType: 'max',
+      maxAttachmentCount: 12,
+    }
+    let controller = createComposerAttachmentController({
+      upload,
+      maxFiles: 12,
+      validateFiles: (files, existing) =>
+        validateComposerFileMix(files, existing, context),
+      onError,
+    })
+    let files = Array.from({ length: 13 }, (_, index) =>
+      file(`image-${index}.jpg`, 'image/jpeg'),
+    )
+
+    expect(controller.addFiles(files)).toEqual([])
+    expect(onError).toHaveBeenCalledOnce()
+    expect(upload).not.toHaveBeenCalled()
+    expect(controller.getItems()).toEqual([])
+
+    controller.addFiles(files.slice(0, 11))
+    onError.mockClear()
+    upload.mockClear()
+    expect(controller.addFiles(files.slice(11))).toEqual([])
+    expect(onError).toHaveBeenCalledOnce()
+    expect(upload).not.toHaveBeenCalled()
+    expect(controller.getItems()).toHaveLength(11)
+  })
+
   it('applies the capability attachment limit to every provider', () => {
     let result = validateComposerFileMix(
       [file('third.jpg', 'image/jpeg')],
