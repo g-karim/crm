@@ -1,4 +1,5 @@
 import {
+  countNewMessengerMessages,
   createMessengerSyncController,
   mergeMessengerMessages,
 } from '@/utils/messengerSync'
@@ -68,6 +69,70 @@ const delta = (changes = [], overrides = {}) => ({
 })
 
 describe('messenger sync', () => {
+  it('counts only appended inbound non-history inserts as new messages', () => {
+    let previous = {
+      name: 'M-1',
+      message_datetime: '2026-07-16 10:00:00',
+      creation: '2026-07-16 10:00:01',
+    }
+    let messages = [
+      {
+        name: 'OLD-HISTORY',
+        direction: 'inbound',
+        ingest_source: 'provider_history',
+        message_datetime: '2026-07-15 10:00:00',
+      },
+      previous,
+      {
+        name: 'OUTBOUND',
+        direction: 'outbound',
+        message_datetime: '2026-07-16 10:01:00',
+      },
+      {
+        name: 'DELETED',
+        direction: 'inbound',
+        status: 'deleted',
+        message_datetime: '2026-07-16 10:02:00',
+      },
+      {
+        name: 'NEW-INBOUND',
+        direction: 'inbound',
+        ingest_source: 'provider_webhook',
+        conversation: 'OTHER-CHANNEL-SAME-LEAD',
+        message_datetime: '2026-07-16 10:03:00',
+      },
+    ]
+
+    expect(
+      countNewMessengerMessages({
+        messages,
+        inserted: ['OLD-HISTORY', 'OUTBOUND', 'DELETED', 'NEW-INBOUND'],
+        previousLastMessage: previous,
+      }),
+    ).toBe(1)
+  })
+
+  it('does not count an inserted provider message sorted before the old tail', () => {
+    let previous = {
+      name: 'M-2',
+      message_datetime: '2026-07-16 10:00:00',
+    }
+    expect(
+      countNewMessengerMessages({
+        messages: [
+          {
+            name: 'LATE-DELIVERY',
+            direction: 'inbound',
+            ingest_source: 'provider_webhook',
+            message_datetime: '2026-07-16 09:59:00',
+          },
+          previous,
+        ],
+        inserted: ['LATE-DELIVERY'],
+        previousLastMessage: previous,
+      }),
+    ).toBe(0)
+  })
   it('loads the initial snapshot for the current CRM Lead', async () => {
     let message = { name: 'M-1', message_datetime: '2026-07-16 10:00:00' }
     let harness = createHarness({ get_message_page: snapshot([message]) })

@@ -41,6 +41,30 @@ export default defineConfig({
         __dirname,
         'tests/stubs/IconStub.vue',
       ),
+      '~icons/lucide/chevron-left': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
+      '~icons/lucide/chevron-right': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
+      '~icons/lucide/download': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
+      '~icons/lucide/minus': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
+      '~icons/lucide/plus': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
+      '~icons/lucide/x': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
     },
   },
 })

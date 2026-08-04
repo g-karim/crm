@@ -1,0 +1,122 @@
+import { createApp } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/components/LeadMessenger/AttachmentRenderer.vue', () => ({
+  default: {
+    props: ['attachments'],
+    template:
+      '<div data-forward-attachments>{{ attachments.map((item) => item.id).join(",") }}</div>',
+  },
+}))
+
+import MessageForwardStack from '@/components/LeadMessenger/MessageForwardStack.vue'
+
+let mounted = []
+
+afterEach(() => {
+  mounted.forEach(({ app, root }) => {
+    app.unmount()
+    root.remove()
+  })
+  mounted = []
+})
+
+function mountStack(context) {
+  let root = document.createElement('div')
+  document.body.appendChild(root)
+  let app = createApp(MessageForwardStack, { context, provider: 'vk_direct' })
+  app.config.globalProperties.__ = globalThis.__
+  app.mount(root)
+  mounted.push({ app, root })
+  return root
+}
+
+describe('forwarded message stack', () => {
+  it('renders nested messages and their routed attachments', () => {
+    let root = mountStack({
+      version: 1,
+      truncated: false,
+      items: [
+        {
+          key: 'forward-0',
+          sender_name: 'Мария',
+          text: 'Первое сообщение',
+          attachments: [{ id: 'A-1', type: 'image' }],
+          items: [
+            {
+              key: 'forward-0-0',
+              sender_name: null,
+              text: 'Вложенное сообщение',
+              attachments: [],
+              items: [],
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(root.querySelectorAll('[data-forward-item]')).toHaveLength(2)
+    expect(root.textContent).toContain('Пересланное сообщение')
+    expect(root.textContent).toContain('Мария')
+    expect(root.textContent).toContain('Первое сообщение')
+    expect(root.textContent).toContain('Вложенное сообщение')
+    expect(root.querySelector('[data-forward-attachments]').textContent).toBe(
+      'A-1',
+    )
+  })
+
+  it('renders an embedded reply before the forwarded response', () => {
+    let root = mountStack({
+      version: 1,
+      items: [
+        {
+          key: 'forward-0',
+          relation: 'forward',
+          sender_name: 'Мария',
+          text: 'Ответ',
+          items: [
+            {
+              key: 'forward-0-0',
+              relation: 'reply',
+              text: 'Исходный текст',
+              items: [],
+            },
+          ],
+        },
+      ],
+    })
+
+    expect(root.textContent).toContain('Исходное сообщение')
+    expect(root.textContent.indexOf('Исходный текст')).toBeLessThan(
+      root.textContent.indexOf('Ответ'),
+    )
+    expect(root.textContent).toContain('Мария')
+  })
+
+  it('uses a neutral label for an empty forwarded item', () => {
+    let root = mountStack({
+      version: 1,
+      items: [{ key: 'forward-0', relation: 'forward', items: [] }],
+    })
+    expect(root.textContent).toContain('Пересланное сообщение')
+    expect(root.textContent).not.toContain('недоступно')
+  })
+
+  it('shows unavailable and truncation fallbacks explicitly', () => {
+    let root = mountStack({
+      version: 1,
+      truncated: true,
+      items: [
+        {
+          key: 'forward-0',
+          attachment_types: ['video'],
+          attachments: [],
+          items: [],
+        },
+      ],
+    })
+
+    expect(root.textContent).toContain('Вложение недоступно')
+    expect(root.querySelector('[data-forward-truncated]')).not.toBeNull()
+  })
+})

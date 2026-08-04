@@ -32,6 +32,23 @@ export function mergeMessengerMessages(current = [], incoming = []) {
   }
 }
 
+export function countNewMessengerMessages({
+  messages = [],
+  inserted = [],
+  previousLastMessage = null,
+} = {}) {
+  if (!previousLastMessage || !inserted.length) return 0
+  let insertedNames = new Set(inserted)
+  return messages.filter(
+    (message) =>
+      insertedNames.has(message?.name) &&
+      message.direction === 'inbound' &&
+      message.status !== 'deleted' &&
+      message.ingest_source !== 'provider_history' &&
+      compareMessengerMessages(message, previousLastMessage) > 0,
+  ).length
+}
+
 export function createMessengerSyncController(options) {
   let socket = options.socket
   let call = options.call
@@ -71,10 +88,10 @@ export function createMessengerSyncController(options) {
   }
 
   function merge(incoming, kind, extra) {
-    options.onBeforeChange?.({ kind, incoming, messages })
+    let changeSnapshot = options.onBeforeChange?.({ kind, incoming, messages })
     let result = mergeMessengerMessages(messages, incoming)
     messages = result.messages
-    notify(kind, result, extra)
+    notify(kind, result, { ...extra, changeSnapshot })
     return result
   }
 

@@ -177,6 +177,43 @@ describe('external messenger video', () => {
     )
   })
 
+  it('keeps the loading state inside the video frame while buffering', async () => {
+    let root = mountVideo(
+      {
+        id: 'MAX-VIDEO-LOADING',
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        mime_type: 'video/mp4',
+        playback_url: '/api/max-video',
+      },
+      'max_direct',
+    )
+
+    root.querySelector('button')?.click()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    let video = root.querySelector('video')
+    let loading = root.querySelector('[data-video-loading]')
+    expect(loading).not.toBeNull()
+    expect(loading.parentElement).toBe(root.querySelector('[data-video-frame]'))
+    expect(loading.classList.contains('inset-0')).toBe(true)
+    expect(loading.classList.contains('pointer-events-none')).toBe(true)
+
+    video.dispatchEvent(new Event('playing'))
+    await Promise.resolve()
+    expect(root.querySelector('[data-video-loading]')).toBeNull()
+
+    video.dispatchEvent(new Event('waiting'))
+    await Promise.resolve()
+    expect(root.querySelector('[data-video-loading]')).not.toBeNull()
+
+    video.dispatchEvent(new Event('canplay'))
+    await Promise.resolve()
+    expect(root.querySelector('[data-video-loading]')).toBeNull()
+  })
+
   it('does not imitate a VK player for preview-only or embed video', () => {
     let root = mountVideo(
       {

@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
+import { getForwardedContentKind } from '@/utils/messengerForwarding'
 
 let mounted = []
 afterEach(() => {
@@ -22,6 +23,28 @@ function mount(context, props = {}) {
 }
 
 describe('message reply quote', () => {
+  it('classifies forwarded trees consistently for composer snapshots', () => {
+    expect(
+      getForwardedContentKind({
+        items: [
+          {
+            attachment_types: ['image'],
+            items: [{ attachment_types: ['file'] }],
+          },
+        ],
+      }),
+    ).toBe('attachment')
+    expect(
+      getForwardedContentKind({
+        items: [{ attachment_types: ['image', 'link'] }],
+      }),
+    ).toBe('message')
+    expect(getForwardedContentKind({ items: [{ text: 'Текст' }] })).toBe(
+      'message',
+    )
+    expect(getForwardedContentKind({ items: [{}] })).toBe('message')
+  })
+
   it('renders a safe snapshot without provider payload fields', () => {
     let root = mount({
       message: null,
@@ -63,5 +86,38 @@ describe('message reply quote', () => {
     )
     expect(root.textContent).toContain('Иван Петров')
     expect(root.textContent).not.toContain('Иван VK')
+  })
+
+  it('describes forwarded reply targets by their normalized content kind', () => {
+    let attachment = mount({
+      message: 'FORWARD-FILE',
+      state: 'available',
+      snapshot: { forwarded_content_kind: 'attachment' },
+    })
+    let message = mount({
+      message: 'FORWARD-LINK',
+      state: 'available',
+      snapshot: {
+        forwarded_content_kind: 'message',
+        attachment_types: ['link'],
+      },
+    })
+
+    expect(attachment.textContent).toContain('Вложение')
+    expect(message.textContent).toContain('Пересланное сообщение')
+    expect(message.textContent).not.toContain('Исходное сообщение недоступно')
+  })
+
+  it('keeps an outer comment above forwarded-content classification', () => {
+    let root = mount({
+      message: 'FORWARD-WITH-COMMENT',
+      state: 'available',
+      snapshot: {
+        text: 'Комментарий отправителя',
+        forwarded_content_kind: 'attachment',
+      },
+    })
+    expect(root.textContent).toContain('Комментарий отправителя')
+    expect(root.textContent).not.toContain('Вложение')
   })
 })

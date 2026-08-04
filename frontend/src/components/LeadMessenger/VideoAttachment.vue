@@ -8,10 +8,19 @@
       class="relative w-full overflow-hidden bg-black"
       :style="mediaAspectStyle"
     >
-      <LoadingIndicator
+      <div
         v-if="loading"
-        class="absolute left-1/2 top-1/2 z-10 size-6 -translate-x-1/2 -translate-y-1/2 text-white"
-      />
+        data-video-loading
+        class="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black/20"
+        role="status"
+        :aria-label="__('Загрузка видео')"
+      >
+        <span
+          class="grid size-10 place-items-center rounded-full bg-black/65 text-white shadow-sm"
+        >
+          <LoadingIndicator class="size-5" />
+        </span>
+      </div>
       <video
         ref="videoElement"
         :src="playbackUrl"
@@ -20,7 +29,12 @@
         controls
         preload="none"
         playsinline
-        @canplay="loading = false"
+        @loadstart="startLoading"
+        @waiting="startLoading"
+        @seeking="startLoading"
+        @canplay="finishLoading"
+        @playing="finishLoading"
+        @seeked="finishLoading"
         @loadedmetadata="handleLoadedMetadata"
         @play="announcePlayback"
         @error="handleLocalError"
@@ -226,6 +240,14 @@ function announcePlayback() {
   window.dispatchEvent(
     new CustomEvent('crm-messenger-video-play', { detail: instanceId }),
   )
+}
+
+function startLoading() {
+  loading.value = true
+}
+
+function finishLoading() {
+  loading.value = false
 }
 
 function stopPlayback() {
