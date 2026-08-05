@@ -70,12 +70,6 @@
       </div>
     </button>
   </div>
-  <ImageLightbox
-    v-if="lightboxOpen"
-    :images="availableImages"
-    :initialIndex="lightboxIndex"
-    @close="lightboxOpen = false"
-  />
 </template>
 
 <script setup>
@@ -86,28 +80,21 @@ import {
   getSingleImageMediaWidthClass,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import ImageOffIcon from '~icons/lucide/image-off'
-import ImageLightbox from './ImageLightbox.vue'
 
 const props = defineProps({
   images: { type: Array, default: () => [] },
 })
-const lightboxOpen = ref(false)
-const lightboxIndex = ref(0)
+const emit = defineEmits(['open-image'])
 const singleImage = computed(() =>
   props.images.length === 1 ? props.images[0] : null,
 )
 const visibleImages = computed(() => visibleImageAttachments(props.images))
-const availableImages = computed(() =>
-  props.images.filter((image) => image.url && getAttachmentState(image).active),
-)
 
 function open(image) {
-  let index = availableImages.value.findIndex((item) => item.id === image.id)
-  if (index < 0) return
-  lightboxIndex.value = index
-  lightboxOpen.value = true
+  if (!image.url || !getAttachmentState(image).active) return
+  emit('open-image', image)
 }
 
 function imageDimension(value) {

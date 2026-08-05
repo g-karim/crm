@@ -118,7 +118,9 @@
                   item.message.direction === 'outbound'
                     ? 'justify-end'
                     : 'justify-start',
-                  highlightedMessage === item.message.name
+                  item.messages.some(
+                    (message) => highlightedMessage === message.name,
+                  )
                     ? 'rounded ring-2 ring-outline-blue-2'
                     : '',
                 ]"
@@ -132,6 +134,13 @@
                     messageBubbleWidthClass(item.message),
                   ]"
                 >
+                  <span
+                    v-for="groupMessage in item.messages.slice(0, -1)"
+                    :key="`anchor:${groupMessage.name}`"
+                    :data-message-id="groupMessage.name"
+                    class="block h-0 overflow-hidden"
+                    aria-hidden="true"
+                  />
                   <MessageMetadata
                     :message="item.message"
                     :sender="messageSender(item.message)"
@@ -154,6 +163,18 @@
                     :context="item.message.reply_context"
                     :client-name="clientDisplayName"
                     @navigate="navigateToReply"
+                  />
+                  <MessageForwardStack
+                    v-for="groupMessage in item.messages.filter(
+                      (message) =>
+                        message.status !== 'deleted' &&
+                        message.forward_context,
+                    )"
+                    :key="`forward:${groupMessage.name}`"
+                    class="mb-2 last:mb-0"
+                    :context="groupMessage.forward_context"
+                    :playback-scope="videoPlaybackScope"
+                    :provider="groupMessage.provider"
                   />
                   <MessageContent
                     :message="item.message"
@@ -373,6 +394,7 @@ import ComposerAttachments from '@/components/LeadMessenger/ComposerAttachments.
 import ComposerVoiceRecorder from '@/components/LeadMessenger/ComposerVoiceRecorder.vue'
 import MessageContent from '@/components/LeadMessenger/MessageContent.vue'
 import MessageFooterMetadata from '@/components/LeadMessenger/MessageFooterMetadata.vue'
+import MessageForwardStack from '@/components/LeadMessenger/MessageForwardStack.vue'
 import MessageMetadata from '@/components/LeadMessenger/MessageMetadata.vue'
 import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
 import { globalStore } from '@/stores/global'
@@ -389,8 +411,12 @@ import {
   getSingleImageBubbleWidthClass,
   isSingleImageAttachmentSet,
 } from '@/utils/messengerAttachments'
-import { createMessengerSyncController } from '@/utils/messengerSync'
+import {
+  countNewMessengerMessages,
+  createMessengerSyncController,
+} from '@/utils/messengerSync'
 import { isVideoFile, validateComposerFileMix } from '@/utils/messengerComposer'
+import { getForwardedContentKind } from '@/utils/messengerForwarding'
 import { createMessengerReadController } from '@/utils/messengerRead'
 import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
 import {
@@ -454,7 +480,6 @@ const messageActionState = ref({
   errors: {},
 })
 const messageEditorElements = new Map()
-let scrollSnapshot = null
 let typingTimer = null
 let highlightTimer = null
 
@@ -624,6 +649,9 @@ const replyComposerContext = computed(() => {
       attachment_types: (replyTarget.value.attachments || []).map(
         (item) => item.type,
       ),
+      forwarded_content_kind: replyTarget.value.forward_context
+        ? getForwardedContentKind(replyTarget.value.forward_context)
+        : undefined,
     },
   }
 })
@@ -632,15 +660,19 @@ const messageSync = createMessengerSyncController({
   socket: $socket,
   call,
   visibilityTarget: document,
-  onBeforeChange({ kind }) {
+  onBeforeChange({ kind, messages: currentMessages }) {
     if (kind === 'history') {
-      scrollSnapshot = {
+      return {
         kind,
         height: messagesEl.value?.scrollHeight || 0,
         top: messagesEl.value?.scrollTop || 0,
       }
     } else if (kind === 'delta') {
-      scrollSnapshot = { kind, nearBottom: isNearBottom() }
+      return {
+        kind,
+        nearBottom: isNearBottom(),
+        previousLastMessage: currentMessages.at(-1) || null,
+      }
     }
   },
   async onChange(change) {
@@ -650,18 +682,22 @@ const messageSync = createMessengerSyncController({
       scrollToBottom()
     } else if (
       change.kind === 'history' &&
-      scrollSnapshot?.kind === 'history'
+      change.changeSnapshot?.kind === 'history'
     ) {
       let addedHeight =
-        (messagesEl.value?.scrollHeight || 0) - scrollSnapshot.height
+        (messagesEl.value?.scrollHeight || 0) - change.changeSnapshot.height
       if (messagesEl.value) {
-        messagesEl.value.scrollTop = scrollSnapshot.top + addedHeight
+        messagesEl.value.scrollTop = change.changeSnapshot.top + addedHeight
       }
     } else if (change.kind === 'delta' && change.inserted.length) {
-      if (scrollSnapshot?.nearBottom) scrollToBottom()
-      else newMessageCount.value += change.inserted.length
+      if (change.changeSnapshot?.nearBottom) scrollToBottom()
+      else
+        newMessageCount.value += countNewMessengerMessages({
+          messages: change.messages,
+          inserted: change.inserted,
+          previousLastMessage: change.changeSnapshot?.previousLastMessage,
+        })
     }
-    scrollSnapshot = null
   },
   onDeltaApplied(_merge, incoming) {
     if (
@@ -1310,6 +1346,7 @@ function messageSource(message) {
 }
 
 function messageBubbleWidthClass(message) {
+  if (message.forward_context) return 'w-[32rem] max-w-full'
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
   return getSingleImageBubbleWidthClass(message.attachments[0])
 }

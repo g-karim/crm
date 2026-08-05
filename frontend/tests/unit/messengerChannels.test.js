@@ -239,6 +239,95 @@ describe('messengerChannels', () => {
     expect(items.map((item) => item.dateLabel)).toEqual(['Сегодня', ''])
   })
 
+  it('groups only adjacent MAX forward-only messages within five seconds', () => {
+    let forward = (name, time, overrides = {}) => ({
+      name,
+      provider: 'max_direct',
+      conversation: 'MAX-CONVERSATION',
+      direction: 'inbound',
+      sender_name: 'MAX Клиент',
+      status: 'received',
+      message_datetime: time,
+      text: null,
+      attachments: [],
+      forward_context: { version: 1, items: [{ key: `${name}-forward` }] },
+      ...overrides,
+    })
+    let first = forward('MAX-1', '2026-07-16 08:00:00')
+    let second = forward('MAX-2', '2026-07-16 08:00:05')
+    let tooLate = forward('MAX-3', '2026-07-16 08:00:11')
+    let ordinary = {
+      ...forward('MAX-TEXT', '2026-07-16 08:00:12'),
+      text: 'Обычное сообщение',
+      forward_context: null,
+    }
+    let afterBreak = forward('MAX-4', '2026-07-16 08:00:13')
+
+    let items = buildMessengerMessageItems(
+      [first, second, tooLate, ordinary, afterBreak],
+      '2026-07-16 09:00:00',
+    )
+
+    expect(items).toHaveLength(4)
+    expect(items[0].messages).toEqual([first, second])
+    expect(items[0].message).toBe(second)
+    expect(items.slice(1).map((item) => item.messages.length)).toEqual([
+      1, 1, 1,
+    ])
+  })
+
+  it('caps one visual MAX forwarding group at twenty provider messages', () => {
+    let messages = Array.from({ length: 21 }, (_, index) => ({
+      name: `MAX-${index}`,
+      provider: 'max_direct',
+      conversation: 'MAX-CONVERSATION',
+      direction: 'inbound',
+      sender_name: 'MAX Клиент',
+      status: 'received',
+      message_datetime: `2026-07-16 08:00:${String(index).padStart(2, '0')}`,
+      attachments: [],
+      forward_context: { items: [{ key: `forward-${index}` }] },
+    }))
+
+    let items = buildMessengerMessageItems(messages, '2026-07-16 09:00:00')
+    expect(items.map((item) => item.messages.length)).toEqual([20, 1])
+  })
+
+  it('does not group MAX forwards across sender, direction, or day boundaries', () => {
+    let base = {
+      provider: 'max_direct',
+      conversation: 'MAX-CONVERSATION',
+      direction: 'inbound',
+      sender_name: 'Первый клиент',
+      status: 'received',
+      attachments: [],
+      forward_context: { items: [{ key: 'forward' }] },
+    }
+    let messages = [
+      { ...base, name: 'MAX-1', message_datetime: '2026-07-16 08:00:00' },
+      {
+        ...base,
+        name: 'MAX-2',
+        sender_name: 'Другой клиент',
+        message_datetime: '2026-07-16 08:00:01',
+      },
+      {
+        ...base,
+        name: 'MAX-3',
+        direction: 'outbound',
+        message_datetime: '2026-07-16 08:00:02',
+      },
+      { ...base, name: 'MAX-4', message_datetime: '2026-07-16 20:59:59' },
+      { ...base, name: 'MAX-5', message_datetime: '2026-07-16 21:00:01' },
+    ]
+
+    expect(
+      buildMessengerMessageItems(messages, '2026-07-16 09:00:00').map(
+        (item) => item.messages.length,
+      ),
+    ).toEqual([1, 1, 1, 1, 1])
+  })
+
   it('adds a new date separator when the next calendar day starts', () => {
     let items = buildMessengerMessageItems(
       [

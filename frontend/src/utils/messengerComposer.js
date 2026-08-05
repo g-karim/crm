@@ -33,14 +33,17 @@ export function createComposerAttachmentController(options) {
         ? options.maxFiles()
         : options.maxFiles || 10,
     )
+    let validation = options.validateFiles?.(files, [...items]) || {}
+    if (validation.error) {
+      options.onError?.(validation.error)
+      return []
+    }
+    files = validation.files || files
     let available = Math.max(maxFiles - items.length, 0)
     if (files.length > available) {
       options.onError?.(`Можно выбрать не более ${maxFiles} вложений.`)
+      return []
     }
-    let validation = options.validateFiles?.(files, [...items]) || {}
-    if (validation.error) options.onError?.(validation.error)
-    files = validation.files || files
-    files = files.slice(0, available)
     if (!files.length) return []
 
     let added = files.map((file) => {

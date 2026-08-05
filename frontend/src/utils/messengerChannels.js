@@ -1,4 +1,5 @@
 import { dayjsLocal } from 'frappe-ui'
+import { isMaxForwardOnlyMessage } from '@/utils/messengerForwarding'
 
 const PLATFORM_LABELS = {
   avito: 'Avito',
@@ -62,8 +63,9 @@ export function getMessengerDateLabel(messageDatetime, now = dayjsLocal()) {
 
 export function buildMessengerMessageItems(messages = [], now = dayjsLocal()) {
   let previousDayKey = ''
+  let result = []
 
-  return messages.map((message) => {
+  messages.forEach((message) => {
     let dayKey = getMessengerDayKey(message?.message_datetime)
     let dateLabel =
       dayKey && dayKey !== previousDayKey
@@ -71,12 +73,51 @@ export function buildMessengerMessageItems(messages = [], now = dayjsLocal()) {
         : ''
     previousDayKey = dayKey
 
-    return {
+    let previous = result.at(-1)
+    let previousMessage = previous?.messages?.at(-1)
+    if (
+      previous &&
+      previous.messages.length < 20 &&
+      canGroupMaxForwards(previousMessage, message)
+    ) {
+      previous.messages.push(message)
+      previous.message = message
+      return
+    }
+
+    result.push({
       message,
+      messages: [message],
       dayKey,
       dateLabel,
-    }
+    })
   })
+
+  return result
+}
+
+function canGroupMaxForwards(previous, current) {
+  if (!isMaxForwardOnlyMessage(previous) || !isMaxForwardOnlyMessage(current)) {
+    return false
+  }
+  if (
+    previous.conversation !== current.conversation ||
+    previous.direction !== current.direction ||
+    forwardSender(previous) !== forwardSender(current) ||
+    getMessengerDayKey(previous.message_datetime) !==
+      getMessengerDayKey(current.message_datetime)
+  ) {
+    return false
+  }
+  let previousTime = getLocalDate(previous.message_datetime)
+  let currentTime = getLocalDate(current.message_datetime)
+  if (!previousTime?.isValid() || !currentTime?.isValid()) return false
+  let difference = currentTime.diff(previousTime, 'millisecond')
+  return difference >= 0 && difference <= 5000
+}
+
+function forwardSender(message) {
+  return String(message?.sender_name || message?.client_name || '')
 }
 
 export function getMessengerChannelType(channel = {}) {

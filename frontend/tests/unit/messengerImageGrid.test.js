@@ -23,7 +23,17 @@ vi.mock('@/components/LeadMessenger/MessengerAudioPlayer.vue', () => ({
 }))
 
 vi.mock('@/components/LeadMessenger/VideoAttachment.vue', () => ({
-  default: { template: '<div data-test-video />' },
+  default: {
+    props: ['attachment'],
+    template: '<div data-test-video :data-id="attachment.id" />',
+  },
+}))
+
+vi.mock('@/components/LeadMessenger/VkLottieSticker.vue', () => ({
+  default: {
+    props: ['attachment'],
+    template: '<div data-test-lottie-sticker :data-id="attachment.id" />',
+  },
 }))
 
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
@@ -160,6 +170,25 @@ describe('messenger image layout', () => {
     expect(root.querySelector('[data-test-video]')).not.toBeNull()
   })
 
+  it('renders videos and following image runs in provider order', () => {
+    let root = mountRenderer([
+      { id: 'V-1', type: 'video', status: 'external' },
+      { id: 'V-2', type: 'video', status: 'external' },
+      image('I-1'),
+    ])
+    let ordered = [
+      ...root.querySelectorAll(
+        '[data-test-video], [data-mixed-single-image-row]',
+      ),
+    ]
+
+    expect(ordered.map((item) => item.dataset.id || 'images')).toEqual([
+      'V-1',
+      'V-2',
+      'images',
+    ])
+  })
+
   it('renders a downloaded MAX sticker and a code-only fallback', () => {
     let root = mountRenderer([
       {
@@ -193,11 +222,49 @@ describe('messenger image layout', () => {
     expect(pending.querySelector('img')).toBeNull()
     expect(pending.querySelector('div').className).toContain('min-h-28')
 
-    let root = mountGrid([image('I-1')])
+    let root = mountRenderer([image('I-1')])
     root.querySelector('[data-single-image]').click()
     await nextTick()
 
     expect(root.querySelector('[data-test-lightbox]')).not.toBeNull()
     expect(root.querySelector('[data-test-lightbox]').dataset.index).toBe('0')
+  })
+
+  it('opens every image in one lightbox across separated visual groups', async () => {
+    let root = mountRenderer([
+      image('I-1'),
+      { id: 'V-1', type: 'video', status: 'external' },
+      image('I-2'),
+      image('I-3'),
+    ])
+    let imageButtons = root.querySelectorAll(
+      '[data-single-image], [data-image-grid] button',
+    )
+
+    imageButtons[1].click()
+    await nextTick()
+
+    let lightbox = root.querySelector('[data-test-lightbox]')
+    expect(lightbox.textContent).toBe('3')
+    expect(lightbox.dataset.index).toBe('1')
+  })
+
+  it('routes animated JSON stickers to the Lottie renderer', () => {
+    let root = mountRenderer([
+      {
+        id: 'VK-STICKER-1',
+        type: 'sticker',
+        status: 'available',
+        mime_type: 'application/json',
+        is_animated: true,
+        url: '/api/sticker',
+        preview_url: '/api/sticker-preview',
+      },
+    ])
+
+    expect(root.querySelector('[data-test-lottie-sticker]')?.dataset.id).toBe(
+      'VK-STICKER-1',
+    )
+    expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
   })
 })
