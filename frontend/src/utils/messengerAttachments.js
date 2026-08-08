@@ -20,6 +20,46 @@ const STATUS_LABELS = {
   unsupported: 'Не поддерживается',
 }
 
+const REPLY_ATTACHMENT_TYPE_ALIASES = {
+  photo: 'image',
+  doc: 'file',
+  document: 'file',
+  audio_message: 'audio',
+  geo: 'location',
+}
+
+const REPLY_ATTACHMENT_LABELS = {
+  image: ['Изображение', 'Изображения'],
+  video: ['Видео', 'Видео'],
+  audio: ['Аудио', 'Аудио'],
+  file: ['Документ', 'Документы'],
+  link: ['Ссылка', 'Ссылки'],
+  sticker: ['Стикер', 'Стикеры'],
+  location: ['Геолокация', 'Геолокации'],
+  contact: ['Контакт', 'Контакты'],
+  unsupported: ['Вложение', 'Вложения'],
+}
+
+export function getMessengerReplyAttachmentLabel(snapshot = {}) {
+  let attachmentTypes = Array.isArray(snapshot.attachment_types)
+    ? snapshot.attachment_types.filter(Boolean)
+    : []
+  if (!attachmentTypes.length && snapshot.message_type !== 'text') {
+    attachmentTypes = snapshot.message_type ? [snapshot.message_type] : []
+  }
+  if (!attachmentTypes.length) return ''
+
+  let normalizedTypes = attachmentTypes.map((type) => {
+    type = String(type).trim().toLowerCase()
+    type = REPLY_ATTACHMENT_TYPE_ALIASES[type] || type
+    return REPLY_ATTACHMENT_LABELS[type] ? type : 'unsupported'
+  })
+  if (new Set(normalizedTypes).size > 1) return 'Вложения'
+
+  let labels = REPLY_ATTACHMENT_LABELS[normalizedTypes[0]]
+  return labels[attachmentTypes.length > 1 ? 1 : 0]
+}
+
 export function groupMessengerAttachments(attachments = []) {
   return attachments.reduce(
     (groups, attachment) => {

@@ -222,12 +222,27 @@ export function getMessengerConversationNotice(conversation = {}) {
 export function getMessengerCapabilities(channel = {}) {
   let video = channel?.capabilities?.video || {}
   let voice = channel?.capabilities?.voice || {}
+  let reactions = channel?.capabilities?.reactions || {}
+  let location = channel?.capabilities?.location || {}
+  let contact = channel?.capabilities?.contact || {}
   return {
     can_start_conversation:
       channel?.capabilities?.can_start_conversation ?? true,
     requires_inbound: Boolean(channel?.capabilities?.requires_inbound),
     requires_phone: Boolean(channel?.capabilities?.requires_phone),
     supports_attachments: Boolean(channel?.capabilities?.supports_attachments),
+    reactions: {
+      receive: Boolean(reactions.receive),
+      send: Boolean(reactions.send),
+    },
+    location: {
+      receive: Boolean(location.receive),
+      send: Boolean(location.send),
+    },
+    contact: {
+      receive: Boolean(contact.receive),
+      send: Boolean(contact.send),
+    },
     supported_attachment_types:
       channel?.capabilities?.supported_attachment_types || [],
     max_attachment_count: Math.max(
