@@ -16,6 +16,7 @@
 </template>
 
 <script setup>
+import { getMessengerReplyAttachmentLabel } from '@/utils/messengerAttachments'
 import { computed } from 'vue'
 
 const props = defineProps({
@@ -47,11 +48,12 @@ const body = computed(() => {
   if (props.context?.state === 'deleted') return __('Сообщение удалено')
   let snapshot = props.context?.snapshot || {}
   if (snapshot.text) return snapshot.text
-  if (snapshot.forwarded_content_kind === 'attachment') return __('Вложение')
   if (snapshot.forwarded_content_kind === 'message') {
     return __('Пересланное сообщение')
   }
-  if (snapshot.attachment_types?.length) return __('Вложение')
+  let attachmentLabel = getMessengerReplyAttachmentLabel(snapshot)
+  if (attachmentLabel) return __(attachmentLabel)
+  if (snapshot.forwarded_content_kind === 'attachment') return __('Вложение')
   return __('Исходное сообщение недоступно')
 })
 </script>

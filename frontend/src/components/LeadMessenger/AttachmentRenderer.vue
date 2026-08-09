@@ -81,6 +81,14 @@
         :playback-scope="playbackScope"
         :provider="provider"
       />
+      <LocationAttachment
+        v-else-if="segment.type === 'location'"
+        :attachment="segment.attachment"
+      />
+      <ContactAttachment
+        v-else-if="segment.type === 'contact'"
+        :contact="segment.attachment.contact"
+      />
       <AttachmentCard v-else :attachment="segment.attachment" />
     </template>
     <ImageLightbox
@@ -100,9 +108,11 @@ import {
 } from '@/utils/messengerAttachments'
 import { computed, ref } from 'vue'
 import AttachmentCard from './AttachmentCard.vue'
+import ContactAttachment from './ContactAttachment.vue'
 import ImageGrid from './ImageGrid.vue'
 import ImageLightbox from './ImageLightbox.vue'
 import MessengerAudioPlayer from './MessengerAudioPlayer.vue'
+import LocationAttachment from './LocationAttachment.vue'
 import VideoAttachment from './VideoAttachment.vue'
 import VkLottieSticker from './VkLottieSticker.vue'
 
@@ -151,8 +161,6 @@ function isImageSticker(attachment) {
 }
 
 function isLottieSticker(attachment) {
-  return (
-    attachment.mime_type === 'application/json' && attachment.is_animated
-  )
+  return attachment.mime_type === 'application/json' && attachment.is_animated
 }
 </script>

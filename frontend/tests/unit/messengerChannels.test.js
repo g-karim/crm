@@ -161,9 +161,11 @@ describe('messengerChannels', () => {
         provider_history_cleared_at: '2026-07-30 18:00:00',
       }),
     ).toMatchObject({ type: 'info', blocksSend: false })
-    expect(
-      getMessengerConversationNotice({ provider: 'vk_direct' }),
-    ).toEqual({ type: '', message: '', blocksSend: false })
+    expect(getMessengerConversationNotice({ provider: 'vk_direct' })).toEqual({
+      type: '',
+      message: '',
+      blocksSend: false,
+    })
   })
 
   it('reads provider capabilities with safe defaults', () => {
@@ -174,6 +176,9 @@ describe('messengerChannels', () => {
       supports_attachments: false,
       supported_attachment_types: [],
       max_attachment_count: 10,
+      reactions: { receive: false, send: false },
+      location: { receive: false, send: false },
+      contact: { receive: false, send: false },
       voice: {
         send: false,
         max_duration_seconds: 300,
@@ -196,6 +201,9 @@ describe('messengerChannels', () => {
           requires_phone: false,
           supports_attachments: true,
           supported_attachment_types: ['image', 'file'],
+          reactions: { receive: true, send: true },
+          location: { receive: true, send: true },
+          contact: { receive: true, send: false },
           voice: {
             send: true,
             max_duration_seconds: 120,
@@ -211,6 +219,9 @@ describe('messengerChannels', () => {
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
       max_attachment_count: 10,
+      reactions: { receive: true, send: true },
+      location: { receive: true, send: true },
+      contact: { receive: true, send: false },
       voice: {
         send: true,
         max_duration_seconds: 120,

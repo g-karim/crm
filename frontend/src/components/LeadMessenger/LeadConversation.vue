@@ -133,6 +133,7 @@
                       : 'bg-surface-gray-1 text-ink-gray-9',
                     messageBubbleWidthClass(item.message),
                   ]"
+                  @contextmenu="openReactionPicker(item.message, $event)"
                 >
                   <span
                     v-for="groupMessage in item.messages.slice(0, -1)"
@@ -167,8 +168,7 @@
                   <MessageForwardStack
                     v-for="groupMessage in item.messages.filter(
                       (message) =>
-                        message.status !== 'deleted' &&
-                        message.forward_context,
+                        message.status !== 'deleted' && message.forward_context,
                     )"
                     :key="`forward:${groupMessage.name}`"
                     class="mb-2 last:mb-0"
@@ -199,6 +199,25 @@
                     :attachments="item.message.attachments"
                     :playback-scope="videoPlaybackScope"
                     :provider="item.message.provider"
+                  />
+                  <MessageReactions
+                    v-if="
+                      item.message.status !== 'deleted' &&
+                      item.message.channel_info?.capabilities?.reactions
+                        ?.receive
+                    "
+                    :ref="
+                      (component) =>
+                        setReactionComponent(item.message.name, component)
+                    "
+                    :message="item.message"
+                    :can-send="
+                      Boolean(
+                        item.message.channel_info?.capabilities?.reactions
+                          ?.send,
+                      )
+                    "
+                    @changed="handleReactionsChanged(item.message, $event)"
                   />
                   <MessageFooterMetadata :message="item.message" />
                   <div
@@ -284,7 +303,7 @@
           v-model="draftText"
           class="mb-2 min-h-20 w-full"
           :rows="3"
-          :disabled="baseSendDisabled"
+          :disabled="baseSendDisabled || Boolean(pendingLocation)"
           :placeholder="__('Введите сообщение...')"
           @keydown.enter.stop="sendOnEnter"
           @paste.stop="handleComposerPaste"
@@ -294,9 +313,24 @@
           :supportsAttachments="selectedCapabilities.supports_attachments"
           :channelType="selectedChannelType"
           :maxFiles="selectedCapabilities.max_attachment_count"
-          :disabled="voiceActive"
+          :disabled="voiceActive || Boolean(pendingLocation)"
           @change="pendingAttachments = $event"
         />
+        <div
+          v-if="pendingLocation"
+          class="mb-2 flex items-center justify-between rounded-md border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-sm"
+        >
+          <span class="tabular-nums">
+            {{ pendingLocation.latitude.toFixed(6) }},
+            {{ pendingLocation.longitude.toFixed(6) }}
+          </span>
+          <Button
+            variant="ghost"
+            icon="x"
+            :aria-label="__('Удалить геопозицию')"
+            @click="pendingLocation = null"
+          />
+        </div>
         <ComposerVoiceRecorder
           v-if="selectedCapabilities.voice.send"
           ref="voiceRecorder"
@@ -305,7 +339,11 @@
           reference-doctype="CRM Lead"
           :reference-name="props.leadName"
           :reply-to-message="replyTarget?.name || ''"
-          :disabled="baseSendDisabled || Boolean(pendingAttachments.length)"
+          :disabled="
+            baseSendDisabled ||
+            Boolean(pendingAttachments.length) ||
+            Boolean(pendingLocation)
+          "
           :show-trigger="false"
           :max-duration-seconds="
             selectedCapabilities.voice.max_duration_seconds
@@ -351,9 +389,24 @@
               :disabled="
                 baseSendDisabled ||
                 voiceActive ||
-                Boolean(pendingAttachments.length)
+                Boolean(pendingAttachments.length) ||
+                Boolean(pendingLocation)
               "
               @click="voiceRecorder?.start()"
+            />
+            <Button
+              v-if="selectedCapabilities.location.send"
+              variant="ghost"
+              icon="map-pin"
+              :aria-label="__('Добавить геопозицию')"
+              :disabled="
+                baseSendDisabled ||
+                voiceActive ||
+                Boolean(pendingAttachments.length) ||
+                Boolean(draftText.trim()) ||
+                Boolean(replyTarget)
+              "
+              @click="locationPickerOpen = true"
             />
             <Button
               v-if="selectedCapabilities.supports_attachments"
@@ -362,6 +415,7 @@
               :disabled="
                 baseSendDisabled ||
                 voiceActive ||
+                Boolean(pendingLocation) ||
                 pendingAttachments.length >=
                   selectedCapabilities.max_attachment_count
               "
@@ -375,7 +429,9 @@
               :disabled="
                 sendDisabled ||
                 voiceActive ||
-                (!draftText.trim() && !pendingAttachments.length)
+                (!draftText.trim() &&
+                  !pendingAttachments.length &&
+                  !pendingLocation)
               "
               @click="sendMessage"
             />
@@ -383,6 +439,11 @@
         </div>
       </div>
     </div>
+    <LocationPickerDialog
+      v-model="locationPickerOpen"
+      :location="pendingLocation"
+      @select="selectLocation"
+    />
   </div>
 </template>
 
@@ -392,10 +453,12 @@ import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
 import ComposerAttachments from '@/components/LeadMessenger/ComposerAttachments.vue'
 import ComposerVoiceRecorder from '@/components/LeadMessenger/ComposerVoiceRecorder.vue'
+import LocationPickerDialog from '@/components/LeadMessenger/LocationPickerDialog.vue'
 import MessageContent from '@/components/LeadMessenger/MessageContent.vue'
 import MessageFooterMetadata from '@/components/LeadMessenger/MessageFooterMetadata.vue'
 import MessageForwardStack from '@/components/LeadMessenger/MessageForwardStack.vue'
 import MessageMetadata from '@/components/LeadMessenger/MessageMetadata.vue'
+import MessageReactions from '@/components/LeadMessenger/MessageReactions.vue'
 import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
 import { globalStore } from '@/stores/global'
 import {
@@ -460,6 +523,8 @@ const draftText = ref('')
 const clientRequestId = ref('')
 const clientRequestFingerprint = ref('')
 const pendingAttachments = ref([])
+const pendingLocation = ref(null)
+const locationPickerOpen = ref(false)
 const voiceActive = ref(false)
 const sendWarning = ref('')
 const genericError = ref('')
@@ -480,6 +545,7 @@ const messageActionState = ref({
   errors: {},
 })
 const messageEditorElements = new Map()
+const reactionComponents = new Map()
 let typingTimer = null
 let highlightTimer = null
 
@@ -795,6 +861,15 @@ watch(
   () => initialize(true),
 )
 
+watch(
+  () => selectedCapabilities.value.location.send,
+  (supported) => {
+    if (supported) return
+    pendingLocation.value = null
+    locationPickerOpen.value = false
+  },
+)
+
 async function initialize(leadChanged = false) {
   genericError.value = ''
   sendWarning.value = ''
@@ -807,6 +882,7 @@ async function initialize(leadChanged = false) {
     selectedConversationName.value = ''
     handoffTargetChannel.value = ''
     draftText.value = ''
+    pendingLocation.value = null
     composerAttachments.value?.clear()
     clientRequestId.value = ''
     clientRequestFingerprint.value = ''
@@ -929,10 +1005,20 @@ async function sendMessage() {
   let text = draftText.value.trim()
   if (
     voiceActive.value ||
-    (!text && !pendingAttachments.value.length) ||
+    (!text && !pendingAttachments.value.length && !pendingLocation.value) ||
     sendDisabled.value
   )
     return
+
+  if (
+    pendingLocation.value &&
+    (text || pendingAttachments.value.length || replyTarget.value)
+  ) {
+    genericError.value = __(
+      'Геолокацию можно отправить только отдельным сообщением.',
+    )
+    return
+  }
 
   genericError.value = ''
   sendWarning.value = ''
@@ -948,6 +1034,7 @@ async function sendMessage() {
       channel: selectedChannel.value,
       text,
       attachments: attachmentNames,
+      location: pendingLocation.value,
       reply: replyTarget.value?.name || '',
     })
     if (
@@ -963,6 +1050,7 @@ async function sendMessage() {
       channel: selectedChannel.value,
       client_request_id: clientRequestId.value,
       attachments: attachmentNames,
+      location: pendingLocation.value || undefined,
       reply_to_message: replyTarget.value?.name || undefined,
       reference_doctype: 'CRM Lead',
       reference_name: props.leadName,
@@ -981,6 +1069,7 @@ async function sendMessage() {
     } else {
       draftText.value = ''
       composerAttachments.value?.clear()
+      pendingLocation.value = null
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
       cancelReply()
@@ -1050,7 +1139,11 @@ async function prepareHandoff() {
     genericError.value = __('Выберите конкретный внешний чат.')
     return
   }
-  if (draftText.value.trim() || pendingAttachments.value.length) {
+  if (
+    draftText.value.trim() ||
+    pendingAttachments.value.length ||
+    pendingLocation.value
+  ) {
     genericError.value = __(
       'Очистите текущий черновик и вложения перед подготовкой перехода.',
     )
@@ -1160,12 +1253,12 @@ function sendOnEnter(event) {
 }
 
 function handleComposerPaste(event) {
-  if (voiceActive.value) return
+  if (voiceActive.value || pendingLocation.value) return
   composerAttachments.value?.handlePaste(event)
 }
 
 function handleComposerDragOver(event) {
-  if (voiceActive.value) return
+  if (voiceActive.value || pendingLocation.value) return
   if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return
   event.preventDefault()
   draggingFiles.value = true
@@ -1173,7 +1266,7 @@ function handleComposerDragOver(event) {
 
 function handleComposerDrop(event) {
   draggingFiles.value = false
-  if (voiceActive.value) return
+  if (voiceActive.value || pendingLocation.value) return
   composerAttachments.value?.handleDrop(event)
 }
 
@@ -1217,6 +1310,12 @@ async function handleMessagesScroll() {
 
 function startReply(message) {
   if (!message?.can_reply || messageActionState.value.pendingMessage) return
+  if (pendingLocation.value) {
+    genericError.value = __(
+      'Удалите геолокацию перед подготовкой ответа.',
+    )
+    return
+  }
   let conversation = resolveMessengerReplyConversation(
     conversations.value,
     message,
@@ -1235,6 +1334,20 @@ function startReply(message) {
 
 function cancelReply() {
   replyTarget.value = null
+}
+
+function selectLocation(location) {
+  if (
+    draftText.value.trim() ||
+    pendingAttachments.value.length ||
+    replyTarget.value
+  ) {
+    genericError.value = __(
+      'Геолокацию можно отправить только отдельным сообщением.',
+    )
+    return
+  }
+  pendingLocation.value = location
 }
 
 function retryMessage(message) {
@@ -1353,6 +1466,23 @@ function messageBubbleWidthClass(message) {
 
 function messageFailureReason(message) {
   return message.failure_reason || message.error || ''
+}
+
+function handleReactionsChanged(message, reactionState) {
+  message.reactions = reactionState
+  messageSync.syncDelta().catch(() => {})
+}
+
+function setReactionComponent(messageName, component) {
+  if (component) reactionComponents.set(messageName, component)
+  else reactionComponents.delete(messageName)
+}
+
+function openReactionPicker(message, event) {
+  if (message.status === 'deleted') return
+  if (!message.channel_info?.capabilities?.reactions?.send) return
+  if (reactionComponents.get(message.name)?.openPicker(event))
+    event.preventDefault()
 }
 
 function messageStatusNoteClass(message) {

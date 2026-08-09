@@ -18,6 +18,21 @@ vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
   },
 }))
 
+vi.mock('@/components/LeadMessenger/ContactAttachment.vue', () => ({
+  default: {
+    props: ['contact'],
+    template: '<div data-test-contact>{{ contact.display_name }}</div>',
+  },
+}))
+
+vi.mock('@/components/LeadMessenger/LocationAttachment.vue', () => ({
+  default: {
+    props: ['attachment'],
+    template:
+      '<div data-test-location>{{ attachment.location.latitude }}</div>',
+  },
+}))
+
 vi.mock('@/components/LeadMessenger/MessengerAudioPlayer.vue', () => ({
   default: { template: '<div data-test-audio />' },
 }))

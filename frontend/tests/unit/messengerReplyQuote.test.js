@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
 import { getForwardedContentKind } from '@/utils/messengerForwarding'
 
@@ -119,5 +119,78 @@ describe('message reply quote', () => {
     })
     expect(root.textContent).toContain('Комментарий отправителя')
     expect(root.textContent).not.toContain('Вложение')
+  })
+
+  it.each([
+    ['image', 'Изображение'],
+    ['photo', 'Изображение'],
+    ['video', 'Видео'],
+    ['audio', 'Аудио'],
+    ['audio_message', 'Аудио'],
+    ['file', 'Документ'],
+    ['doc', 'Документ'],
+    ['document', 'Документ'],
+    ['link', 'Ссылка'],
+    ['sticker', 'Стикер'],
+    ['location', 'Геолокация'],
+    ['geo', 'Геолокация'],
+    ['contact', 'Контакт'],
+    ['unsupported', 'Вложение'],
+    ['provider-specific', 'Вложение'],
+  ])('labels a single %s attachment as %s', (type, label) => {
+    let root = mount({
+      message: 'MSG-ATTACHMENT',
+      state: 'available',
+      snapshot: { attachment_types: [type] },
+    })
+
+    expect(root.textContent).toContain(label)
+  })
+
+  it.each([
+    ['image', 'Изображения'],
+    ['photo', 'Изображения'],
+    ['video', 'Видео'],
+    ['audio_message', 'Аудио'],
+    ['doc', 'Документы'],
+    ['link', 'Ссылки'],
+    ['sticker', 'Стикеры'],
+    ['geo', 'Геолокации'],
+    ['contact', 'Контакты'],
+    ['provider-specific', 'Вложения'],
+  ])('labels repeated %s attachments as %s', (type, label) => {
+    let root = mount({
+      message: 'MSG-ATTACHMENTS',
+      state: 'available',
+      snapshot: { attachment_types: [type, type] },
+    })
+
+    expect(root.textContent).toContain(label)
+  })
+
+  it('labels mixed attachments generically', () => {
+    let root = mount({
+      message: 'MSG-MIXED',
+      state: 'available',
+      snapshot: { attachment_types: ['photo', 'doc'] },
+    })
+
+    expect(root.textContent).toContain('Вложения')
+  })
+
+  it('uses a normalized or legacy message type when attachment types are absent', () => {
+    let contact = mount({
+      message: 'MSG-CONTACT',
+      state: 'available',
+      snapshot: { message_type: 'contact' },
+    })
+    let photo = mount({
+      message: 'MSG-PHOTO',
+      state: 'available',
+      snapshot: { message_type: 'photo' },
+    })
+
+    expect(contact.textContent).toContain('Контакт')
+    expect(photo.textContent).toContain('Изображение')
   })
 })
