@@ -5,6 +5,7 @@
     type="button"
     class="inline-flex max-w-full justify-self-start overflow-hidden rounded-md bg-surface-gray-2 text-left"
     :class="getSingleImageMediaWidthClass(singleImage)"
+    :style="singleImageStyle"
     :disabled="!singleImage.url || !getAttachmentState(singleImage).active"
     @click="open(singleImage)"
   >
@@ -14,7 +15,7 @@
       :alt="singleImage.file_name || __('Изображение')"
       :width="imageDimension(singleImage.width)"
       :height="imageDimension(singleImage.height)"
-      class="block h-auto w-full max-w-full object-contain"
+      class="block h-auto max-h-[22.5rem] w-full max-w-full object-contain"
       loading="lazy"
     />
     <div
@@ -33,7 +34,7 @@
   <div
     v-else-if="images.length"
     data-image-grid
-    class="grid w-[min(28rem,calc(100vw-3rem))] max-w-full grid-cols-2 gap-1 overflow-hidden rounded-lg"
+    class="grid w-[min(20rem,calc(100vw-3rem))] max-w-full grid-cols-2 gap-1 overflow-hidden rounded-lg"
   >
     <button
       v-for="(image, index) in visibleImages"
@@ -76,6 +77,7 @@
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import {
   getAttachmentState,
+  getCompactMediaDimensions,
   getImageGridCellClass,
   getSingleImageMediaWidthClass,
   visibleImageAttachments,
@@ -90,6 +92,20 @@ const emit = defineEmits(['open-image'])
 const singleImage = computed(() =>
   props.images.length === 1 ? props.images[0] : null,
 )
+const singleImageStyle = computed(() => {
+  if (!singleImage.value) return undefined
+  let dimensions = getCompactMediaDimensions(singleImage.value)
+  let style = {
+    width: `${dimensions.width}px`,
+    maxWidth: '100%',
+  }
+  if (
+    Number(singleImage.value.width) > 0 &&
+    Number(singleImage.value.height) > 0
+  )
+    style.aspectRatio = String(dimensions.ratio)
+  return style
+})
 const visibleImages = computed(() => visibleImageAttachments(props.images))
 
 function open(image) {

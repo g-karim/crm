@@ -3,9 +3,7 @@
     v-if="attachments.length"
     data-attachment-renderer
     class="mt-2 grid max-w-full gap-2"
-    :class="
-      singleImage ? 'w-full' : hasVideo ? 'w-[28rem]' : 'w-full max-w-[28rem]'
-    "
+    :class="singleImage ? 'w-full' : 'w-full max-w-[20rem]'"
   >
     <template v-for="segment in segments" :key="segment.key">
       <div
@@ -126,9 +124,6 @@ const segments = computed(() =>
 )
 const singleImage = computed(() =>
   isSingleImageAttachmentSet(props.attachments),
-)
-const hasVideo = computed(() =>
-  props.attachments.some((attachment) => attachment.type === 'video'),
 )
 const availableImages = computed(() =>
   props.attachments.filter(

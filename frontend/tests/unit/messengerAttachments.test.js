@@ -4,6 +4,7 @@ import {
   formatAttachmentDuration,
   getAttachmentAction,
   getAttachmentState,
+  getCompactMediaDimensions,
   getVideoPlaybackUrl,
   getImageGridCellClass,
   getSingleImageBubbleWidthClass,
@@ -74,30 +75,35 @@ describe('messenger attachment contract v1', () => {
     )
   })
 
-  it('selects presentation width from image orientation, not intrinsic size', () => {
+  it('uses content-sized bubble classes for compact media', () => {
     expect(getSingleImageBubbleWidthClass({ width: 100, height: 200 })).toBe(
-      'w-[18rem]',
+      'w-fit max-w-full',
     )
-    expect(getSingleImageBubbleWidthClass({ width: 64, height: 64 })).toBe(
-      'w-[24rem]',
-    )
-    expect(getSingleImageBubbleWidthClass({ width: 400, height: 200 })).toBe(
-      'w-[29.5rem]',
-    )
-    expect(getSingleImageBubbleWidthClass({ width: 100, height: 95 })).toBe(
-      'w-[24rem]',
-    )
-    expect(getSingleImageBubbleWidthClass({})).toBe('w-[24rem]')
-
+    expect(getSingleImageBubbleWidthClass({})).toBe('w-fit max-w-full')
     expect(getSingleImageMediaWidthClass({ width: 100, height: 200 })).toBe(
-      'w-[16.5rem]',
+      'max-w-full',
     )
-    expect(getSingleImageMediaWidthClass({ width: 64, height: 64 })).toBe(
-      'w-[22.5rem]',
-    )
-    expect(getSingleImageMediaWidthClass({ width: 400, height: 200 })).toBe(
-      'w-[28rem]',
-    )
+  })
+
+  it('fits portrait, square and landscape media inside 320 by 360 pixels', () => {
+    expect(getCompactMediaDimensions({ width: 100, height: 200 })).toEqual({
+      ratio: 0.5,
+      width: 180,
+      height: 360,
+    })
+    expect(getCompactMediaDimensions({ width: 64, height: 64 })).toEqual({
+      ratio: 1,
+      width: 320,
+      height: 320,
+    })
+    expect(getCompactMediaDimensions({ width: 400, height: 200 })).toEqual({
+      ratio: 2,
+      width: 320,
+      height: 160,
+    })
+    expect(
+      getCompactMediaDimensions({ width: 9, height: 16 }).height,
+    ).toBeLessThanOrEqual(360)
   })
 
   it('builds grid layouts for two, three, four and more images', () => {

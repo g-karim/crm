@@ -97,21 +97,22 @@ function mountRenderer(attachments) {
 }
 
 describe('messenger image layout', () => {
-  it('scales a small single-image preview to the presentation width', () => {
+  it('scales a small single-image preview inside the compact media bounds', () => {
     let root = mountGrid([image('I-1')])
     let wrapper = root.querySelector('[data-single-image]')
     let media = wrapper.querySelector('img')
 
     expect(root.querySelector('[data-image-grid]')).toBeNull()
-    expect(wrapper.className).toContain('w-[22.5rem]')
     expect(wrapper.className).toContain('max-w-full')
     expect(wrapper.className).toContain('rounded-md')
+    expect(wrapper.style.width).toBe('320px')
+    expect(wrapper.style.aspectRatio).toBe('1 / 1')
     expect(media.getAttribute('width')).toBe('64')
     expect(media.getAttribute('height')).toBe('64')
     expect(media.className).toContain('w-full')
     expect(media.className).toContain('h-auto')
     expect(media.className).not.toContain('w-auto')
-    expect(media.className).not.toContain('max-h-[22rem]')
+    expect(media.className).toContain('max-h-[22.5rem]')
     expect(media.className).not.toContain('size-full')
     expect(media.className).not.toContain('object-cover')
   })
@@ -131,7 +132,7 @@ describe('messenger image layout', () => {
     let media = root.querySelector('[data-single-image]')
     let document = root.querySelector('[data-test-attachment-card]')
 
-    expect(renderer.className).toContain('max-w-[28rem]')
+    expect(renderer.className).toContain('max-w-[20rem]')
     expect(mediaRow.className).toContain('justify-center')
     expect(mediaRow.querySelectorAll('[data-media-side-line]')).toHaveLength(2)
     expect(
@@ -139,7 +140,8 @@ describe('messenger image layout', () => {
         line.className.includes('bg-outline-gray-1'),
       ),
     ).toBe(true)
-    expect(media.className).toContain('w-[16.5rem]')
+    expect(media.style.width).toBe('180px')
+    expect(media.style.aspectRatio).toBe('0.5 / 1')
     expect(media.className).toContain('justify-self-start')
     expect(media.querySelector('img').className).toContain('h-auto')
     expect(media.querySelector('img').className).not.toContain('object-cover')
@@ -158,7 +160,7 @@ describe('messenger image layout', () => {
 
     expect(root.querySelector('[data-single-image]')).toBeNull()
     expect(grid.className).toContain('grid-cols-2')
-    expect(grid.className).toContain('w-[min(28rem,calc(100vw-3rem))]')
+    expect(grid.className).toContain('w-[min(20rem,calc(100vw-3rem))]')
     expect(grid.querySelectorAll('button')).toHaveLength(4)
     expect(media.every((item) => item.className.includes('object-cover'))).toBe(
       true,
@@ -166,7 +168,7 @@ describe('messenger image layout', () => {
     expect(grid.textContent).toContain('+1')
   })
 
-  it('reserves the full presentation width before video playback starts', () => {
+  it('reserves the compact presentation width before video playback starts', () => {
     let root = mountRenderer([
       {
         id: 'MAX-VIDEO-1',
@@ -179,9 +181,9 @@ describe('messenger image layout', () => {
     ])
     let renderer = root.querySelector('[data-attachment-renderer]')
 
-    expect(renderer.className).toContain('w-[28rem]')
+    expect(renderer.className).toContain('max-w-[20rem]')
     expect(renderer.className).toContain('max-w-full')
-    expect(renderer.className.split(/\s+/)).not.toContain('w-full')
+    expect(renderer.className.split(/\s+/)).toContain('w-full')
     expect(root.querySelector('[data-test-video]')).not.toBeNull()
   })
 

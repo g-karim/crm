@@ -101,28 +101,29 @@ export function isSingleImageAttachmentSet(attachments = []) {
 }
 
 export function getSingleImageBubbleWidthClass(image = {}) {
-  let orientation = getImagePresentationOrientation(image)
-  if (orientation === 'portrait') return 'w-[18rem]'
-  if (orientation === 'landscape') return 'w-[29.5rem]'
-  return 'w-[24rem]'
+  return 'w-fit max-w-full'
 }
 
 export function getSingleImageMediaWidthClass(image = {}) {
-  let orientation = getImagePresentationOrientation(image)
-  if (orientation === 'portrait') return 'w-[16.5rem]'
-  if (orientation === 'landscape') return 'w-[28rem]'
-  return 'w-[22.5rem]'
+  return 'max-w-full'
 }
 
-function getImagePresentationOrientation(image = {}) {
-  let width = Number(image.width || 0)
-  let height = Number(image.height || 0)
-  if (!width || !height) return 'square'
-
-  let ratio = width / height
-  if (ratio < 0.9) return 'portrait'
-  if (ratio > 1.1) return 'landscape'
-  return 'square'
+export function getCompactMediaDimensions(
+  media = {},
+  maxWidth = 320,
+  maxHeight = 360,
+) {
+  let width = Number(media.width || 0)
+  let height = Number(media.height || 0)
+  let ratio = width > 0 && height > 0 ? width / height : 16 / 9
+  if (!Number.isFinite(ratio) || ratio <= 0) ratio = 16 / 9
+  ratio = Math.min(Math.max(ratio, 0.4), 4)
+  let displayWidth = Math.min(maxWidth, maxHeight * ratio)
+  return {
+    ratio,
+    width: Math.round(displayWidth * 100) / 100,
+    height: Math.round((displayWidth / ratio) * 100) / 100,
+  }
 }
 
 export function getAttachmentState(attachment = {}) {

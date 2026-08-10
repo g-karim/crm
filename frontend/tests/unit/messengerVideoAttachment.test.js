@@ -42,6 +42,37 @@ function mountVideo(attachment, provider = '') {
 }
 
 describe('external messenger video', () => {
+  it('keeps portrait and landscape previews inside 320 by 360 pixels', () => {
+    let portrait = mountVideo({
+      id: 'VIDEO-PORTRAIT',
+      type: 'video',
+      status: 'external',
+      video_source: 'external',
+      preview_url: '/api/portrait-preview',
+      width: 1080,
+      height: 1920,
+    })
+    let landscape = mountVideo({
+      id: 'VIDEO-LANDSCAPE',
+      type: 'video',
+      status: 'external',
+      video_source: 'external',
+      preview_url: '/api/landscape-preview',
+      width: 1920,
+      height: 1080,
+    })
+
+    expect(portrait.firstElementChild.style.width).toBe('202.5px')
+    expect(portrait.firstElementChild.style.maxWidth).toBe('100%')
+    expect(portrait.querySelector('[data-video-frame]').style.aspectRatio).toBe(
+      '0.5625 / 1',
+    )
+    expect(landscape.firstElementChild.style.width).toBe('320px')
+    expect(
+      landscape.querySelector('[data-video-frame]').style.aspectRatio,
+    ).toBe(`${1920 / 1080} / 1`)
+  })
+
   it('shows the saved preview and metadata with a neutral source action', () => {
     let root = mountVideo({
       id: 'VIDEO-1',

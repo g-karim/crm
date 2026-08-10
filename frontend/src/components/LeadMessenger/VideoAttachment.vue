@@ -1,6 +1,7 @@
 <template>
   <div
-    class="w-full max-w-[28rem] overflow-hidden rounded-lg bg-surface-gray-2"
+    class="max-w-full overflow-hidden rounded-lg bg-surface-gray-2"
+    :style="mediaContainerStyle"
   >
     <div
       v-if="mode === 'local'"
@@ -145,6 +146,7 @@ import {
   formatAttachmentDuration,
   getAttachmentAction,
   getAttachmentState,
+  getCompactMediaDimensions,
   getVideoPlaybackUrl,
 } from '@/utils/messengerAttachments'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
@@ -165,6 +167,8 @@ const loading = ref(false)
 const localFailed = ref(false)
 const previewFailed = ref(false)
 const actualDurationMs = ref(0)
+const actualWidth = ref(0)
+const actualHeight = ref(0)
 const state = computed(() => getAttachmentState(props.attachment))
 const playbackUrl = computed(() => {
   if (
@@ -202,13 +206,19 @@ const duration = computed(() =>
     actualDurationMs.value || props.attachment.duration_ms,
   ),
 )
-const mediaAspectStyle = computed(() => {
-  let width = Number(props.attachment.width || 0)
-  let height = Number(props.attachment.height || 0)
-  let ratio = width > 0 && height > 0 ? width / height : 16 / 9
-  if (!Number.isFinite(ratio) || ratio <= 0) ratio = 16 / 9
-  return { aspectRatio: String(Math.min(Math.max(ratio, 0.5), 2)) }
-})
+const mediaDimensions = computed(() =>
+  getCompactMediaDimensions({
+    width: actualWidth.value || props.attachment.width,
+    height: actualHeight.value || props.attachment.height,
+  }),
+)
+const mediaContainerStyle = computed(() => ({
+  width: `${mediaDimensions.value.width}px`,
+  maxWidth: '100%',
+}))
+const mediaAspectStyle = computed(() => ({
+  aspectRatio: String(mediaDimensions.value.ratio),
+}))
 const actionLabel = computed(() =>
   props.provider === 'vk_direct'
     ? __('Смотреть в VK Видео')
@@ -268,6 +278,8 @@ function handleLocalError() {
 
 function handleLoadedMetadata(event) {
   const seconds = Number(event.currentTarget?.duration)
+  actualWidth.value = Number(event.currentTarget?.videoWidth || 0)
+  actualHeight.value = Number(event.currentTarget?.videoHeight || 0)
   actualDurationMs.value =
     Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0
 }
@@ -295,6 +307,8 @@ watch(
   () => [props.attachment.id, playbackUrl.value],
   () => {
     actualDurationMs.value = 0
+    actualWidth.value = 0
+    actualHeight.value = 0
     previewFailed.value = false
   },
 )
