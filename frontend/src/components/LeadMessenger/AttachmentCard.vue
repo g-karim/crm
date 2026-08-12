@@ -23,7 +23,7 @@
     </div>
     <div class="min-w-0 flex-1">
       <div class="truncate text-sm font-medium text-ink-gray-8">
-        {{ title }}
+        {{ __(title) }}
       </div>
       <div
         class="mt-0.5 flex flex-wrap gap-x-2 text-xs"
@@ -41,6 +41,7 @@
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import {
   formatAttachmentSize,
+  getMessengerAttachmentTitle,
   getAttachmentAction,
   getAttachmentState,
 } from '@/utils/messengerAttachments'
@@ -60,13 +61,7 @@ const props = defineProps({
 const state = computed(() => getAttachmentState(props.attachment))
 const action = computed(() => getAttachmentAction(props.attachment))
 const size = computed(() => formatAttachmentSize(props.attachment.size_bytes))
-const title = computed(
-  () =>
-    props.attachment.title ||
-    props.attachment.fallback_text ||
-    props.attachment.file_name ||
-    fallbackTitle(props.attachment.type),
-)
+const title = computed(() => getMessengerAttachmentTitle(props.attachment))
 const cardIcon = computed(() => {
   if (props.icon === 'sticker') return StickerIcon
   if (props.attachment.type === 'link') return LinkIcon
@@ -74,12 +69,4 @@ const cardIcon = computed(() => {
   if (props.attachment.type === 'unsupported') return CircleHelpIcon
   return FileIcon
 })
-
-function fallbackTitle(type) {
-  if (type === 'video') return __('Видео')
-  if (type === 'link') return __('Ссылка')
-  if (type === 'sticker') return __('Стикер')
-  if (type === 'unsupported') return __('Неподдерживаемое вложение')
-  return __('Файл')
-}
 </script>

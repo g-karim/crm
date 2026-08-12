@@ -122,6 +122,9 @@ describe('VK Lottie sticker', () => {
     expect(root.querySelector('img')?.getAttribute('src')).toBe(
       '/api/sticker-preview',
     )
+    expect(root.firstElementChild.getAttribute('aria-label')).toBe('Стикер')
+    expect(root.querySelector('img')?.getAttribute('alt')).toBe('Стикер')
+    expect(root.textContent).not.toContain('sticker.json')
   })
 
   it('rejects animations with external assets and keeps the preview', async () => {

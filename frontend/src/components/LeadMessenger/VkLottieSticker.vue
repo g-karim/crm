@@ -1,7 +1,7 @@
 <template>
   <div
     class="relative flex size-52 max-h-52 max-w-52 items-center justify-center overflow-hidden"
-    :aria-label="attachment.file_name || __('Стикер')"
+    :aria-label="__(title)"
   >
     <div
       ref="animationContainer"
@@ -12,7 +12,7 @@
     <img
       v-if="(!ready || reducedMotion) && attachment.preview_url"
       :src="attachment.preview_url"
-      :alt="attachment.file_name || __('Стикер')"
+      :alt="__(title)"
       class="max-h-52 max-w-52 object-contain"
       loading="lazy"
     />
@@ -26,7 +26,8 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { getMessengerAttachmentTitle } from '@/utils/messengerAttachments'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   attachment: { type: Object, required: true },
@@ -35,6 +36,12 @@ const props = defineProps({
 const animationContainer = ref(null)
 const ready = ref(false)
 const reducedMotion = ref(false)
+const title = computed(() =>
+  getMessengerAttachmentTitle({
+    ...props.attachment,
+    type: props.attachment.type || 'sticker',
+  }),
+)
 let animation = null
 let abortController = null
 let mediaQuery = null

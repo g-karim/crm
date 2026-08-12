@@ -83,6 +83,26 @@ describe('messenger routing', () => {
     })
   })
 
+  it('uses a human attachment preview instead of a technical type marker', () => {
+    expect(
+      messengerConversationOption({
+        name: 'TG-VOICE',
+        channel: 'TG',
+        last_message: {
+          message_type: 'audio',
+          display_text: 'Голосовое сообщение',
+        },
+      }).label,
+    ).toContain('Голосовое сообщение')
+    expect(
+      messengerConversationOption({
+        name: 'TG-VIDEO',
+        channel: 'TG',
+        last_message: { message_type: 'video' },
+      }).label,
+    ).toContain('Видео')
+  })
+
   it('pins reply to the source conversation regardless of selected channel', () => {
     expect(
       resolveMessengerReplyConversation(conversations, {

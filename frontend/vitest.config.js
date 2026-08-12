@@ -29,6 +29,10 @@ export default defineConfig({
         __dirname,
         'tests/stubs/IconStub.vue',
       ),
+      '~icons/lucide/audio-lines': path.resolve(
+        __dirname,
+        'tests/stubs/IconStub.vue',
+      ),
       '~icons/lucide/clock-3': path.resolve(
         __dirname,
         'tests/stubs/IconStub.vue',

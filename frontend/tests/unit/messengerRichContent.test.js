@@ -50,10 +50,17 @@ vi.mock('frappe-ui', () => ({
   toast: { error: vi.fn() },
 }))
 
+vi.mock(
+  '~icons/lucide/audio-lines',
+  () => ({ default: { template: '<span data-test-audio-icon />' } }),
+  { virtual: true },
+)
+
 import ContactAttachment from '@/components/LeadMessenger/ContactAttachment.vue'
 import LocationAttachment from '@/components/LeadMessenger/LocationAttachment.vue'
 import LocationPickerDialog from '@/components/LeadMessenger/LocationPickerDialog.vue'
 import MessageReactions from '@/components/LeadMessenger/MessageReactions.vue'
+import MessengerAudioPlayer from '@/components/LeadMessenger/MessengerAudioPlayer.vue'
 import { call } from 'frappe-ui'
 
 let mounted = []
@@ -102,6 +109,20 @@ async function flushImports() {
 }
 
 describe('messenger rich content', () => {
+  it('renders the common voice title for a Telegram technical filename', () => {
+    let root = mount(MessengerAudioPlayer, {
+      attachment: {
+        type: 'audio',
+        status: 'pending',
+        is_voice: true,
+        file_name: 'voice.ogg',
+      },
+    })
+
+    expect(root.textContent).toContain('Голосовое сообщение')
+    expect(root.textContent).not.toContain('voice.ogg')
+  })
+
   it('renders a location card without the OpenStreetMap embed footer', async () => {
     let root = mount(LocationAttachment, {
       attachment: {
@@ -202,7 +223,9 @@ describe('messenger rich content', () => {
     expect(buttons[1].textContent).toContain('#64 1')
     expect(buttons).toHaveLength(2)
 
-    root.component.openPicker(new MouseEvent('contextmenu', { clientX: 20, clientY: 30 }))
+    root.component.openPicker(
+      new MouseEvent('contextmenu', { clientX: 20, clientY: 30 }),
+    )
     await nextTick()
     let picker = document.body.querySelector('[role="menu"]')
     expect(picker).not.toBeNull()

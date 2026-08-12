@@ -713,7 +713,7 @@ const replyComposerContext = computed(() => {
       text: `${replyTarget.value.text || ''}`.slice(0, 500) || null,
       message_type: replyTarget.value.message_type || 'text',
       attachment_types: (replyTarget.value.attachments || []).map(
-        (item) => item.type,
+        (item) => (item.is_voice ? 'voice' : item.type),
       ),
       forwarded_content_kind: replyTarget.value.forward_context
         ? getForwardedContentKind(replyTarget.value.forward_context)

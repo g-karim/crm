@@ -4,6 +4,8 @@ import {
   formatAttachmentDuration,
   getAttachmentAction,
   getAttachmentState,
+  getMessengerAttachmentTitle,
+  getMessengerMessagePreview,
   getCompactMediaDimensions,
   getVideoPlaybackUrl,
   getImageGridCellClass,
@@ -52,6 +54,70 @@ describe('messenger attachment contract v1', () => {
   it('formats voice duration', () => {
     expect(formatAttachmentDuration(4250)).toBe('0:04')
     expect(formatAttachmentDuration(65000)).toBe('1:05')
+  })
+
+  it('uses one title contract and hides provider-generated names', () => {
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'audio',
+        is_voice: true,
+        file_name: 'voice.ogg',
+      }),
+    ).toBe('Голосовое сообщение')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'video',
+        file_name: 'video-note.mp4',
+      }),
+    ).toBe('Видео')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'file',
+        file_name: 'contract.pdf',
+      }),
+    ).toBe('contract.pdf')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'file',
+        file_name: 'contract.pdf',
+        display_title: 'Договор',
+      }),
+    ).toBe('Договор')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'unsupported',
+        fallback_text: 'Неподдерживаемое вложение MAX: share',
+      }),
+    ).toBe('Неподдерживаемое вложение')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'link',
+        title: 'Provider-specific page title',
+      }),
+    ).toBe('Ссылка')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'audio',
+        file_name: 'audio.mp3',
+      }),
+    ).toBe('Аудио')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'sticker',
+        status: 'unsupported',
+        file_name: 'sticker.tgs',
+      }),
+    ).toBe('Стикер недоступен')
+  })
+
+  it('builds human last-message previews without raw type markers', () => {
+    expect(
+      getMessengerMessagePreview({
+        message_type: 'audio',
+        display_text: 'Голосовое сообщение',
+      }),
+    ).toBe('Голосовое сообщение')
+    expect(getMessengerMessagePreview({ message_type: 'video' })).toBe('Видео')
   })
 
   it('classifies only a single standalone image as single-image layout', () => {

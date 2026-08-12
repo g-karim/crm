@@ -24,7 +24,7 @@ const REPLY_ATTACHMENT_TYPE_ALIASES = {
   photo: 'image',
   doc: 'file',
   document: 'file',
-  audio_message: 'audio',
+  audio_message: 'voice',
   geo: 'location',
 }
 
@@ -32,6 +32,7 @@ const REPLY_ATTACHMENT_LABELS = {
   image: ['Изображение', 'Изображения'],
   video: ['Видео', 'Видео'],
   audio: ['Аудио', 'Аудио'],
+  voice: ['Голосовое сообщение', 'Голосовые сообщения'],
   file: ['Документ', 'Документы'],
   link: ['Ссылка', 'Ссылки'],
   sticker: ['Стикер', 'Стикеры'],
@@ -39,6 +40,43 @@ const REPLY_ATTACHMENT_LABELS = {
   contact: ['Контакт', 'Контакты'],
   unsupported: ['Вложение', 'Вложения'],
 }
+
+const ATTACHMENT_TITLES = {
+  image: 'Изображение',
+  video: 'Видео',
+  audio: 'Аудио',
+  voice: 'Голосовое сообщение',
+  file: 'Файл',
+  link: 'Ссылка',
+  sticker: 'Стикер',
+  location: 'Геолокация',
+  contact: 'Контакт',
+  unsupported: 'Неподдерживаемое вложение',
+}
+
+const TECHNICAL_FILENAMES = new Set([
+  'attachment',
+  'audio',
+  'audio.mp3',
+  'audio.ogg',
+  'animation.mp4',
+  'contact',
+  'document',
+  'live-photo.mp4',
+  'location',
+  'photo.jpg',
+  'sticker',
+  'sticker.json',
+  'sticker.tgs',
+  'sticker.webm',
+  'sticker.webp',
+  'unsupported',
+  'video.mp4',
+  'video-note.mp4',
+  'voice.ogg',
+  'voice-recording.m4a',
+  'voice-recording.ogg',
+])
 
 export function getMessengerReplyAttachmentLabel(snapshot = {}) {
   let attachmentTypes = Array.isArray(snapshot.attachment_types)
@@ -58,6 +96,59 @@ export function getMessengerReplyAttachmentLabel(snapshot = {}) {
 
   let labels = REPLY_ATTACHMENT_LABELS[normalizedTypes[0]]
   return labels[attachmentTypes.length > 1 ? 1 : 0]
+}
+
+export function getMessengerAttachmentTitle(attachment = {}) {
+  if (attachment.display_title) return String(attachment.display_title)
+  let type = attachment.is_voice ? 'voice' : attachment.type || 'unsupported'
+  if (
+    type === 'sticker' &&
+    ['failed', 'unsupported'].includes(attachment.status)
+  ) {
+    return 'Стикер недоступен'
+  }
+  if (
+    [
+      'voice',
+      'image',
+      'sticker',
+      'link',
+      'location',
+      'contact',
+      'unsupported',
+    ].includes(type)
+  ) {
+    return ATTACHMENT_TITLES[type]
+  }
+  if (attachment.title && !isTechnicalAttachmentName(attachment.title)) {
+    return String(attachment.title)
+  }
+  if (
+    attachment.file_name &&
+    !isTechnicalAttachmentName(attachment.file_name)
+  ) {
+    return String(attachment.file_name)
+  }
+  return ATTACHMENT_TITLES[type] || ATTACHMENT_TITLES.unsupported
+}
+
+export function getMessengerMessagePreview(message = {}) {
+  if (message.display_text) return String(message.display_text)
+  if (String(message.text || '').trim()) return String(message.text).trim()
+  return ATTACHMENT_TITLES[message.message_type] || 'Вложение'
+}
+
+export function isTechnicalAttachmentName(value) {
+  let name = String(value || '')
+    .split('/')
+    .at(-1)
+    .trim()
+    .toLowerCase()
+  return (
+    TECHNICAL_FILENAMES.has(name) ||
+    /^vk-(audio|photo|sticker|video)(-|\.|$)/i.test(name) ||
+    /^max-(audio|file|image|sticker|video)(-|\.|$)/i.test(name)
+  )
 }
 
 export function groupMessengerAttachments(attachments = []) {

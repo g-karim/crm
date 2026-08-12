@@ -59,7 +59,7 @@
             state(segment.attachment).active
           "
           :src="segment.attachment.url"
-          :alt="segment.attachment.file_name || __('Стикер')"
+          :alt="__(getMessengerAttachmentTitle(segment.attachment))"
           class="max-h-52 max-w-52 object-contain"
           loading="lazy"
         />
@@ -102,6 +102,7 @@
 import {
   buildMessengerAttachmentSegments,
   getAttachmentState,
+  getMessengerAttachmentTitle,
   isSingleImageAttachmentSet,
 } from '@/utils/messengerAttachments'
 import { computed, ref } from 'vue'

@@ -147,6 +147,7 @@ import {
   getAttachmentAction,
   getAttachmentState,
   getCompactMediaDimensions,
+  getMessengerAttachmentTitle,
   getVideoPlaybackUrl,
 } from '@/utils/messengerAttachments'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
@@ -195,12 +196,7 @@ const cardAttachment = computed(() => ({
   open_url: '',
   url: '',
 }))
-const title = computed(
-  () =>
-    props.attachment.title ||
-    props.attachment.file_name ||
-    __('Видеосообщение'),
-)
+const title = computed(() => getMessengerAttachmentTitle(props.attachment))
 const duration = computed(() =>
   formatAttachmentDuration(
     actualDurationMs.value || props.attachment.duration_ms,
