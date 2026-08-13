@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/LeadMessenger/AttachmentRenderer.vue', () => ({
   default: {
-    props: ['attachments'],
+    props: ['attachments', 'compactPreview'],
     template:
-      '<div data-forward-attachments>{{ attachments.map((item) => item.id).join(",") }}</div>',
+      '<div data-forward-attachments :data-compact="compactPreview">{{ attachments.map((item) => item.id).join(",") }}</div>',
   },
 }))
 
@@ -62,6 +62,17 @@ describe('forwarded message stack', () => {
     expect(root.textContent).toContain('Вложенное сообщение')
     expect(root.querySelector('[data-forward-attachments]').textContent).toBe(
       'A-1',
+    )
+    expect(
+      root
+        .querySelector('[data-forward-attachments]')
+        .hasAttribute('data-compact'),
+    ).toBe(true)
+    expect(
+      root.querySelector('[data-message-forward-stack]').className,
+    ).toContain('w-fit')
+    expect(root.querySelector('[data-forward-item]').className).toContain(
+      'max-w-[20rem]',
     )
   })
 

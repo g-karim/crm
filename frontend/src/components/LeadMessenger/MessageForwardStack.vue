@@ -1,10 +1,10 @@
 <template>
-  <div data-message-forward-stack class="space-y-2">
+  <div data-message-forward-stack class="w-fit max-w-full space-y-2">
     <div
       v-for="item in context?.items || []"
       :key="item.key"
       data-forward-item
-      class="min-w-0 rounded-md border-l-2 border-outline-blue-2 bg-surface-gray-2 px-2.5 py-2"
+      class="w-fit min-w-0 max-w-[20rem] rounded-md border-l-2 border-outline-blue-2 bg-surface-gray-2 px-2.5 py-2"
     >
       <div class="mb-1 flex min-w-0 items-center gap-2 text-xs text-ink-gray-6">
         <span class="shrink-0 font-medium">
@@ -43,6 +43,7 @@
         :attachments="item.attachments"
         :playback-scope="`${playbackScope}:${item.key}`"
         :provider="provider"
+        compact-preview
       />
       <div
         v-else-if="
@@ -81,9 +82,7 @@ defineProps({
 
 function formattedTime(value) {
   if (!value) return ''
-  let match = String(value).match(
-    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/,
-  )
+  let match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/)
   return match
     ? `${match[3]}.${match[2]}.${match[1]} ${match[4]}:${match[5]}`
     : ''

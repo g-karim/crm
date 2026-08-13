@@ -167,6 +167,17 @@ export function groupMessengerAttachments(attachments = []) {
 export function buildMessengerAttachmentSegments(attachments = []) {
   let segments = []
   attachments.forEach((attachment, index) => {
+    if (
+      attachment?.is_animated &&
+      ['image', 'video'].includes(attachment?.type)
+    ) {
+      segments.push({
+        type: 'animation',
+        key: `${attachment?.id || 'animation'}-${index}`,
+        attachment,
+      })
+      return
+    }
     if (attachment?.type === 'image') {
       let previous = segments.at(-1)
       if (previous?.type === 'images') previous.items.push(attachment)
@@ -204,16 +215,34 @@ export function getCompactMediaDimensions(
   maxWidth = 320,
   maxHeight = 360,
 ) {
+  return getMediaFrameDimensions(media, maxWidth, maxHeight)
+}
+
+export function getCompactPreviewDimensions(
+  media = {},
+  maxWidth = 320,
+  maxHeight = 280,
+) {
+  return getMediaFrameDimensions(media, maxWidth, maxHeight)
+}
+
+function getMediaFrameDimensions(media, maxWidth, maxHeight) {
   let width = Number(media.width || 0)
   let height = Number(media.height || 0)
   let ratio = width > 0 && height > 0 ? width / height : 16 / 9
   if (!Number.isFinite(ratio) || ratio <= 0) ratio = 16 / 9
-  ratio = Math.min(Math.max(ratio, 0.4), 4)
-  let displayWidth = Math.min(maxWidth, maxHeight * ratio)
+  ratio = Math.min(Math.max(ratio, 0.1), 10)
+
+  let portrait = ratio < 1
+  let naturalHeight = maxWidth / ratio
+  let displayWidth = portrait ? maxWidth : Math.min(maxWidth, maxHeight * ratio)
+  let displayHeight = Math.min(displayWidth / ratio, maxHeight)
+  let frameRatio = displayWidth / displayHeight
   return {
-    ratio,
+    ratio: frameRatio,
     width: Math.round(displayWidth * 100) / 100,
-    height: Math.round((displayWidth / ratio) * 100) / 100,
+    height: Math.round(displayHeight * 100) / 100,
+    letterboxed: portrait && naturalHeight > maxHeight,
   }
 }
 

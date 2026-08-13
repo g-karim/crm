@@ -89,6 +89,26 @@ describe('message footer metadata', () => {
     )
   })
 
+  it('shows Telegram sent as one gray check without claiming it was read', () => {
+    let root = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'telegram_bot',
+        direction: 'outbound',
+        status: 'sent',
+        delivery_status: 'sent',
+        read_at: null,
+      }),
+    })
+
+    let delivery = root.querySelector('[data-message-delivery]')
+    expect(delivery.className).toContain('text-ink-gray-5')
+    expect(delivery.className).not.toContain('text-ink-blue-2')
+    expect(delivery.querySelectorAll('svg')).toHaveLength(1)
+    expect(delivery.closest('[data-test-tooltip]').title).toBe(
+      'Отправлено в Telegram; статус прочтения недоступен',
+    )
+  })
+
   it('hides the edited marker for unedited and deleted messages', () => {
     let unedited = mountComponent(MessageFooterMetadata, {
       message: message({ is_edited: 0 }),

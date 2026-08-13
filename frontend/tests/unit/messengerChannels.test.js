@@ -139,6 +139,15 @@ describe('messengerChannels', () => {
 
     expect(
       getMessengerDeliveryLabel({
+        provider: 'telegram_bot',
+        direction: 'outbound',
+        status: 'sent',
+        read_at: null,
+      }),
+    ).toBe('Отправлено в Telegram; статус прочтения недоступен')
+
+    expect(
+      getMessengerDeliveryLabel({
         provider: 'max_direct',
         direction: 'outbound',
         status: 'retrying',
@@ -179,6 +188,7 @@ describe('messengerChannels', () => {
       reactions: { receive: false, send: false },
       location: { receive: false, send: false },
       contact: { receive: false, send: false },
+      typing: { receive: false, send: false },
       voice: {
         send: false,
         max_duration_seconds: 300,
@@ -204,6 +214,7 @@ describe('messengerChannels', () => {
           reactions: { receive: true, send: true },
           location: { receive: true, send: true },
           contact: { receive: true, send: false },
+          typing: { receive: true, send: true },
           voice: {
             send: true,
             max_duration_seconds: 120,
@@ -222,6 +233,7 @@ describe('messengerChannels', () => {
       reactions: { receive: true, send: true },
       location: { receive: true, send: true },
       contact: { receive: true, send: false },
+      typing: { receive: true, send: true },
       voice: {
         send: true,
         max_duration_seconds: 120,

@@ -9,10 +9,23 @@
       class="relative w-full overflow-hidden bg-black"
       :style="mediaAspectStyle"
     >
+      <img
+        v-if="showBackdrop"
+        data-media-backdrop
+        :src="backdropSource"
+        alt=""
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl"
+      />
+      <span
+        v-if="showBackdrop"
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 bg-black/35"
+      />
       <div
         v-if="loading"
         data-video-loading
-        class="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-black/20"
+        class="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-black/20"
         role="status"
         :aria-label="__('Загрузка видео')"
       >
@@ -26,7 +39,7 @@
         ref="videoElement"
         :src="playbackUrl"
         :poster="attachment.preview_url || undefined"
-        class="absolute inset-0 size-full bg-black object-contain"
+        class="absolute inset-0 z-10 size-full object-contain"
         controls
         preload="none"
         playsinline
@@ -37,6 +50,7 @@
         @playing="finishLoading"
         @seeked="finishLoading"
         @loadedmetadata="handleLoadedMetadata"
+        @loadeddata="captureBackdropFrame"
         @play="announcePlayback"
         @error="handleLocalError"
       />
@@ -51,28 +65,44 @@
       @click="activate"
     >
       <img
+        v-if="showBackdrop"
+        data-media-backdrop
+        :src="backdropSource"
+        alt=""
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl"
+      />
+      <span
+        v-if="showBackdrop"
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 bg-black/35"
+      />
+      <img
         v-if="attachment.preview_url"
         :src="attachment.preview_url"
         :alt="title"
-        class="absolute inset-0 size-full object-contain"
+        class="absolute inset-0 z-10 size-full object-contain"
         loading="lazy"
+        @load="handlePreviewImageLoad"
       />
       <video
         v-else-if="previewPlaybackUrl && !previewFailed"
         data-video-preview
         :src="previewPlaybackUrl"
-        class="pointer-events-none absolute inset-0 size-full bg-black object-contain"
+        class="pointer-events-none absolute inset-0 z-10 size-full object-contain"
         muted
         preload="metadata"
         playsinline
         aria-hidden="true"
         tabindex="-1"
         @loadedmetadata="handlePreviewMetadata"
+        @loadeddata="captureBackdropFrame"
+        @seeked="captureBackdropFrame"
         @error="previewFailed = true"
       />
-      <span v-else class="absolute inset-0 bg-black/80" />
+      <span v-else class="absolute inset-0 z-10 bg-black/80" />
       <span
-        class="absolute inset-0 flex items-center justify-center bg-black/15 transition-colors group-hover:bg-black/25"
+        class="absolute inset-0 z-20 flex items-center justify-center bg-black/15 transition-colors group-hover:bg-black/25"
       >
         <span
           class="flex size-11 items-center justify-center rounded-full bg-black/65 text-white"
@@ -82,7 +112,7 @@
       </span>
       <span
         v-if="duration"
-        class="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white"
+        class="absolute bottom-2 right-2 z-20 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white"
       >
         {{ duration }}
       </span>
@@ -90,18 +120,32 @@
     <div
       v-else-if="attachment.preview_url"
       data-video-frame
-      class="relative w-full overflow-hidden bg-black"
+      class="relative block w-full overflow-hidden bg-black"
       :style="mediaAspectStyle"
     >
       <img
+        v-if="showBackdrop"
+        data-media-backdrop
+        :src="backdropSource"
+        alt=""
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl"
+      />
+      <span
+        v-if="showBackdrop"
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 bg-black/35"
+      />
+      <img
         :src="attachment.preview_url"
         :alt="title"
-        class="absolute inset-0 size-full object-contain"
+        class="absolute inset-0 z-10 size-full object-contain"
         loading="lazy"
+        @load="handlePreviewImageLoad"
       />
       <span
         v-if="duration"
-        class="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white"
+        class="absolute bottom-2 right-2 z-20 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white"
       >
         {{ duration }}
       </span>
@@ -109,13 +153,11 @@
     <AttachmentCard v-else :attachment="cardAttachment" />
 
     <div
-      v-if="title || action || localFailed"
-      class="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+      v-if="showFooter"
+      data-video-footer
+      class="grid gap-2 px-3 py-2 text-sm"
     >
-      <div class="min-w-0">
-        <div v-if="title" class="truncate font-medium text-ink-gray-8">
-          {{ title }}
-        </div>
+      <div v-if="statusLabel || localFailed" class="min-w-0">
         <div v-if="statusLabel" class="text-xs text-ink-gray-5">
           {{ statusLabel }}
         </div>
@@ -133,8 +175,10 @@
         :href="action"
         target="_blank"
         rel="noopener noreferrer"
-        class="shrink-0 text-ink-blue-3 hover:underline"
+        data-video-external-action
+        class="flex w-full items-center justify-center gap-2 rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2 text-center text-sm font-medium text-ink-blue-3 transition-colors hover:bg-surface-gray-2"
       >
+        <ExternalLinkIcon class="size-4 shrink-0" />
         {{ actionLabel }}
       </a>
     </div>
@@ -147,10 +191,12 @@ import {
   getAttachmentAction,
   getAttachmentState,
   getCompactMediaDimensions,
+  getCompactPreviewDimensions,
   getMessengerAttachmentTitle,
   getVideoPlaybackUrl,
 } from '@/utils/messengerAttachments'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
+import ExternalLinkIcon from '@/components/Icons/ExternalLinkIcon.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import PlayIcon from '~icons/lucide/play'
 import AttachmentCard from './AttachmentCard.vue'
@@ -159,6 +205,7 @@ const props = defineProps({
   attachment: { type: Object, required: true },
   playbackScope: { type: String, default: '' },
   provider: { type: String, default: '' },
+  compactPreview: { type: Boolean, default: false },
 })
 
 const instanceId = `messenger-video-${Math.random().toString(36).slice(2)}`
@@ -170,6 +217,7 @@ const previewFailed = ref(false)
 const actualDurationMs = ref(0)
 const actualWidth = ref(0)
 const actualHeight = ref(0)
+const generatedBackdropUrl = ref('')
 const state = computed(() => getAttachmentState(props.attachment))
 const playbackUrl = computed(() => {
   if (
@@ -202,12 +250,15 @@ const duration = computed(() =>
     actualDurationMs.value || props.attachment.duration_ms,
   ),
 )
-const mediaDimensions = computed(() =>
-  getCompactMediaDimensions({
+const mediaDimensions = computed(() => {
+  let media = {
     width: actualWidth.value || props.attachment.width,
     height: actualHeight.value || props.attachment.height,
-  }),
-)
+  }
+  return props.compactPreview
+    ? getCompactPreviewDimensions(media)
+    : getCompactMediaDimensions(media)
+})
 const mediaContainerStyle = computed(() => ({
   width: `${mediaDimensions.value.width}px`,
   maxWidth: '100%',
@@ -215,6 +266,12 @@ const mediaContainerStyle = computed(() => ({
 const mediaAspectStyle = computed(() => ({
   aspectRatio: String(mediaDimensions.value.ratio),
 }))
+const backdropSource = computed(
+  () => props.attachment.preview_url || generatedBackdropUrl.value,
+)
+const showBackdrop = computed(
+  () => mediaDimensions.value.letterboxed && Boolean(backdropSource.value),
+)
 const actionLabel = computed(() =>
   props.provider === 'vk_direct'
     ? __('Смотреть в VK Видео')
@@ -224,10 +281,14 @@ const statusLabel = computed(() => {
   if (state.value.busy) return state.value.label
   if (state.value.unsupported) return __('Формат видео не поддерживается')
   if (props.provider === 'vk_direct' && !playable.value && action.value)
-    return __('Видео доступно только во VK')
+    return __('Доступно только во VK')
   if (!playable.value && !action.value) return __('Видео недоступно')
   return ''
 })
+const showFooter = computed(
+  () =>
+    Boolean(statusLabel.value) || Boolean(action.value) || localFailed.value,
+)
 
 async function activate() {
   if (!playbackUrl.value || localFailed.value) return
@@ -280,6 +341,11 @@ function handleLoadedMetadata(event) {
     Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0
 }
 
+function handlePreviewImageLoad(event) {
+  actualWidth.value = Number(event.currentTarget?.naturalWidth || 0)
+  actualHeight.value = Number(event.currentTarget?.naturalHeight || 0)
+}
+
 function handlePreviewMetadata(event) {
   handleLoadedMetadata(event)
   const preview = event.currentTarget
@@ -289,6 +355,26 @@ function handlePreviewMetadata(event) {
     preview.currentTime = Math.min(0.1, seconds / 2)
   } catch {
     // The media fragment still requests the first decodable frame.
+  }
+}
+
+function captureBackdropFrame(event) {
+  if (props.attachment.preview_url || generatedBackdropUrl.value) return
+  const video = event.currentTarget
+  const width = Number(video?.videoWidth || 0)
+  const height = Number(video?.videoHeight || 0)
+  if (!video || !width || !height) return
+  try {
+    const canvas = document.createElement('canvas')
+    const scale = Math.min(96 / width, 96 / height, 1)
+    canvas.width = Math.max(1, Math.round(width * scale))
+    canvas.height = Math.max(1, Math.round(height * scale))
+    const context = canvas.getContext('2d')
+    if (!context) return
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    generatedBackdropUrl.value = canvas.toDataURL('image/jpeg', 0.6)
+  } catch {
+    generatedBackdropUrl.value = ''
   }
 }
 
@@ -305,6 +391,7 @@ watch(
     actualDurationMs.value = 0
     actualWidth.value = 0
     actualHeight.value = 0
+    generatedBackdropUrl.value = ''
     previewFailed.value = false
   },
 )

@@ -7,6 +7,7 @@ import {
   getMessengerAttachmentTitle,
   getMessengerMessagePreview,
   getCompactMediaDimensions,
+  getCompactPreviewDimensions,
   getVideoPlaybackUrl,
   getImageGridCellClass,
   getSingleImageBubbleWidthClass,
@@ -37,6 +38,20 @@ describe('messenger attachment contract v1', () => {
     ])
     expect(segments[2].items.map((item) => item.id)).toEqual(['I-1', 'I-2'])
     expect(segments[4].items.map((item) => item.id)).toEqual(['I-3'])
+  })
+
+  it('routes animated images and videos through one animation segment', () => {
+    let segments = buildMessengerAttachmentSegments([
+      { id: 'GIF-1', type: 'image', is_animated: true },
+      { id: 'GIF-2', type: 'video', is_animated: true },
+      { id: 'I-1', type: 'image' },
+    ])
+
+    expect(segments.map((segment) => segment.type)).toEqual([
+      'animation',
+      'animation',
+      'images',
+    ])
   })
 
   it('groups voice/audio, sticker, images and unsupported', () => {
@@ -151,25 +166,52 @@ describe('messenger attachment contract v1', () => {
     )
   })
 
-  it('fits portrait, square and landscape media inside 320 by 360 pixels', () => {
-    expect(getCompactMediaDimensions({ width: 100, height: 200 })).toEqual({
-      ratio: 0.5,
-      width: 180,
+  it('uses a full-width letterboxed frame for portrait media', () => {
+    expect(getCompactMediaDimensions({ width: 9, height: 16 })).toEqual({
+      ratio: 320 / 360,
+      width: 320,
       height: 360,
+      letterboxed: true,
+    })
+    expect(getCompactMediaDimensions({ width: 4, height: 5 })).toEqual({
+      ratio: 320 / 360,
+      width: 320,
+      height: 360,
+      letterboxed: true,
     })
     expect(getCompactMediaDimensions({ width: 64, height: 64 })).toEqual({
       ratio: 1,
       width: 320,
       height: 320,
+      letterboxed: false,
     })
     expect(getCompactMediaDimensions({ width: 400, height: 200 })).toEqual({
       ratio: 2,
       width: 320,
       height: 160,
+      letterboxed: false,
     })
-    expect(
-      getCompactMediaDimensions({ width: 9, height: 16 }).height,
-    ).toBeLessThanOrEqual(360)
+    expect(getCompactMediaDimensions({})).toEqual({
+      ratio: 16 / 9,
+      width: 320,
+      height: 180,
+      letterboxed: false,
+    })
+  })
+
+  it('letterboxes tall compact previews without cropping them', () => {
+    expect(getCompactPreviewDimensions({ width: 1920, height: 1080 })).toEqual({
+      ratio: 1920 / 1080,
+      width: 320,
+      height: 180,
+      letterboxed: false,
+    })
+    expect(getCompactPreviewDimensions({ width: 1080, height: 1920 })).toEqual({
+      ratio: 320 / 280,
+      width: 320,
+      height: 280,
+      letterboxed: true,
+    })
   })
 
   it('builds grid layouts for two, three, four and more images', () => {
