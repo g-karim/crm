@@ -204,6 +204,13 @@ describe('messenger rich content', () => {
           items: [
             { reaction_id: 8, count: 2, emoji: '🔥' },
             { reaction_id: 64, count: 1, emoji: null },
+            {
+              reaction_id: 'custom_emoji:custom-1',
+              count: 1,
+              emoji: null,
+              reaction_type: 'custom_emoji',
+              supported: false,
+            },
           ],
           own_reaction_id: 8,
           catalog_version: 'vk-message-reactions-40-v1',
@@ -221,7 +228,12 @@ describe('messenger rich content', () => {
     expect(buttons[0].textContent).toContain('🔥 2')
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true')
     expect(buttons[1].textContent).toContain('#64 1')
-    expect(buttons).toHaveLength(2)
+    expect(buttons[2].textContent).toContain('✦ 1')
+    expect(buttons[2].getAttribute('title')).toBe(
+      'Пользовательская реакция Telegram',
+    )
+    expect(buttons[2].disabled).toBe(true)
+    expect(buttons).toHaveLength(3)
 
     root.component.openPicker(
       new MouseEvent('contextmenu', { clientX: 20, clientY: 30 }),
@@ -239,6 +251,39 @@ describe('messenger rich content', () => {
         catalog_version: 'vk-message-reactions-40-v1',
         catalog_signature: 'catalog-signature',
       }),
+    )
+  })
+
+  it('uses string Telegram reaction IDs and toggles the operator reaction', async () => {
+    call.mockResolvedValueOnce({
+      ok: true,
+      reaction_state: { items: [], own_reaction_id: null },
+    })
+    let root = mount(MessageReactions, {
+      message: {
+        name: 'telegram-message-1',
+        reactions: {
+          items: [{ reaction_id: 'emoji:👍', count: 2, emoji: '👍' }],
+          own_reaction_id: 'emoji:👍',
+          catalog_version: 'telegram-bot-api-10.2-emoji-v1',
+          catalog_signature: 'telegram-signature',
+          catalog: [{ reaction_id: 'emoji:👍', emoji: '👍' }],
+        },
+      },
+      canSend: true,
+    })
+
+    root.querySelector('button').click()
+    await nextTick()
+
+    expect(call).toHaveBeenCalledWith(
+      'crm_messenger.api.messages.set_reaction',
+      {
+        message: 'telegram-message-1',
+        reaction_id: null,
+        catalog_version: 'telegram-bot-api-10.2-emoji-v1',
+        catalog_signature: 'telegram-signature',
+      },
     )
   })
 })

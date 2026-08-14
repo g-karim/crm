@@ -10,11 +10,16 @@
           ? 'border-outline-blue-2 bg-surface-blue-2'
           : 'border-outline-gray-2 bg-surface-white'
       "
-      :disabled="pending || !canSend"
+      :disabled="pending || !canSend || reaction.supported === false"
       :aria-pressed="reaction.reaction_id === ownReactionId"
+      :title="
+        reaction.reaction_type === 'custom_emoji'
+          ? __('Пользовательская реакция Telegram')
+          : undefined
+      "
       @click="toggleReaction(reaction.reaction_id)"
     >
-      {{ reaction.emoji || `#${reaction.reaction_id}` }} {{ reaction.count }}
+      {{ reactionDisplay(reaction) }} {{ reaction.count }}
     </button>
   </div>
 
@@ -77,6 +82,12 @@ const pickerStyle = computed(() => ({
   left: `${pickerPosition.value.left}px`,
   top: `${pickerPosition.value.top}px`,
 }))
+
+function reactionDisplay(reaction) {
+  if (reaction.emoji) return reaction.emoji
+  if (reaction.reaction_type === 'custom_emoji') return '✦'
+  return `#${reaction.reaction_id}`
+}
 
 function openPicker(event) {
   if (!props.canSend || pending.value || !catalog.value.length) return false
