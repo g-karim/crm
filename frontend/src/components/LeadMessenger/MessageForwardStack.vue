@@ -4,7 +4,7 @@
       v-for="item in context?.items || []"
       :key="item.key"
       data-forward-item
-      class="w-fit min-w-0 max-w-[20rem] rounded-md border-l-2 border-outline-blue-2 bg-surface-gray-2 px-2.5 py-2"
+      class="w-[20rem] min-w-0 max-w-full rounded-md border-l-2 border-outline-blue-2 bg-surface-gray-2 px-2.5 py-2"
     >
       <div class="mb-1 flex min-w-0 items-center gap-2 text-xs text-ink-gray-6">
         <span class="shrink-0 font-medium">

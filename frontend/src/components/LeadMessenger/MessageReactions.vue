@@ -27,7 +27,7 @@
     <div
       v-if="pickerOpen"
       ref="pickerElement"
-      class="fixed z-[1000] grid w-[19rem] grid-cols-7 gap-1 rounded-lg border border-outline-gray-2 bg-surface-white p-2 shadow-xl"
+      class="fixed z-[1000] grid max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[19rem] grid-cols-[repeat(auto-fit,minmax(2.25rem,1fr))] justify-items-center gap-1 overflow-y-auto overscroll-contain rounded-lg border border-outline-gray-2 bg-surface-white p-2 shadow-xl"
       :style="pickerStyle"
       role="menu"
       :aria-label="__('Выберите реакцию')"
@@ -105,8 +105,14 @@ function openPicker(event) {
     let rect = pickerElement.value?.getBoundingClientRect()
     if (!rect) return
     pickerPosition.value = {
-      left: Math.max(8, Math.min(event.clientX, window.innerWidth - rect.width - 8)),
-      top: Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8)),
+      left: Math.max(
+        8,
+        Math.min(event.clientX, window.innerWidth - rect.width - 8),
+      ),
+      top: Math.max(
+        8,
+        Math.min(event.clientY, window.innerHeight - rect.height - 8),
+      ),
     }
   })
   return true

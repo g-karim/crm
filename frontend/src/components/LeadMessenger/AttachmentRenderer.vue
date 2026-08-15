@@ -2,8 +2,14 @@
   <div
     v-if="attachments.length"
     data-attachment-renderer
-    class="mt-2 grid w-fit max-w-full gap-2"
-    :class="singleImage && !compactPreview ? '' : 'max-w-[20rem]'"
+    class="mt-2 grid max-w-full gap-2"
+    :class="
+      compactPreview
+        ? 'w-full min-w-0'
+        : singleImage
+          ? 'w-fit'
+          : 'w-fit max-w-[20rem]'
+    "
   >
     <template v-for="segment in segments" :key="segment.key">
       <ImageGrid
@@ -56,6 +62,7 @@
       <MessengerAudioPlayer
         v-else-if="segment.type === 'audio'"
         :attachment="segment.attachment"
+        :compact-preview="compactPreview"
       />
       <VideoAttachment
         v-else-if="segment.type === 'video'"

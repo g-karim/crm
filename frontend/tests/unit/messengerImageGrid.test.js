@@ -43,7 +43,11 @@ vi.mock('@/components/LeadMessenger/LocationAttachment.vue', () => ({
 }))
 
 vi.mock('@/components/LeadMessenger/MessengerAudioPlayer.vue', () => ({
-  default: { template: '<div data-test-audio />' },
+  default: {
+    props: ['attachment', 'compactPreview'],
+    template:
+      '<div data-test-audio :data-id="attachment.id" :data-compact="compactPreview" />',
+  },
 }))
 
 vi.mock('@/components/LeadMessenger/VideoAttachment.vue', () => ({
@@ -370,6 +374,29 @@ describe('messenger image layout', () => {
     expect(animations.every((item) => item.dataset.compact === 'true')).toBe(
       true,
     )
+  })
+
+  it('constrains forwarded voice to the compact attachment container', () => {
+    let root = mountRenderer(
+      [
+        {
+          id: 'VOICE-1',
+          type: 'audio',
+          status: 'available',
+          is_voice: true,
+          url: '/media/voice.ogg',
+        },
+      ],
+      { compactPreview: true },
+    )
+    let renderer = root.querySelector('[data-attachment-renderer]')
+    let audio = root.querySelector('[data-test-audio]')
+
+    expect(renderer.className).toContain('w-full')
+    expect(renderer.className).toContain('min-w-0')
+    expect(renderer.className).not.toContain('w-fit')
+    expect(audio.dataset.id).toBe('VOICE-1')
+    expect(audio.dataset.compact).toBe('true')
   })
 
   it('letterboxes a portrait forwarded image and keeps the lightbox source', async () => {

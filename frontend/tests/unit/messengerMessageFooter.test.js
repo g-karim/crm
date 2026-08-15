@@ -133,4 +133,17 @@ describe('message footer metadata', () => {
       root.querySelector('[class*="overflow-wrap:anywhere"]'),
     ).not.toBeNull()
   })
+
+  it('lets the message editor shrink inside a narrow bubble', () => {
+    let root = mountComponent(MessageContent, {
+      message: message(),
+      editing: true,
+      draft: 'Новый текст',
+    })
+    let editor = root.querySelector('[data-message-editor]')
+
+    expect(editor.className).toContain('w-full')
+    expect(editor.className).toContain('min-w-0')
+    expect(editor.className).not.toContain('min-w-[260px]')
+  })
 })

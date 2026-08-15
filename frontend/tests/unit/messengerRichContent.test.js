@@ -121,6 +121,25 @@ describe('messenger rich content', () => {
 
     expect(root.textContent).toContain('Голосовое сообщение')
     expect(root.textContent).not.toContain('voice.ogg')
+    expect(root.querySelector('[data-messenger-audio]').className).toContain(
+      'w-[min(22rem,calc(100vw-3rem))]',
+    )
+  })
+
+  it('uses the parent width for a compact forwarded voice player', () => {
+    let root = mount(MessengerAudioPlayer, {
+      attachment: {
+        type: 'audio',
+        status: 'pending',
+        is_voice: true,
+      },
+      compactPreview: true,
+    })
+    let player = root.querySelector('[data-messenger-audio]')
+
+    expect(player.className).toContain('w-full')
+    expect(player.className).toContain('min-w-0')
+    expect(player.className).not.toContain('w-[min(22rem,calc(100vw-3rem))]')
   })
 
   it('renders a location card without the OpenStreetMap embed footer', async () => {
@@ -190,6 +209,9 @@ describe('messenger rich content', () => {
     expect(root.textContent).toContain('55.750000, 37.610000')
     expect(marker.on).toHaveBeenCalledWith('dragend', expect.any(Function))
     expect(map.attributionControl.setPrefix).toHaveBeenCalledWith(false)
+    expect(root.querySelector('[class*="55dvh"]').className).toContain(
+      'h-[clamp(10rem,55dvh,26.25rem)]',
+    )
 
     markerHandlers.dragend({ target: marker })
     await nextTick()
@@ -241,6 +263,12 @@ describe('messenger rich content', () => {
     await nextTick()
     let picker = document.body.querySelector('[role="menu"]')
     expect(picker).not.toBeNull()
+    expect(picker.className).toContain('w-[calc(100vw-1rem)]')
+    expect(picker.className).toContain('max-h-[calc(100dvh-1rem)]')
+    expect(picker.className).toContain('overflow-y-auto')
+    expect(picker.className).toContain(
+      'grid-cols-[repeat(auto-fit,minmax(2.25rem,1fr))]',
+    )
     expect(picker.querySelectorAll('[role="menuitemradio"]')).toHaveLength(40)
     picker.querySelector('[role="menuitemradio"]').click()
     await nextTick()
@@ -285,5 +313,34 @@ describe('messenger rich content', () => {
         catalog_signature: 'telegram-signature',
       },
     )
+  })
+
+  it('keeps the full Telegram reaction catalog inside a scrollable picker', async () => {
+    let catalog = Array.from({ length: 73 }, (_, index) => ({
+      reaction_id: `emoji:${index}`,
+      emoji: `${index}`,
+    }))
+    let root = mount(MessageReactions, {
+      message: {
+        name: 'telegram-message-catalog',
+        reactions: {
+          items: [],
+          catalog,
+          catalog_version: 'telegram-bot-api-10.2-emoji-v1',
+          catalog_signature: 'telegram-signature',
+        },
+      },
+      canSend: true,
+    })
+
+    root.component.openPicker(
+      new MouseEvent('contextmenu', { clientX: 310, clientY: 560 }),
+    )
+    await nextTick()
+    let picker = document.body.querySelector('[role="menu"]')
+
+    expect(picker.querySelectorAll('[role="menuitemradio"]')).toHaveLength(73)
+    expect(picker.className).toContain('max-w-[19rem]')
+    expect(picker.className).toContain('overscroll-contain')
   })
 })

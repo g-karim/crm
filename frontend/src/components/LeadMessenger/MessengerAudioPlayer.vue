@@ -1,6 +1,10 @@
 <template>
   <div
-    class="w-[min(22rem,calc(100vw-3rem))] max-w-full rounded-lg border border-outline-gray-1 bg-surface-white p-3"
+    data-messenger-audio
+    class="max-w-full rounded-lg border border-outline-gray-1 bg-surface-white p-3"
+    :class="
+      compactPreview ? 'w-full min-w-0' : 'w-[min(22rem,calc(100vw-3rem))]'
+    "
   >
     <div
       class="mb-2 flex min-w-0 items-center gap-2 text-sm font-medium text-ink-gray-8"
@@ -136,7 +140,10 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import AudioLinesIcon from '~icons/lucide/audio-lines'
 import CircleAlertIcon from '~icons/lucide/circle-alert'
 
-const props = defineProps({ attachment: { type: Object, required: true } })
+const props = defineProps({
+  attachment: { type: Object, required: true },
+  compactPreview: { type: Boolean, default: false },
+})
 const audio = ref(null)
 const playing = ref(false)
 const loading = ref(true)

@@ -114,24 +114,25 @@
               <div
                 :data-message-id="item.message.name"
                 class="flex"
-                :class="[
+                :class="
                   item.message.direction === 'outbound'
                     ? 'justify-end'
-                    : 'justify-start',
-                  item.messages.some(
-                    (message) => highlightedMessage === message.name,
-                  )
-                    ? 'rounded ring-2 ring-outline-blue-2'
-                    : '',
-                ]"
+                    : 'justify-start'
+                "
               >
                 <div
+                  data-message-bubble
                   class="min-w-0 max-w-[94%] rounded-md px-3 py-2 text-base shadow-sm sm:max-w-[78%]"
                   :class="[
                     item.message.direction === 'outbound'
                       ? 'bg-surface-blue-1 text-ink-gray-9'
                       : 'bg-surface-gray-1 text-ink-gray-9',
                     messageBubbleWidthClass(item.message),
+                    item.messages.some(
+                      (message) => highlightedMessage === message.name,
+                    )
+                      ? 'ring-2 ring-outline-blue-2'
+                      : '',
                   ]"
                   @contextmenu="openReactionPicker(item.message, $event)"
                 >
@@ -377,11 +378,11 @@
             @click="prepareHandoff"
           />
         </div>
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0 text-sm text-ink-gray-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="min-w-0 flex-1 basis-40 text-sm text-ink-gray-5">
             <div class="truncate">{{ composerHint }}</div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
             <Button
               v-if="selectedCapabilities.voice.send"
               variant="ghost"
