@@ -1,3 +1,5 @@
+import { getMessengerMessagePreview } from '@/utils/messengerAttachments'
+
 export function messengerConversationsForChannel(
   conversations = [],
   channel = '',
@@ -37,12 +39,9 @@ export function messengerConversationOption(conversation = {}) {
   let externalId =
     conversation.external_chat_id_masked ||
     maskExternalChatId(conversation.external_chat_id)
-  let lastMessage =
-    conversation.last_message?.text ||
-    (conversation.last_message?.message_type &&
-    conversation.last_message.message_type !== 'text'
-      ? `[${conversation.last_message.message_type}]`
-      : '')
+  let lastMessage = conversation.last_message
+    ? getMessengerMessagePreview(conversation.last_message)
+    : ''
   let label = [
     platform,
     channel,

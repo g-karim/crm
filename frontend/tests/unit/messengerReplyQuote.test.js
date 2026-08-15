@@ -69,7 +69,11 @@ describe('message reply quote', () => {
     let root = mount({
       message: 'MSG-1',
       state: 'available',
-      snapshot: { direction: 'inbound', sender_name: '560784880', text: 'Исходный текст' },
+      snapshot: {
+        direction: 'inbound',
+        sender_name: '560784880',
+        text: 'Исходный текст',
+      },
     })
     expect(root.textContent).toContain('Клиент')
     expect(root.textContent).not.toContain('560784880')
@@ -80,7 +84,11 @@ describe('message reply quote', () => {
       {
         message: 'MSG-1',
         state: 'available',
-        snapshot: { direction: 'inbound', sender_name: 'Иван VK', text: 'Текст' },
+        snapshot: {
+          direction: 'inbound',
+          sender_name: 'Иван VK',
+          text: 'Текст',
+        },
       },
       { clientName: 'Иван Петров' },
     )
@@ -126,7 +134,8 @@ describe('message reply quote', () => {
     ['photo', 'Изображение'],
     ['video', 'Видео'],
     ['audio', 'Аудио'],
-    ['audio_message', 'Аудио'],
+    ['audio_message', 'Голосовое сообщение'],
+    ['voice', 'Голосовое сообщение'],
     ['file', 'Документ'],
     ['doc', 'Документ'],
     ['document', 'Документ'],
@@ -151,7 +160,8 @@ describe('message reply quote', () => {
     ['image', 'Изображения'],
     ['photo', 'Изображения'],
     ['video', 'Видео'],
-    ['audio_message', 'Аудио'],
+    ['audio_message', 'Голосовые сообщения'],
+    ['voice', 'Голосовые сообщения'],
     ['doc', 'Документы'],
     ['link', 'Ссылки'],
     ['sticker', 'Стикеры'],

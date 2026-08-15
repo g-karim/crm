@@ -4,7 +4,10 @@
     :options="{ title: __('Отправить геопозицию'), size: '3xl' }"
   >
     <template #body-content>
-      <div ref="mapElement" class="h-[420px] w-full rounded-md" />
+      <div
+        ref="mapElement"
+        class="h-[clamp(10rem,55dvh,26.25rem)] w-full rounded-md"
+      />
       <div v-if="selected" class="mt-2 text-sm tabular-nums text-ink-gray-6">
         {{ selected.latitude.toFixed(6) }}, {{ selected.longitude.toFixed(6) }}
       </div>

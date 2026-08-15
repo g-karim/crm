@@ -24,7 +24,7 @@ const REPLY_ATTACHMENT_TYPE_ALIASES = {
   photo: 'image',
   doc: 'file',
   document: 'file',
-  audio_message: 'audio',
+  audio_message: 'voice',
   geo: 'location',
 }
 
@@ -32,6 +32,7 @@ const REPLY_ATTACHMENT_LABELS = {
   image: ['Изображение', 'Изображения'],
   video: ['Видео', 'Видео'],
   audio: ['Аудио', 'Аудио'],
+  voice: ['Голосовое сообщение', 'Голосовые сообщения'],
   file: ['Документ', 'Документы'],
   link: ['Ссылка', 'Ссылки'],
   sticker: ['Стикер', 'Стикеры'],
@@ -39,6 +40,43 @@ const REPLY_ATTACHMENT_LABELS = {
   contact: ['Контакт', 'Контакты'],
   unsupported: ['Вложение', 'Вложения'],
 }
+
+const ATTACHMENT_TITLES = {
+  image: 'Изображение',
+  video: 'Видео',
+  audio: 'Аудио',
+  voice: 'Голосовое сообщение',
+  file: 'Файл',
+  link: 'Ссылка',
+  sticker: 'Стикер',
+  location: 'Геолокация',
+  contact: 'Контакт',
+  unsupported: 'Неподдерживаемое вложение',
+}
+
+const TECHNICAL_FILENAMES = new Set([
+  'attachment',
+  'audio',
+  'audio.mp3',
+  'audio.ogg',
+  'animation.mp4',
+  'contact',
+  'document',
+  'live-photo.mp4',
+  'location',
+  'photo.jpg',
+  'sticker',
+  'sticker.json',
+  'sticker.tgs',
+  'sticker.webm',
+  'sticker.webp',
+  'unsupported',
+  'video.mp4',
+  'video-note.mp4',
+  'voice.ogg',
+  'voice-recording.m4a',
+  'voice-recording.ogg',
+])
 
 export function getMessengerReplyAttachmentLabel(snapshot = {}) {
   let attachmentTypes = Array.isArray(snapshot.attachment_types)
@@ -60,6 +98,59 @@ export function getMessengerReplyAttachmentLabel(snapshot = {}) {
   return labels[attachmentTypes.length > 1 ? 1 : 0]
 }
 
+export function getMessengerAttachmentTitle(attachment = {}) {
+  if (attachment.display_title) return String(attachment.display_title)
+  let type = attachment.is_voice ? 'voice' : attachment.type || 'unsupported'
+  if (
+    type === 'sticker' &&
+    ['failed', 'unsupported'].includes(attachment.status)
+  ) {
+    return 'Стикер недоступен'
+  }
+  if (
+    [
+      'voice',
+      'image',
+      'sticker',
+      'link',
+      'location',
+      'contact',
+      'unsupported',
+    ].includes(type)
+  ) {
+    return ATTACHMENT_TITLES[type]
+  }
+  if (attachment.title && !isTechnicalAttachmentName(attachment.title)) {
+    return String(attachment.title)
+  }
+  if (
+    attachment.file_name &&
+    !isTechnicalAttachmentName(attachment.file_name)
+  ) {
+    return String(attachment.file_name)
+  }
+  return ATTACHMENT_TITLES[type] || ATTACHMENT_TITLES.unsupported
+}
+
+export function getMessengerMessagePreview(message = {}) {
+  if (message.display_text) return String(message.display_text)
+  if (String(message.text || '').trim()) return String(message.text).trim()
+  return ATTACHMENT_TITLES[message.message_type] || 'Вложение'
+}
+
+export function isTechnicalAttachmentName(value) {
+  let name = String(value || '')
+    .split('/')
+    .at(-1)
+    .trim()
+    .toLowerCase()
+  return (
+    TECHNICAL_FILENAMES.has(name) ||
+    /^vk-(audio|photo|sticker|video)(-|\.|$)/i.test(name) ||
+    /^max-(audio|file|image|sticker|video)(-|\.|$)/i.test(name)
+  )
+}
+
 export function groupMessengerAttachments(attachments = []) {
   return attachments.reduce(
     (groups, attachment) => {
@@ -76,6 +167,17 @@ export function groupMessengerAttachments(attachments = []) {
 export function buildMessengerAttachmentSegments(attachments = []) {
   let segments = []
   attachments.forEach((attachment, index) => {
+    if (
+      attachment?.is_animated &&
+      ['image', 'video'].includes(attachment?.type)
+    ) {
+      segments.push({
+        type: 'animation',
+        key: `${attachment?.id || 'animation'}-${index}`,
+        attachment,
+      })
+      return
+    }
     if (attachment?.type === 'image') {
       let previous = segments.at(-1)
       if (previous?.type === 'images') previous.items.push(attachment)
@@ -101,28 +203,47 @@ export function isSingleImageAttachmentSet(attachments = []) {
 }
 
 export function getSingleImageBubbleWidthClass(image = {}) {
-  let orientation = getImagePresentationOrientation(image)
-  if (orientation === 'portrait') return 'w-[18rem]'
-  if (orientation === 'landscape') return 'w-[29.5rem]'
-  return 'w-[24rem]'
+  return 'w-fit max-w-full'
 }
 
 export function getSingleImageMediaWidthClass(image = {}) {
-  let orientation = getImagePresentationOrientation(image)
-  if (orientation === 'portrait') return 'w-[16.5rem]'
-  if (orientation === 'landscape') return 'w-[28rem]'
-  return 'w-[22.5rem]'
+  return 'max-w-full'
 }
 
-function getImagePresentationOrientation(image = {}) {
-  let width = Number(image.width || 0)
-  let height = Number(image.height || 0)
-  if (!width || !height) return 'square'
+export function getCompactMediaDimensions(
+  media = {},
+  maxWidth = 320,
+  maxHeight = 360,
+) {
+  return getMediaFrameDimensions(media, maxWidth, maxHeight)
+}
 
-  let ratio = width / height
-  if (ratio < 0.9) return 'portrait'
-  if (ratio > 1.1) return 'landscape'
-  return 'square'
+export function getCompactPreviewDimensions(
+  media = {},
+  maxWidth = 320,
+  maxHeight = 280,
+) {
+  return getMediaFrameDimensions(media, maxWidth, maxHeight)
+}
+
+function getMediaFrameDimensions(media, maxWidth, maxHeight) {
+  let width = Number(media.width || 0)
+  let height = Number(media.height || 0)
+  let ratio = width > 0 && height > 0 ? width / height : 16 / 9
+  if (!Number.isFinite(ratio) || ratio <= 0) ratio = 16 / 9
+  ratio = Math.min(Math.max(ratio, 0.1), 10)
+
+  let portrait = ratio < 1
+  let naturalHeight = maxWidth / ratio
+  let displayWidth = portrait ? maxWidth : Math.min(maxWidth, maxHeight * ratio)
+  let displayHeight = Math.min(displayWidth / ratio, maxHeight)
+  let frameRatio = displayWidth / displayHeight
+  return {
+    ratio: frameRatio,
+    width: Math.round(displayWidth * 100) / 100,
+    height: Math.round(displayHeight * 100) / 100,
+    letterboxed: portrait && naturalHeight > maxHeight,
+  }
 }
 
 export function getAttachmentState(attachment = {}) {

@@ -1,10 +1,16 @@
 <template>
   <div
-    class="w-[min(22rem,calc(100vw-3rem))] max-w-full rounded-lg border border-outline-gray-1 bg-surface-white p-3"
+    data-messenger-audio
+    class="max-w-full rounded-lg border border-outline-gray-1 bg-surface-white p-3"
+    :class="
+      compactPreview ? 'w-full min-w-0' : 'w-[min(22rem,calc(100vw-3rem))]'
+    "
   >
-    <div class="mb-2 flex min-w-0 items-center gap-2 text-sm font-medium text-ink-gray-8">
+    <div
+      class="mb-2 flex min-w-0 items-center gap-2 text-sm font-medium text-ink-gray-8"
+    >
       <AudioLinesIcon class="size-4 shrink-0" />
-      <span class="truncate">{{ title }}</span>
+      <span class="truncate">{{ __(title) }}</span>
     </div>
 
     <audio
@@ -46,7 +52,11 @@
           v-for="(bar, index) in bars"
           :key="index"
           class="flex-1 rounded-full"
-          :class="barProgress(index) <= progress ? 'bg-surface-blue-3' : 'bg-surface-gray-4'"
+          :class="
+            barProgress(index) <= progress
+              ? 'bg-surface-blue-3'
+              : 'bg-surface-gray-4'
+          "
           :style="{ height: `${2 + bar * 22}px` }"
         />
       </div>
@@ -95,7 +105,10 @@
           />
         </div>
       </div>
-      <div v-if="error" class="mt-2 flex items-center gap-2 text-xs text-ink-red-4">
+      <div
+        v-if="error"
+        class="mt-2 flex items-center gap-2 text-xs text-ink-red-4"
+      >
         <CircleAlertIcon class="size-4 shrink-0" />
         <span>{{ error }}</span>
       </div>
@@ -118,13 +131,19 @@ import {
   normalizeAudioVolume,
   prepareWaveform,
 } from '@/utils/messengerAudio'
-import { getAttachmentState } from '@/utils/messengerAttachments'
+import {
+  getAttachmentState,
+  getMessengerAttachmentTitle,
+} from '@/utils/messengerAttachments'
 import { Button } from 'frappe-ui'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import AudioLinesIcon from '~icons/lucide/audio-lines'
 import CircleAlertIcon from '~icons/lucide/circle-alert'
 
-const props = defineProps({ attachment: { type: Object, required: true } })
+const props = defineProps({
+  attachment: { type: Object, required: true },
+  compactPreview: { type: Boolean, default: false },
+})
 const audio = ref(null)
 const playing = ref(false)
 const loading = ref(true)
@@ -138,16 +157,13 @@ let previousVolume = 1
 const state = computed(() => getAttachmentState(props.attachment))
 const bars = computed(() => prepareWaveform(props.attachment.waveform, 64))
 const duration = computed(
-  () => metadataDuration.value || Number(props.attachment.duration_ms || 0) / 1000,
+  () =>
+    metadataDuration.value || Number(props.attachment.duration_ms || 0) / 1000,
 )
 const progress = computed(() =>
   duration.value ? clampAudioFraction(currentTime.value / duration.value) : 0,
 )
-const title = computed(() =>
-  props.attachment.is_voice
-    ? __('Голосовое сообщение')
-    : props.attachment.title || props.attachment.file_name || __('Аудио'),
-)
+const title = computed(() => getMessengerAttachmentTitle(props.attachment))
 
 async function togglePlayback() {
   if (!audio.value || error.value) return

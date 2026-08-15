@@ -2,11 +2,11 @@
 import { createApp, nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/components/LeadMessenger/ImageLightbox.vue', () => ({
+vi.mock('@/components/LeadMessenger/MediaLightbox.vue', () => ({
   default: {
-    props: ['images', 'initialIndex'],
+    props: ['items', 'initialIndex'],
     template:
-      '<div data-test-lightbox :data-index="initialIndex">{{ images.length }}</div>',
+      '<div data-test-lightbox :data-index="initialIndex">{{ items.map((item) => `${item.id}:${item.kind}`).join(",") }}</div>',
   },
 }))
 
@@ -15,6 +15,15 @@ vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
     props: ['attachment'],
     template:
       '<div data-test-attachment-card>{{ attachment.fallback_text || attachment.file_name }}</div>',
+  },
+}))
+
+vi.mock('@/components/LeadMessenger/AnimatedMediaAttachment.vue', () => ({
+  default: {
+    emits: ['open-media'],
+    props: ['attachment', 'compactPreview'],
+    template:
+      '<button data-test-animation :data-id="attachment.id" :data-compact="compactPreview" @click="$emit(\'open-media\', attachment)" />',
   },
 }))
 
@@ -34,7 +43,11 @@ vi.mock('@/components/LeadMessenger/LocationAttachment.vue', () => ({
 }))
 
 vi.mock('@/components/LeadMessenger/MessengerAudioPlayer.vue', () => ({
-  default: { template: '<div data-test-audio />' },
+  default: {
+    props: ['attachment', 'compactPreview'],
+    template:
+      '<div data-test-audio :data-id="attachment.id" :data-compact="compactPreview" />',
+  },
 }))
 
 vi.mock('@/components/LeadMessenger/VideoAttachment.vue', () => ({
@@ -86,10 +99,10 @@ function mountGrid(images) {
   return root
 }
 
-function mountRenderer(attachments) {
+function mountRenderer(attachments, props = {}) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(AttachmentRenderer, { attachments })
+  let app = createApp(AttachmentRenderer, { attachments, ...props })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
   mounted.push({ app, root })
@@ -97,22 +110,22 @@ function mountRenderer(attachments) {
 }
 
 describe('messenger image layout', () => {
-  it('scales a small single-image preview to the presentation width', () => {
+  it('scales a small single-image preview inside the compact media bounds', () => {
     let root = mountGrid([image('I-1')])
     let wrapper = root.querySelector('[data-single-image]')
     let media = wrapper.querySelector('img')
 
     expect(root.querySelector('[data-image-grid]')).toBeNull()
-    expect(wrapper.className).toContain('w-[22.5rem]')
     expect(wrapper.className).toContain('max-w-full')
     expect(wrapper.className).toContain('rounded-md')
+    expect(wrapper.style.width).toBe('320px')
+    expect(wrapper.style.aspectRatio).toBe('1 / 1')
     expect(media.getAttribute('width')).toBe('64')
     expect(media.getAttribute('height')).toBe('64')
     expect(media.className).toContain('w-full')
-    expect(media.className).toContain('h-auto')
+    expect(media.className).toContain('size-full')
     expect(media.className).not.toContain('w-auto')
-    expect(media.className).not.toContain('max-h-[22rem]')
-    expect(media.className).not.toContain('size-full')
+    expect(media.className).toContain('object-contain')
     expect(media.className).not.toContain('object-cover')
   })
 
@@ -127,22 +140,20 @@ describe('messenger image layout', () => {
       },
     ])
     let renderer = root.querySelector('[data-attachment-renderer]')
-    let mediaRow = root.querySelector('[data-mixed-single-image-row]')
     let media = root.querySelector('[data-single-image]')
     let document = root.querySelector('[data-test-attachment-card]')
 
-    expect(renderer.className).toContain('max-w-[28rem]')
-    expect(mediaRow.className).toContain('justify-center')
-    expect(mediaRow.querySelectorAll('[data-media-side-line]')).toHaveLength(2)
-    expect(
-      [...mediaRow.querySelectorAll('[data-media-side-line]')].every((line) =>
-        line.className.includes('bg-outline-gray-1'),
-      ),
-    ).toBe(true)
-    expect(media.className).toContain('w-[16.5rem]')
+    expect(renderer.className).toContain('max-w-[20rem]')
+    expect(renderer.className).toContain('w-fit')
+    expect(root.querySelector('[data-mixed-single-image-row]')).toBeNull()
+    expect(root.querySelector('[data-media-side-line]')).toBeNull()
+    expect(media.style.width).toBe('320px')
+    expect(media.style.aspectRatio).toBe(`${320 / 360} / 1`)
     expect(media.className).toContain('justify-self-start')
-    expect(media.querySelector('img').className).toContain('h-auto')
-    expect(media.querySelector('img').className).not.toContain('object-cover')
+    expect(media.querySelector('[data-media-backdrop]')).not.toBeNull()
+    expect(
+      media.querySelector('img:not([data-media-backdrop])').className,
+    ).toContain('object-contain')
     expect(document.textContent).toContain('contract.pdf')
     expect(media.compareDocumentPosition(document)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
@@ -158,7 +169,7 @@ describe('messenger image layout', () => {
 
     expect(root.querySelector('[data-single-image]')).toBeNull()
     expect(grid.className).toContain('grid-cols-2')
-    expect(grid.className).toContain('w-[min(28rem,calc(100vw-3rem))]')
+    expect(grid.className).toContain('w-[min(20rem,calc(100vw-3rem))]')
     expect(grid.querySelectorAll('button')).toHaveLength(4)
     expect(media.every((item) => item.className.includes('object-cover'))).toBe(
       true,
@@ -166,7 +177,7 @@ describe('messenger image layout', () => {
     expect(grid.textContent).toContain('+1')
   })
 
-  it('reserves the full presentation width before video playback starts', () => {
+  it('reserves the compact presentation width before video playback starts', () => {
     let root = mountRenderer([
       {
         id: 'MAX-VIDEO-1',
@@ -179,9 +190,9 @@ describe('messenger image layout', () => {
     ])
     let renderer = root.querySelector('[data-attachment-renderer]')
 
-    expect(renderer.className).toContain('w-[28rem]')
+    expect(renderer.className).toContain('max-w-[20rem]')
     expect(renderer.className).toContain('max-w-full')
-    expect(renderer.className.split(/\s+/)).not.toContain('w-full')
+    expect(renderer.className.split(/\s+/)).toContain('w-fit')
     expect(root.querySelector('[data-test-video]')).not.toBeNull()
   })
 
@@ -192,9 +203,7 @@ describe('messenger image layout', () => {
       image('I-1'),
     ])
     let ordered = [
-      ...root.querySelectorAll(
-        '[data-test-video], [data-mixed-single-image-row]',
-      ),
+      ...root.querySelectorAll('[data-test-video], [data-single-image]'),
     ]
 
     expect(ordered.map((item) => item.dataset.id || 'images')).toEqual([
@@ -260,8 +269,63 @@ describe('messenger image layout', () => {
     await nextTick()
 
     let lightbox = root.querySelector('[data-test-lightbox]')
-    expect(lightbox.textContent).toBe('3')
+    expect(lightbox.textContent).toBe('I-1:image,I-2:image,I-3:image')
     expect(lightbox.dataset.index).toBe('1')
+  })
+
+  it('opens images and provider animations in one ordered gallery', async () => {
+    let root = mountRenderer([
+      image('PHOTO-1'),
+      {
+        id: 'VK-GIF',
+        type: 'image',
+        status: 'available',
+        mime_type: 'image/gif',
+        is_animated: true,
+        url: '/media/vk.gif',
+      },
+      {
+        id: 'TG-GIF',
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        is_animated: true,
+        playback_url: '/media/telegram.mp4',
+      },
+      image('MAX-GIF', {
+        mime_type: 'image/gif',
+        url: '/media/max.gif',
+      }),
+    ])
+
+    root.querySelector('[data-test-animation][data-id="TG-GIF"]').click()
+    await nextTick()
+
+    let lightbox = root.querySelector('[data-test-lightbox]')
+    expect(lightbox.textContent).toBe(
+      'PHOTO-1:image,VK-GIF:image,TG-GIF:animation,MAX-GIF:image',
+    )
+    expect(lightbox.dataset.index).toBe('2')
+  })
+
+  it('does not include animated stickers in the media gallery', async () => {
+    let root = mountRenderer([
+      image('PHOTO-1'),
+      {
+        id: 'STICKER-1',
+        type: 'sticker',
+        status: 'available',
+        mime_type: 'video/webm',
+        is_animated: true,
+        url: '/media/sticker.webm',
+      },
+    ])
+
+    root.querySelector('[data-single-image]').click()
+    await nextTick()
+    expect(root.querySelector('[data-test-lightbox]').textContent).toBe(
+      'PHOTO-1:image',
+    )
   })
 
   it('routes animated JSON stickers to the Lottie renderer', () => {
@@ -281,5 +345,110 @@ describe('messenger image layout', () => {
       'VK-STICKER-1',
     )
     expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+  })
+
+  it('routes animated images and videos to the common animation renderer', () => {
+    let root = mountRenderer(
+      [
+        {
+          id: 'GIF-1',
+          type: 'video',
+          status: 'available',
+          is_animated: true,
+        },
+        {
+          id: 'GIF-2',
+          type: 'image',
+          status: 'available',
+          is_animated: true,
+        },
+      ],
+      { compactPreview: true },
+    )
+
+    let animations = [...root.querySelectorAll('[data-test-animation]')]
+    expect(animations.map((item) => item.dataset.id)).toEqual([
+      'GIF-1',
+      'GIF-2',
+    ])
+    expect(animations.every((item) => item.dataset.compact === 'true')).toBe(
+      true,
+    )
+  })
+
+  it('constrains forwarded voice to the compact attachment container', () => {
+    let root = mountRenderer(
+      [
+        {
+          id: 'VOICE-1',
+          type: 'audio',
+          status: 'available',
+          is_voice: true,
+          url: '/media/voice.ogg',
+        },
+      ],
+      { compactPreview: true },
+    )
+    let renderer = root.querySelector('[data-attachment-renderer]')
+    let audio = root.querySelector('[data-test-audio]')
+
+    expect(renderer.className).toContain('w-full')
+    expect(renderer.className).toContain('min-w-0')
+    expect(renderer.className).not.toContain('w-fit')
+    expect(audio.dataset.id).toBe('VOICE-1')
+    expect(audio.dataset.compact).toBe('true')
+  })
+
+  it('letterboxes a portrait forwarded image and keeps the lightbox source', async () => {
+    let root = mountRenderer(
+      [image('PORTRAIT', { width: 1080, height: 1920 })],
+      { compactPreview: true },
+    )
+    let preview = root.querySelector('[data-single-image]')
+
+    expect(preview.style.width).toBe('320px')
+    expect(preview.style.aspectRatio).toBe(`${320 / 280} / 1`)
+    expect(preview.querySelector('[data-media-backdrop]')).not.toBeNull()
+    expect(
+      preview.querySelector('img:not([data-media-backdrop])').className,
+    ).toContain('object-contain')
+
+    preview.click()
+    await nextTick()
+    expect(root.querySelector('[data-test-lightbox]')).not.toBeNull()
+  })
+
+  it('uses loaded image dimensions when provider metadata is missing', async () => {
+    let root = mountGrid([image('UNKNOWN', { width: null, height: null })])
+    let preview = root.querySelector('[data-single-image]')
+    let media = preview.querySelector('img:not([data-media-backdrop])')
+
+    expect(preview.style.aspectRatio).toBe('')
+    Object.defineProperty(media, 'naturalWidth', {
+      configurable: true,
+      value: 900,
+    })
+    Object.defineProperty(media, 'naturalHeight', {
+      configurable: true,
+      value: 1600,
+    })
+    media.dispatchEvent(new Event('load'))
+    await nextTick()
+
+    expect(preview.style.width).toBe('320px')
+    expect(preview.style.aspectRatio).toBe(`${320 / 360} / 1`)
+    expect(preview.querySelector('[data-media-backdrop]')).not.toBeNull()
+  })
+
+  it('caps a forwarded album grid at 320 by 280 pixels', () => {
+    let root = mountRenderer(
+      Array.from({ length: 4 }, (_, index) => image(`I-${index + 1}`)),
+      { compactPreview: true },
+    )
+    let grid = root.querySelector('[data-image-grid]')
+
+    expect(grid.style.maxHeight).toBe('280px')
+    expect(grid.style.aspectRatio).toBe(`${320 / 280} / 1`)
+    expect(grid.className).toContain('grid-rows-2')
   })
 })

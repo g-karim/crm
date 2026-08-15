@@ -16,17 +16,44 @@
         @pointermove="movePan"
         @pointerup="endPan"
         @pointercancel="endPan"
+        @click.self="emit('close')"
       >
+        <video
+          v-if="current.kind === 'animation' && !mediaFailed"
+          :key="current.id || current.url"
+          ref="mediaElement"
+          data-lightbox-animation
+          :src="current.url"
+          class="max-h-full max-w-full object-contain will-change-transform"
+          :style="mediaStyle"
+          autoplay
+          loop
+          muted
+          playsinline
+          preload="metadata"
+          @error="mediaFailed = true"
+          @dblclick.stop="resetView"
+        />
         <img
-          ref="imageElement"
+          v-else-if="current.url && !mediaFailed"
+          :key="current.id || current.url"
+          ref="mediaElement"
           data-lightbox-image
           :src="current.url"
           :alt="current.file_name || __('Изображение')"
           class="max-h-full max-w-full object-contain will-change-transform"
-          :style="imageStyle"
+          :style="mediaStyle"
           draggable="false"
+          @error="mediaFailed = true"
           @dblclick.stop="resetView"
         />
+        <div
+          v-else
+          data-lightbox-unavailable
+          class="rounded-xl border border-white/20 bg-black/70 px-4 py-3 text-sm text-white"
+        >
+          {{ __('Медиа недоступно') }}
+        </div>
       </div>
 
       <div
@@ -46,7 +73,7 @@
           data-lightbox-zoom-out
           type="button"
           class="grid size-9 place-items-center rounded-lg transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30 disabled:opacity-40 disabled:hover:scale-100"
-          :disabled="scale <= MIN_SCALE"
+          :disabled="scale <= MIN_SCALE || mediaFailed"
           :aria-label="__('Уменьшить')"
           @click="setScale(scale - SCALE_STEP)"
         >
@@ -55,7 +82,8 @@
         <button
           data-lightbox-reset
           type="button"
-          class="min-w-14 rounded-lg px-2 py-2 text-xs font-medium transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30"
+          class="min-w-14 rounded-lg px-2 py-2 text-xs font-medium transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30 disabled:opacity-40 disabled:hover:scale-100"
+          :disabled="mediaFailed"
           :aria-label="__('Сбросить масштаб')"
           @click="resetView"
         >
@@ -65,7 +93,7 @@
           data-lightbox-zoom-in
           type="button"
           class="grid size-9 place-items-center rounded-lg transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30 disabled:opacity-40 disabled:hover:scale-100"
-          :disabled="scale >= MAX_SCALE"
+          :disabled="scale >= MAX_SCALE || mediaFailed"
           :aria-label="__('Увеличить')"
           @click="setScale(scale + SCALE_STEP)"
         >
@@ -83,11 +111,11 @@
       </div>
 
       <button
-        v-if="images.length > 1"
+        v-if="items.length > 1"
         data-lightbox-previous
         type="button"
         class="absolute left-2 z-10 grid size-11 place-items-center rounded-full border border-white/20 bg-black/65 p-0 leading-none text-white shadow transition duration-150 ease-out hover:scale-105 hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/20 sm:left-6"
-        :aria-label="__('Предыдущее изображение')"
+        :aria-label="__('Предыдущее медиа')"
         @click="move(-1)"
       >
         <span class="grid size-full place-items-center leading-none">
@@ -95,11 +123,11 @@
         </span>
       </button>
       <button
-        v-if="images.length > 1"
+        v-if="items.length > 1"
         data-lightbox-next
         type="button"
         class="absolute right-2 z-10 grid size-11 place-items-center rounded-full border border-white/20 bg-black/65 p-0 leading-none text-white shadow transition duration-150 ease-out hover:scale-105 hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/20 sm:right-6"
-        :aria-label="__('Следующее изображение')"
+        :aria-label="__('Следующее медиа')"
         @click="move(1)"
       >
         <span class="grid size-full place-items-center leading-none">
@@ -107,10 +135,10 @@
         </span>
       </button>
       <div
-        v-if="images.length > 1"
+        v-if="items.length > 1"
         class="absolute bottom-3 rounded-full border border-white/20 bg-black/70 px-3 py-1 text-sm text-white"
       >
-        {{ currentIndex + 1 }} / {{ images.length }}
+        {{ currentIndex + 1 }} / {{ items.length }}
       </div>
     </div>
   </Teleport>
@@ -130,14 +158,15 @@ const MAX_SCALE = 5
 const SCALE_STEP = 0.25
 
 const props = defineProps({
-  images: { type: Array, default: () => [] },
+  items: { type: Array, default: () => [] },
   initialIndex: { type: Number, default: 0 },
 })
 const emit = defineEmits(['close'])
 const currentIndex = ref(normalizedIndex(props.initialIndex))
-const current = computed(() => props.images[currentIndex.value] || {})
+const current = computed(() => props.items[currentIndex.value] || {})
 const viewport = ref(null)
-const imageElement = ref(null)
+const mediaElement = ref(null)
+const mediaFailed = ref(false)
 const scale = ref(MIN_SCALE)
 const panX = ref(0)
 const panY = ref(0)
@@ -145,24 +174,25 @@ const dragging = ref(false)
 let dragStart = null
 let previousOverflow = ''
 
-const imageStyle = computed(() => ({
+const mediaStyle = computed(() => ({
   transform: `translate3d(${panX.value}px, ${panY.value}px, 0) scale(${scale.value})`,
   transition: dragging.value ? 'none' : 'transform 120ms ease-out',
 }))
 
 function normalizedIndex(value) {
-  if (!props.images.length) return 0
+  if (!props.items.length) return 0
   let number = Number.isFinite(Number(value)) ? Number(value) : 0
-  return Math.min(Math.max(Math.trunc(number), 0), props.images.length - 1)
+  return Math.min(Math.max(Math.trunc(number), 0), props.items.length - 1)
 }
 
 function move(delta) {
-  if (!props.images.length) return
+  if (!props.items.length) return
   currentIndex.value =
-    (currentIndex.value + delta + props.images.length) % props.images.length
+    (currentIndex.value + delta + props.items.length) % props.items.length
 }
 
 function setScale(value, clientX, clientY) {
+  if (mediaFailed.value) return
   let next = Math.min(Math.max(value, MIN_SCALE), MAX_SCALE)
   if (next === scale.value) return
   let rect = viewport.value?.getBoundingClientRect()
@@ -186,7 +216,8 @@ function onWheel(event) {
 }
 
 function startPan(event) {
-  if (scale.value <= MIN_SCALE || event.button !== 0) return
+  if (mediaFailed.value || scale.value <= MIN_SCALE || event.button !== 0)
+    return
   dragging.value = true
   dragStart = {
     pointerId: event.pointerId,
@@ -219,10 +250,16 @@ function clampPan() {
     return
   }
   let container = viewport.value
-  let image = imageElement.value
-  if (!container || !image) return
-  let maxX = Math.max((image.offsetWidth * scale.value - container.clientWidth) / 2, 0)
-  let maxY = Math.max((image.offsetHeight * scale.value - container.clientHeight) / 2, 0)
+  let media = mediaElement.value
+  if (!container || !media) return
+  let maxX = Math.max(
+    (media.offsetWidth * scale.value - container.clientWidth) / 2,
+    0,
+  )
+  let maxY = Math.max(
+    (media.offsetHeight * scale.value - container.clientHeight) / 2,
+    0,
+  )
   panX.value = Math.min(Math.max(panX.value, -maxX), maxX)
   panY.value = Math.min(Math.max(panY.value, -maxY), maxY)
 }
@@ -237,9 +274,10 @@ function resetView() {
 
 function onKeydown(event) {
   if (event.key === 'Escape') emit('close')
-  else if (event.key === 'ArrowLeft' && props.images.length > 1) move(-1)
-  else if (event.key === 'ArrowRight' && props.images.length > 1) move(1)
-  else if (event.key === '+' || event.key === '=') setScale(scale.value + SCALE_STEP)
+  else if (event.key === 'ArrowLeft' && props.items.length > 1) move(-1)
+  else if (event.key === 'ArrowRight' && props.items.length > 1) move(1)
+  else if (event.key === '+' || event.key === '=')
+    setScale(scale.value + SCALE_STEP)
   else if (event.key === '-') setScale(scale.value - SCALE_STEP)
   else if (event.key === '0') resetView()
   else return
@@ -247,6 +285,7 @@ function onKeydown(event) {
 }
 
 watch(currentIndex, async () => {
+  mediaFailed.value = false
   resetView()
   await nextTick()
   clampPan()

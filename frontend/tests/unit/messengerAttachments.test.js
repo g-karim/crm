@@ -4,6 +4,10 @@ import {
   formatAttachmentDuration,
   getAttachmentAction,
   getAttachmentState,
+  getMessengerAttachmentTitle,
+  getMessengerMessagePreview,
+  getCompactMediaDimensions,
+  getCompactPreviewDimensions,
   getVideoPlaybackUrl,
   getImageGridCellClass,
   getSingleImageBubbleWidthClass,
@@ -36,6 +40,20 @@ describe('messenger attachment contract v1', () => {
     expect(segments[4].items.map((item) => item.id)).toEqual(['I-3'])
   })
 
+  it('routes animated images and videos through one animation segment', () => {
+    let segments = buildMessengerAttachmentSegments([
+      { id: 'GIF-1', type: 'image', is_animated: true },
+      { id: 'GIF-2', type: 'video', is_animated: true },
+      { id: 'I-1', type: 'image' },
+    ])
+
+    expect(segments.map((segment) => segment.type)).toEqual([
+      'animation',
+      'animation',
+      'images',
+    ])
+  })
+
   it('groups voice/audio, sticker, images and unsupported', () => {
     let groups = groupMessengerAttachments([
       { id: 'I-1', type: 'image' },
@@ -51,6 +69,70 @@ describe('messenger attachment contract v1', () => {
   it('formats voice duration', () => {
     expect(formatAttachmentDuration(4250)).toBe('0:04')
     expect(formatAttachmentDuration(65000)).toBe('1:05')
+  })
+
+  it('uses one title contract and hides provider-generated names', () => {
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'audio',
+        is_voice: true,
+        file_name: 'voice.ogg',
+      }),
+    ).toBe('Голосовое сообщение')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'video',
+        file_name: 'video-note.mp4',
+      }),
+    ).toBe('Видео')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'file',
+        file_name: 'contract.pdf',
+      }),
+    ).toBe('contract.pdf')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'file',
+        file_name: 'contract.pdf',
+        display_title: 'Договор',
+      }),
+    ).toBe('Договор')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'unsupported',
+        fallback_text: 'Неподдерживаемое вложение MAX: share',
+      }),
+    ).toBe('Неподдерживаемое вложение')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'link',
+        title: 'Provider-specific page title',
+      }),
+    ).toBe('Ссылка')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'audio',
+        file_name: 'audio.mp3',
+      }),
+    ).toBe('Аудио')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'sticker',
+        status: 'unsupported',
+        file_name: 'sticker.tgs',
+      }),
+    ).toBe('Стикер недоступен')
+  })
+
+  it('builds human last-message previews without raw type markers', () => {
+    expect(
+      getMessengerMessagePreview({
+        message_type: 'audio',
+        display_text: 'Голосовое сообщение',
+      }),
+    ).toBe('Голосовое сообщение')
+    expect(getMessengerMessagePreview({ message_type: 'video' })).toBe('Видео')
   })
 
   it('classifies only a single standalone image as single-image layout', () => {
@@ -74,30 +156,62 @@ describe('messenger attachment contract v1', () => {
     )
   })
 
-  it('selects presentation width from image orientation, not intrinsic size', () => {
+  it('uses content-sized bubble classes for compact media', () => {
     expect(getSingleImageBubbleWidthClass({ width: 100, height: 200 })).toBe(
-      'w-[18rem]',
+      'w-fit max-w-full',
     )
-    expect(getSingleImageBubbleWidthClass({ width: 64, height: 64 })).toBe(
-      'w-[24rem]',
-    )
-    expect(getSingleImageBubbleWidthClass({ width: 400, height: 200 })).toBe(
-      'w-[29.5rem]',
-    )
-    expect(getSingleImageBubbleWidthClass({ width: 100, height: 95 })).toBe(
-      'w-[24rem]',
-    )
-    expect(getSingleImageBubbleWidthClass({})).toBe('w-[24rem]')
-
+    expect(getSingleImageBubbleWidthClass({})).toBe('w-fit max-w-full')
     expect(getSingleImageMediaWidthClass({ width: 100, height: 200 })).toBe(
-      'w-[16.5rem]',
+      'max-w-full',
     )
-    expect(getSingleImageMediaWidthClass({ width: 64, height: 64 })).toBe(
-      'w-[22.5rem]',
-    )
-    expect(getSingleImageMediaWidthClass({ width: 400, height: 200 })).toBe(
-      'w-[28rem]',
-    )
+  })
+
+  it('uses a full-width letterboxed frame for portrait media', () => {
+    expect(getCompactMediaDimensions({ width: 9, height: 16 })).toEqual({
+      ratio: 320 / 360,
+      width: 320,
+      height: 360,
+      letterboxed: true,
+    })
+    expect(getCompactMediaDimensions({ width: 4, height: 5 })).toEqual({
+      ratio: 320 / 360,
+      width: 320,
+      height: 360,
+      letterboxed: true,
+    })
+    expect(getCompactMediaDimensions({ width: 64, height: 64 })).toEqual({
+      ratio: 1,
+      width: 320,
+      height: 320,
+      letterboxed: false,
+    })
+    expect(getCompactMediaDimensions({ width: 400, height: 200 })).toEqual({
+      ratio: 2,
+      width: 320,
+      height: 160,
+      letterboxed: false,
+    })
+    expect(getCompactMediaDimensions({})).toEqual({
+      ratio: 16 / 9,
+      width: 320,
+      height: 180,
+      letterboxed: false,
+    })
+  })
+
+  it('letterboxes tall compact previews without cropping them', () => {
+    expect(getCompactPreviewDimensions({ width: 1920, height: 1080 })).toEqual({
+      ratio: 1920 / 1080,
+      width: 320,
+      height: 180,
+      letterboxed: false,
+    })
+    expect(getCompactPreviewDimensions({ width: 1080, height: 1920 })).toEqual({
+      ratio: 320 / 280,
+      width: 320,
+      height: 280,
+      letterboxed: true,
+    })
   })
 
   it('builds grid layouts for two, three, four and more images', () => {

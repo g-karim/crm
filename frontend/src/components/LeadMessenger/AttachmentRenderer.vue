@@ -4,37 +4,25 @@
     data-attachment-renderer
     class="mt-2 grid max-w-full gap-2"
     :class="
-      singleImage ? 'w-full' : hasVideo ? 'w-[28rem]' : 'w-full max-w-[28rem]'
+      compactPreview
+        ? 'w-full min-w-0'
+        : singleImage
+          ? 'w-fit'
+          : 'w-fit max-w-[20rem]'
     "
   >
     <template v-for="segment in segments" :key="segment.key">
-      <div
-        v-if="
-          segment.type === 'images' &&
-          segment.items.length === 1 &&
-          !singleImage
-        "
-        data-mixed-single-image-row
-        class="flex w-full min-w-0 items-stretch justify-center gap-2"
-      >
-        <span
-          data-media-side-line
-          aria-hidden="true"
-          class="w-px shrink-0 rounded-full bg-outline-gray-1"
-        />
-        <div class="min-w-0 max-w-full">
-          <ImageGrid :images="segment.items" @open-image="openImage" />
-        </div>
-        <span
-          data-media-side-line
-          aria-hidden="true"
-          class="w-px shrink-0 rounded-full bg-outline-gray-1"
-        />
-      </div>
       <ImageGrid
-        v-else-if="segment.type === 'images'"
+        v-if="segment.type === 'images'"
         :images="segment.items"
+        :compact-preview="compactPreview"
         @open-image="openImage"
+      />
+      <AnimatedMediaAttachment
+        v-else-if="segment.type === 'animation'"
+        :attachment="segment.attachment"
+        :compact-preview="compactPreview"
+        @open-media="openMedia"
       />
       <div v-else-if="segment.type === 'sticker'" class="max-w-52">
         <VkLottieSticker
@@ -61,7 +49,7 @@
             state(segment.attachment).active
           "
           :src="segment.attachment.url"
-          :alt="segment.attachment.file_name || __('Стикер')"
+          :alt="__(getMessengerAttachmentTitle(segment.attachment))"
           class="max-h-52 max-w-52 object-contain"
           loading="lazy"
         />
@@ -74,12 +62,14 @@
       <MessengerAudioPlayer
         v-else-if="segment.type === 'audio'"
         :attachment="segment.attachment"
+        :compact-preview="compactPreview"
       />
       <VideoAttachment
         v-else-if="segment.type === 'video'"
         :attachment="segment.attachment"
         :playback-scope="playbackScope"
         :provider="provider"
+        :compact-preview="compactPreview"
       />
       <LocationAttachment
         v-else-if="segment.type === 'location'"
@@ -91,9 +81,9 @@
       />
       <AttachmentCard v-else :attachment="segment.attachment" />
     </template>
-    <ImageLightbox
+    <MediaLightbox
       v-if="lightboxOpen"
-      :images="availableImages"
+      :items="availableMedia"
       :initialIndex="lightboxIndex"
       @close="lightboxOpen = false"
     />
@@ -104,13 +94,15 @@
 import {
   buildMessengerAttachmentSegments,
   getAttachmentState,
+  getMessengerAttachmentTitle,
   isSingleImageAttachmentSet,
 } from '@/utils/messengerAttachments'
 import { computed, ref } from 'vue'
+import AnimatedMediaAttachment from './AnimatedMediaAttachment.vue'
 import AttachmentCard from './AttachmentCard.vue'
 import ContactAttachment from './ContactAttachment.vue'
 import ImageGrid from './ImageGrid.vue'
-import ImageLightbox from './ImageLightbox.vue'
+import MediaLightbox from './MediaLightbox.vue'
 import MessengerAudioPlayer from './MessengerAudioPlayer.vue'
 import LocationAttachment from './LocationAttachment.vue'
 import VideoAttachment from './VideoAttachment.vue'
@@ -120,6 +112,7 @@ const props = defineProps({
   attachments: { type: Array, default: () => [] },
   playbackScope: { type: String, default: '' },
   provider: { type: String, default: '' },
+  compactPreview: { type: Boolean, default: false },
 })
 const segments = computed(() =>
   buildMessengerAttachmentSegments(props.attachments),
@@ -127,22 +120,47 @@ const segments = computed(() =>
 const singleImage = computed(() =>
   isSingleImageAttachmentSet(props.attachments),
 )
-const hasVideo = computed(() =>
-  props.attachments.some((attachment) => attachment.type === 'video'),
-)
-const availableImages = computed(() =>
-  props.attachments.filter(
-    (attachment) =>
-      attachment.type === 'image' &&
-      attachment.url &&
-      getAttachmentState(attachment).active,
-  ),
+const availableMedia = computed(() =>
+  props.attachments.flatMap((attachment) => {
+    if (!getAttachmentState(attachment).active) return []
+    if (attachment.type === 'image' && attachment.url) {
+      return [
+        {
+          id: attachment.id,
+          kind: 'image',
+          url: attachment.url,
+          download_url: attachment.download_url,
+          file_name: attachment.file_name,
+        },
+      ]
+    }
+    if (attachment.type === 'video' && attachment.is_animated) {
+      let url = attachment.playback_url
+      if (!url) return []
+      return [
+        {
+          id: attachment.id,
+          kind: 'animation',
+          url,
+          download_url: attachment.download_url,
+          file_name: attachment.file_name,
+        },
+      ]
+    }
+    return []
+  }),
 )
 const lightboxOpen = ref(false)
 const lightboxIndex = ref(0)
 
 function openImage(image) {
-  let index = availableImages.value.findIndex((item) => item.id === image.id)
+  openMedia(image)
+}
+
+function openMedia(attachment) {
+  let index = availableMedia.value.findIndex(
+    (item) => item.id === attachment?.id,
+  )
   if (index < 0) return
   lightboxIndex.value = index
   lightboxOpen.value = true

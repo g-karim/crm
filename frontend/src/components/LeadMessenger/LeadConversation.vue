@@ -114,24 +114,25 @@
               <div
                 :data-message-id="item.message.name"
                 class="flex"
-                :class="[
+                :class="
                   item.message.direction === 'outbound'
                     ? 'justify-end'
-                    : 'justify-start',
-                  item.messages.some(
-                    (message) => highlightedMessage === message.name,
-                  )
-                    ? 'rounded ring-2 ring-outline-blue-2'
-                    : '',
-                ]"
+                    : 'justify-start'
+                "
               >
                 <div
+                  data-message-bubble
                   class="min-w-0 max-w-[94%] rounded-md px-3 py-2 text-base shadow-sm sm:max-w-[78%]"
                   :class="[
                     item.message.direction === 'outbound'
                       ? 'bg-surface-blue-1 text-ink-gray-9'
                       : 'bg-surface-gray-1 text-ink-gray-9',
                     messageBubbleWidthClass(item.message),
+                    item.messages.some(
+                      (message) => highlightedMessage === message.name,
+                    )
+                      ? 'ring-2 ring-outline-blue-2'
+                      : '',
                   ]"
                   @contextmenu="openReactionPicker(item.message, $event)"
                 >
@@ -306,6 +307,7 @@
           :disabled="baseSendDisabled || Boolean(pendingLocation)"
           :placeholder="__('Введите сообщение...')"
           @keydown.enter.stop="sendOnEnter"
+          @update:modelValue="handleComposerInput"
           @paste.stop="handleComposerPaste"
         />
         <ComposerAttachments
@@ -376,11 +378,11 @@
             @click="prepareHandoff"
           />
         </div>
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0 text-sm text-ink-gray-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="min-w-0 flex-1 basis-40 text-sm text-ink-gray-5">
             <div class="truncate">{{ composerHint }}</div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
             <Button
               v-if="selectedCapabilities.voice.send"
               variant="ghost"
@@ -481,6 +483,7 @@ import {
 import { isVideoFile, validateComposerFileMix } from '@/utils/messengerComposer'
 import { getForwardedContentKind } from '@/utils/messengerForwarding'
 import { createMessengerReadController } from '@/utils/messengerRead'
+import { createMessengerTypingController } from '@/utils/messengerTyping'
 import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
 import {
   createMessengerMessageActions,
@@ -548,6 +551,12 @@ const messageEditorElements = new Map()
 const reactionComponents = new Map()
 let typingTimer = null
 let highlightTimer = null
+
+const composerTyping = createMessengerTypingController({
+  send(conversation) {
+    return call('crm_messenger.api.messages.send_typing', { conversation })
+  },
+})
 
 const { $dialog, $socket } = globalStore()
 
@@ -712,8 +721,8 @@ const replyComposerContext = computed(() => {
       sender_name: messageSender(replyTarget.value),
       text: `${replyTarget.value.text || ''}`.slice(0, 500) || null,
       message_type: replyTarget.value.message_type || 'text',
-      attachment_types: (replyTarget.value.attachments || []).map(
-        (item) => item.type,
+      attachment_types: (replyTarget.value.attachments || []).map((item) =>
+        item.is_voice ? 'voice' : item.type,
       ),
       forwarded_content_kind: replyTarget.value.forward_context
         ? getForwardedContentKind(replyTarget.value.forward_context)
@@ -853,6 +862,7 @@ onBeforeUnmount(() => {
   readController.stop()
   clearTyping()
   clearTimeout(highlightTimer)
+  composerTyping.reset()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
@@ -1001,6 +1011,20 @@ function ensureSelectedConversation() {
   selectedConversationName.value = resolved.conversation?.name || ''
 }
 
+function handleComposerInput(value) {
+  composerTyping.input({
+    text: value,
+    conversation: selectedConversation.value?.name,
+    enabled:
+      props.active &&
+      document.visibilityState === 'visible' &&
+      selectedCapabilities.value.typing.send &&
+      !baseSendDisabled.value &&
+      !voiceActive.value &&
+      !pendingAttachments.value.length,
+  })
+}
+
 async function sendMessage() {
   let text = draftText.value.trim()
   if (
@@ -1067,6 +1091,7 @@ async function sendMessage() {
       clientRequestFingerprint.value = ''
       throw new Error(result?.message || __('Не удалось отправить сообщение.'))
     } else {
+      composerTyping.reset()
       draftText.value = ''
       composerAttachments.value?.clear()
       pendingLocation.value = null
@@ -1311,9 +1336,7 @@ async function handleMessagesScroll() {
 function startReply(message) {
   if (!message?.can_reply || messageActionState.value.pendingMessage) return
   if (pendingLocation.value) {
-    genericError.value = __(
-      'Удалите геолокацию перед подготовкой ответа.',
-    )
+    genericError.value = __('Удалите геолокацию перед подготовкой ответа.')
     return
   }
   let conversation = resolveMessengerReplyConversation(
@@ -1409,21 +1432,26 @@ function clearTyping() {
 }
 
 function handleVisibilityChange() {
-  if (document.visibilityState !== 'visible') clearTyping()
-  else readController.schedule()
+  if (document.visibilityState !== 'visible') {
+    clearTyping()
+    composerTyping.reset()
+  } else readController.schedule()
 }
 
 watch(
   () => props.active,
   (active) => {
-    if (!active) clearTyping()
-    else readController.schedule()
+    if (!active) {
+      clearTyping()
+      composerTyping.reset()
+    } else readController.schedule()
   },
 )
 
 watch(
   () => selectedConversation.value?.name,
   (conversationName) => {
+    composerTyping.reset()
     if (
       replyTarget.value &&
       replyTarget.value.conversation !== conversationName
@@ -1438,8 +1466,16 @@ watch(
 watch(
   () => selectedChannel.value,
   () => {
+    composerTyping.reset()
     ensureSelectedConversation()
     handoffTargetChannel.value = ''
+  },
+)
+
+watch(
+  () => [voiceActive.value, pendingAttachments.value.length],
+  ([recording, attachmentCount]) => {
+    if (recording || attachmentCount) composerTyping.reset()
   },
 )
 
@@ -1459,7 +1495,6 @@ function messageSource(message) {
 }
 
 function messageBubbleWidthClass(message) {
-  if (message.forward_context) return 'w-[32rem] max-w-full'
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
   return getSingleImageBubbleWidthClass(message.attachments[0])
 }

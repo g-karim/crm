@@ -176,6 +176,12 @@ export function shouldShowMessengerText(message = {}) {
 
 export function getMessengerDeliveryLabel(message = {}) {
   if (isMaxVideoProcessingMessage(message)) return 'MAX обрабатывает видео'
+  if (
+    message?.provider === 'telegram_bot' &&
+    getMessengerDeliveryState(message) === 'sent'
+  ) {
+    return 'Отправлено в Telegram; статус прочтения недоступен'
+  }
   return DELIVERY_LABELS[getMessengerDeliveryState(message)] || ''
 }
 
@@ -225,6 +231,7 @@ export function getMessengerCapabilities(channel = {}) {
   let reactions = channel?.capabilities?.reactions || {}
   let location = channel?.capabilities?.location || {}
   let contact = channel?.capabilities?.contact || {}
+  let typing = channel?.capabilities?.typing || {}
   return {
     can_start_conversation:
       channel?.capabilities?.can_start_conversation ?? true,
@@ -242,6 +249,12 @@ export function getMessengerCapabilities(channel = {}) {
     contact: {
       receive: Boolean(contact.receive),
       send: Boolean(contact.send),
+    },
+    typing: {
+      receive: Boolean(
+        typing.receive ?? channel?.capabilities?.supports_typing_events,
+      ),
+      send: Boolean(typing.send),
     },
     supported_attachment_types:
       channel?.capabilities?.supported_attachment_types || [],

@@ -50,10 +50,17 @@ vi.mock('frappe-ui', () => ({
   toast: { error: vi.fn() },
 }))
 
+vi.mock(
+  '~icons/lucide/audio-lines',
+  () => ({ default: { template: '<span data-test-audio-icon />' } }),
+  { virtual: true },
+)
+
 import ContactAttachment from '@/components/LeadMessenger/ContactAttachment.vue'
 import LocationAttachment from '@/components/LeadMessenger/LocationAttachment.vue'
 import LocationPickerDialog from '@/components/LeadMessenger/LocationPickerDialog.vue'
 import MessageReactions from '@/components/LeadMessenger/MessageReactions.vue'
+import MessengerAudioPlayer from '@/components/LeadMessenger/MessengerAudioPlayer.vue'
 import { call } from 'frappe-ui'
 
 let mounted = []
@@ -102,6 +109,39 @@ async function flushImports() {
 }
 
 describe('messenger rich content', () => {
+  it('renders the common voice title for a Telegram technical filename', () => {
+    let root = mount(MessengerAudioPlayer, {
+      attachment: {
+        type: 'audio',
+        status: 'pending',
+        is_voice: true,
+        file_name: 'voice.ogg',
+      },
+    })
+
+    expect(root.textContent).toContain('Голосовое сообщение')
+    expect(root.textContent).not.toContain('voice.ogg')
+    expect(root.querySelector('[data-messenger-audio]').className).toContain(
+      'w-[min(22rem,calc(100vw-3rem))]',
+    )
+  })
+
+  it('uses the parent width for a compact forwarded voice player', () => {
+    let root = mount(MessengerAudioPlayer, {
+      attachment: {
+        type: 'audio',
+        status: 'pending',
+        is_voice: true,
+      },
+      compactPreview: true,
+    })
+    let player = root.querySelector('[data-messenger-audio]')
+
+    expect(player.className).toContain('w-full')
+    expect(player.className).toContain('min-w-0')
+    expect(player.className).not.toContain('w-[min(22rem,calc(100vw-3rem))]')
+  })
+
   it('renders a location card without the OpenStreetMap embed footer', async () => {
     let root = mount(LocationAttachment, {
       attachment: {
@@ -169,6 +209,9 @@ describe('messenger rich content', () => {
     expect(root.textContent).toContain('55.750000, 37.610000')
     expect(marker.on).toHaveBeenCalledWith('dragend', expect.any(Function))
     expect(map.attributionControl.setPrefix).toHaveBeenCalledWith(false)
+    expect(root.querySelector('[class*="55dvh"]').className).toContain(
+      'h-[clamp(10rem,55dvh,26.25rem)]',
+    )
 
     markerHandlers.dragend({ target: marker })
     await nextTick()
@@ -183,6 +226,13 @@ describe('messenger rich content', () => {
           items: [
             { reaction_id: 8, count: 2, emoji: '🔥' },
             { reaction_id: 64, count: 1, emoji: null },
+            {
+              reaction_id: 'custom_emoji:custom-1',
+              count: 1,
+              emoji: null,
+              reaction_type: 'custom_emoji',
+              supported: false,
+            },
           ],
           own_reaction_id: 8,
           catalog_version: 'vk-message-reactions-40-v1',
@@ -200,12 +250,25 @@ describe('messenger rich content', () => {
     expect(buttons[0].textContent).toContain('🔥 2')
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true')
     expect(buttons[1].textContent).toContain('#64 1')
-    expect(buttons).toHaveLength(2)
+    expect(buttons[2].textContent).toContain('✦ 1')
+    expect(buttons[2].getAttribute('title')).toBe(
+      'Пользовательская реакция Telegram',
+    )
+    expect(buttons[2].disabled).toBe(true)
+    expect(buttons).toHaveLength(3)
 
-    root.component.openPicker(new MouseEvent('contextmenu', { clientX: 20, clientY: 30 }))
+    root.component.openPicker(
+      new MouseEvent('contextmenu', { clientX: 20, clientY: 30 }),
+    )
     await nextTick()
     let picker = document.body.querySelector('[role="menu"]')
     expect(picker).not.toBeNull()
+    expect(picker.className).toContain('w-[calc(100vw-1rem)]')
+    expect(picker.className).toContain('max-h-[calc(100dvh-1rem)]')
+    expect(picker.className).toContain('overflow-y-auto')
+    expect(picker.className).toContain(
+      'grid-cols-[repeat(auto-fit,minmax(2.25rem,1fr))]',
+    )
     expect(picker.querySelectorAll('[role="menuitemradio"]')).toHaveLength(40)
     picker.querySelector('[role="menuitemradio"]').click()
     await nextTick()
@@ -217,5 +280,67 @@ describe('messenger rich content', () => {
         catalog_signature: 'catalog-signature',
       }),
     )
+  })
+
+  it('uses string Telegram reaction IDs and toggles the operator reaction', async () => {
+    call.mockResolvedValueOnce({
+      ok: true,
+      reaction_state: { items: [], own_reaction_id: null },
+    })
+    let root = mount(MessageReactions, {
+      message: {
+        name: 'telegram-message-1',
+        reactions: {
+          items: [{ reaction_id: 'emoji:👍', count: 2, emoji: '👍' }],
+          own_reaction_id: 'emoji:👍',
+          catalog_version: 'telegram-bot-api-10.2-emoji-v1',
+          catalog_signature: 'telegram-signature',
+          catalog: [{ reaction_id: 'emoji:👍', emoji: '👍' }],
+        },
+      },
+      canSend: true,
+    })
+
+    root.querySelector('button').click()
+    await nextTick()
+
+    expect(call).toHaveBeenCalledWith(
+      'crm_messenger.api.messages.set_reaction',
+      {
+        message: 'telegram-message-1',
+        reaction_id: null,
+        catalog_version: 'telegram-bot-api-10.2-emoji-v1',
+        catalog_signature: 'telegram-signature',
+      },
+    )
+  })
+
+  it('keeps the full Telegram reaction catalog inside a scrollable picker', async () => {
+    let catalog = Array.from({ length: 73 }, (_, index) => ({
+      reaction_id: `emoji:${index}`,
+      emoji: `${index}`,
+    }))
+    let root = mount(MessageReactions, {
+      message: {
+        name: 'telegram-message-catalog',
+        reactions: {
+          items: [],
+          catalog,
+          catalog_version: 'telegram-bot-api-10.2-emoji-v1',
+          catalog_signature: 'telegram-signature',
+        },
+      },
+      canSend: true,
+    })
+
+    root.component.openPicker(
+      new MouseEvent('contextmenu', { clientX: 310, clientY: 560 }),
+    )
+    await nextTick()
+    let picker = document.body.querySelector('[role="menu"]')
+
+    expect(picker.querySelectorAll('[role="menuitemradio"]')).toHaveLength(73)
+    expect(picker.className).toContain('max-w-[19rem]')
+    expect(picker.className).toContain('overscroll-contain')
   })
 })

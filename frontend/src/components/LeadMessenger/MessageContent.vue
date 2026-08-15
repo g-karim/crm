@@ -4,7 +4,7 @@
       v-if="editing"
       :ref="setEditorElement"
       data-message-editor
-      class="min-w-[260px] space-y-2"
+      class="w-full min-w-0 space-y-2"
     >
       <Textarea
         :modelValue="draft"

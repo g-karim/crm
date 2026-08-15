@@ -29,12 +29,13 @@ afterEach(() => {
     root.remove()
   })
   mounted = []
+  vi.restoreAllMocks()
 })
 
-function mountVideo(attachment, provider = '') {
+function mountVideo(attachment, provider = '', props = {}) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(VideoAttachment, { attachment, provider })
+  let app = createApp(VideoAttachment, { attachment, provider, ...props })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
   mounted.push({ app, root })
@@ -42,6 +43,41 @@ function mountVideo(attachment, provider = '') {
 }
 
 describe('external messenger video', () => {
+  it('letterboxes portrait previews and keeps landscape proportions', () => {
+    let portrait = mountVideo({
+      id: 'VIDEO-PORTRAIT',
+      type: 'video',
+      status: 'external',
+      video_source: 'external',
+      preview_url: '/api/portrait-preview',
+      width: 1080,
+      height: 1920,
+    })
+    let landscape = mountVideo({
+      id: 'VIDEO-LANDSCAPE',
+      type: 'video',
+      status: 'external',
+      video_source: 'external',
+      preview_url: '/api/landscape-preview',
+      width: 1920,
+      height: 1080,
+    })
+
+    expect(portrait.firstElementChild.style.width).toBe('320px')
+    expect(portrait.firstElementChild.style.maxWidth).toBe('100%')
+    expect(portrait.querySelector('[data-video-frame]').style.aspectRatio).toBe(
+      `${320 / 360} / 1`,
+    )
+    expect(portrait.querySelector('[data-media-backdrop]')).not.toBeNull()
+    expect(
+      portrait.querySelector('img:not([data-media-backdrop])').className,
+    ).toContain('object-contain')
+    expect(landscape.firstElementChild.style.width).toBe('320px')
+    expect(
+      landscape.querySelector('[data-video-frame]').style.aspectRatio,
+    ).toBe(`${1920 / 1080} / 1`)
+  })
+
   it('shows the saved preview and metadata with a neutral source action', () => {
     let root = mountVideo({
       id: 'VIDEO-1',
@@ -56,10 +92,11 @@ describe('external messenger video', () => {
       duration_ms: 65000,
     })
 
-    expect(root.querySelector('img')?.getAttribute('src')).toBe(
-      '/api/private-preview',
-    )
-    expect(root.textContent).toContain('Видео клиента')
+    expect(
+      root.querySelector('img:not([data-media-backdrop])')?.getAttribute('src'),
+    ).toBe('/api/private-preview')
+    expect(root.textContent).not.toContain('Видео клиента')
+    expect(root.textContent).not.toContain('preview.jpg')
     expect(root.textContent).toContain('1:05')
     expect(root.textContent).toContain('Открыть источник')
     expect(root.textContent).not.toContain('Открыть в VK')
@@ -97,9 +134,72 @@ describe('external messenger video', () => {
 
     expect(maxRoot.textContent).not.toContain('Открыть источник')
     expect(maxRoot.querySelector('a')).toBeNull()
-    expect(vkRoot.textContent).toContain('Видео доступно только во VK')
+    expect(vkRoot.textContent).toContain('Доступно только во VK')
     expect(vkRoot.textContent).toContain('Смотреть в VK Видео')
     expect(vkRoot.querySelector('a')?.getAttribute('href')).toBe('/api/open-vk')
+    expect(
+      vkRoot.querySelector('[data-video-external-action]').className,
+    ).toContain('w-full')
+  })
+
+  it('letterboxes a portrait forwarded VK preview and stacks the action', () => {
+    let root = mountVideo(
+      {
+        id: 'VK-PORTRAIT',
+        type: 'video',
+        status: 'external',
+        video_source: 'external',
+        mime_type: 'image/jpeg',
+        file_name: 'vk-video-1.jpg',
+        preview_url: '/api/private-preview',
+        open_url: '/api/open-vk',
+        width: 1080,
+        height: 1920,
+      },
+      'vk_direct',
+      { compactPreview: true },
+    )
+
+    let container = root.firstElementChild
+    let frame = root.querySelector('[data-video-frame]')
+    expect(container.style.width).toBe('320px')
+    expect(frame.style.aspectRatio).toBe(`${320 / 280} / 1`)
+    expect(frame.tagName).toBe('DIV')
+    expect(frame.querySelector('[data-media-backdrop]')).not.toBeNull()
+    expect(
+      frame.querySelector('img:not([data-media-backdrop])').className,
+    ).toContain('object-contain')
+    expect(root.textContent).toContain('Доступно только во VK')
+    expect(root.textContent).toContain('Смотреть в VK Видео')
+    expect(
+      root.querySelector('[data-video-external-action]').getAttribute('href'),
+    ).toBe('/api/open-vk')
+    expect(root.textContent).not.toContain('vk-video-1.jpg')
+  })
+
+  it('uses contain after a compact local preview starts playing', async () => {
+    let root = mountVideo(
+      {
+        id: 'LOCAL-PORTRAIT',
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        mime_type: 'video/mp4',
+        playback_url: '/api/video',
+        width: 1080,
+        height: 1920,
+      },
+      'telegram_bot',
+      { compactPreview: true },
+    )
+
+    expect(root.querySelector('[data-video-preview]').className).toContain(
+      'object-contain',
+    )
+    root.querySelector('button').click()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(root.querySelector('video').className).toContain('object-contain')
   })
 
   it('uses browser metadata as the local duration fallback', async () => {
@@ -233,7 +333,7 @@ describe('external messenger video', () => {
     expect(root.querySelector('iframe')).toBeNull()
     expect(root.querySelector('[data-test-play-icon]')).toBeNull()
     expect(root.querySelector('button')).toBeNull()
-    expect(root.textContent).toContain('Видео доступно только во VK')
+    expect(root.textContent).toContain('Доступно только во VK')
     expect(root.textContent).toContain('Смотреть в VK Видео')
   })
 
@@ -254,7 +354,51 @@ describe('external messenger video', () => {
 
     expect(root.querySelector('video')).toBeNull()
     expect(root.querySelector('[data-test-play-icon]')).toBeNull()
-    expect(root.textContent).toContain('Видео доступно только во VK')
+    expect(root.textContent).toContain('Доступно только во VK')
+  })
+
+  it('captures a safe blurred backdrop from a local portrait video', async () => {
+    const drawImage = vi.fn()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage,
+    })
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
+      'data:image/jpeg;base64,frame',
+    )
+    let root = mountVideo(
+      {
+        id: 'LOCAL-PORTRAIT-NO-POSTER',
+        type: 'video',
+        status: 'available',
+        video_source: 'local_file',
+        mime_type: 'video/mp4',
+        playback_url: '/api/video',
+      },
+      'telegram_bot',
+    )
+    let preview = root.querySelector('[data-video-preview]')
+    Object.defineProperty(preview, 'videoWidth', {
+      configurable: true,
+      value: 900,
+    })
+    Object.defineProperty(preview, 'videoHeight', {
+      configurable: true,
+      value: 1600,
+    })
+    Object.defineProperty(preview, 'duration', {
+      configurable: true,
+      value: 5,
+    })
+
+    preview.dispatchEvent(new Event('loadedmetadata'))
+    preview.dispatchEvent(new Event('loadeddata'))
+    await Promise.resolve()
+
+    expect(drawImage).toHaveBeenCalledOnce()
+    expect(root.firstElementChild.style.width).toBe('320px')
+    expect(
+      root.querySelector('[data-media-backdrop]').getAttribute('src'),
+    ).toBe('data:image/jpeg;base64,frame')
   })
 
   it('uses the unavailable card when no preview or player exists', () => {
