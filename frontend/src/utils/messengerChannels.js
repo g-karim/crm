@@ -128,6 +128,9 @@ export function getMessengerChannelType(channel = {}) {
 }
 
 export function getMessengerPlatformLabel(channel = {}) {
+  let displayLabel = String(channel?.label || '').trim()
+  if (displayLabel) return displayLabel
+
   let type = getMessengerChannelType(channel)
 
   return (
