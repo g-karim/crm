@@ -54,6 +54,15 @@ describe('messengerChannels', () => {
     ).toBe('Custom Platform')
   })
 
+  it('prefers the effective server channel label', () => {
+    expect(
+      getMessengerPlatformLabel({
+        platform: 'telegram',
+        label: 'Telegram - EXP Bot',
+      }),
+    ).toBe('Telegram - EXP Bot')
+  })
+
   it('reads channel type from platform, channel_type, or chat_type', () => {
     expect(getMessengerChannelType({ platform: 'telegram' })).toBe('telegram')
     expect(getMessengerChannelType({ channel_type: 'avito' })).toBe('avito')
@@ -71,6 +80,20 @@ describe('messengerChannels', () => {
       { label: 'Avito', value: 'ch-1' },
       { label: 'Avito 2', value: 'ch-2' },
       { label: 'WhatsApp', value: 'ch-3' },
+    ])
+  })
+
+  it('keeps effective labels and disambiguates duplicates', () => {
+    expect(
+      buildMessengerChannelOptions([
+        { name: 'ch-1', platform: 'vk', label: 'VK - EXP' },
+        { name: 'ch-2', platform: 'vk', label: 'VK - EXP' },
+        { name: 'ch-3', platform: 'vk', label: 'Продажи' },
+      ]),
+    ).toEqual([
+      { label: 'VK - EXP', value: 'ch-1' },
+      { label: 'VK - EXP 2', value: 'ch-2' },
+      { label: 'Продажи', value: 'ch-3' },
     ])
   })
 
