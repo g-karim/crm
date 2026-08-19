@@ -38,7 +38,7 @@
         >
           <RouterLink
             v-for="n in notifications.data"
-            :key="n.comment"
+            :key="n.name"
             :to="getRoute(n)"
             class="flex cursor-pointer items-start gap-2.5 px-4 py-2.5 hover:bg-surface-gray-2"
             @click="markAsRead(n.comment || n.notification_type_doc)"
@@ -48,7 +48,11 @@
                 class="size-[5px] rounded-full"
                 :class="[n.read ? 'bg-transparent' : 'bg-surface-gray-7']"
               />
-              <WhatsAppIcon v-if="n.type == 'WhatsApp'" class="size-7" />
+              <MessageCircleIcon
+                v-if="n.type == 'Messenger'"
+                class="size-7 text-ink-blue-3"
+              />
+              <WhatsAppIcon v-else-if="n.type == 'WhatsApp'" class="size-7" />
               <UserAvatar v-else :user="n.from_user.name" size="lg" />
             </div>
             <div>
@@ -68,7 +72,13 @@
                 </span>
               </div>
               <div class="text-sm text-ink-gray-5">
-                {{ __(timeAgo(n.creation)) }}
+                {{ __(timeAgo(n.last_event_at || n.creation)) }}
+                <Badge
+                  v-if="n.type == 'Messenger' && n.event_count > 1"
+                  class="ml-1"
+                  :label="n.event_count"
+                  variant="subtle"
+                />
               </div>
             </div>
           </RouterLink>
@@ -90,6 +100,7 @@
 </template>
 <script setup>
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
+import MessageCircleIcon from '~icons/lucide/message-circle'
 import MarkAsDoneIcon from '@/components/Icons/MarkAsDoneIcon.vue'
 import NotificationsIcon from '@/components/Icons/NotificationsIcon.vue'
 import EventNotificationsArea from '@/components/EventNotificationsArea.vue'
@@ -142,12 +153,10 @@ function markAllAsRead() {
 }
 
 onBeforeUnmount(() => {
-  $socket.off('crm_notification')
   $socket.off('event_notification')
 })
 
 onMounted(() => {
-  $socket.on('crm_notification', () => notifications.reload())
   $socket.on('event_notification', (data) => handleEventNotification(data))
 })
 

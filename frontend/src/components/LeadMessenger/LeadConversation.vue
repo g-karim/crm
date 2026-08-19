@@ -775,7 +775,12 @@ const messageSync = createMessengerSyncController({
     }
   },
   onDeltaApplied(_merge, incoming) {
+    let hasInbound = incoming.some(
+      (message) => message.direction === 'inbound',
+    )
+    if (hasInbound) markMessengerNotificationsRead()
     if (
+      hasInbound &&
       incoming.some(
         (message) =>
           message.conversation === selectedConversation.value?.name &&
@@ -909,6 +914,7 @@ async function initialize(leadChanged = false) {
         ? messageSync.setLead(props.leadName)
         : messageSync.start(props.leadName),
     ])
+    await markMessengerNotificationsRead()
   } catch (error) {
     handleError(error, __('Не удалось загрузить сообщения.'))
   } finally {
@@ -1435,7 +1441,21 @@ function handleVisibilityChange() {
   if (document.visibilityState !== 'visible') {
     clearTyping()
     composerTyping.reset()
-  } else readController.schedule()
+  } else {
+    readController.schedule()
+    markMessengerNotificationsRead()
+  }
+}
+
+async function markMessengerNotificationsRead() {
+  if (!props.active || document.visibilityState !== 'visible') return
+  try {
+    await call('crm.api.notifications.mark_messenger_as_read', {
+      reference_name: props.leadName,
+    })
+  } catch {
+    // Notifications are auxiliary and must not interrupt the conversation UI.
+  }
 }
 
 watch(
@@ -1444,7 +1464,10 @@ watch(
     if (!active) {
       clearTyping()
       composerTyping.reset()
-    } else readController.schedule()
+    } else {
+      readController.schedule()
+      markMessengerNotificationsRead()
+    }
   },
 )
 

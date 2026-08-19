@@ -24,7 +24,7 @@
     >
       <RouterLink
         v-for="n in notifications.data"
-        :key="n.comment"
+        :key="n.name"
         :to="getRoute(n)"
         class="flex cursor-pointer items-start gap-3 px-2.5 py-3 hover:bg-surface-gray-2"
         @click="mark_doc_as_read(n.comment || n.notification_type_doc)"
@@ -34,7 +34,11 @@
             class="size-[5px] rounded-full"
             :class="[n.read ? 'bg-transparent' : 'bg-surface-gray-7']"
           />
-          <WhatsAppIcon v-if="n.type == 'WhatsApp'" class="size-7" />
+          <MessageCircleIcon
+            v-if="n.type == 'Messenger'"
+            class="size-7 text-ink-blue-3"
+          />
+          <WhatsAppIcon v-else-if="n.type == 'WhatsApp'" class="size-7" />
           <UserAvatar v-else :user="n.from_user.name" size="lg" />
         </div>
         <div>
@@ -54,7 +58,13 @@
             </span>
           </div>
           <div class="text-sm text-ink-gray-5">
-            {{ __(timeAgo(n.creation)) }}
+            {{ __(timeAgo(n.last_event_at || n.creation)) }}
+            <Badge
+              v-if="n.type == 'Messenger' && n.event_count > 1"
+              class="ml-1"
+              :label="n.event_count"
+              variant="subtle"
+            />
           </div>
         </div>
       </RouterLink>
@@ -70,27 +80,14 @@
 <script setup>
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
+import MessageCircleIcon from '~icons/lucide/message-circle'
 import MarkAsDoneIcon from '@/components/Icons/MarkAsDoneIcon.vue'
 import NotificationsIcon from '@/components/Icons/NotificationsIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { notifications, notificationsStore } from '@/stores/notifications'
-import { globalStore } from '@/stores/global'
 import { timeAgo, sanitizeHTML } from '@/utils'
 import { Breadcrumbs } from 'frappe-ui'
-import { onMounted, onBeforeUnmount } from 'vue'
-
-const { $socket } = globalStore()
 const { mark_as_read, mark_doc_as_read } = notificationsStore()
-
-onBeforeUnmount(() => {
-  $socket.off('crm_notification')
-})
-
-onMounted(() => {
-  $socket.on('crm_notification', () => {
-    notifications.reload()
-  })
-})
 
 function getRoute(notification) {
   let params = {
@@ -104,7 +101,7 @@ function getRoute(notification) {
   return {
     name: notification.route_name,
     params: params,
-    hash: '#' + notification.comment || notification.notification_type_doc,
+    hash: notification.hash,
   }
 }
 </script>
