@@ -97,7 +97,9 @@
             <div class="max-w-md text-base text-ink-gray-5">
               {{
                 permissions.can_operate
-                  ? __('Выберите канал и отправьте первое сообщение этому лиду.')
+                  ? __(
+                      'Выберите канал и отправьте первое сообщение этому лиду.',
+                    )
                   : __('Для этого лида пока нет доступных сообщений.')
               }}
             </div>
@@ -284,7 +286,11 @@
             type="select"
             :options="channelOptions"
             :disabled="
-              !channels.length || sendingMessage || voiceActive || replyTarget
+              !channels.length ||
+              sendingMessage ||
+              voiceActive ||
+              replyTarget ||
+              preparedHandoff
             "
             :placeholder="__('Платформа')"
           />
@@ -293,11 +299,38 @@
             v-model="selectedConversationName"
             type="select"
             :options="conversationOptions"
-            :disabled="sendingMessage || voiceActive || Boolean(replyTarget)"
+            :disabled="
+              sendingMessage ||
+              voiceActive ||
+              Boolean(replyTarget) ||
+              Boolean(preparedHandoff)
+            "
             :placeholder="__('Внешний чат')"
           />
         </div>
+        <div
+          v-if="preparedHandoff"
+          data-testid="prepared-handoff"
+          class="mb-2 rounded-md border border-outline-gray-2 bg-surface-gray-1 p-3"
+        >
+          <div class="mb-2 text-xs font-medium text-ink-gray-5">
+            {{ __('Подготовлен переход. Текст нельзя изменить.') }}
+          </div>
+          <div class="whitespace-pre-wrap text-sm text-ink-gray-8">
+            {{ preparedHandoff.message }}
+          </div>
+          <div class="mt-3 flex justify-end">
+            <Button
+              :label="__('Отменить')"
+              variant="ghost"
+              :loading="handoffCancelling"
+              :disabled="sendingMessage"
+              @click="cancelPreparedHandoff"
+            />
+          </div>
+        </div>
         <Textarea
+          v-else
           ref="textareaRef"
           v-model="draftText"
           class="mb-2 min-h-20 w-full"
@@ -309,6 +342,7 @@
           @paste.stop="handleComposerPaste"
         />
         <ComposerAttachments
+          v-if="!preparedHandoff"
           ref="composerAttachments"
           :supportsAttachments="selectedCapabilities.supports_attachments"
           :channelType="selectedChannelType"
@@ -332,7 +366,7 @@
           />
         </div>
         <ComposerVoiceRecorder
-          v-if="selectedCapabilities.voice.send"
+          v-if="!preparedHandoff && selectedCapabilities.voice.send"
           ref="voiceRecorder"
           :conversation="selectedConversation?.name || ''"
           :channel="selectedChannel"
@@ -354,7 +388,7 @@
           @queued="voiceQueued"
         />
         <div
-          v-if="handoffChannelOptions.length"
+          v-if="!preparedHandoff && handoffChannelOptions.length"
           class="mb-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
         >
           <FormControl
@@ -382,7 +416,7 @@
           </div>
           <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
             <Button
-              v-if="selectedCapabilities.voice.send"
+              v-if="!preparedHandoff && selectedCapabilities.voice.send"
               variant="ghost"
               icon="mic"
               :aria-label="__('Записать голосовое сообщение')"
@@ -395,7 +429,7 @@
               @click="voiceRecorder?.start()"
             />
             <Button
-              v-if="selectedCapabilities.location.send"
+              v-if="!preparedHandoff && selectedCapabilities.location.send"
               variant="ghost"
               icon="map-pin"
               :aria-label="__('Добавить геопозицию')"
@@ -409,7 +443,9 @@
               @click="locationPickerOpen = true"
             />
             <Button
-              v-if="selectedCapabilities.supports_attachments"
+              v-if="
+                !preparedHandoff && selectedCapabilities.supports_attachments
+              "
               variant="ghost"
               icon="paperclip"
               :disabled="
@@ -429,7 +465,8 @@
               :disabled="
                 sendDisabled ||
                 voiceActive ||
-                (!draftText.trim() &&
+                (!preparedHandoff &&
+                  !draftText.trim() &&
                   !pendingAttachments.length &&
                   !pendingLocation)
               "
@@ -438,10 +475,7 @@
           </div>
         </div>
       </div>
-      <div
-        v-else
-        class="border-t px-4 py-4 text-sm text-ink-gray-5 sm:px-10"
-      >
+      <div v-else class="border-t px-4 py-4 text-sm text-ink-gray-5 sm:px-10">
         {{ __('Только чтение') }}
       </div>
     </div>
@@ -526,6 +560,8 @@ const selectedChannel = ref('')
 const selectedConversationName = ref('')
 const handoffTargetChannel = ref('')
 const handoffLoading = ref(false)
+const handoffCancelling = ref(false)
+const preparedHandoff = ref(null)
 const draftText = ref('')
 const clientRequestId = ref('')
 const clientRequestFingerprint = ref('')
@@ -786,9 +822,7 @@ const messageSync = createMessengerSyncController({
     }
   },
   onDeltaApplied(_merge, incoming) {
-    let hasInbound = incoming.some(
-      (message) => message.direction === 'inbound',
-    )
+    let hasInbound = incoming.some((message) => message.direction === 'inbound')
     if (hasInbound) markMessengerNotificationsRead()
     if (
       hasInbound &&
@@ -912,6 +946,7 @@ async function initialize(leadChanged = false) {
     selectedChannel.value = ''
     selectedConversationName.value = ''
     handoffTargetChannel.value = ''
+    preparedHandoff.value = null
     draftText.value = ''
     pendingLocation.value = null
     composerAttachments.value?.clear()
@@ -1058,7 +1093,8 @@ function handleComposerInput(value) {
 
 async function sendMessage() {
   if (!permissions.value.can_operate) return
-  let text = draftText.value.trim()
+  let handoff = preparedHandoff.value
+  let text = handoff?.message || draftText.value.trim()
   if (
     voiceActive.value ||
     (!text && !pendingAttachments.value.length && !pendingLocation.value) ||
@@ -1105,6 +1141,7 @@ async function sendMessage() {
       text,
       channel: selectedChannel.value,
       client_request_id: clientRequestId.value,
+      handoff: handoff?.handoff || undefined,
       attachments: attachmentNames,
       location: pendingLocation.value || undefined,
       reply_to_message: replyTarget.value?.name || undefined,
@@ -1112,6 +1149,7 @@ async function sendMessage() {
       reference_name: props.leadName,
     })
 
+    if (result?.name && handoff) preparedHandoff.value = null
     if (result?.reason === 'not_configured') {
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
@@ -1121,6 +1159,13 @@ async function sendMessage() {
     } else if (!result?.ok) {
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
+      if (
+        handoff &&
+        ['handoff_revoked', 'handoff_expired', 'handoff_consumed'].includes(
+          result?.reason,
+        )
+      )
+        preparedHandoff.value = null
       throw new Error(result?.message || __('Не удалось отправить сообщение.'))
     } else {
       composerTyping.reset()
@@ -1200,7 +1245,8 @@ async function prepareHandoff() {
   if (
     draftText.value.trim() ||
     pendingAttachments.value.length ||
-    pendingLocation.value
+    pendingLocation.value ||
+    replyTarget.value
   ) {
     genericError.value = __(
       'Очистите текущий черновик и вложения перед подготовкой перехода.',
@@ -1217,13 +1263,39 @@ async function prepareHandoff() {
     })
     if (!result?.ok)
       throw new Error(result?.message || __('Не удалось подготовить переход.'))
-    draftText.value = result.message || ''
+    preparedHandoff.value = {
+      handoff: result.handoff,
+      message: result.message || '',
+      sourceConversation: selectedConversation.value.name,
+      targetChannel: result.target_channel,
+      expiresAt: result.expires_at,
+    }
     handoffTargetChannel.value = ''
-    nextTick(() => textareaRef.value?.el?.focus?.())
   } catch (error) {
     handleError(error, __('Не удалось подготовить переход.'))
   } finally {
     handoffLoading.value = false
+  }
+}
+
+async function cancelPreparedHandoff() {
+  if (!preparedHandoff.value || handoffCancelling.value) return
+  genericError.value = ''
+  handoffCancelling.value = true
+  try {
+    let result = await call('crm_messenger.api.handoffs.revoke_handoff', {
+      handoff: preparedHandoff.value.handoff,
+    })
+    if (!result?.ok)
+      throw new Error(result?.message || __('Не удалось отменить переход.'))
+    preparedHandoff.value = null
+    clientRequestId.value = ''
+    clientRequestFingerprint.value = ''
+    nextTick(() => textareaRef.value?.el?.focus?.())
+  } catch (error) {
+    handleError(error, __('Не удалось отменить переход.'))
+  } finally {
+    handoffCancelling.value = false
   }
 }
 
@@ -1316,6 +1388,7 @@ function handleComposerPaste(event) {
 }
 
 function handleComposerDragOver(event) {
+  if (preparedHandoff.value) return
   if (voiceActive.value || pendingLocation.value) return
   if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return
   event.preventDefault()
@@ -1323,6 +1396,7 @@ function handleComposerDragOver(event) {
 }
 
 function handleComposerDrop(event) {
+  if (preparedHandoff.value) return
   draggingFiles.value = false
   if (voiceActive.value || pendingLocation.value) return
   composerAttachments.value?.handleDrop(event)
@@ -1601,6 +1675,7 @@ function applyPermissions(value = {}) {
   pendingLocation.value = null
   locationPickerOpen.value = false
   handoffTargetChannel.value = ''
+  preparedHandoff.value = null
   composerAttachments.value?.clear()
   voiceRecorder.value?.reset?.()
   messageActions.cancelEdit()

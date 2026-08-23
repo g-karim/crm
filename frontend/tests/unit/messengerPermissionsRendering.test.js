@@ -41,7 +41,9 @@ const components = vi.hoisted(() => ({
 vi.mock('frappe-ui', () => ({
   Badge: { props: ['label'], template: '<span>{{ label }}</span>' },
   Button: components.button,
-  Dialog: { template: '<div><slot name="body-content" /><slot name="actions" /></div>' },
+  Dialog: {
+    template: '<div><slot name="body-content" /><slot name="actions" /></div>',
+  },
   Dropdown: { template: '<div><slot /></div>' },
   FeatherIcon: { template: '<span />' },
   FileUploadHandler: { template: '<div><slot /></div>' },
@@ -87,6 +89,7 @@ import LeadConversation from '@/components/LeadMessenger/LeadConversation.vue'
 
 let mounted = []
 let permissions
+let preparedResult
 
 const channel = (name) => ({
   name,
@@ -111,11 +114,23 @@ beforeEach(() => {
     can_operate: false,
     can_administer: false,
   }
+  preparedResult = {
+    ok: true,
+    handoff: 'HANDOFF-1',
+    status: 'prepared',
+    target_channel: 'CHANNEL-2',
+    expires_at: '2026-08-24 12:00:00',
+    message: 'Перейдите в другой канал\nCRM-ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  }
   mocks.socket.reset()
   vi.clearAllMocks()
   mocks.call.mockImplementation(async (method) => {
     if (method.endsWith('get_channels')) {
-      return { ok: true, channels: [channel('CHANNEL-1'), channel('CHANNEL-2')], permissions }
+      return {
+        ok: true,
+        channels: [channel('CHANNEL-1'), channel('CHANNEL-2')],
+        permissions,
+      }
     }
     if (method.endsWith('get_conversations')) {
       return {
@@ -149,6 +164,16 @@ beforeEach(() => {
         permissions,
       }
     }
+    if (method.endsWith('create_handoff')) return preparedResult
+    if (method.endsWith('revoke_handoff'))
+      return { ok: true, handoff: 'HANDOFF-1', status: 'revoked' }
+    if (method.endsWith('send_message'))
+      return {
+        ok: true,
+        name: 'MESSAGE-1',
+        status: 'queued',
+        handoff_status: 'queued',
+      }
     return { ok: true }
   })
 })
@@ -183,7 +208,9 @@ describe('messenger permission rendering', () => {
     expect(root.textContent).toContain('Только чтение')
     expect(root.textContent).not.toContain('Отправить')
     expect(root.textContent).not.toContain('Подготовить переход')
-    expect(root.querySelector('input[placeholder="Введите сообщение..."]')).toBeNull()
+    expect(
+      root.querySelector('input[placeholder="Введите сообщение..."]'),
+    ).toBeNull()
   })
 
   it('renders operator composer and handoff controls', async () => {
@@ -193,13 +220,17 @@ describe('messenger permission rendering', () => {
     expect(root.textContent).not.toContain('Только чтение')
     expect(root.textContent).toContain('Отправить')
     expect(root.textContent).toContain('Подготовить переход')
-    expect(root.querySelector('input[placeholder="Введите сообщение..."]')).not.toBeNull()
+    expect(
+      root.querySelector('input[placeholder="Введите сообщение..."]'),
+    ).not.toBeNull()
   })
 
   it('closes an active composer when a delta revokes operator permission', async () => {
     permissions = { ...permissions, can_operate: true }
     let root = await mountConversation()
-    let composer = root.querySelector('input[placeholder="Введите сообщение..."]')
+    let composer = root.querySelector(
+      'input[placeholder="Введите сообщение..."]',
+    )
     composer.value = 'unsent draft'
     composer.dispatchEvent(new Event('input'))
 
@@ -212,6 +243,154 @@ describe('messenger permission rendering', () => {
     })
 
     await vi.waitFor(() => expect(root.textContent).toContain('Только чтение'))
-    expect(root.querySelector('input[placeholder="Введите сообщение..."]')).toBeNull()
+    expect(
+      root.querySelector('input[placeholder="Введите сообщение..."]'),
+    ).toBeNull()
+  })
+
+  it('locks prepared handoff text and sends it with the handoff id', async () => {
+    permissions = { ...permissions, can_operate: true }
+    let root = await mountConversation()
+    let target = root.querySelector(
+      'input[placeholder="Перейти в другой мессенджер"]',
+    )
+    target.value = 'CHANNEL-2'
+    target.dispatchEvent(new Event('input'))
+    await nextTick()
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Подготовить переход')
+      .click()
+
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('[data-testid="prepared-handoff"]'),
+      ).not.toBeNull(),
+    )
+    expect(root.textContent).toContain(preparedResult.message)
+    expect(
+      root.querySelector('input[placeholder="Введите сообщение..."]'),
+    ).toBeNull()
+    expect(root.querySelector('input[placeholder="Платформа"]').disabled).toBe(
+      true,
+    )
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Отправить')
+      .click()
+
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.messages.send_message',
+        expect.objectContaining({
+          conversation: 'CONVERSATION-1',
+          text: preparedResult.message,
+          handoff: 'HANDOFF-1',
+          attachments: [],
+        }),
+      ),
+    )
+    await vi.waitFor(() =>
+      expect(root.querySelector('[data-testid="prepared-handoff"]')).toBeNull(),
+    )
+  })
+
+  it('keeps prepared handoff until revoke succeeds', async () => {
+    permissions = { ...permissions, can_operate: true }
+    let root = await mountConversation()
+    let target = root.querySelector(
+      'input[placeholder="Перейти в другой мессенджер"]',
+    )
+    target.value = 'CHANNEL-2'
+    target.dispatchEvent(new Event('input'))
+    await nextTick()
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Подготовить переход')
+      .click()
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('[data-testid="prepared-handoff"]'),
+      ).not.toBeNull(),
+    )
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Отменить')
+      .click()
+
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.handoffs.revoke_handoff',
+        { handoff: 'HANDOFF-1' },
+      ),
+    )
+    await vi.waitFor(() =>
+      expect(root.querySelector('[data-testid="prepared-handoff"]')).toBeNull(),
+    )
+  })
+
+  it('keeps a prepared handoff after a recoverable send error', async () => {
+    permissions = { ...permissions, can_operate: true }
+    let root = await mountConversation()
+    let target = root.querySelector(
+      'input[placeholder="Перейти в другой мессенджер"]',
+    )
+    target.value = 'CHANNEL-2'
+    target.dispatchEvent(new Event('input'))
+    await nextTick()
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Подготовить переход')
+      .click()
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('[data-testid="prepared-handoff"]'),
+      ).not.toBeNull(),
+    )
+    let defaultCall = mocks.call.getMockImplementation()
+    mocks.call.mockImplementation(async (method, args) => {
+      if (method.endsWith('send_message')) throw new Error('network error')
+      return defaultCall(method, args)
+    })
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Отправить')
+      .click()
+
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('[data-testid="prepared-handoff"]'),
+      ).not.toBeNull(),
+    )
+  })
+
+  it('clears a prepared handoff after a terminal server response', async () => {
+    permissions = { ...permissions, can_operate: true }
+    let root = await mountConversation()
+    let target = root.querySelector(
+      'input[placeholder="Перейти в другой мессенджер"]',
+    )
+    target.value = 'CHANNEL-2'
+    target.dispatchEvent(new Event('input'))
+    await nextTick()
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Подготовить переход')
+      .click()
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('[data-testid="prepared-handoff"]'),
+      ).not.toBeNull(),
+    )
+    let defaultCall = mocks.call.getMockImplementation()
+    mocks.call.mockImplementation(async (method, args) => {
+      if (method.endsWith('send_message'))
+        return {
+          ok: false,
+          reason: 'handoff_expired',
+          message: 'Handoff has expired.',
+        }
+      return defaultCall(method, args)
+    })
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Отправить')
+      .click()
+
+    await vi.waitFor(() =>
+      expect(root.querySelector('[data-testid="prepared-handoff"]')).toBeNull(),
+    )
   })
 })
