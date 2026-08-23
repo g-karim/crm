@@ -282,6 +282,31 @@ describe('messenger rich content', () => {
     )
   })
 
+  it('keeps reactions visible but immutable without operator permission', async () => {
+    let root = mount(MessageReactions, {
+      message: {
+        name: 'read-only-message',
+        reactions: {
+          items: [{ reaction_id: 'emoji:👍', count: 1, emoji: '👍' }],
+          catalog: [{ reaction_id: 'emoji:👍', emoji: '👍' }],
+        },
+      },
+      canSend: false,
+    })
+
+    let button = root.querySelector('button')
+    expect(button.textContent).toContain('👍 1')
+    expect(button.disabled).toBe(true)
+    expect(
+      root.component.openPicker(
+        new MouseEvent('contextmenu', { clientX: 20, clientY: 30 }),
+      ),
+    ).toBe(false)
+    button.click()
+    await nextTick()
+    expect(call).not.toHaveBeenCalled()
+  })
+
   it('uses string Telegram reaction IDs and toggles the operator reaction', async () => {
     call.mockResolvedValueOnce({
       ok: true,

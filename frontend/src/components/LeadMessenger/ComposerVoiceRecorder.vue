@@ -248,5 +248,5 @@ watch(
   },
 )
 onBeforeUnmount(() => recorder.dispose())
-defineExpose({ start: startRecording })
+defineExpose({ start: startRecording, reset: recorder.reset })
 </script>

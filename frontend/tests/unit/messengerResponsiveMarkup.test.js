@@ -34,4 +34,21 @@ describe('messenger responsive markup', () => {
       'class="ml-auto flex flex-wrap items-center justify-end gap-2"',
     )
   })
+
+  it('gates every mutation surface with backend operator permissions', () => {
+    expect(conversationSource).toContain('v-if="permissions.can_operate"')
+    expect(conversationSource).toContain("{{ __('Только чтение') }}")
+    expect(conversationSource).toContain(
+      "__('Для этого лида пока нет доступных сообщений.')",
+    )
+    expect(conversationSource).toContain(
+      ':can-send="Boolean(item.message.can_react)"',
+    )
+    expect(conversationSource).toContain(
+      "reference_doctype: 'CRM Lead',\n      reference_name: props.leadName",
+    )
+    expect(conversationSource).toContain('voiceRecorder.value?.reset?.()')
+    expect(conversationSource).toContain('locationPickerOpen.value = false')
+    expect(conversationSource).toContain('onPermissions: applyPermissions')
+  })
 })

@@ -163,8 +163,10 @@ doc_events = {
 		"validate": ["crm.api.contact.validate"],
 	},
 	"ToDo": {
+		"before_validate": ["crm.api.todo.validate_crm_lead_assignment_permission"],
 		"after_insert": ["crm.api.todo.after_insert"],
 		"on_update": ["crm.api.todo.on_update"],
+		"on_trash": ["crm.api.todo.validate_crm_lead_assignment_permission"],
 	},
 	"Communication": {
 		"after_insert": ["crm.utils.on_communication_insert"],

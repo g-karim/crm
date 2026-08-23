@@ -87,6 +87,10 @@ export function createMessengerSyncController(options) {
     })
   }
 
+  function notifyPermissions(result) {
+    if (result?.permissions) options.onPermissions?.(result.permissions)
+  }
+
   function merge(incoming, kind, extra) {
     let changeSnapshot = options.onBeforeChange?.({ kind, incoming, messages })
     let result = mergeMessengerMessages(messages, incoming)
@@ -116,6 +120,7 @@ export function createMessengerSyncController(options) {
       throw new Error('Unsupported messenger snapshot response.')
     }
 
+    notifyPermissions(result)
     if (reset) messages = []
     syncCursor = result.sync_cursor
     beforeCursor = result.page?.before_cursor || ''
@@ -145,6 +150,7 @@ export function createMessengerSyncController(options) {
         if (result?.contract_version !== 1) {
           throw new Error('Unsupported messenger history response.')
         }
+        notifyPermissions(result)
         beforeCursor = result.page?.before_cursor || ''
         hasMoreHistory = Boolean(result.page?.has_more && beforeCursor)
         merge(result.messages || [], 'history')
@@ -169,6 +175,7 @@ export function createMessengerSyncController(options) {
         if (result?.contract_version !== 1 || !result?.next_cursor) {
           throw new Error('Unsupported messenger delta response.')
         }
+        notifyPermissions(result)
         let merged = merge(result.changes || [], 'delta')
         syncCursor = result.next_cursor
         hasMore = Boolean(result.has_more)

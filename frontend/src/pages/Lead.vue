@@ -16,7 +16,12 @@
         v-if="document.actions?.length"
         :actions="document.actions"
       />
-      <AssignTo v-model="assignees.data" doctype="CRM Lead" :docname="leadId" />
+      <AssignTo
+        v-if="canWrite"
+        v-model="assignees.data"
+        doctype="CRM Lead"
+        :docname="leadId"
+      />
       <Dropdown
         v-if="doc && document.statuses"
         :options="statuses"
@@ -331,6 +336,7 @@ const {
 } = useDocument('CRM Lead', props.leadId)
 
 const canDelete = computed(() => permissions.data?.permissions?.delete || false)
+const canWrite = computed(() => permissions.data?.permissions?.write || false)
 
 const doc = computed(() => document.doc || {})
 

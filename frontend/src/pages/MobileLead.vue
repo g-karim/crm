@@ -40,7 +40,12 @@
     v-if="doc.name"
     class="flex h-12 items-center justify-between gap-2 border-b px-3 py-2.5"
   >
-    <AssignTo v-model="assignees.data" doctype="CRM Lead" :docname="leadId" />
+    <AssignTo
+      v-if="canWrite"
+      v-model="assignees.data"
+      doctype="CRM Lead"
+      :docname="leadId"
+    />
     <div class="flex items-center gap-2">
       <CustomActions
         v-if="document._actions?.length"
@@ -194,11 +199,13 @@ const {
   triggerOnChange,
   triggerOnRender,
   assignees,
+  permissions,
   document,
   scripts,
   error,
 } = useDocument('CRM Lead', props.leadId)
 
+const canWrite = computed(() => permissions.data?.permissions?.write || false)
 const doc = computed(() => document.doc || {})
 
 onMounted(async () => {

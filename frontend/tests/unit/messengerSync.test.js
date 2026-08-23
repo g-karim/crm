@@ -36,6 +36,7 @@ function createHarness(responses = {}) {
   let visibility = new EventTarget()
   visibility.visibilityState = 'visible'
   let changes = []
+  let permissions = []
   let calls = []
   let call = vi.fn(async (method, params) => {
     calls.push([method, params])
@@ -48,8 +49,9 @@ function createHarness(responses = {}) {
     call,
     visibilityTarget: visibility,
     onChange: (change) => changes.push(change),
+    onPermissions: (value) => permissions.push(value),
   })
-  return { controller, socket, visibility, changes, calls }
+  return { controller, socket, visibility, changes, permissions, calls }
 }
 
 const snapshot = (messages = [], overrides = {}) => ({
@@ -148,6 +150,24 @@ describe('messenger sync', () => {
         limit: 100,
       },
     ])
+  })
+
+  it('propagates permission loss from a delta response', async () => {
+    let operator = {
+      can_read: true,
+      can_operate: true,
+      can_administer: false,
+    }
+    let readOnly = { ...operator, can_operate: false }
+    let harness = createHarness({
+      get_message_page: snapshot([], { permissions: operator }),
+      get_message_changes: delta([], { permissions: readOnly }),
+    })
+
+    await harness.controller.start('LEAD-1')
+    await harness.controller.syncDelta()
+
+    expect(harness.permissions).toEqual([operator, readOnly])
   })
 
   it('subscribes and unsubscribes with the component lifecycle', async () => {

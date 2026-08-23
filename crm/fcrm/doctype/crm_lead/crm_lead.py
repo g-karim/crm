@@ -8,6 +8,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import has_gravatar, validate_email_address
 
+from crm.api.todo import allow_internal_lead_assignment
 from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
 from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import (
 	add_status_change_log,
@@ -172,7 +173,11 @@ class CRMLead(Document):
 					# the agent is already set as an assignee
 					return
 
-		assign({"assign_to": [agent], "doctype": "CRM Lead", "name": self.name}, ignore_permissions=True)
+		with allow_internal_lead_assignment():
+			assign(
+				{"assign_to": [agent], "doctype": "CRM Lead", "name": self.name},
+				ignore_permissions=True,
+			)
 
 	def share_with_agent(self, agent):
 		if not agent:

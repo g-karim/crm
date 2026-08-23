@@ -52,7 +52,7 @@
         {{ __(conversationNotice.message) }}
       </div>
       <div
-        v-if="missingPhone"
+        v-if="permissions.can_operate && missingPhone"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
         {{
@@ -62,13 +62,13 @@
         }}
       </div>
       <div
-        v-if="!channels.length"
+        v-if="permissions.can_operate && !channels.length"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
         {{ __('Нет активных каналов для отправки сообщений.') }}
       </div>
       <div
-        v-if="selectedRequiresInbound"
+        v-if="permissions.can_operate && selectedRequiresInbound"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
         {{ __('Сначала должно прийти входящее сообщение в выбранном канале.') }}
@@ -96,7 +96,9 @@
             </div>
             <div class="max-w-md text-base text-ink-gray-5">
               {{
-                __('Выберите канал и отправьте первое сообщение этому лиду.')
+                permissions.can_operate
+                  ? __('Выберите канал и отправьте первое сообщение этому лиду.')
+                  : __('Для этого лида пока нет доступных сообщений.')
               }}
             </div>
           </div>
@@ -212,12 +214,7 @@
                         setReactionComponent(item.message.name, component)
                     "
                     :message="item.message"
-                    :can-send="
-                      Boolean(
-                        item.message.channel_info?.capabilities?.reactions
-                          ?.send,
-                      )
-                    "
+                    :can-send="Boolean(item.message.can_react)"
                     @changed="handleReactionsChanged(item.message, $event)"
                   />
                   <MessageFooterMetadata :message="item.message" />
@@ -255,6 +252,7 @@
       </div>
 
       <div
+        v-if="permissions.can_operate"
         class="relative border-t px-4 py-3 sm:px-10"
         @dragover="handleComposerDragOver"
         @dragleave="draggingFiles = false"
@@ -440,6 +438,12 @@
           </div>
         </div>
       </div>
+      <div
+        v-else
+        class="border-t px-4 py-4 text-sm text-ink-gray-5 sm:px-10"
+      >
+        {{ __('Только чтение') }}
+      </div>
     </div>
     <LocationPickerDialog
       v-model="locationPickerOpen"
@@ -531,6 +535,11 @@ const locationPickerOpen = ref(false)
 const voiceActive = ref(false)
 const sendWarning = ref('')
 const genericError = ref('')
+const permissions = ref({
+  can_read: false,
+  can_operate: false,
+  can_administer: false,
+})
 const messagesEl = ref(null)
 const newMessageCount = ref(0)
 const composerAttachments = ref(null)
@@ -632,6 +641,7 @@ const selectedRequiresInbound = computed(
 )
 const baseSendDisabled = computed(
   () =>
+    !permissions.value.can_operate ||
     sendingMessage.value ||
     missingPhone.value ||
     selectedRequiresInbound.value ||
@@ -735,6 +745,7 @@ const messageSync = createMessengerSyncController({
   socket: $socket,
   call,
   visibilityTarget: document,
+  onPermissions: applyPermissions,
   onBeforeChange({ kind, messages: currentMessages }) {
     if (kind === 'history') {
       return {
@@ -816,7 +827,10 @@ const messageSync = createMessengerSyncController({
 const readController = createMessengerReadController({
   call,
   isEnabled: () =>
-    props.active && document.visibilityState === 'visible' && isNearBottom(),
+    permissions.value.can_operate &&
+    props.active &&
+    document.visibilityState === 'visible' &&
+    isNearBottom(),
   getConversation: () => selectedConversation.value,
   getMessages: () => messages.value,
   onConfirmed(result) {
@@ -849,6 +863,7 @@ function setEditorElement(messageName, element) {
 }
 
 function startMessageEdit(message) {
+  if (!permissions.value.can_operate) return false
   return openMessengerMessageEditor(message, {
     startEdit: messageActions.startEdit,
     nextTick,
@@ -891,6 +906,7 @@ async function initialize(leadChanged = false) {
   newMessageCount.value = 0
   loadingMessages.value = true
   if (leadChanged) {
+    applyPermissions()
     messages.value = []
     conversations.value = []
     selectedChannel.value = ''
@@ -923,7 +939,12 @@ async function initialize(leadChanged = false) {
 }
 
 function confirmDeleteMessage(message) {
-  if (!message?.can_delete || messageActionState.value.pendingMessage) return
+  if (
+    !permissions.value.can_operate ||
+    !message?.can_delete ||
+    messageActionState.value.pendingMessage
+  )
+    return
   $dialog({
     title: __('Удалить сообщение для всех?'),
     message: __(
@@ -964,10 +985,13 @@ async function loadChannels() {
   try {
     let result = await call('crm_messenger.api.channels.get_channels', {
       active_only: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: props.leadName,
     })
     if (!result?.ok)
       throw new Error(result?.message || __('Не удалось загрузить каналы.'))
     channels.value = result.channels || []
+    applyPermissions(result.permissions)
     ensureSelectedChannel()
   } catch (error) {
     handleError(error, __('Не удалось загрузить каналы.'))
@@ -990,6 +1014,7 @@ async function loadConversations() {
     if (!result?.ok)
       throw new Error(result?.message || __('Не удалось загрузить переписку.'))
     conversations.value = result.conversations || []
+    applyPermissions(result.permissions)
     ensureSelectedChannel()
   } catch (error) {
     handleError(error, __('Не удалось загрузить переписку.'))
@@ -1032,6 +1057,7 @@ function handleComposerInput(value) {
 }
 
 async function sendMessage() {
+  if (!permissions.value.can_operate) return
   let text = draftText.value.trim()
   if (
     voiceActive.value ||
@@ -1150,6 +1176,7 @@ async function resolveConversationForSend() {
 }
 
 async function prepareHandoff() {
+  if (!permissions.value.can_operate) return
   if (!handoffTargetChannel.value || !selectedConversation.value) return
   genericError.value = ''
   let handoffAction = resolveMessengerHandoffAction(
@@ -1340,7 +1367,12 @@ async function handleMessagesScroll() {
 }
 
 function startReply(message) {
-  if (!message?.can_reply || messageActionState.value.pendingMessage) return
+  if (
+    !permissions.value.can_operate ||
+    !message?.can_reply ||
+    messageActionState.value.pendingMessage
+  )
+    return
   if (pendingLocation.value) {
     genericError.value = __('Удалите геолокацию перед подготовкой ответа.')
     return
@@ -1380,7 +1412,12 @@ function selectLocation(location) {
 }
 
 function retryMessage(message) {
-  if (!message?.can_retry || messageActionState.value.pendingMessage) return
+  if (
+    !permissions.value.can_operate ||
+    !message?.can_retry ||
+    messageActionState.value.pendingMessage
+  )
+    return
   if (!message.retry_requires_confirmation) {
     messageActions.retryMessage(message)
     return
@@ -1538,9 +1575,37 @@ function setReactionComponent(messageName, component) {
 
 function openReactionPicker(message, event) {
   if (message.status === 'deleted') return
-  if (!message.channel_info?.capabilities?.reactions?.send) return
+  if (!permissions.value.can_operate || !message.can_react) return
   if (reactionComponents.get(message.name)?.openPicker(event))
     event.preventDefault()
+}
+
+function applyPermissions(value = {}) {
+  let next = {
+    can_read: Boolean(value?.can_read),
+    can_operate: Boolean(value?.can_operate),
+    can_administer: Boolean(value?.can_administer),
+  }
+  let lostOperatorAccess = permissions.value.can_operate && !next.can_operate
+  permissions.value = next
+  if (!lostOperatorAccess) return
+
+  for (let message of messages.value) {
+    message.can_reply = false
+    message.can_edit = false
+    message.can_delete = false
+    message.can_retry = false
+    message.can_react = false
+  }
+  draftText.value = ''
+  pendingLocation.value = null
+  locationPickerOpen.value = false
+  handoffTargetChannel.value = ''
+  composerAttachments.value?.clear()
+  voiceRecorder.value?.reset?.()
+  messageActions.cancelEdit()
+  cancelReply()
+  composerTyping.reset()
 }
 
 function messageStatusNoteClass(message) {
