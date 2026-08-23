@@ -51,6 +51,7 @@
             v-if="item.status === 'failed'"
             class="mt-1 !h-5 !px-1 text-xs"
             variant="ghost"
+            :disabled="disabled || frozen"
             :label="__('Повторить')"
             @click="controller.retry(item.id)"
           />
@@ -58,6 +59,7 @@
         <Button
           class="absolute right-0 top-0 !size-6 translate-x-1/3 -translate-y-1/3 rounded-full shadow-sm"
           icon="x"
+          :disabled="disabled || frozen"
           :aria-label="__('Удалить вложение')"
           @click="controller.remove(item.id)"
         />
@@ -71,8 +73,8 @@ import {
   createComposerAttachmentController,
   validateComposerFileMix,
 } from '@/utils/messengerComposer'
-import { Button, FileUploadHandler, toast } from 'frappe-ui'
-import { onBeforeUnmount, ref } from 'vue'
+import { Button, FileUploadHandler, call, toast } from 'frappe-ui'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import FileIcon from '~icons/lucide/file'
 
 const props = defineProps({
@@ -80,14 +82,18 @@ const props = defineProps({
   channelType: { type: String, default: '' },
   maxFiles: { type: Number, default: 10 },
   disabled: { type: Boolean, default: false },
+  conversation: { type: String, default: '' },
 })
 const emit = defineEmits(['change'])
 const fileInput = ref(null)
 const items = ref([])
+const frozen = ref(false)
 
 const controller = createComposerAttachmentController({
   maxFiles: () => props.maxFiles,
+  scope: () => props.conversation,
   upload: uploadFile,
+  discard: discardFiles,
   createObjectURL: (file) => URL.createObjectURL(file),
   revokeObjectURL: (url) => URL.revokeObjectURL(url),
   validateFiles(files, existing) {
@@ -109,7 +115,20 @@ function uploadFile(file, onProgress) {
   uploader.on('progress', ({ uploaded, total }) => {
     onProgress(total ? (uploaded / total) * 100 : 0)
   })
-  return uploader.upload(file, { private: true })
+  return uploader.upload(file, {
+    private: true,
+    docname: props.conversation,
+    upload_endpoint:
+      '/api/method/crm_messenger.api.attachments.upload_temporary_file',
+  })
+}
+
+function discardFiles(files, conversation = props.conversation) {
+  if (!conversation || !files?.length) return
+  return call('crm_messenger.api.attachments.discard_temporary_files', {
+    conversation,
+    files,
+  })
 }
 
 function onFileInput(event) {
@@ -138,13 +157,43 @@ function itemStatus(item) {
   return __('Ожидание')
 }
 
-onBeforeUnmount(() => controller.clear())
+async function discard() {
+  frozen.value = false
+  await controller.discard()
+}
+
+function release() {
+  frozen.value = false
+  controller.release()
+}
+
+function freeze() {
+  let snapshot = controller.freeze()
+  frozen.value = snapshot !== null
+  return snapshot
+}
+
+function unfreeze() {
+  frozen.value = false
+  controller.unfreeze()
+}
+
+onBeforeUnmount(() => controller.discard())
+watch(
+  () => props.conversation,
+  (conversation, previousConversation) => {
+    if (conversation !== previousConversation) controller.discard()
+  },
+)
 
 defineExpose({
   openFileSelector,
   handlePaste,
   handleDrop,
-  clear: controller.clear,
+  discard,
+  release,
+  freeze,
+  unfreeze,
   hasBlockingItems: controller.hasBlockingItems,
   readyFileNames: controller.readyFileNames,
 })

@@ -51,12 +51,24 @@ vi.mock('frappe-ui', () => ({
   Textarea: components.input,
   Tooltip: { template: '<span><slot /></span>' },
   call: mocks.call,
-  dayjsLocal: () => ({}),
+  dayjsLocal: () => ({
+    isValid: () => true,
+    format: () => '2026-08-23',
+    fromNow: () => 'now',
+  }),
   toast: { error: vi.fn() },
 }))
 
 vi.mock('@/stores/global', () => ({
   globalStore: () => ({ $dialog: vi.fn(), $socket: mocks.socket }),
+}))
+vi.mock('@/stores/users', () => ({
+  usersStore: () => ({
+    getUser: (name) => ({ name, full_name: 'Оператор Тестов' }),
+  }),
+}))
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
 }))
 
 const emptyComponent = vi.hoisted(() => () => ({
@@ -74,7 +86,15 @@ vi.mock('@/components/LeadMessenger/MessageReactions.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageReplyQuote.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
   default: {
-    methods: { clear() {}, openFileSelector() {} },
+    methods: {
+      discard() {},
+      freeze() {
+        return []
+      },
+      unfreeze() {},
+      release() {},
+      openFileSelector() {},
+    },
     template: '<span />',
   },
 }))
@@ -90,6 +110,7 @@ import LeadConversation from '@/components/LeadMessenger/LeadConversation.vue'
 let mounted = []
 let permissions
 let preparedResult
+let snapshotMessages
 
 const channel = (name) => ({
   name,
@@ -122,6 +143,7 @@ beforeEach(() => {
     expires_at: '2026-08-24 12:00:00',
     message: 'Перейдите в другой канал\nCRM-ABCDEFGHIJKLMNOPQRSTUVWXYZ',
   }
+  snapshotMessages = []
   mocks.socket.reset()
   vi.clearAllMocks()
   mocks.call.mockImplementation(async (method) => {
@@ -149,7 +171,7 @@ beforeEach(() => {
     if (method.endsWith('get_message_page')) {
       return {
         contract_version: 1,
-        messages: [],
+        messages: snapshotMessages,
         page: { has_more: false, before_cursor: null },
         sync_cursor: 'cursor-1',
         permissions,
@@ -186,10 +208,10 @@ afterEach(() => {
   mounted = []
 })
 
-async function mountConversation() {
+async function mountConversation(props = {}) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(LeadConversation, { leadName: 'LEAD-1' })
+  let app = createApp(LeadConversation, { leadName: 'LEAD-1', ...props })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
   mounted.push({ app, root })
@@ -223,6 +245,74 @@ describe('messenger permission rendering', () => {
     expect(
       root.querySelector('input[placeholder="Введите сообщение..."]'),
     ).not.toBeNull()
+  })
+
+  it('does not send Enter while an IME composition is active', async () => {
+    permissions = { ...permissions, can_operate: true }
+    let root = await mountConversation()
+    let composer = root.querySelector(
+      'input[placeholder="Введите сообщение..."]',
+    )
+    composer.value = 'составляемый текст'
+    composer.dispatchEvent(new Event('input'))
+    composer.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        isComposing: true,
+      }),
+    )
+    await nextTick()
+
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+  })
+
+  it('marks a Messenger notification at the loaded event boundary', async () => {
+    snapshotMessages = [
+      {
+        name: 'MESSAGE-INBOUND-1',
+        conversation: 'CONVERSATION-1',
+        direction: 'inbound',
+        status: 'received',
+        ingest_source: 'provider_webhook',
+        message_datetime: '2026-08-23 12:00:00',
+      },
+    ]
+
+    await mountConversation()
+
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm.api.notifications.mark_messenger_as_read',
+        {
+          conversation: 'CONVERSATION-1',
+          last_event_id: 'MESSAGE-INBOUND-1',
+        },
+      ),
+    )
+  })
+
+  it('does not mark Messenger notifications while the tab is inactive', async () => {
+    snapshotMessages = [
+      {
+        name: 'MESSAGE-INBOUND-1',
+        conversation: 'CONVERSATION-1',
+        direction: 'inbound',
+        status: 'received',
+        ingest_source: 'provider_webhook',
+        message_datetime: '2026-08-23 12:00:00',
+      },
+    ]
+
+    await mountConversation({ active: false })
+
+    expect(
+      mocks.call.mock.calls.some(([method]) =>
+        method.endsWith('mark_messenger_as_read'),
+      ),
+    ).toBe(false)
   })
 
   it('closes an active composer when a delta revokes operator permission', async () => {

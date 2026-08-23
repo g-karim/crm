@@ -111,10 +111,7 @@ export function createMessengerSyncController(options) {
     if (!leadName) return
     let requestGeneration = generation
     let requestedLead = leadName
-    let result = await api(
-      'get_message_page',
-      scopeParams({ limit: 100 }),
-    )
+    let result = await api('get_message_page', scopeParams({ limit: 100 }))
     if (requestGeneration !== generation || requestedLead !== leadName) return
     if (result?.contract_version !== 1 || !result?.sync_cursor) {
       throw new Error('Unsupported messenger snapshot response.')
@@ -297,6 +294,10 @@ export function createMessengerSyncController(options) {
     )
   }
 
+  function mergeExternal(incoming) {
+    return merge(Array.isArray(incoming) ? incoming : [incoming], 'external')
+  }
+
   return {
     start,
     stop,
@@ -304,6 +305,7 @@ export function createMessengerSyncController(options) {
     loadSnapshot,
     loadOlder,
     syncDelta,
+    mergeExternal,
     getMessages: () => messages,
     getCursor: () => syncCursor,
     hasMoreHistory: () => hasMoreHistory,

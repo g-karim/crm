@@ -6,22 +6,12 @@ export const visible = ref(false)
 
 export const notifications = createResource({
   url: 'crm.api.notifications.get_notifications',
-  initialData: [],
+  initialData: { notifications: [], unread_count: 0, has_more: false },
   auto: true,
 })
 
 export const unreadNotificationsCount = computed(
-  () =>
-    notifications.data
-      ?.filter((notification) => !notification.read)
-      .reduce(
-        (count, notification) =>
-          count +
-          (notification.type === 'Messenger'
-            ? Math.max(Number(notification.event_count) || 1, 1)
-            : 1),
-        0,
-      ) || 0,
+  () => Number(notifications.data?.unread_count) || 0,
 )
 
 export const notificationsStore = defineStore('crm-notifications', () => {
@@ -30,20 +20,28 @@ export const notificationsStore = defineStore('crm-notifications', () => {
 
   const mark_as_read = createResource({
     url: 'crm.api.notifications.mark_as_read',
-    onSuccess: () => {
-      mark_as_read.params = {}
-      notifications.reload()
-    },
+    onSuccess: () => notifications.reload(),
+  })
+  const mark_all_as_read = createResource({
+    url: 'crm.api.notifications.mark_all_as_read',
   })
 
   function toggle() {
     visible.value = !visible.value
   }
 
-  function mark_doc_as_read(doc) {
-    mark_as_read.params = { doc: doc }
-    mark_as_read.reload()
-    toggle()
+  function markNotificationAsRead(notification) {
+    if (!notification) return
+    mark_as_read.submit({ notification })
+  }
+
+  async function markAllAsRead() {
+    let hasMore = true
+    while (hasMore) {
+      let result = await mark_all_as_read.submit({ limit: 500 })
+      hasMore = Boolean(result?.has_more)
+    }
+    notifications.reload()
   }
 
   function initializeRealtime(socket) {
@@ -64,7 +62,9 @@ export const notificationsStore = defineStore('crm-notifications', () => {
   return {
     unreadNotificationsCount,
     mark_as_read,
-    mark_doc_as_read,
+    mark_all_as_read,
+    markNotificationAsRead,
+    markAllAsRead,
     initializeRealtime,
     disposeRealtime,
     toggle,

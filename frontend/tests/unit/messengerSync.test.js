@@ -71,6 +71,22 @@ const delta = (changes = [], overrides = {}) => ({
 })
 
 describe('messenger sync', () => {
+  it('merges an exact unloaded reply target through the shared ordering path', () => {
+    let harness = createHarness()
+    let older = {
+      name: 'M-1',
+      message_datetime: '2026-07-16 09:00:00',
+    }
+    let newer = {
+      name: 'M-2',
+      message_datetime: '2026-07-16 10:00:00',
+    }
+
+    harness.controller.mergeExternal(newer)
+    harness.controller.mergeExternal(older)
+
+    expect(harness.controller.getMessages()).toEqual([older, newer])
+  })
   it('counts only appended inbound non-history inserts as new messages', () => {
     let previous = {
       name: 'M-1',
@@ -182,7 +198,7 @@ describe('messenger sync', () => {
     expect(
       harness.socket.handlers.get('crm_messenger:conversation_changed'),
     ).toEqual([])
-		expect(harness.socket.handlers.get('crm_messenger:typing')).toEqual([])
+    expect(harness.socket.handlers.get('crm_messenger:typing')).toEqual([])
   })
 
   it('routes only typing events for the active Lead', async () => {
@@ -215,7 +231,11 @@ describe('messenger sync', () => {
   })
 
   it('merges delta changes by message name without duplicates', async () => {
-    let first = { name: 'M-1', status: 'sent', message_datetime: '2026-07-16 10:00:00' }
+    let first = {
+      name: 'M-1',
+      status: 'sent',
+      message_datetime: '2026-07-16 10:00:00',
+    }
     let changed = { ...first, status: 'read' }
     let harness = createHarness({
       get_message_page: snapshot([first]),
@@ -282,16 +302,24 @@ describe('messenger sync', () => {
     }
     harness.socket.emit('crm_messenger:conversation_changed', event)
     harness.socket.emit('crm_messenger:conversation_changed', event)
-    resolveDelta(delta([{ name: 'M-1', message_datetime: '2026-07-16 10:00:00' }]))
+    resolveDelta(
+      delta([{ name: 'M-1', message_datetime: '2026-07-16 10:00:00' }]),
+    )
 
-    await vi.waitFor(() => expect(harness.controller.getMessages()).toHaveLength(1))
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages()).toHaveLength(1),
+    )
     expect(harness.controller.getMessages().map((item) => item.name)).toEqual([
       'M-1',
     ])
   })
 
   it('deduplicates the same message in snapshot and delta', async () => {
-    let message = { name: 'M-1', text: 'snapshot', message_datetime: '2026-07-16 10:00:00' }
+    let message = {
+      name: 'M-1',
+      text: 'snapshot',
+      message_datetime: '2026-07-16 10:00:00',
+    }
     let harness = createHarness({
       get_message_page: snapshot([message]),
       get_message_changes: delta([{ ...message, text: 'delta' }]),
@@ -314,7 +342,9 @@ describe('messenger sync', () => {
 
     await vi.waitFor(() =>
       expect(
-        harness.calls.filter(([method]) => method.endsWith('get_message_changes')),
+        harness.calls.filter(([method]) =>
+          method.endsWith('get_message_changes'),
+        ),
       ).toHaveLength(1),
     )
     expect(harness.socket.emitted.at(-1)).toEqual([
@@ -327,7 +357,12 @@ describe('messenger sync', () => {
   it('unsubscribes from the old Lead and ignores its events after a switch', async () => {
     let harness = createHarness({
       get_message_page: ({ reference_name }) =>
-        snapshot([{ name: `${reference_name}-M`, message_datetime: '2026-07-16 10:00:00' }]),
+        snapshot([
+          {
+            name: `${reference_name}-M`,
+            message_datetime: '2026-07-16 10:00:00',
+          },
+        ]),
       get_message_changes: delta(),
     })
     await harness.controller.start('LEAD-1')
@@ -355,7 +390,9 @@ describe('messenger sync', () => {
 
     await vi.waitFor(() =>
       expect(
-        harness.calls.filter(([method]) => method.endsWith('get_message_changes')),
+        harness.calls.filter(([method]) =>
+          method.endsWith('get_message_changes'),
+        ),
       ).toHaveLength(1),
     )
   })
@@ -366,13 +403,16 @@ describe('messenger sync', () => {
       status: 'sent',
       attachments: [{ id: 'A-1', status: 'pending' }],
     }
-    let result = mergeMessengerMessages([message], [
-      {
-        ...message,
-        status: 'read',
-        attachments: [{ id: 'A-1', status: 'available' }],
-      },
-    ])
+    let result = mergeMessengerMessages(
+      [message],
+      [
+        {
+          ...message,
+          status: 'read',
+          attachments: [{ id: 'A-1', status: 'available' }],
+        },
+      ],
+    )
 
     expect(result.messages[0].status).toBe('read')
     expect(result.messages[0].attachments[0].status).toBe('available')
@@ -389,7 +429,10 @@ describe('messenger sync', () => {
       type: 'image',
     }))
 
-    let result = mergeMessengerMessages([message], [{ ...message, attachments }])
+    let result = mergeMessengerMessages(
+      [message],
+      [{ ...message, attachments }],
+    )
 
     expect(result.messages).toHaveLength(1)
     expect(result.messages[0].attachments).toEqual(attachments)

@@ -15,8 +15,11 @@ function harness(
   let urls = []
   let revoked = []
   let changes = []
+  let discard = vi.fn(async () => {})
   let controller = createComposerAttachmentController({
     upload,
+    discard,
+    scope: () => 'CONVERSATION-1',
     createObjectURL: (value) => {
       let url = `blob:${value.name}`
       urls.push(url)
@@ -26,7 +29,7 @@ function harness(
     validateFiles: (files) => ({ files }),
     onChange: (items) => changes.push(items),
   })
-  return { controller, upload, urls, revoked, changes }
+  return { controller, upload, discard, urls, revoked, changes }
 }
 
 describe('messenger composer attachments', () => {
@@ -117,17 +120,74 @@ describe('messenger composer attachments', () => {
     expect(current.upload).toHaveBeenCalledOnce()
   })
 
-  it('removes local state and revokes preview without deleting a Frappe File', async () => {
+  it('removes local state, revokes preview and discards the temporary File', async () => {
     let current = harness()
     let [item] = current.controller.addFiles([file('remove.png', 'image/png')])
     await vi.waitFor(() =>
       expect(current.controller.readyFileNames()).toHaveLength(1),
     )
 
-    current.controller.remove(item.id)
+    await current.controller.remove(item.id)
 
     expect(current.controller.getItems()).toEqual([])
     expect(current.revoked).toEqual(['blob:remove.png'])
+    expect(current.discard).toHaveBeenCalledWith(
+      ['FILE-remove.png'],
+      'CONVERSATION-1',
+    )
+  })
+
+  it('freezes an immutable uploaded snapshot until send completes', async () => {
+    let current = harness()
+    let [item] = current.controller.addFiles([file('send.pdf')])
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toEqual(['FILE-send.pdf']),
+    )
+
+    expect(current.controller.freeze()).toEqual(['FILE-send.pdf'])
+    expect(current.controller.isFrozen()).toBe(true)
+    expect(current.controller.addFiles([file('late.pdf')])).toEqual([])
+    await current.controller.remove(item.id)
+    current.controller.retry(item.id)
+    expect(current.controller.readyFileNames()).toEqual(['FILE-send.pdf'])
+
+    current.controller.unfreeze()
+    await current.controller.remove(item.id)
+    expect(current.controller.getItems()).toEqual([])
+  })
+
+  it('releases accepted files locally without server cleanup', async () => {
+    let current = harness()
+    current.controller.addFiles([file('accepted.pdf')])
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toHaveLength(1),
+    )
+
+    current.controller.freeze()
+    current.controller.release()
+
+    expect(current.controller.getItems()).toEqual([])
+    expect(current.discard).not.toHaveBeenCalled()
+  })
+
+  it('discards an upload that finishes after its composer scope reset', async () => {
+    let resolveUpload
+    let upload = vi.fn(
+      () => new Promise((resolve) => (resolveUpload = resolve)),
+    )
+    let current = harness(upload)
+    current.controller.addFiles([file('stale.pdf')])
+
+    await current.controller.discard()
+    resolveUpload({ name: 'FILE-stale.pdf' })
+
+    await vi.waitFor(() =>
+      expect(current.discard).toHaveBeenCalledWith(
+        ['FILE-stale.pdf'],
+        'CONVERSATION-1',
+      ),
+    )
+    expect(current.controller.getItems()).toEqual([])
   })
 
   it('keeps a failed upload and retries the same File', async () => {

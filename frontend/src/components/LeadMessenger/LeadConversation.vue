@@ -347,7 +347,10 @@
           :supportsAttachments="selectedCapabilities.supports_attachments"
           :channelType="selectedChannelType"
           :maxFiles="selectedCapabilities.max_attachment_count"
-          :disabled="voiceActive || Boolean(pendingLocation)"
+          :conversation="selectedConversation?.name || ''"
+          :disabled="
+            baseSendDisabled || voiceActive || Boolean(pendingLocation)
+          "
           @change="pendingAttachments = $event"
         />
         <div
@@ -501,6 +504,7 @@ import MessageMetadata from '@/components/LeadMessenger/MessageMetadata.vue'
 import MessageReactions from '@/components/LeadMessenger/MessageReactions.vue'
 import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
 import { globalStore } from '@/stores/global'
+import { usersStore } from '@/stores/users'
 import {
   buildMessengerMessageItems,
   buildMessengerChannelOptions,
@@ -540,6 +544,7 @@ import {
 } from '@/utils/messengerViewport'
 import { Button, FormControl, Textarea, call, toast } from 'frappe-ui'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const props = defineProps({
   leadName: { type: String, required: true },
@@ -596,6 +601,9 @@ const messageEditorElements = new Map()
 const reactionComponents = new Map()
 let typingTimer = null
 let highlightTimer = null
+let preserveComposerScope = false
+let notificationReadPending = false
+let appliedRouteConversation = ''
 
 const composerTyping = createMessengerTypingController({
   send(conversation) {
@@ -604,6 +612,8 @@ const composerTyping = createMessengerTypingController({
 })
 
 const { $dialog, $socket } = globalStore()
+const { getUser } = usersStore()
+const route = useRoute()
 
 const leadPhone = computed(
   () => props.phone || props.lead?.mobile_no || props.lead?.phone || '',
@@ -820,10 +830,10 @@ const messageSync = createMessengerSyncController({
           previousLastMessage: change.changeSnapshot?.previousLastMessage,
         })
     }
+    scheduleMessengerNotificationRead()
   },
   onDeltaApplied(_merge, incoming) {
     let hasInbound = incoming.some((message) => message.direction === 'inbound')
-    if (hasInbound) markMessengerNotificationsRead()
     if (
       hasInbound &&
       incoming.some(
@@ -912,6 +922,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  resetComposer()
   messageSync.stop()
   readController.stop()
   clearTyping()
@@ -940,22 +951,14 @@ async function initialize(leadChanged = false) {
   newMessageCount.value = 0
   loadingMessages.value = true
   if (leadChanged) {
+    await resetComposer()
     applyPermissions()
     messages.value = []
     conversations.value = []
     selectedChannel.value = ''
     selectedConversationName.value = ''
     handoffTargetChannel.value = ''
-    preparedHandoff.value = null
-    draftText.value = ''
-    pendingLocation.value = null
-    composerAttachments.value?.clear()
-    clientRequestId.value = ''
-    clientRequestFingerprint.value = ''
     messageEditorElements.clear()
-    messageActions.cancelEdit()
-    cancelReply()
-    clearTyping()
   }
   try {
     await Promise.all([
@@ -965,7 +968,7 @@ async function initialize(leadChanged = false) {
         ? messageSync.setLead(props.leadName)
         : messageSync.start(props.leadName),
     ])
-    await markMessengerNotificationsRead()
+    scheduleMessengerNotificationRead()
   } catch (error) {
     handleError(error, __('Не удалось загрузить сообщения.'))
   } finally {
@@ -1051,6 +1054,7 @@ async function loadConversations() {
     conversations.value = result.conversations || []
     applyPermissions(result.permissions)
     ensureSelectedChannel()
+    applyRequestedConversation()
   } catch (error) {
     handleError(error, __('Не удалось загрузить переписку.'))
   } finally {
@@ -1075,6 +1079,16 @@ function ensureSelectedConversation() {
     selectedConversation: selectedConversationName.value,
   })
   selectedConversationName.value = resolved.conversation?.name || ''
+}
+
+function applyRequestedConversation() {
+  let requested = `${route.query.messenger_conversation || ''}`
+  if (!requested || requested === appliedRouteConversation) return
+  let conversation = conversations.value.find((row) => row.name === requested)
+  if (!conversation) return
+  selectedChannel.value = conversation.channel
+  selectedConversationName.value = conversation.name
+  appliedRouteConversation = requested
 }
 
 function handleComposerInput(value) {
@@ -1115,12 +1129,13 @@ async function sendMessage() {
   genericError.value = ''
   sendWarning.value = ''
   sendingMessage.value = true
+  let attachmentNames = composerAttachments.value?.freeze() || []
+  let accepted = false
 
   try {
     let conversation = await resolveConversationForSend()
     if (!conversation?.name) return
 
-    let attachmentNames = composerAttachments.value?.readyFileNames() || []
     let fingerprint = JSON.stringify({
       conversation: conversation.name,
       channel: selectedChannel.value,
@@ -1148,6 +1163,16 @@ async function sendMessage() {
       reference_doctype: 'CRM Lead',
       reference_name: props.leadName,
     })
+    accepted = Boolean(result?.name)
+    if (accepted) {
+      composerTyping.reset()
+      draftText.value = ''
+      composerAttachments.value?.release()
+      pendingLocation.value = null
+      clientRequestId.value = ''
+      clientRequestFingerprint.value = ''
+      cancelReply()
+    }
 
     if (result?.name && handoff) preparedHandoff.value = null
     if (result?.reason === 'not_configured') {
@@ -1169,16 +1194,11 @@ async function sendMessage() {
       throw new Error(result?.message || __('Не удалось отправить сообщение.'))
     } else {
       composerTyping.reset()
-      draftText.value = ''
-      composerAttachments.value?.clear()
-      pendingLocation.value = null
-      clientRequestId.value = ''
-      clientRequestFingerprint.value = ''
-      cancelReply()
     }
   } catch (error) {
     handleError(error, __('Не удалось отправить сообщение.'))
   } finally {
+    if (!accepted) composerAttachments.value?.unfreeze()
     sendingMessage.value = false
     await Promise.all([loadConversations(), messageSync.syncDelta()])
   }
@@ -1198,11 +1218,13 @@ async function resolveConversationForSend() {
     },
   )
   if (result?.ok && result.conversation?.name) {
-    selectedChannel.value =
-      result.conversation.channel ||
-      result.channel?.name ||
-      selectedChannel.value
-    selectedConversationName.value = result.conversation.name
+    preserveComposerDuringScopeChange(() => {
+      selectedChannel.value =
+        result.conversation.channel ||
+        result.channel?.name ||
+        selectedChannel.value
+      selectedConversationName.value = result.conversation.name
+    })
     return (
       conversations.value.find(
         (conversation) => conversation.name === result.conversation.name,
@@ -1366,7 +1388,9 @@ async function createConversation() {
     conversations.value = [conversation, ...conversations.value]
   }
   if (conversation?.name) {
-    selectedConversationName.value = conversation.name
+    preserveComposerDuringScopeChange(() => {
+      selectedConversationName.value = conversation.name
+    })
   }
   return conversation
 }
@@ -1377,19 +1401,21 @@ function makeClientRequestId() {
 }
 
 function sendOnEnter(event) {
-  if (event.shiftKey) return
+  if (event.isComposing || event.shiftKey) return
   event.preventDefault()
   sendMessage()
 }
 
 function handleComposerPaste(event) {
-  if (voiceActive.value || pendingLocation.value) return
+  if (baseSendDisabled.value || voiceActive.value || pendingLocation.value)
+    return
   composerAttachments.value?.handlePaste(event)
 }
 
 function handleComposerDragOver(event) {
   if (preparedHandoff.value) return
-  if (voiceActive.value || pendingLocation.value) return
+  if (baseSendDisabled.value || voiceActive.value || pendingLocation.value)
+    return
   if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return
   event.preventDefault()
   draggingFiles.value = true
@@ -1398,7 +1424,8 @@ function handleComposerDragOver(event) {
 function handleComposerDrop(event) {
   if (preparedHandoff.value) return
   draggingFiles.value = false
-  if (voiceActive.value || pendingLocation.value) return
+  if (baseSendDisabled.value || voiceActive.value || pendingLocation.value)
+    return
   composerAttachments.value?.handleDrop(event)
 }
 
@@ -1412,6 +1439,7 @@ function scrollToBottom() {
   messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   newMessageCount.value = 0
   readController.schedule()
+  scheduleMessengerNotificationRead()
 }
 
 function isNearBottom() {
@@ -1422,6 +1450,7 @@ async function handleMessagesScroll() {
   if (isNearBottom()) {
     newMessageCount.value = 0
     readController.schedule()
+    scheduleMessengerNotificationRead()
   }
   if (
     !messagesEl.value ||
@@ -1461,8 +1490,11 @@ function startReply(message) {
     )
     return
   }
-  selectedChannel.value = conversation.channel
-  selectedConversationName.value = conversation.name
+  resetComposer()
+  preserveComposerDuringScopeChange(() => {
+    selectedChannel.value = conversation.channel
+    selectedConversationName.value = conversation.name
+  })
   replyTarget.value = message
   nextTick(() => textareaRef.value?.el?.focus?.())
 }
@@ -1514,8 +1546,23 @@ function retryMessage(message) {
 }
 
 async function navigateToReply(messageName) {
-  if (!messageName || !messages.value.some((item) => item.name === messageName))
-    return
+  if (!messageName) return
+  if (!messages.value.some((item) => item.name === messageName)) {
+    try {
+      let result = await call('crm_messenger.api.messages.get_message', {
+        message: messageName,
+      })
+      if (
+        !result?.ok ||
+        result.message?.conversation !== selectedConversation.value?.name
+      )
+        return
+      messageSync.mergeExternal(result.message)
+    } catch (error) {
+      handleError(error, __('Не удалось загрузить исходное сообщение.'))
+      return
+    }
+  }
   await nextTick()
   let selector = `[data-message-id="${CSS.escape(messageName)}"]`
   let element = messagesEl.value?.querySelector(selector)
@@ -1554,19 +1601,44 @@ function handleVisibilityChange() {
     composerTyping.reset()
   } else {
     readController.schedule()
-    markMessengerNotificationsRead()
+    scheduleMessengerNotificationRead()
   }
 }
 
 async function markMessengerNotificationsRead() {
-  if (!props.active || document.visibilityState !== 'visible') return
+  if (
+    notificationReadPending ||
+    !props.active ||
+    document.visibilityState !== 'visible' ||
+    !selectedConversation.value?.name ||
+    !isNearBottom()
+  )
+    return
+  let lastInbound = messages.value
+    .filter(
+      (message) =>
+        message.conversation === selectedConversation.value.name &&
+        message.direction === 'inbound' &&
+        message.status !== 'deleted' &&
+        message.ingest_source !== 'provider_history',
+    )
+    .at(-1)
+  if (!lastInbound?.name) return
+  notificationReadPending = true
   try {
     await call('crm.api.notifications.mark_messenger_as_read', {
-      reference_name: props.leadName,
+      conversation: selectedConversation.value.name,
+      last_event_id: lastInbound.name,
     })
   } catch {
     // Notifications are auxiliary and must not interrupt the conversation UI.
+  } finally {
+    notificationReadPending = false
   }
+}
+
+function scheduleMessengerNotificationRead() {
+  nextTick(() => markMessengerNotificationsRead())
 }
 
 watch(
@@ -1577,14 +1649,28 @@ watch(
       composerTyping.reset()
     } else {
       readController.schedule()
-      markMessengerNotificationsRead()
+      scheduleMessengerNotificationRead()
     }
   },
 )
 
 watch(
+  () => route.query.messenger_conversation,
+  () => {
+    appliedRouteConversation = ''
+    applyRequestedConversation()
+  },
+)
+
+watch(
   () => selectedConversation.value?.name,
-  (conversationName) => {
+  (conversationName, previousConversation) => {
+    if (
+      previousConversation !== undefined &&
+      conversationName !== previousConversation &&
+      !preserveComposerScope
+    )
+      resetComposer()
     composerTyping.reset()
     if (
       replyTarget.value &&
@@ -1599,7 +1685,13 @@ watch(
 
 watch(
   () => selectedChannel.value,
-  () => {
+  (channel, previousChannel) => {
+    if (
+      previousChannel !== undefined &&
+      channel !== previousChannel &&
+      !preserveComposerScope
+    )
+      resetComposer()
     composerTyping.reset()
     ensureSelectedConversation()
     handoffTargetChannel.value = ''
@@ -1614,7 +1706,10 @@ watch(
 )
 
 function messageSender(message) {
-  if (message.direction === 'outbound') return __('Вы')
+  if (message.direction === 'outbound')
+    return message.crm_user
+      ? getUser(message.crm_user)?.full_name || __('Оператор')
+      : __('Оператор')
   return clientDisplayName.value
 }
 
@@ -1671,16 +1766,40 @@ function applyPermissions(value = {}) {
     message.can_retry = false
     message.can_react = false
   }
+  resetComposer()
+}
+
+function preserveComposerDuringScopeChange(change) {
+  preserveComposerScope = true
+  change()
+  nextTick(() => {
+    preserveComposerScope = false
+  })
+}
+
+async function resetComposer() {
+  let handoff = preparedHandoff.value
+  preparedHandoff.value = null
   draftText.value = ''
   pendingLocation.value = null
   locationPickerOpen.value = false
   handoffTargetChannel.value = ''
-  preparedHandoff.value = null
-  composerAttachments.value?.clear()
+  clientRequestId.value = ''
+  clientRequestFingerprint.value = ''
+  draggingFiles.value = false
+  sendWarning.value = ''
+  cancelReply()
+  clearTyping()
+  composerTyping.reset()
   voiceRecorder.value?.reset?.()
   messageActions.cancelEdit()
-  cancelReply()
-  composerTyping.reset()
+  let cleanup = composerAttachments.value?.discard?.()
+  let revoke = handoff?.handoff
+    ? call('crm_messenger.api.handoffs.revoke_handoff', {
+        handoff: handoff.handoff,
+      })
+    : null
+  await Promise.allSettled([cleanup, revoke].filter(Boolean))
 }
 
 function messageStatusNoteClass(message) {

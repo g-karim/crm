@@ -18,11 +18,11 @@
         </div>
         <div class="flex gap-1 mr-3">
           <Button
-            v-if="activeTab == 'all' && notifications.data?.length"
+            v-if="activeTab == 'all' && notificationItems.length"
             :tooltip="__('Mark all as read')"
             :icon="MarkAsDoneIcon"
             variant="ghost"
-            @click="markAllAsRead"
+            @click="handleMarkAllAsRead"
           />
         </div>
       </div>
@@ -33,15 +33,15 @@
       />
       <div v-if="activeTab == 'all'" class="flex h-full">
         <div
-          v-if="notifications.data?.length"
+          v-if="notificationItems.length"
           class="divide-y divide-outline-gray-modals overflow-auto text-base"
         >
           <RouterLink
-            v-for="n in notifications.data"
+            v-for="n in notificationItems"
             :key="n.name"
             :to="getRoute(n)"
             class="flex cursor-pointer items-start gap-2.5 px-4 py-2.5 hover:bg-surface-gray-2"
-            @click="markAsRead(n.comment || n.notification_type_doc)"
+            @click="markAsRead(n)"
           >
             <div class="mt-1 flex items-center gap-2.5">
               <div
@@ -117,14 +117,17 @@ import { timeAgo, sanitizeHTML } from '@/utils'
 import { onClickOutside } from '@vueuse/core'
 import { useTelemetry } from 'frappe-ui/frappe'
 import { TabButtons } from 'frappe-ui'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 
 const { $socket } = globalStore()
-const { mark_as_read, toggle, mark_doc_as_read } = notificationsStore()
+const { markAllAsRead, toggle, markNotificationAsRead } = notificationsStore()
 const { handleEventNotification } = useEventNotificationAlert()
 const { capture } = useTelemetry()
 
 const activeTab = ref('all')
+const notificationItems = computed(
+  () => notifications.data?.notifications || [],
+)
 const tabs = [
   { label: __('All'), value: 'all' },
   { label: __('Events'), value: 'events' },
@@ -142,14 +145,16 @@ onClickOutside(
   },
 )
 
-function markAsRead(doc) {
+function markAsRead(notification) {
   capture('notification_mark_as_read')
-  mark_doc_as_read(doc)
+  if (notification.type !== 'Messenger')
+    markNotificationAsRead(notification.name)
+  toggle()
 }
 
-function markAllAsRead() {
+function handleMarkAllAsRead() {
   capture('notification_mark_all_as_read')
-  mark_as_read.reload()
+  markAllAsRead()
 }
 
 onBeforeUnmount(() => {
@@ -174,6 +179,10 @@ function getRoute(notification) {
     name: notification.route_name,
     params: params,
     hash: notification.hash,
+    query:
+      notification.type === 'Messenger'
+        ? { messenger_conversation: notification.notification_type_doc }
+        : undefined,
   }
 }
 </script>

@@ -1,21 +1,30 @@
 export function createComposerAttachmentController(options) {
   let items = []
   let handledPasteEvents = new WeakMap()
+  let frozen = false
+  let generation = 0
 
   function notify() {
     options.onChange?.([...items])
   }
 
   async function uploadItem(item) {
+    if (frozen) return
+    let uploadGeneration = generation
     item.status = 'uploading'
     item.progress = 0
     item.error = ''
     notify()
     try {
       let uploadedFile = await options.upload(item.file, (progress) => {
+        if (item.discarded || uploadGeneration !== generation) return
         item.progress = Math.max(0, Math.min(Number(progress || 0), 100))
         notify()
       })
+      if (item.discarded || uploadGeneration !== generation) {
+        await discardFiles([uploadedFile?.name], item.scope).catch(() => {})
+        return
+      }
       item.uploadedFile = uploadedFile
       item.status = 'uploaded'
       item.progress = 100
@@ -27,6 +36,7 @@ export function createComposerAttachmentController(options) {
   }
 
   function addFiles(fileList) {
+    if (frozen) return []
     let files = Array.from(fileList || []).filter(Boolean)
     let maxFiles = Number(
       typeof options.maxFiles === 'function'
@@ -59,6 +69,7 @@ export function createComposerAttachmentController(options) {
         progress: 0,
         error: '',
         uploadedFile: null,
+        scope: options.scope?.(),
       }
       items.push(item)
       return item
@@ -68,29 +79,69 @@ export function createComposerAttachmentController(options) {
     return added
   }
 
-  function remove(id) {
+  async function remove(id) {
+    if (frozen) return
     let item = items.find((candidate) => candidate.id === id)
     if (!item) return
+    item.discarded = true
     if (item.previewUrl) options.revokeObjectURL?.(item.previewUrl)
     items = items.filter((candidate) => candidate.id !== id)
     notify()
+    await discardFiles([item.uploadedFile?.name], item.scope).catch(() => {})
   }
 
   function retry(id) {
+    if (frozen) return
     let item = items.find((candidate) => candidate.id === id)
     if (!item || item.status !== 'failed') return
     return uploadItem(item)
   }
 
-  function clear() {
+  function release() {
+    generation += 1
     items.forEach((item) => {
       if (item.previewUrl) options.revokeObjectURL?.(item.previewUrl)
     })
     items = []
+    frozen = false
     notify()
   }
 
+  async function discard() {
+    let discardedItems = [...items]
+    items.forEach((item) => (item.discarded = true))
+    release()
+    let groups = new Map()
+    discardedItems.forEach((item) => {
+      if (!item.uploadedFile?.name) return
+      let names = groups.get(item.scope) || []
+      names.push(item.uploadedFile.name)
+      groups.set(item.scope, names)
+    })
+    await Promise.allSettled(
+      [...groups].map(([scope, fileNames]) => discardFiles(fileNames, scope)),
+    )
+  }
+
+  function freeze() {
+    if (items.some((item) => item.status !== 'uploaded')) return null
+    frozen = true
+    notify()
+    return items.map((item) => item.uploadedFile?.name).filter(Boolean)
+  }
+
+  function unfreeze() {
+    frozen = false
+    notify()
+  }
+
+  async function discardFiles(fileNames, scope) {
+    fileNames = [...new Set((fileNames || []).filter(Boolean))]
+    if (fileNames.length) await options.discard?.(fileNames, scope)
+  }
+
   function handlePaste(event) {
+    if (frozen) return false
     if (event && typeof event === 'object' && handledPasteEvents.has(event)) {
       return handledPasteEvents.get(event)
     }
@@ -110,6 +161,7 @@ export function createComposerAttachmentController(options) {
   }
 
   function handleDrop(event) {
+    if (frozen) return false
     let files = Array.from(event?.dataTransfer?.files || [])
     if (!files.length) return false
     event.preventDefault()
@@ -121,10 +173,14 @@ export function createComposerAttachmentController(options) {
     addFiles,
     remove,
     retry,
-    clear,
+    discard,
+    release,
+    freeze,
+    unfreeze,
     handlePaste,
     handleDrop,
     getItems: () => [...items],
+    isFrozen: () => frozen,
     hasBlockingItems: () => items.some((item) => item.status !== 'uploaded'),
     readyFileNames: () =>
       items

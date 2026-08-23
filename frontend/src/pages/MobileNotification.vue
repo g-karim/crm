@@ -13,21 +13,21 @@
         :tooltip="__('Mark all as read')"
         :label="__('Mark all as read')"
         :iconLeft="MarkAsDoneIcon"
-        @click="() => mark_as_read.reload()"
+        @click="markAllAsRead"
       />
     </template>
   </LayoutHeader>
   <div class="flex flex-col overflow-hidden text-ink-gray-9">
     <div
-      v-if="notifications.data?.length"
+      v-if="notificationItems.length"
       class="divide-y divide-outline-gray-1 overflow-y-auto text-base"
     >
       <RouterLink
-        v-for="n in notifications.data"
+        v-for="n in notificationItems"
         :key="n.name"
         :to="getRoute(n)"
         class="flex cursor-pointer items-start gap-3 px-2.5 py-3 hover:bg-surface-gray-2"
-        @click="mark_doc_as_read(n.comment || n.notification_type_doc)"
+        @click="markAsRead(n)"
       >
         <div class="mt-1 flex items-center gap-2.5">
           <div
@@ -87,7 +87,16 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import { notifications, notificationsStore } from '@/stores/notifications'
 import { timeAgo, sanitizeHTML } from '@/utils'
 import { Breadcrumbs } from 'frappe-ui'
-const { mark_as_read, mark_doc_as_read } = notificationsStore()
+import { computed } from 'vue'
+const { markAllAsRead, markNotificationAsRead } = notificationsStore()
+const notificationItems = computed(
+  () => notifications.data?.notifications || [],
+)
+
+function markAsRead(notification) {
+  if (notification.type !== 'Messenger')
+    markNotificationAsRead(notification.name)
+}
 
 function getRoute(notification) {
   let params = {
@@ -102,6 +111,10 @@ function getRoute(notification) {
     name: notification.route_name,
     params: params,
     hash: notification.hash,
+    query:
+      notification.type === 'Messenger'
+        ? { messenger_conversation: notification.notification_type_doc }
+        : undefined,
   }
 }
 </script>
