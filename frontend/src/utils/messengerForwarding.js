@@ -36,3 +36,19 @@ export function isMaxForwardOnlyMessage(message = {}) {
     !message.reply_context,
   )
 }
+
+export function isStickerOnlyForwardItem(item = {}) {
+  let attachments = Array.isArray(item?.attachments) ? item.attachments : []
+  let children = Array.isArray(item?.items) ? item.items : []
+  return Boolean(
+    !String(item?.text || '').trim() &&
+    attachments.length === 1 &&
+    attachments[0]?.type === 'sticker' &&
+    !children.length,
+  )
+}
+
+export function isStickerOnlyForwardContext(context = {}) {
+  let items = Array.isArray(context?.items) ? context.items : []
+  return items.length === 1 && isStickerOnlyForwardItem(items[0])
+}

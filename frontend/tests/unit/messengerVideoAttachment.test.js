@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
   default: {
     props: ['attachment'],
-    template: '<div data-test-attachment-card>{{ attachment.file_name }}</div>',
+    template:
+      '<div data-test-attachment-card :data-status="attachment.status">{{ attachment.file_name }}</div>',
   },
 }))
 
@@ -335,6 +336,51 @@ describe('external messenger video', () => {
     expect(root.querySelector('button')).toBeNull()
     expect(root.textContent).toContain('Доступно только во VK')
     expect(root.textContent).toContain('Смотреть в VK Видео')
+  })
+
+  it('shows the VK fallback immediately for a pending external-only video', () => {
+    let root = mountVideo(
+      {
+        id: 'VK-PENDING-EXTERNAL',
+        type: 'video',
+        status: 'pending',
+        video_source: 'provider_embed',
+        mime_type: 'image/jpeg',
+        file_name: 'vk-video-preview.jpg',
+        open_url: '/api/open-vk-pending',
+      },
+      'vk_direct',
+    )
+
+    expect(root.textContent).toContain('Доступно только во VK')
+    expect(root.textContent).toContain('Смотреть в VK Видео')
+    expect(
+      root.querySelector('[data-video-external-action]').getAttribute('href'),
+    ).toBe('/api/open-vk-pending')
+    expect(
+      root.querySelector('[data-test-attachment-card]').dataset.status,
+    ).toBe('external')
+    expect(root.querySelector('[data-video-loading]')).toBeNull()
+  })
+
+  it('keeps waiting for a pending provider-file video', () => {
+    let root = mountVideo(
+      {
+        id: 'VK-PENDING-FILE',
+        type: 'video',
+        status: 'pending',
+        video_source: 'provider_file',
+        file_name: 'vk-video.mp4',
+        open_url: '/api/open-vk-file',
+      },
+      'vk_direct',
+    )
+
+    expect(root.textContent).toContain('Ожидает загрузки')
+    expect(root.querySelector('[data-video-external-action]')).toBeNull()
+    expect(
+      root.querySelector('[data-test-attachment-card]').dataset.status,
+    ).toBe('pending')
   })
 
   it('uses inline playback for VK only when the local file is MP4', () => {

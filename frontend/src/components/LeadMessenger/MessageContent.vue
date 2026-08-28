@@ -42,7 +42,7 @@
       </div>
     </template>
 
-    <div v-if="error" class="mt-2 text-xs text-ink-red-4">
+    <div v-if="error" class="mt-2 text-xs text-ink-red-8">
       {{ __(error) }}
     </div>
   </div>

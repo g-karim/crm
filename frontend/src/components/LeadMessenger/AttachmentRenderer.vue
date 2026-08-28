@@ -5,7 +5,9 @@
     class="mt-2 grid max-w-full gap-2"
     :class="
       compactPreview
-        ? 'w-full min-w-0'
+        ? singleSticker
+          ? 'w-fit min-w-0 max-w-full'
+          : 'w-full min-w-0'
         : singleImage
           ? 'w-fit'
           : 'w-fit max-w-[20rem]'
@@ -24,7 +26,10 @@
         :compact-preview="compactPreview"
         @open-media="openMedia"
       />
-      <div v-else-if="segment.type === 'sticker'" class="max-w-52">
+      <div
+        v-else-if="segment.type === 'sticker'"
+        class="flex size-52 max-w-full items-center justify-center justify-self-start"
+      >
         <VkLottieSticker
           v-if="isLottieSticker(segment.attachment)"
           :attachment="segment.attachment"
@@ -36,7 +41,7 @@
             state(segment.attachment).active
           "
           :src="segment.attachment.url"
-          class="max-h-52 max-w-52 object-contain"
+          class="size-full object-contain"
           autoplay
           loop
           muted
@@ -50,7 +55,7 @@
           "
           :src="segment.attachment.url"
           :alt="__(getMessengerAttachmentTitle(segment.attachment))"
-          class="max-h-52 max-w-52 object-contain"
+          class="size-full object-contain"
           loading="lazy"
         />
         <AttachmentCard
@@ -96,6 +101,7 @@ import {
   getAttachmentState,
   getMessengerAttachmentTitle,
   isSingleImageAttachmentSet,
+  isSingleStickerAttachmentSet,
 } from '@/utils/messengerAttachments'
 import { computed, ref } from 'vue'
 import AnimatedMediaAttachment from './AnimatedMediaAttachment.vue'
@@ -119,6 +125,9 @@ const segments = computed(() =>
 )
 const singleImage = computed(() =>
   isSingleImageAttachmentSet(props.attachments),
+)
+const singleSticker = computed(() =>
+  isSingleStickerAttachmentSet(props.attachments),
 )
 const availableMedia = computed(() =>
   props.attachments.flatMap((attachment) => {

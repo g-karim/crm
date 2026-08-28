@@ -164,7 +164,7 @@
         <button
           v-if="localFailed && playbackUrl"
           type="button"
-          class="text-xs text-ink-blue-3 hover:underline"
+          class="text-xs text-ink-blue-6 hover:underline"
           @click="retryLocal"
         >
           {{ __('Повторить воспроизведение') }}
@@ -176,7 +176,7 @@
         target="_blank"
         rel="noopener noreferrer"
         data-video-external-action
-        class="flex w-full items-center justify-center gap-2 rounded-md border border-outline-gray-2 bg-surface-white px-3 py-2 text-center text-sm font-medium text-ink-blue-3 transition-colors hover:bg-surface-gray-2"
+        class="flex w-full items-center justify-center gap-2 rounded-md border border-outline-gray-2 bg-surface-base px-3 py-2 text-center text-sm font-medium text-ink-blue-6 transition-colors hover:bg-surface-gray-2"
       >
         <ExternalLinkIcon class="size-4 shrink-0" />
         {{ actionLabel }}
@@ -188,11 +188,11 @@
 <script setup>
 import {
   formatAttachmentDuration,
-  getAttachmentAction,
   getAttachmentState,
   getCompactMediaDimensions,
   getCompactPreviewDimensions,
   getMessengerAttachmentTitle,
+  getVideoExternalAction,
   getVideoPlaybackUrl,
 } from '@/utils/messengerAttachments'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
@@ -237,10 +237,20 @@ const playable = computed(() =>
 const action = computed(() =>
   props.provider === 'max_direct' || playable.value
     ? ''
-    : getAttachmentAction(props.attachment),
+    : getVideoExternalAction(props.attachment),
+)
+const immediateExternalFallback = computed(() =>
+  Boolean(
+    props.provider === 'vk_direct' &&
+    action.value &&
+    ['external', 'provider_embed'].includes(props.attachment.video_source),
+  ),
 )
 const cardAttachment = computed(() => ({
   ...props.attachment,
+  status: immediateExternalFallback.value
+    ? 'external'
+    : props.attachment.status,
   open_url: '',
   url: '',
 }))
@@ -278,6 +288,7 @@ const actionLabel = computed(() =>
     : __('Открыть источник'),
 )
 const statusLabel = computed(() => {
+  if (immediateExternalFallback.value) return __('Доступно только во VK')
   if (state.value.busy) return state.value.label
   if (state.value.unsupported) return __('Формат видео не поддерживается')
   if (props.provider === 'vk_direct' && !playable.value && action.value)

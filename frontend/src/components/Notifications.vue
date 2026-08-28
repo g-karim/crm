@@ -50,7 +50,7 @@
               />
               <MessageCircleIcon
                 v-if="n.type == 'Messenger'"
-                class="size-7 text-ink-blue-3"
+                class="size-7 text-ink-blue-6"
               />
               <WhatsAppIcon v-else-if="n.type == 'WhatsApp'" class="size-7" />
               <UserAvatar v-else :user="n.from_user.name" size="lg" />

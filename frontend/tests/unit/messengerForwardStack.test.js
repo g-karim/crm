@@ -105,6 +105,26 @@ describe('forwarded message stack', () => {
     expect(root.textContent).toContain('Мария')
   })
 
+  it('keeps an attachment-only sticker card content-sized', () => {
+    let root = mountStack({
+      version: 1,
+      items: [
+        {
+          key: 'forward-0',
+          relation: 'forward',
+          attachments: [{ id: 'STICKER-1', type: 'sticker' }],
+          items: [],
+        },
+      ],
+    })
+
+    let forwardItem = root.querySelector('[data-forward-item]')
+    let forwardHeader = forwardItem.firstElementChild
+    expect(forwardItem.className).toContain('w-[14.5rem]')
+    expect(forwardItem.className).not.toContain('w-[20rem]')
+    expect(forwardHeader.className).toContain('flex-wrap')
+  })
+
   it('uses a neutral label for an empty forwarded item', () => {
     let root = mountStack({
       version: 1,

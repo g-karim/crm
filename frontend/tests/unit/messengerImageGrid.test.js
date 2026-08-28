@@ -237,6 +237,30 @@ describe('messenger image layout', () => {
     expect(root.textContent).toContain('Стикер MAX недоступен для загрузки')
   })
 
+  it('keeps a forwarded sticker renderer content-sized', () => {
+    let root = mountRenderer(
+      [
+        {
+          id: 'S-1',
+          type: 'sticker',
+          status: 'available',
+          mime_type: 'image/webp',
+          url: '/media/sticker.webp',
+        },
+      ],
+      { compactPreview: true },
+    )
+    let renderer = root.querySelector('[data-attachment-renderer]')
+    let wrapper = renderer.querySelector('img').parentElement
+
+    expect(renderer.className).toContain('w-fit')
+    expect(renderer.className.split(/\s+/)).not.toContain('w-full')
+    expect(wrapper.className).toContain('justify-self-start')
+    expect(wrapper.className).toContain('size-52')
+    expect(wrapper.className).not.toContain('w-fit')
+    expect(root.querySelector('img').className).toContain('size-full')
+  })
+
   it('keeps pending media disabled and opens available media in lightbox', async () => {
     let pendingRoot = mountGrid([
       image('P-1', { status: 'pending', url: null }),

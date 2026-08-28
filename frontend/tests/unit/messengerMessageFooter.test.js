@@ -85,7 +85,7 @@ describe('message footer metadata', () => {
 
     expect(footerOrder(root)).toEqual(['edited', 'time', 'delivery'])
     expect(root.querySelector('[data-message-delivery]').className).toContain(
-      'text-ink-blue-2',
+      'text-ink-blue-5',
     )
   })
 
@@ -102,7 +102,7 @@ describe('message footer metadata', () => {
 
     let delivery = root.querySelector('[data-message-delivery]')
     expect(delivery.className).toContain('text-ink-gray-5')
-    expect(delivery.className).not.toContain('text-ink-blue-2')
+    expect(delivery.className).not.toContain('text-ink-blue-5')
     expect(delivery.querySelectorAll('svg')).toHaveLength(1)
     expect(delivery.closest('[data-test-tooltip]').title).toBe(
       'Отправлено в Telegram; статус прочтения недоступен',

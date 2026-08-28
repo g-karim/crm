@@ -8,12 +8,14 @@ import {
   getMessengerMessagePreview,
   getCompactMediaDimensions,
   getCompactPreviewDimensions,
+  getVideoExternalAction,
   getVideoPlaybackUrl,
   getImageGridCellClass,
   getSingleImageBubbleWidthClass,
   getSingleImageMediaWidthClass,
   groupMessengerAttachments,
   isSingleImageAttachmentSet,
+  isSingleStickerAttachmentSet,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
 import { describe, expect, it } from 'vitest'
@@ -154,6 +156,15 @@ describe('messenger attachment contract v1', () => {
     expect(isSingleImageAttachmentSet([{ id: 'S-1', type: 'sticker' }])).toBe(
       false,
     )
+    expect(isSingleStickerAttachmentSet([{ id: 'S-1', type: 'sticker' }])).toBe(
+      true,
+    )
+    expect(
+      isSingleStickerAttachmentSet([
+        { id: 'S-1', type: 'sticker' },
+        { id: 'S-2', type: 'sticker' },
+      ]),
+    ).toBe(false)
   })
 
   it('uses content-sized bubble classes for compact media', () => {
@@ -303,5 +314,32 @@ describe('messenger attachment contract v1', () => {
         url: 'https://temporary.provider/video.mp4',
       }),
     ).toBe(false)
+  })
+
+  it('allows an external-only video action before attachment processing finishes', () => {
+    expect(
+      getVideoExternalAction({
+        type: 'video',
+        status: 'pending',
+        video_source: 'external',
+        open_url: '/open-vk-video',
+      }),
+    ).toBe('/open-vk-video')
+    expect(
+      getVideoExternalAction({
+        type: 'video',
+        status: 'pending',
+        video_source: 'provider_embed',
+        open_url: '/open-vk-embed',
+      }),
+    ).toBe('/open-vk-embed')
+    expect(
+      getVideoExternalAction({
+        type: 'video',
+        status: 'pending',
+        video_source: 'provider_file',
+        open_url: '/open-provider-file',
+      }),
+    ).toBe('')
   })
 })

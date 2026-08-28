@@ -4,9 +4,13 @@
       v-for="item in context?.items || []"
       :key="item.key"
       data-forward-item
-      class="w-[20rem] min-w-0 max-w-full rounded-md border-l-2 border-outline-blue-2 bg-surface-gray-2 px-2.5 py-2"
+      class="min-w-0 max-w-full rounded-md border-l-2 border-outline-blue-3 bg-surface-gray-2 px-2.5 py-2"
+      :class="isStickerOnlyForwardItem(item) ? 'w-[14.5rem]' : 'w-[20rem]'"
     >
-      <div class="mb-1 flex min-w-0 items-center gap-2 text-xs text-ink-gray-6">
+      <div
+        class="mb-1 flex min-w-0 items-center gap-2 text-xs text-ink-gray-6"
+        :class="isStickerOnlyForwardItem(item) ? 'flex-wrap' : ''"
+      >
         <span class="shrink-0 font-medium">
           {{
             item.relation === 'reply'
@@ -72,6 +76,7 @@
 </template>
 
 <script setup>
+import { isStickerOnlyForwardItem } from '@/utils/messengerForwarding'
 import AttachmentRenderer from './AttachmentRenderer.vue'
 
 defineProps({

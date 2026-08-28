@@ -7,8 +7,8 @@
       class="rounded-full border px-2 py-0.5 text-xs tabular-nums transition-colors"
       :class="
         reaction.reaction_id === ownReactionId
-          ? 'border-outline-blue-2 bg-surface-blue-2'
-          : 'border-outline-gray-2 bg-surface-white'
+          ? 'border-outline-blue-3 bg-surface-blue-2'
+          : 'border-outline-gray-2 bg-surface-base'
       "
       :disabled="pending || !canSend || reaction.supported === false"
       :aria-pressed="reaction.reaction_id === ownReactionId"
@@ -27,7 +27,7 @@
     <div
       v-if="pickerOpen"
       ref="pickerElement"
-      class="fixed z-[1000] grid max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[19rem] grid-cols-[repeat(auto-fit,minmax(2.25rem,1fr))] justify-items-center gap-1 overflow-y-auto overscroll-contain rounded-lg border border-outline-gray-2 bg-surface-white p-2 shadow-xl"
+      class="fixed z-[1000] grid max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[19rem] grid-cols-[repeat(auto-fit,minmax(2.25rem,1fr))] justify-items-center gap-1 overflow-y-auto overscroll-contain rounded-lg border border-outline-gray-2 bg-surface-base p-2 shadow-xl"
       :style="pickerStyle"
       role="menu"
       :aria-label="__('Выберите реакцию')"
@@ -41,7 +41,7 @@
         class="flex size-9 items-center justify-center rounded-md text-xl transition-colors hover:bg-surface-gray-2"
         :class="
           reaction.reaction_id === ownReactionId
-            ? 'bg-surface-blue-2 ring-1 ring-outline-blue-2'
+            ? 'bg-surface-blue-2 ring-1 ring-outline-blue-3'
             : ''
         "
         :disabled="pending"

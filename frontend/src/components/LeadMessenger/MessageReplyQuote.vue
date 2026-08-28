@@ -2,7 +2,7 @@
   <button
     type="button"
     data-message-reply-quote
-    class="block w-full min-w-0 rounded border-l-2 border-outline-blue-2 bg-surface-gray-2 px-2 py-1 text-left"
+    class="block w-full min-w-0 rounded border-l-2 border-outline-blue-3 bg-surface-gray-2 px-2 py-1 text-left"
     :disabled="!clickable"
     @click="$emit('navigate', context?.message)"
   >

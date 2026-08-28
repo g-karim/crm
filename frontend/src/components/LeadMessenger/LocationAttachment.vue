@@ -1,6 +1,6 @@
 <template>
   <div
-    class="overflow-hidden rounded-md border border-outline-gray-2 bg-surface-white"
+    class="overflow-hidden rounded-md border border-outline-gray-2 bg-surface-base"
   >
     <div
       ref="mapElement"
@@ -22,7 +22,7 @@
         :href="openUrl"
         target="_blank"
         rel="noopener noreferrer"
-        class="shrink-0 text-ink-blue-3 hover:underline"
+        class="shrink-0 text-ink-blue-6 hover:underline"
       >
         {{ __('Открыть карту') }}
       </a>

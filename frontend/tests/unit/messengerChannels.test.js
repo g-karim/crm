@@ -122,6 +122,13 @@ describe('messengerChannels', () => {
         status: 'read',
         delivery_status: 'sent',
       }),
+    ).toBe('sent')
+    expect(
+      getMessengerDeliveryState({
+        direction: 'outbound',
+        status: 'received',
+        delivery_status: 'read',
+      }),
     ).toBe('read')
     expect(
       getMessengerDeliveryState({
@@ -142,6 +149,19 @@ describe('messengerChannels', () => {
       }),
     ).toBe('')
   })
+
+  it.each(['sent', 'delivered', 'read', 'failed'])(
+    'uses canonical delivery_status for %s',
+    (deliveryStatus) => {
+      expect(
+        getMessengerDeliveryState({
+          direction: 'outbound',
+          status: 'received',
+          delivery_status: deliveryStatus,
+        }),
+      ).toBe(deliveryStatus)
+    },
+  )
 
   it('shows text only for content or a deleted placeholder', () => {
     expect(shouldShowMessengerText({ text: null })).toBe(false)

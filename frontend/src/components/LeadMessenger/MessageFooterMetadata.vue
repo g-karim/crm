@@ -65,9 +65,9 @@ const deliveryTooltip = computed(() => {
   return reason ? `${__(label)}: ${reason}` : __(label)
 })
 const deliveryIconClass = computed(() => {
-  if (deliveryState.value === 'read') return 'text-ink-blue-2'
+  if (deliveryState.value === 'read') return 'text-ink-blue-5'
   if (['failed', 'unknown'].includes(deliveryState.value)) {
-    return 'text-ink-red-4'
+    return 'text-ink-red-8'
   }
   return 'text-ink-gray-5'
 })

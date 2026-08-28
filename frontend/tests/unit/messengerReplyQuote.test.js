@@ -1,7 +1,10 @@
 import { createApp } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
-import { getForwardedContentKind } from '@/utils/messengerForwarding'
+import {
+  getForwardedContentKind,
+  isStickerOnlyForwardContext,
+} from '@/utils/messengerForwarding'
 
 let mounted = []
 afterEach(() => {
@@ -43,6 +46,32 @@ describe('message reply quote', () => {
       'message',
     )
     expect(getForwardedContentKind({ items: [{}] })).toBe('message')
+  })
+
+  it('recognizes only a standalone forwarded sticker as compact content', () => {
+    expect(isStickerOnlyForwardContext(null)).toBe(false)
+    expect(isStickerOnlyForwardContext({ items: [null] })).toBe(false)
+    expect(
+      isStickerOnlyForwardContext({
+        items: [
+          {
+            attachments: [{ id: 'STICKER-1', type: 'sticker' }],
+            items: [],
+          },
+        ],
+      }),
+    ).toBe(true)
+    expect(
+      isStickerOnlyForwardContext({
+        items: [
+          {
+            text: 'Подпись',
+            attachments: [{ id: 'STICKER-1', type: 'sticker' }],
+            items: [],
+          },
+        ],
+      }),
+    ).toBe(false)
   })
 
   it('renders a safe snapshot without provider payload fields', () => {

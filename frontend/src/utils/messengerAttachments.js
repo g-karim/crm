@@ -202,6 +202,10 @@ export function isSingleImageAttachmentSet(attachments = []) {
   return attachments.length === 1 && attachments[0]?.type === 'image'
 }
 
+export function isSingleStickerAttachmentSet(attachments = []) {
+  return attachments.length === 1 && attachments[0]?.type === 'sticker'
+}
+
 export function getSingleImageBubbleWidthClass(image = {}) {
   return 'w-fit max-w-full'
 }
@@ -263,6 +267,17 @@ export function getAttachmentState(attachment = {}) {
 export function getAttachmentAction(attachment = {}) {
   if (!getAttachmentState(attachment).active) return ''
   return attachment.open_url || attachment.url || ''
+}
+
+export function getVideoExternalAction(attachment = {}) {
+  if (
+    attachment.type === 'video' &&
+    ['external', 'provider_embed'].includes(attachment.video_source) &&
+    attachment.open_url
+  ) {
+    return attachment.open_url
+  }
+  return getAttachmentAction(attachment)
 }
 
 export function getImageGridCellClass(count, index) {

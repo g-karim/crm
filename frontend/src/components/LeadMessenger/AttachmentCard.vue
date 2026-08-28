@@ -4,7 +4,7 @@
     :href="action || undefined"
     :target="action ? '_blank' : undefined"
     :rel="action ? 'noopener noreferrer' : undefined"
-    class="flex min-w-0 max-w-sm items-center gap-3 rounded-lg border border-outline-gray-1 bg-surface-white p-3 no-underline"
+    class="flex min-w-0 max-w-sm items-center gap-3 rounded-lg border border-outline-gray-1 bg-surface-base p-3 no-underline"
     :class="action ? 'hover:bg-surface-gray-1' : ''"
   >
     <div
@@ -27,7 +27,7 @@
       </div>
       <div
         class="mt-0.5 flex flex-wrap gap-x-2 text-xs"
-        :class="state.failed ? 'text-ink-red-4' : 'text-ink-gray-5'"
+        :class="state.failed ? 'text-ink-red-8' : 'text-ink-gray-5'"
       >
         <span v-if="size">{{ size }}</span>
         <span>{{ __(state.label) }}</span>

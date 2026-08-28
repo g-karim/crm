@@ -167,7 +167,7 @@ export function getMessengerDeliveryState(message = {}) {
   if (message?.direction !== 'outbound') return ''
 
   let status = normalizePlatform(
-    message?.status || message?.delivery_status || '',
+    message?.delivery_status || message?.status || '',
   )
   return DELIVERY_STATES.includes(status) ? status : ''
 }

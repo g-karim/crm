@@ -12,7 +12,7 @@
       <div
         v-for="item in items"
         :key="item.id"
-        class="relative flex w-40 shrink-0 items-center gap-2 rounded-lg border border-outline-gray-1 bg-surface-white p-2"
+        class="relative flex w-40 shrink-0 items-center gap-2 rounded-lg border border-outline-gray-1 bg-surface-base p-2"
       >
         <img
           v-if="item.previewUrl"
@@ -33,7 +33,7 @@
           <div
             class="mt-1 truncate text-xs"
             :class="
-              item.status === 'failed' ? 'text-ink-red-4' : 'text-ink-gray-5'
+              item.status === 'failed' ? 'text-ink-red-8' : 'text-ink-gray-5'
             "
           >
             {{ itemStatus(item) }}

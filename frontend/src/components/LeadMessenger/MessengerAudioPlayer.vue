@@ -1,7 +1,7 @@
 <template>
   <div
     data-messenger-audio
-    class="max-w-full rounded-lg border border-outline-gray-1 bg-surface-white p-3"
+    class="max-w-full rounded-lg border border-outline-gray-1 bg-surface-base p-3"
     :class="
       compactPreview ? 'w-full min-w-0' : 'w-[min(22rem,calc(100vw-3rem))]'
     "
@@ -107,7 +107,7 @@
       </div>
       <div
         v-if="error"
-        class="mt-2 flex items-center gap-2 text-xs text-ink-red-4"
+        class="mt-2 flex items-center gap-2 text-xs text-ink-red-8"
       >
         <CircleAlertIcon class="size-4 shrink-0" />
         <span>{{ error }}</span>

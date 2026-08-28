@@ -18,8 +18,8 @@
           class="size-2 rounded-full"
           :class="
             state.state === 'paused'
-              ? 'bg-surface-amber-5'
-              : 'animate-pulse bg-surface-red-5'
+              ? 'bg-surface-amber-7'
+              : 'animate-pulse bg-surface-red-7'
           "
         />
         <span class="text-sm tabular-nums text-ink-gray-8">
@@ -27,7 +27,7 @@
         </span>
         <span
           v-if="state.state === 'paused'"
-          class="text-xs font-medium text-ink-amber-3"
+          class="text-xs font-medium text-ink-amber-6"
         >
           {{ __('Пауза') }}
         </span>
@@ -71,7 +71,7 @@
       </div>
 
       <div v-else-if="state.blob" class="flex flex-col gap-2">
-        <div v-if="state.error" class="text-sm text-ink-red-4">
+        <div v-if="state.error" class="text-sm text-ink-red-8">
           {{ state.error }}
         </div>
         <MessengerAudioPlayer :attachment="previewAttachment" />
@@ -95,7 +95,7 @@
       </div>
 
       <div v-else class="flex items-center justify-between gap-2 text-sm">
-        <span :class="state.error ? 'text-ink-red-4' : 'text-ink-gray-6'">
+        <span :class="state.error ? 'text-ink-red-8' : 'text-ink-gray-6'">
           {{ state.error || stateLabel }}
         </span>
         <Button

@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full min-h-0 flex-col bg-surface-white">
+  <div class="flex h-full min-h-0 flex-col bg-surface-base">
     <div
       class="flex min-h-[64px] items-center justify-between gap-3 border-b px-4 py-3 sm:px-10"
     >
@@ -30,7 +30,7 @@
     <div v-else class="relative flex min-h-0 flex-1 flex-col">
       <div
         v-if="genericError"
-        class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-red-3 sm:mx-10"
+        class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-red-6 sm:mx-10"
       >
         {{ genericError }}
       </div>
@@ -45,7 +45,7 @@
         class="mx-4 mt-4 rounded border px-3 py-2 text-sm sm:mx-10"
         :class="
           conversationNotice.type === 'warning'
-            ? 'border-outline-red-1 bg-surface-red-1 text-ink-red-3'
+            ? 'border-outline-red-1 bg-surface-red-1 text-ink-red-6'
             : 'border-outline-gray-1 bg-surface-gray-1 text-ink-gray-7'
         "
       >
@@ -135,7 +135,7 @@
                     item.messages.some(
                       (message) => highlightedMessage === message.name,
                     )
-                      ? 'ring-2 ring-outline-blue-2'
+                      ? 'ring-2 ring-outline-blue-3'
                       : '',
                   ]"
                   @contextmenu="openReactionPicker(item.message, $event)"
@@ -151,7 +151,7 @@
                     :message="item.message"
                     :sender="messageSender(item.message)"
                     :source="messageSource(item.message)"
-                    :failed="item.message.status === 'failed'"
+                    :failed="messageFailed(item.message)"
                     :editing="
                       messageActionState.editingMessage === item.message.name
                     "
@@ -276,7 +276,7 @@
         </div>
         <div
           v-if="draggingFiles"
-          class="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-outline-blue-2 bg-surface-blue-1/90 text-sm font-medium text-ink-blue-3"
+          class="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-outline-blue-3 bg-surface-blue-1/90 text-sm font-medium text-ink-blue-6"
         >
           {{ __('Перетащите файлы сюда') }}
         </div>
@@ -511,19 +511,24 @@ import {
   getMessengerChannelType,
   getMessengerCapabilities,
   getMessengerConversationNotice,
+  getMessengerDeliveryState,
   getMessengerPlatformLabel,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 import {
   getSingleImageBubbleWidthClass,
   isSingleImageAttachmentSet,
+  isSingleStickerAttachmentSet,
 } from '@/utils/messengerAttachments'
 import {
   countNewMessengerMessages,
   createMessengerSyncController,
 } from '@/utils/messengerSync'
 import { isVideoFile, validateComposerFileMix } from '@/utils/messengerComposer'
-import { getForwardedContentKind } from '@/utils/messengerForwarding'
+import {
+  getForwardedContentKind,
+  isStickerOnlyForwardContext,
+} from '@/utils/messengerForwarding'
 import { createMessengerReadController } from '@/utils/messengerRead'
 import { createMessengerTypingController } from '@/utils/messengerTyping'
 import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
@@ -1724,12 +1729,24 @@ function messageSource(message) {
 }
 
 function messageBubbleWidthClass(message) {
+  if (isSingleStickerAttachmentSet(message.attachments)) {
+    return 'w-[14.5rem] !max-w-[94%] sm:!max-w-[14.5rem]'
+  }
+  if (isStickerOnlyForwardContext(message.forward_context)) {
+    return 'w-64 !max-w-[94%] sm:!max-w-64'
+  }
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
   return getSingleImageBubbleWidthClass(message.attachments[0])
 }
 
 function messageFailureReason(message) {
   return message.failure_reason || message.error || ''
+}
+
+function messageFailed(message) {
+  return message.direction === 'outbound'
+    ? getMessengerDeliveryState(message) === 'failed'
+    : message.status === 'failed'
 }
 
 function handleReactionsChanged(message, reactionState) {
@@ -1803,8 +1820,12 @@ async function resetComposer() {
 }
 
 function messageStatusNoteClass(message) {
-  return ['failed', 'unknown'].includes(message?.status)
-    ? 'text-ink-red-4'
+  let status =
+    message?.direction === 'outbound'
+      ? getMessengerDeliveryState(message)
+      : message?.status
+  return ['failed', 'unknown'].includes(status)
+    ? 'text-ink-red-8'
     : 'text-ink-gray-5'
 }
 
