@@ -96,6 +96,34 @@ describe('messenger message actions', () => {
     ).toEqual({ tombstone: true, edited: false, text: '' })
   })
 
+  it('does not treat background attachment updates as visible edits', () => {
+    expect(
+      getMessengerMessageDisplay(
+        editable({
+          text: '',
+          message_type: 'sticker',
+          is_edited: 1,
+          last_update_source: 'provider_history',
+        }),
+      ).edited,
+    ).toBe(false)
+    expect(
+      getMessengerMessageDisplay(
+        editable({
+          text: '',
+          message_type: 'audio',
+          is_edited: 1,
+          last_update_source: 'attachment_job',
+        }),
+      ).edited,
+    ).toBe(false)
+    expect(
+      getMessengerMessageDisplay(
+        editable({ text: 'Исправленная подпись', is_edited: 1 }),
+      ).edited,
+    ).toBe(true)
+  })
+
   it('edits inline, sends no provider credentials and waits for delta', async () => {
     let message = editable()
     let { controller, call, sync } = harness()

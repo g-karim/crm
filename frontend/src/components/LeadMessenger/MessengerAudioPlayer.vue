@@ -54,8 +54,8 @@
           class="flex-1 rounded-full"
           :class="
             barProgress(index) <= progress
-              ? 'bg-surface-blue-3'
-              : 'bg-surface-gray-4'
+              ? 'bg-surface-blue-7'
+              : 'bg-surface-gray-5'
           "
           :style="{ height: `${2 + bar * 22}px` }"
         />

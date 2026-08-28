@@ -121,6 +121,26 @@ describe('message footer metadata', () => {
     expect(deleted.querySelector('[data-message-edited]')).toBeNull()
   })
 
+  it('hides noisy provider edit flags on content without text', () => {
+    let sticker = mountComponent(MessageFooterMetadata, {
+      message: message({
+        text: '',
+        message_type: 'sticker',
+        last_update_source: 'provider_history',
+      }),
+    })
+    let voice = mountComponent(MessageFooterMetadata, {
+      message: message({
+        text: '',
+        message_type: 'audio',
+        last_update_source: 'attachment_job',
+      }),
+    })
+
+    expect(sticker.querySelector('[data-message-edited]')).toBeNull()
+    expect(voice.querySelector('[data-message-edited]')).toBeNull()
+  })
+
   it('does not render the old edited label in message content', () => {
     let root = mountComponent(MessageContent, {
       message: message(),

@@ -9,10 +9,34 @@ import {
   prepareWaveform,
   sanitizeWaveform,
 } from '@/utils/messengerAudio'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { vkVoiceAttachment } from '../fixtures/vkVoiceAttachment'
 import { describe, expect, it } from 'vitest'
 
+const playerSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'src/components/LeadMessenger/MessengerAudioPlayer.vue',
+  ),
+  'utf8',
+)
+const recorderSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'src/components/LeadMessenger/ComposerVoiceRecorder.vue',
+  ),
+  'utf8',
+)
+
 describe('messenger audio player helpers', () => {
+  it('uses visible waveform colors from the current semantic palette', () => {
+    expect(playerSource).toContain('bg-surface-blue-7')
+    expect(playerSource).toContain('bg-surface-gray-5')
+    expect(recorderSource).toContain('bg-surface-blue-7')
+    expect(playerSource).not.toContain('bg-surface-blue-3')
+  })
+
   it('sanitizes provider waveform values', () => {
     expect(sanitizeWaveform([-1, 12.4, 999, 'bad', 64])).toEqual([
       0, 12, 255, 64,
@@ -20,9 +44,7 @@ describe('messenger audio player helpers', () => {
   })
 
   it('preserves peaks while downsampling provider data', () => {
-    expect(downsampleWaveform([1, 2, 80, 3, 4, 5, 6, 7], 2)).toEqual([
-      80, 7,
-    ])
+    expect(downsampleWaveform([1, 2, 80, 3, 4, 5, 6, 7], 2)).toEqual([80, 7])
   })
 
   it('normalizes low-amplitude recordings by their actual peak', () => {

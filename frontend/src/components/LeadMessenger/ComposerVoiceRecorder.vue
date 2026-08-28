@@ -37,7 +37,7 @@
           <span
             v-for="(bar, index) in liveBars"
             :key="index"
-            class="min-w-px flex-1 rounded bg-surface-blue-3"
+            class="min-w-px flex-1 rounded bg-surface-blue-7"
             :style="{ height: `${Math.max(2, bar * 24)}px` }"
           />
         </div>
