@@ -82,8 +82,8 @@
               :class="[_event.isFullDay ? 'w-full' : 'w-[158px]']"
               variant="outline"
               :value="_event.fromDate"
-              :format="'MMM D, YYYY'"
-              :placeholder="__('May 1, 2025')"
+              :format="dateDisplayFormat"
+              :placeholder="dateDisplayFormat"
               :clearable="false"
               @update:modelValue="(date) => updateDate(date, true)"
             >
@@ -100,6 +100,7 @@
               class="max-w-[112px]"
               variant="outline"
               :modelValue="_event.fromTime"
+              :use12Hour="false"
               :placeholder="__('Start Time')"
               @update:modelValue="(time) => updateTime(time, true)"
             />
@@ -109,6 +110,7 @@
               variant="outline"
               :modelValue="_event.toTime"
               :options="toOptions"
+              :use12Hour="false"
               :placeholder="__('End Time')"
               placement="bottom-end"
               @update:modelValue="(time) => updateTime(time)"
@@ -241,7 +243,7 @@ import {
   Dropdown,
 } from 'frappe-ui'
 import { globalStore } from '@/stores/global'
-import { validateEmail } from '@/utils'
+import { getFormat, validateEmail } from '@/utils'
 import {
   useEvent,
   normalizeParticipants,
@@ -269,6 +271,7 @@ const { eventsResource } = useEvent({
 
 const title = ref(null)
 const error = ref(null)
+const dateDisplayFormat = computed(() => getFormat('', '', true, false, false))
 const mode = computed(() => {
   return _event.value.id == 'duplicate'
     ? 'duplicate'
@@ -488,7 +491,7 @@ function deleteEvent() {
 const toOptions = computed(() => buildEndTimeOptions(_event.value.fromTime))
 
 const colors = Object.keys(colorMap).map((c) => ({
-  label: c.charAt(0).toUpperCase() + c.slice(1),
+  label: __(c.charAt(0).toUpperCase() + c.slice(1)),
   value: colorMap[c].color,
   icon: h('div', {
     class: '!size-2.5 rounded-full',

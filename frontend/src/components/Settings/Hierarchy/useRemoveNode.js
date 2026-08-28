@@ -13,7 +13,7 @@ export function useRemoveNode({ doctype, nodes, enrichedNodes }) {
       toast.success(__('Removed from hierarchy.'))
       nodes.reload()
     } catch (e) {
-      toast.error(e?.messages?.[0] || __('Could not remove.'))
+      toast.error(__(e?.messages?.[0] || 'Could not remove.'))
     }
   }
 

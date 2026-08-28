@@ -1,2 +1,4 @@
 __version__ = "2.0.0-dev"
-__title__ = "Frappe CRM"
+from crm.branding import APP_NAME
+
+__title__ = APP_NAME

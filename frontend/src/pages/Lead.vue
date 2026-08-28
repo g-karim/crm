@@ -22,7 +22,12 @@
         :website="doc.website"
         @done="onEnriched"
       />
-      <AssignTo v-model="assignees.data" doctype="CRM Lead" :docname="leadId" />
+      <AssignTo
+        v-if="canWrite"
+        v-model="assignees.data"
+        doctype="CRM Lead"
+        :docname="leadId"
+      />
       <Dropdown
         v-if="doc && document.statuses"
         :options="statuses"
@@ -53,8 +58,16 @@
       :tabs="tabs"
       class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
     >
-      <template #tab-panel>
+      <template #tab-panel="{ tab }">
+        <LeadConversation
+          v-if="tab.name == 'Messenger'"
+          :leadName="leadId"
+          :lead="doc"
+          :phone="doc.mobile_no || doc.phone"
+          :active="tabs[tabIndex]?.name === 'Messenger'"
+        />
         <Activities
+          v-else
           ref="activities"
           v-model:reload="reload"
           v-model:tabIndex="tabIndex"
@@ -260,6 +273,7 @@ import AttachmentIcon from '@/components/Icons/AttachmentIcon.vue'
 import LostReasonModal from '@/components/Modals/LostReasonModal.vue'
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import Activities from '@/components/Activities/Activities.vue'
+import LeadConversation from '@/components/LeadMessenger/LeadConversation.vue'
 import AssignTo from '@/components/AssignTo.vue'
 import FilesUploader from '@/components/FilesUploader/FilesUploader.vue'
 import SidePanelLayout from '@/components/SidePanelLayout.vue'
@@ -330,6 +344,7 @@ const {
 } = useDocument('CRM Lead', props.leadId)
 
 const canDelete = computed(() => permissions.data?.permissions?.delete || false)
+const canWrite = computed(() => permissions.data?.permissions?.write || false)
 
 const doc = computed(() => document.doc || {})
 
@@ -438,6 +453,11 @@ const tabs = computed(() => {
       icon: CommentIcon,
     },
     {
+      name: 'Messenger',
+      label: __('Переписка'),
+      icon: CommentIcon,
+    },
+    {
       name: 'Data',
       label: __('Data'),
       icon: DetailsIcon,
@@ -509,7 +529,7 @@ function updateField(name, value) {
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(err.messages?.[0] || __('Error updating field'))
+      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }

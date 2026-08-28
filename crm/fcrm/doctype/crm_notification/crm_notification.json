@@ -12,6 +12,10 @@
   "column_break_dduu",
   "to_user",
   "read",
+  "event_count",
+  "last_event_at",
+  "aggregation_key",
+  "last_event_id",
   "section_break_pbvx",
   "reference_doctype",
   "reference_name",
@@ -34,7 +38,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Type",
-   "options": "Mention\nTask\nAssignment\nWhatsApp",
+   "options": "Mention\nTask\nAssignment\nWhatsApp\nMessenger",
    "reqd": 1
   },
   {
@@ -61,6 +65,33 @@
    "fieldname": "read",
    "fieldtype": "Check",
    "label": "Read"
+  },
+  {
+   "default": "1",
+   "fieldname": "event_count",
+   "fieldtype": "Int",
+   "label": "Event Count",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "last_event_at",
+   "fieldtype": "Datetime",
+   "label": "Last Event At"
+  },
+  {
+   "fieldname": "aggregation_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Aggregation Key",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "last_event_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Last Event ID",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_vpwa",

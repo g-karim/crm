@@ -78,8 +78,8 @@
 
   <EmptyState
     v-else
-    title="No Upcoming Events"
-    description="You have no events scheduled"
+    :title="__('No Upcoming Events')"
+    :description="__('You have no events scheduled')"
     :icon="EventIcon"
     width="lg"
   />
@@ -142,8 +142,8 @@ const computedEvents = computed(() => {
       id: event.name,
       title: event.subject,
       fromDate: dayjs(event.starts_on).format('YYYY-MM-DD'),
-      fromTime: dayjs(event.starts_on).format('h:mm a'),
-      toTime: dayjs(event.ends_on).format('h:mm a'),
+      fromTime: dayjs(event.starts_on).format('HH:mm'),
+      toTime: dayjs(event.ends_on).format('HH:mm'),
       color: event.color,
       allDay: event.all_day,
       owner: event.owner,
@@ -187,31 +187,14 @@ const computedEvents = computed(() => {
 const formattedDateTime = (e) => {
   if (e.allDay) return __('All Day')
 
-  if (e.fromTime.includes(':00')) {
-    e.fromTime = e.fromTime.replace(':00', '')
-  }
-  if (e.toTime.includes(':00')) {
-    e.toTime = e.toTime.replace(':00', '')
-  }
-
-  if (
-    (e.fromTime.includes('am') && e.toTime.includes('am')) ||
-    (e.fromTime.includes('pm') && e.toTime.includes('pm'))
-  ) {
-    const fromTime = e.fromTime.replace(' am', '').replace(' pm', '')
-    return `${fromTime} - ${e.toTime} `
-  }
-
   return `${e.fromTime} - ${e.toTime}`
 }
 
 function eventDate(e) {
-  // return date and Month abbreviation return { month: 'Jun', day: '5' }
-
   const dateObj = dayjs(e.fromDate)
   return {
     day: dateObj.format('DD'),
-    month: dateObj.format('MMM'),
+    month: dateObj.format('MM'),
   }
 }
 </script>

@@ -5,7 +5,7 @@
       <div class="flex flex-col gap-1 w-9/12">
         <h2 class="flex gap-2 text-2xl-semibold leading-none h-5 items-center">
           {{ __('Lead Sources') }}
-          <Badge theme="orange" size="sm">Beta</Badge>
+          <Badge theme="orange" size="sm">{{ __('Beta') }}</Badge>
         </h2>
         <p class="text-p-base text-ink-gray-6">
           {{
@@ -41,8 +41,12 @@
     <!-- Empty State -->
     <EmptyState
       v-if="!sources.loading && !sources.data?.length"
-      name="Lead Sources"
-      description="Add and manage your lead sources here."
+      :name="__('Lead Sources')"
+      :description="
+        __(
+          'Manage your lead sources here. Add new sources to start syncing leads automatically.',
+        )
+      "
       icon="refresh-cw"
     />
 
@@ -160,7 +164,7 @@ function toggleLeadSyncSourceEnabled(source) {
         )
       },
       onError: (error) => {
-        toast.error(error.messages[0] || __('Failed to update source'))
+        toast.error(__(error.messages?.[0] || 'Failed to update source'))
         // Revert the change if there was an error
         source.enabled = !source.enabled
       },
@@ -175,7 +179,9 @@ function deleteLeadSource(source) {
       toast.success(__('Lead sync source deleted successfully'))
     },
     onError: (error) => {
-      toast.error(error.messages[0] || __('Failed to delete lead sync source'))
+      toast.error(
+        __(error.messages?.[0] || 'Failed to delete lead sync source'),
+      )
     },
   })
 }

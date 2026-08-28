@@ -274,7 +274,7 @@ async function submitEmail() {
   toast.promise(sending, {
     loading: __('Sending email...'),
     success: __('Email sent'),
-    error: (e) => e?.messages?.[0] || __('Failed to send email!'),
+    error: (e) => __(e?.messages?.[0] || 'Failed to send email!'),
   })
   try {
     await sending
@@ -296,7 +296,7 @@ async function submitComment() {
   toast.promise(sending, {
     loading: __('Sending comment...'),
     success: __('Comment sent'),
-    error: (e) => e?.messages?.[0] || __('Failed to send comment!'),
+    error: (e) => __(e?.messages?.[0] || 'Failed to send comment!'),
   })
   try {
     await sending

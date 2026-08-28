@@ -407,7 +407,7 @@ function makeOutgoingCall(number) {
       }
     },
     onError(err) {
-      toast.error(err.messages[0])
+      toast.error(__(err.messages?.[0] || 'An error occurred'))
     },
   })
 }

@@ -1,0 +1,208 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "field:pipeline_name",
+ "creation": "2026-06-16 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "pipeline_name",
+  "external_source",
+  "external_pipeline_id",
+  "enabled",
+  "is_default",
+  "position",
+  "column_break_1",
+  "color",
+  "icon",
+  "archived",
+  "description",
+  "enable_kanban_freeze_effect",
+  "rules_section",
+  "stage_skip_rule",
+  "stage_backwards_rule",
+  "closing_fields_rule",
+  "required_fields_before_closing",
+  "warn_on_stage_skip",
+  "warn_on_stage_backwards",
+  "warn_on_closing_without_required_fields"
+ ],
+ "fields": [
+  {
+   "fieldname": "pipeline_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Pipeline Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "external_source",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "External Source"
+  },
+  {
+   "fieldname": "external_pipeline_id",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "External Pipeline ID"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Default"
+  },
+  {
+   "default": "1",
+   "fieldname": "position",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Position"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "gray",
+   "fieldname": "color",
+   "fieldtype": "Select",
+   "label": "Color",
+   "options": "black\ngray\nblue\ngreen\nred\npink\norange\namber\nyellow\ncyan\nteal\nviolet\npurple"
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon"
+  },
+  {
+   "default": "0",
+   "fieldname": "archived",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Archived"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_kanban_freeze_effect",
+   "fieldtype": "Check",
+   "label": "Enable deal card ice effect"
+  },
+  {
+   "fieldname": "rules_section",
+   "fieldtype": "Section Break",
+   "label": "Transition Rules"
+  },
+  {
+   "default": "Allow",
+   "fieldname": "stage_skip_rule",
+   "fieldtype": "Select",
+   "label": "Stage Skipping Rule",
+   "options": "Allow\nWarn\nBlock"
+  },
+  {
+   "default": "Allow",
+   "fieldname": "stage_backwards_rule",
+   "fieldtype": "Select",
+   "label": "Moving Backwards Rule",
+   "options": "Allow\nWarn\nBlock"
+  },
+  {
+   "default": "Allow",
+   "fieldname": "closing_fields_rule",
+   "fieldtype": "Select",
+   "label": "Closing Fields Rule",
+   "options": "Allow\nWarn\nBlock"
+  },
+  {
+   "default": "0",
+   "fieldname": "warn_on_stage_skip",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Warn On Stage Skip"
+  },
+  {
+   "default": "0",
+   "fieldname": "warn_on_stage_backwards",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Warn On Moving Backwards"
+  },
+  {
+   "default": "0",
+   "fieldname": "warn_on_closing_without_required_fields",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Warn On Closing Without Fields"
+  },
+  {
+   "depends_on": "eval:doc.closing_fields_rule && doc.closing_fields_rule != 'Allow'",
+   "fieldname": "required_fields_before_closing",
+   "fieldtype": "Small Text",
+   "label": "Required Fields Before Closing"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "FCRM",
+ "name": "CRM Sales Pipeline",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Sales User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
+ "sort_field": "position",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "pipeline_name",
+ "translated_doctype": 1
+}

@@ -1,7 +1,55 @@
+from contextlib import contextmanager
+
 import frappe
 from frappe import _
 
 from crm.fcrm.doctype.crm_notification.crm_notification import notify_user
+
+_INTERNAL_LEAD_ASSIGNMENT_FLAG = "crm_internal_lead_assignment"
+
+
+@contextmanager
+def allow_internal_lead_assignment():
+	"""Allow trusted CRM code to maintain a Lead owner's assignment."""
+	previous = frappe.flags.get(_INTERNAL_LEAD_ASSIGNMENT_FLAG)
+	frappe.flags[_INTERNAL_LEAD_ASSIGNMENT_FLAG] = True
+	try:
+		yield
+	finally:
+		if previous is None:
+			frappe.flags.pop(_INTERNAL_LEAD_ASSIGNMENT_FLAG, None)
+		else:
+			frappe.flags[_INTERNAL_LEAD_ASSIGNMENT_FLAG] = previous
+
+
+def validate_crm_lead_assignment_permission(doc, method=None):
+	"""Require write access for every mutation of a CRM Lead assignment."""
+	if frappe.flags.get(_INTERNAL_LEAD_ASSIGNMENT_FLAG):
+		return
+
+	for reference_type, reference_name in _assignment_references(doc):
+		if reference_type != "CRM Lead" or not reference_name:
+			continue
+
+		lead = frappe.get_doc(reference_type, reference_name)
+		if not frappe.has_permission(reference_type, "write", doc=lead):
+			frappe.throw(
+				_("You need write permission on CRM Lead {0} to change its assignments.").format(
+					reference_name
+				),
+				frappe.PermissionError,
+			)
+
+
+def _assignment_references(doc):
+	references = {(doc.reference_type, doc.reference_name)}
+	if not doc.is_new():
+		previous = frappe.db.get_value(
+			"ToDo", doc.name, ["reference_type", "reference_name"], as_dict=True
+		)
+		if previous:
+			references.add((previous.reference_type, previous.reference_name))
+	return references
 
 
 def after_insert(doc, method):

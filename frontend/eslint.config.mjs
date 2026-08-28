@@ -30,6 +30,22 @@ export default [
     },
   },
   {
+    files: ['tests/**/*.test.js', 'src/**/*.test.js'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        expect: 'readonly',
+        it: 'readonly',
+        vi: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-this-alias': 'off',
+    },
+  },
+  {
     rules: {
       'vue/multi-word-component-names': 'off',
       'vue/prop-name-casing': 'off',

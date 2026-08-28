@@ -141,7 +141,7 @@ async function sendWhatsAppMessage() {
     auto: true,
     onSuccess: () => whatsapp.value.reload(),
     onError: (error) => {
-      toast.error(error.messages?.[0] || __('Failed to send WhatsApp message'))
+      toast.error(__(error.messages?.[0] || 'Failed to send WhatsApp message'))
     },
   })
 }

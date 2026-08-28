@@ -7,6 +7,7 @@
       class="form-control"
       value=""
       doctype="User"
+      :disabled="refreshingUsers"
       :placeholder="__('John Doe')"
       :filters="{
         name: ['in', users.data.crmUsers?.map((user) => user.name)],
@@ -18,7 +19,8 @@
       <template #target="{ togglePopover }">
         <div
           class="w-full min-h-12 flex flex-wrap items-center gap-1.5 p-1.5 pb-5 rounded-lg bg-surface-gray-2 cursor-text"
-          @click.stop="togglePopover"
+          :class="{ 'cursor-wait opacity-60': refreshingUsers }"
+          @click.stop="!refreshingUsers && togglePopover()"
         >
           <Tooltip
             v-for="assignee in assignees"
@@ -35,6 +37,7 @@
               <Button
                 variant="ghost"
                 class="rounded-full !size-4 m-1"
+                :disabled="refreshingUsers"
                 @click.stop="removeValue(assignee.name)"
               >
                 <template #icon>
@@ -62,11 +65,12 @@
     <div class="flex items-center justify-between gap-2">
       <div
         class="text-base text-ink-gray-5 cursor-pointer select-none"
-        @click="assignToMe = !assignToMe"
+        :class="{ 'cursor-wait opacity-60': refreshingUsers }"
+        @click="!refreshingUsers && (assignToMe = !assignToMe)"
       >
         {{ __('Assign To Me') }}
       </div>
-      <Switch v-model="assignToMe" @click.stop />
+      <Switch v-model="assignToMe" :disabled="refreshingUsers" @click.stop />
     </div>
   </div>
 </template>
@@ -91,6 +95,7 @@ const { capture } = useTelemetry()
 const assignees = defineModel({ type: Array, default: () => [] })
 const oldAssignees = ref([])
 const assignToMe = ref(false)
+const refreshingUsers = ref(false)
 
 const error = ref('')
 
@@ -133,13 +138,22 @@ watch(assignToMe, (val) => {
 
 watch(
   () => props.open,
-  (val) => {
+  async (val) => {
     if (val) {
       oldAssignees.value = [...(assignees.value || [])]
 
       assignToMe.value = assignees.value.some(
         (assignee) => assignee.name === getUser('').name,
       )
+
+      if (props.doctype === 'CRM Lead') {
+        refreshingUsers.value = true
+        try {
+          await users.reload()
+        } finally {
+          refreshingUsers.value = false
+        }
+      }
     } else {
       updateAssignees()
     }

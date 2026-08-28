@@ -1,12 +1,15 @@
+from crm.branding import APP_LOGO_URL, APP_NAME, APP_ROUTE
+from crm.dropdown import STANDARD_DROPDOWN_ITEMS
+
 app_name = "crm"
-app_title = "Frappe CRM"
-app_publisher = "Frappe Technologies Pvt. Ltd."
-app_description = "Kick-ass Open Source CRM"
+app_title = APP_NAME
+app_publisher = "EXP VERSE"
+app_description = APP_NAME
 app_email = "shariq@frappe.io"
 app_license = "AGPLv3"
-app_icon_url = "/assets/crm/images/logo.svg"
-app_icon_title = "CRM"
-app_icon_route = "/crm"
+app_icon_url = APP_LOGO_URL
+app_icon_title = APP_NAME
+app_icon_route = APP_ROUTE
 
 # Apps
 # ------------------
@@ -15,9 +18,9 @@ app_icon_route = "/crm"
 add_to_apps_screen = [
 	{
 		"name": "crm",
-		"logo": "/assets/crm/images/logo.svg",
-		"title": "CRM",
-		"route": "/crm",
+		"logo": APP_LOGO_URL,
+		"title": APP_NAME,
+		"route": APP_ROUTE,
 		"has_permission": "crm.api.check_app_permission",
 	}
 ]
@@ -168,8 +171,10 @@ doc_events = {
 		"before_insert": ["crm.extends.notification_log.before_insert"],
 	},
 	"ToDo": {
+		"before_validate": ["crm.api.todo.validate_crm_lead_assignment_permission"],
 		"after_insert": ["crm.api.todo.after_insert"],
 		"on_update": ["crm.api.todo.on_update"],
+		"on_trash": ["crm.api.todo.validate_crm_lead_assignment_permission"],
 	},
 	"Communication": {
 		"after_insert": ["crm.utils.on_communication_insert"],
@@ -229,6 +234,7 @@ scheduler_events = {
 		"crm.fcrm.doctype.crm_invitation.crm_invitation.expire_invitations",
 		"crm.fcrm.doctype.crm_view_settings.crm_view_settings.clear_old_versions",
 		"crm.telemetry.capture_feature_state",
+		"crm.api.notifications.cleanup_messenger_notifications",
 	],
 	"weekly": ["crm.api.event.trigger_weekly_event_notifications"],
 	"daily_long": ["crm.lead_syncing.background_sync.sync_leads_from_sources_daily"],
@@ -312,55 +318,12 @@ ignore_links_on_delete = ["Failed Lead Sync Log"]
 
 after_migrate = [
 	"crm.fcrm.doctype.fcrm_settings.fcrm_settings.after_migrate",
+	"crm.branding.ensure_crm_branding_defaults",
+	"crm.dropdown.ensure_crm_dropdown_items",
 	"crm.api.whatsapp.add_roles",
 	"crm.domain_enrichment.install.seed_default_rules_and_mappings",
 	"crm.install.add_default_scripts",
 	"crm.install.add_web_form_custom_fields",
 ]
 
-standard_dropdown_items = [
-	{
-		"name1": "app_selector",
-		"label": "Apps",
-		"type": "Route",
-		"route": "#",
-		"is_standard": 1,
-	},
-	{
-		"name1": "settings",
-		"label": "Settings",
-		"type": "Route",
-		"icon": "settings",
-		"route": "#",
-		"is_standard": 1,
-	},
-	{
-		"name1": "login_to_fc",
-		"label": "Login to Frappe Cloud",
-		"type": "Route",
-		"route": "#",
-		"is_standard": 1,
-	},
-	{
-		"name1": "about",
-		"label": "About",
-		"type": "Route",
-		"icon": "info",
-		"route": "#",
-		"is_standard": 1,
-	},
-	{
-		"name1": "separator",
-		"label": "",
-		"type": "Separator",
-		"is_standard": 1,
-	},
-	{
-		"name1": "logout",
-		"label": "Log out",
-		"type": "Route",
-		"icon": "log-out",
-		"route": "#",
-		"is_standard": 1,
-	},
-]
+standard_dropdown_items = STANDARD_DROPDOWN_ITEMS

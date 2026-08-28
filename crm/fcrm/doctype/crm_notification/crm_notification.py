@@ -15,7 +15,9 @@ class CRMNotification(Document):
 		from frappe.types import DF
 
 		comment: DF.Link | None
+		event_count: DF.Int
 		from_user: DF.Link | None
+		last_event_at: DF.Datetime | None
 		message: DF.HTMLEditor | None
 		notification_text: DF.Text | None
 		notification_type_doc: DF.DynamicLink | None
@@ -24,12 +26,17 @@ class CRMNotification(Document):
 		reference_doctype: DF.Link | None
 		reference_name: DF.DynamicLink | None
 		to_user: DF.Link
-		type: DF.Literal["Mention", "Task", "Assignment", "WhatsApp"]
+		type: DF.Literal["Mention", "Task", "Assignment", "WhatsApp", "Messenger"]
 	# end: auto-generated types
 
 	def on_update(self):
 		if self.to_user:
-			frappe.publish_realtime("crm_notification", user=self.to_user)
+			frappe.publish_realtime(
+				"crm_notification",
+				{"name": self.name, "type": self.type, "reference_name": self.reference_name},
+				user=self.to_user,
+				after_commit=True,
+			)
 
 
 def get_permission_query_conditions(user=None):

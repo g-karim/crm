@@ -9,10 +9,18 @@
  "field_order": [
   "organization_tab",
   "naming_series",
+  "deal_name",
   "organization",
   "next_step",
   "column_break_ijan",
+  "pipeline",
   "status",
+  "pipeline_label",
+  "status_label",
+  "external_source",
+  "external_pipeline_id",
+  "external_status_id",
+  "external_record_id",
   "deal_owner",
   "section_break_jgpm",
   "probability",
@@ -85,6 +93,15 @@
  ],
  "fields": [
   {
+   "fieldname": "deal_name",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Deal Name",
+   "search_index": 1
+  },
+  {
    "fieldname": "organization",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -153,6 +170,15 @@
    "options": "Phone"
   },
   {
+   "fieldname": "pipeline",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Pipeline",
+   "options": "CRM Sales Pipeline",
+   "reqd": 1
+  },
+  {
    "fieldname": "status",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -161,6 +187,46 @@
    "options": "CRM Deal Status",
    "reqd": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "pipeline_label",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Pipeline Label (Import)"
+  },
+  {
+   "fieldname": "status_label",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Status Label (Import)"
+  },
+  {
+   "fieldname": "external_source",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "External Source"
+  },
+  {
+   "fieldname": "external_pipeline_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "External Pipeline ID"
+  },
+  {
+   "fieldname": "external_status_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "External Status ID"
+  },
+  {
+   "fieldname": "external_record_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_standard_filter": 1,
+   "label": "External Record ID"
   },
   {
    "fieldname": "contacts",
@@ -569,6 +635,6 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "organization",
+ "title_field": "deal_name",
  "track_changes": 1
 }

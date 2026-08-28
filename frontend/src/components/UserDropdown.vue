@@ -2,26 +2,30 @@
   <Dropdown :options="dropdownItems" v-bind="$attrs">
     <template #default="{ open }">
       <button
-        class="flex h-12 items-center rounded-md py-2 duration-300 ease-in-out"
+        class="flex h-16 items-center rounded-md py-2 duration-300 ease-in-out"
         :class="
           isCollapsed
-            ? 'w-auto px-0'
+            ? 'w-8 justify-center px-0 hover:bg-surface-gray-3'
             : open
               ? 'w-full px-2 bg-surface-elevation-3 shadow-sm'
               : 'w-full px-2 hover:bg-surface-gray-2'
         "
       >
-        <BrandLogo v-model="brand" class="h-8 max-w-16 flex-shrink-0" />
+        <BrandLogo
+          v-model="brand"
+          class="flex-shrink-0 duration-300 ease-in-out"
+          :class="isCollapsed ? 'h-8 w-8' : '-ml-3 h-14 w-24'"
+        />
         <div
           class="flex flex-1 flex-col text-left duration-300 ease-in-out truncate"
           :class="
             isCollapsed
               ? 'ml-0 w-0 overflow-hidden opacity-0'
-              : 'ml-2 w-auto opacity-100'
+              : '-ml-1 w-auto opacity-100'
           "
         >
           <div class="text-base-medium leading-none text-ink-gray-9 truncate">
-            {{ __(brand.name || 'CRM') }}
+            {{ __(brand.name || 'EXP CRM') }}
           </div>
           <div class="mt-1 text-sm leading-none text-ink-gray-7 truncate">
             {{ user.full_name }}
@@ -32,7 +36,7 @@
           :class="
             isCollapsed
               ? 'ml-0 w-0 overflow-hidden opacity-0'
-              : 'ml-2 w-auto opacity-100'
+              : 'ml-1 w-auto opacity-100'
           "
         >
           <span
@@ -47,15 +51,11 @@
 
 <script setup>
 import BrandLogo from '@/components/BrandLogo.vue'
-import FrappeCloudIcon from '@/components/Icons/FrappeCloudIcon.vue'
-import AppsIcon from '@/components/Icons/AppsIcon.vue'
 import { sessionStore } from '@/stores/session'
 import { usersStore } from '@/stores/users'
 import { getSettings } from '@/stores/settings'
 import { showSettings, isMobileView } from '@/composables/settings'
-import { showAboutModal } from '@/composables/modals'
-import { confirmLoginToFrappeCloud } from '@/composables/frappecloud'
-import { createResource, Dropdown } from 'frappe-ui'
+import { Dropdown } from 'frappe-ui'
 import { computed, h, markRaw } from 'vue'
 
 defineProps({
@@ -67,13 +67,6 @@ const { logout } = sessionStore()
 const { getUser } = usersStore()
 
 const user = computed(() => getUser() || {})
-
-const apps = createResource({
-  url: 'frappe.apps.get_apps',
-  cache: 'apps',
-  auto: true,
-  transform: (data) => [deskApp(), ...crmSiblingApps(data)],
-})
 
 const dropdownItems = computed(() => {
   if (!settings.value?.dropdown_items) return []
@@ -91,9 +84,10 @@ const dropdownItems = computed(() => {
   items.forEach((item) => {
     if (item.hidden) return
     if (item.type !== 'Separator') {
-      _dropdownItems[_dropdownItems.length - 1].items.push(
-        dropdownItemObj(item),
-      )
+      let dropdownItem = dropdownItemObj(item)
+      if (dropdownItem) {
+        _dropdownItems[_dropdownItems.length - 1].items.push(dropdownItem)
+      }
     } else {
       _dropdownItems.push({
         group: '',
@@ -128,11 +122,11 @@ function dropdownItemObj(item) {
 
 function getStandardItem(item) {
   switch (item.name1) {
-    case 'app_selector':
+    case 'desktop_home':
       return {
-        icon: markRaw(AppsIcon),
+        icon: item.icon,
         label: __(item.label),
-        submenu: appMenuItems(),
+        onClick: () => window.location.assign(item.route || '/home'),
       }
     case 'settings':
       return {
@@ -141,19 +135,6 @@ function getStandardItem(item) {
         onClick: () => (showSettings.value = true),
         condition: () => !isMobileView.value,
       }
-    case 'login_to_fc':
-      return {
-        icon: h(FrappeCloudIcon),
-        label: __(item.label),
-        onClick: () => confirmLoginToFrappeCloud(),
-        condition: () => !isMobileView.value && window.is_fc_site,
-      }
-    case 'about':
-      return {
-        icon: item.icon,
-        label: __(item.label),
-        onClick: () => (showAboutModal.value = true),
-      }
     case 'logout':
       return {
         icon: item.icon,
@@ -161,35 +142,5 @@ function getStandardItem(item) {
         onClick: () => logout.submit(),
       }
   }
-}
-
-function appMenuItems() {
-  return (apps.data || []).map((app) => ({
-    label: app.title,
-    onClick: () => (window.location.href = app.route),
-    slots: {
-      prefix: () => h('img', { class: 'size-5 rounded', src: app.logo }),
-    },
-  }))
-}
-
-function deskApp() {
-  return {
-    name: 'frappe',
-    logo: '/assets/frappe/images/framework.png',
-    title: __('Desk'),
-    route: '/desk',
-  }
-}
-
-function crmSiblingApps(data) {
-  return data
-    .filter((app) => app.name !== 'crm')
-    .map((app) => ({
-      name: app.name,
-      logo: app.logo,
-      title: __(app.title),
-      route: app.route,
-    }))
 }
 </script>

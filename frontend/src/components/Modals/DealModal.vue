@@ -89,7 +89,13 @@ import { isMobileView } from '@/composables/settings'
 import { showQuickEntryModal, quickEntryProps } from '@/composables/modals'
 import { useDocument } from '@/data/document'
 import { useTelemetry } from 'frappe-ui/frappe'
-import { Switch, createResource, call, toast } from 'frappe-ui'
+import {
+  Switch,
+  createListResource,
+  createResource,
+  call,
+  toast,
+} from 'frappe-ui'
 import { computed, ref, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -159,6 +165,24 @@ async function enrichFromWebsite() {
   }
 }
 
+const salesPipelines = createListResource({
+  doctype: 'CRM Sales Pipeline',
+  fields: ['name', 'pipeline_name', 'is_default', 'position'],
+  filters: { enabled: 1, archived: 0 },
+  orderBy: 'position asc, modified asc',
+  cache: 'crm-sales-pipelines',
+  initialData: [],
+  auto: true,
+})
+
+const defaultPipeline = computed(() => {
+  let pipelines = salesPipelines.data || []
+  return (
+    pipelines.find((pipeline) => pipeline.is_default)?.name ||
+    pipelines[0]?.name
+  )
+})
+
 watch(
   [chooseExistingOrganization, chooseExistingContact],
   ([organization, contact]) => {
@@ -185,6 +209,7 @@ const tabs = createResource({
   auto: true,
   transform: (_tabs) => {
     hasOrganizationSections.value = false
+    ensureDealPipelineField(_tabs)
     return _tabs.forEach((tab) => {
       tab.sections.forEach((section) => {
         section.columns.forEach((column) => {
@@ -202,11 +227,7 @@ const tabs = createResource({
             hasContactSections.value = true
           }
           column.fields.forEach((field) => {
-            if (field.fieldname == 'status') {
-              field.fieldtype = 'Select'
-              field.options = dealStatuses.value
-              field.prefix = getDealStatus(deal.doc.status).color
-            }
+            prepareDealField(field)
 
             if (field.fieldtype === 'Table') {
               deal.doc[field.fieldname] = []
@@ -218,7 +239,78 @@ const tabs = createResource({
   },
 })
 
-const dealStatuses = computed(() => statusOptions('deal'))
+const dealStatuses = computed(() =>
+  statusOptions('deal', [], null, { pipeline: deal.doc.pipeline }),
+)
+
+watch(dealStatuses, () => {
+  updateDealStatusFields()
+  if (!deal.doc.status && dealStatuses.value[0]?.value) {
+    deal.doc.status = dealStatuses.value[0].value
+  }
+})
+
+watch(defaultPipeline, (pipeline) => {
+  if (!deal.doc.pipeline && pipeline) {
+    deal.doc.pipeline = pipeline
+  }
+})
+
+watch(
+  () => deal.doc.pipeline,
+  (pipeline, oldPipeline) => {
+    if (!pipeline || pipeline === oldPipeline) return
+    let currentStatus = getDealStatus(deal.doc.status)
+    if (currentStatus?.pipeline !== pipeline) {
+      deal.doc.status = dealStatuses.value[0]?.value || ''
+    }
+  },
+)
+
+function prepareDealField(field) {
+  if (field.fieldname == 'status') {
+    field.fieldtype = 'Select'
+    field.options = dealStatuses.value
+    field.prefix = getDealStatus(deal.doc.status)?.color
+  }
+}
+
+function updateDealStatusFields() {
+  tabs.data?.forEach((tab) => {
+    tab.sections?.forEach((section) => {
+      section.columns?.forEach((column) => {
+        column.fields?.forEach((field) => prepareDealField(field))
+      })
+    })
+  })
+}
+
+function ensureDealPipelineField(_tabs) {
+  let hasPipelineField = _tabs.some((tab) =>
+    tab.sections?.some((section) =>
+      section.columns?.some((column) =>
+        column.fields?.some((field) => field.fieldname === 'pipeline'),
+      ),
+    ),
+  )
+  if (hasPipelineField) return
+
+  let dealSection =
+    _tabs
+      .flatMap((tab) => tab.sections || [])
+      .find((section) => section.name === 'deal_section') ||
+    _tabs.at(-1)?.sections?.at(-1)
+  let column = dealSection?.columns?.[0]
+  if (!column) return
+
+  column.fields.unshift({
+    fieldname: 'pipeline',
+    fieldtype: 'Link',
+    label: __('Sales Pipeline'),
+    options: 'CRM Sales Pipeline',
+    reqd: 1,
+  })
+}
 
 async function createDeal() {
   if (deal.doc.website && !deal.doc.website.startsWith('http')) {
@@ -268,15 +360,16 @@ async function createDeal() {
       capture('deal_created')
       isDealCreating.value = false
       show.value = false
+      resetDealDoc()
       router.push({ name: 'Deal', params: { dealId: name } })
     },
     onError(err) {
       isDealCreating.value = false
       if (!err.messages) {
-        error.value = err.message
+        error.value = __(err.message || 'An error occurred')
         return
       }
-      error.value = err.messages.join('\n')
+      error.value = err.messages.map((message) => __(message)).join('\n')
     },
   })
 }
@@ -287,15 +380,31 @@ function openQuickEntryModal() {
   nextTick(() => (show.value = false))
 }
 
-onMounted(() => {
+function setupDealDocDefaults() {
   deal.doc.no_of_employees = '1-10'
   Object.assign(deal.doc, props.defaults)
+
+  if (!deal.doc.pipeline && defaultPipeline.value) {
+    deal.doc.pipeline = defaultPipeline.value
+  }
 
   if (!deal.doc.deal_owner) {
     deal.doc.deal_owner = getUser().name
   }
-  if (!deal.doc.status && dealStatuses.value[0].value) {
+  if (!deal.doc.status && dealStatuses.value[0]?.value) {
     deal.doc.status = dealStatuses.value[0].value
   }
+}
+
+function resetDealDoc() {
+  deal.doc = {
+    __newDocument: true,
+    doctype: 'CRM Deal',
+  }
+}
+
+onMounted(() => {
+  resetDealDoc()
+  setupDealDocDefaults()
 })
 </script>

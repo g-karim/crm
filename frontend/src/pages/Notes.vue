@@ -105,10 +105,11 @@ import NoteIcon from '@/components/Icons/NoteIcon.vue'
 import ViewControls from '@/components/ViewControls.vue'
 import { useDoctypeModal } from '@/composables/doctypeModal'
 import EmptyState from '@/components/ListViews/EmptyState.vue'
+import ListFooter from '@/components/ListViews/ListFooter.vue'
 import { usersStore } from '@/stores/users'
 import { timeAgo, formatDate, sanitizeHTML } from '@/utils'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
-import { call, Dropdown, Tooltip, ListFooter } from 'frappe-ui'
+import { call, Dropdown, Tooltip } from 'frappe-ui'
 import { ref, watch } from 'vue'
 
 const { getUser } = usersStore()

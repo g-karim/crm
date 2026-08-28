@@ -4,6 +4,22 @@
       <ViewBreadcrumbs v-model="viewControls" routeName="Deals" />
     </template>
     <template #right-header>
+      <Autocomplete
+        v-if="pipelineOptions.length"
+        :value="selectedPipeline"
+        :options="pipelineOptions"
+        placement="bottom-end"
+        @change="setSelectedPipeline"
+      >
+        <template #target="{ togglePopover }">
+          <Button
+            class="max-w-56"
+            :label="selectedPipelineLabel"
+            iconLeft="git-branch"
+            @click="togglePopover()"
+          />
+        </template>
+      </Autocomplete>
       <CustomActions
         v-if="dealsListView?.customListActions"
         :actions="dealsListView.customListActions"
@@ -12,23 +28,27 @@
         variant="solid"
         :label="__('Create')"
         iconLeft="plus"
-        @click="showDealModal = true"
+        @click="openDealModal"
       />
     </template>
   </LayoutHeader>
   <ViewControls
+    v-if="pipelineFilterReady"
+    :key="pipelineViewKey"
     ref="viewControls"
     v-model="deals"
     v-model:loadMore="loadMore"
     v-model:resizeColumn="triggerResize"
     v-model:updatedPageCount="updatedPageCount"
     doctype="CRM Deal"
+    :filters="dealFilters"
     :options="{
       allowedViews: ['list', 'group_by', 'kanban'],
+      includeDefaultFiltersInView: true,
     }"
   />
   <KanbanView
-    v-if="route.params.viewType == 'kanban'"
+    v-if="pipelineFilterReady && route.params.viewType == 'kanban'"
     v-model="deals"
     :options="{
       getRoute: (row) => ({
@@ -37,6 +57,8 @@
         query: { view: route.query.view, viewType: route.params.viewType },
       }),
       onNewClick: (column) => onNewClick(column),
+      manageColumns: false,
+      getCardMeta: (row) => getFreezeState(row),
     }"
     @update="(data) => viewControls.updateKanbanSettings(data)"
     @loadMore="(columnName) => viewControls.loadMoreKanban(columnName)"
@@ -207,7 +229,7 @@
     </template>
   </KanbanView>
   <DealsListView
-    v-else-if="deals.data && rows.length"
+    v-else-if="pipelineFilterReady && deals.data && rows.length"
     ref="dealsListView"
     v-model="deals.data.page_length_count"
     v-model:list="deals"
@@ -230,7 +252,7 @@
     "
   />
   <EmptyState
-    v-else-if="deals.data && !rows.length"
+    v-else-if="pipelineFilterReady && deals.data && !rows.length"
     name="Deals"
     :icon="DealsIcon"
   />
@@ -258,19 +280,21 @@ import EmptyState from '@/components/ListViews/EmptyState.vue'
 import KanbanView from '@/components/Kanban/KanbanView.vue'
 import DealModal from '@/components/Modals/DealModal.vue'
 import ViewControls from '@/components/ViewControls.vue'
+import Autocomplete from '@/components/frappe-ui/Autocomplete.vue'
 import { useDoctypeModal } from '@/composables/doctypeModal'
 import { getMeta } from '@/stores/meta'
 import { globalStore } from '@/stores/global'
 import { usersStore } from '@/stores/users'
 import { organizationsStore } from '@/stores/organizations'
 import { statusesStore } from '@/stores/statuses'
+import { viewsStore } from '@/stores/views'
 import { callEnabled } from '@/composables/telephony'
 import { formatDate, timeAgo, website, formatTime } from '@/utils'
 import { timestampCell } from '@/composables/useTimelinePreferences'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
-import { Tooltip, Avatar, Dropdown } from 'frappe-ui'
+import { Tooltip, Avatar, Dropdown, createListResource } from 'frappe-ui'
 import { useRoute } from 'vue-router'
-import { ref, reactive, computed, h } from 'vue'
+import { ref, reactive, computed, h, watch } from 'vue'
 
 const { getFormattedPercent, getFormattedFloat, getFormattedCurrency } =
   getMeta('CRM Deal')
@@ -278,6 +302,7 @@ const { makeCall } = globalStore()
 const { getUser } = usersStore()
 const { getOrganization } = organizationsStore()
 const { getDealStatus } = statusesStore()
+const { getView, views } = viewsStore()
 const { updateOnboardingStep } = useOnboarding('frappecrm')
 const { capture } = useTelemetry()
 const { showModal } = useDoctypeModal()
@@ -286,6 +311,10 @@ const route = useRoute()
 
 const dealsListView = ref(null)
 const showDealModal = ref(false)
+const selectedPipeline = ref(
+  localStorage.getItem('crm:selectedDealPipeline') || '',
+)
+const pipelinesLoaded = ref(false)
 
 const defaults = reactive({})
 
@@ -295,6 +324,183 @@ const loadMore = ref(1)
 const triggerResize = ref(1)
 const updatedPageCount = ref(20)
 const viewControls = ref(null)
+const freezeThresholdDays = 7
+const deepFreezeThresholdDays = 14
+const millisecondsInDay = 24 * 60 * 60 * 1000
+
+const salesPipelines = createListResource({
+  doctype: 'CRM Sales Pipeline',
+  fields: [
+    'name',
+    'pipeline_name',
+    'is_default',
+    'position',
+    'enable_kanban_freeze_effect',
+  ],
+  filters: { enabled: 1, archived: 0 },
+  orderBy: 'position asc, modified asc',
+  cache: 'crm-sales-pipelines-v2',
+  initialData: [],
+  auto: true,
+  onSuccess() {
+    pipelinesLoaded.value = true
+  },
+})
+
+const pipelineOptions = computed(() => {
+  return (salesPipelines.data || []).map((pipeline) => ({
+    label: __(pipeline.pipeline_name || pipeline.name),
+    value: pipeline.name,
+  }))
+})
+
+const selectedPipelineLabel = computed(() => {
+  return (
+    pipelineOptions.value.find(
+      (option) => option.value === selectedPipeline.value,
+    )?.label || __('Sales Pipeline')
+  )
+})
+
+const dealFilters = computed(() => {
+  return selectedPipeline.value ? { pipeline: selectedPipeline.value } : {}
+})
+
+const pipelineFilterReady = computed(() => {
+  return Boolean(
+    selectedPipeline.value ||
+    (pipelinesLoaded.value && salesPipelines.data?.length === 0),
+  )
+})
+
+const pipelineViewKey = computed(() => selectedPipeline.value || 'all')
+
+const selectedPipelineSettings = computed(() => {
+  return salesPipelines.data?.find(
+    (pipeline) => pipeline.name === selectedPipeline.value,
+  )
+})
+
+watch(
+  () => salesPipelines.data,
+  (pipelines) => {
+    if (!pipelines?.length) return
+
+    let selectedExists = pipelines.some(
+      (pipeline) => pipeline.name === selectedPipeline.value,
+    )
+    if (selectedExists) return
+
+    let defaultPipeline =
+      pipelines.find((pipeline) => pipeline.is_default) || pipelines[0]
+    selectedPipeline.value = defaultPipeline.name
+  },
+  { immediate: true },
+)
+
+watch(selectedPipeline, (pipeline) => {
+  if (!pipeline) return
+  localStorage.setItem('crm:selectedDealPipeline', pipeline)
+  defaults.pipeline = pipeline
+})
+
+watch(
+  [
+    () => route.query.view,
+    () => route.params.viewType,
+    () => views.data,
+    () => pipelineOptions.value,
+  ],
+  () => syncPipelineFromRouteView(),
+  { immediate: true, deep: true },
+)
+
+function setSelectedPipeline(option) {
+  let pipeline = option?.value || ''
+  if (!pipeline || pipeline === selectedPipeline.value) return
+  deals.value = {}
+  loadMore.value = 1
+  triggerResize.value += 1
+  selectedPipeline.value = pipeline
+}
+
+function syncPipelineFromRouteView() {
+  const pipeline = getPipelineFromRouteView()
+  if (!pipeline || pipeline === selectedPipeline.value) return
+
+  const pipelineExists =
+    !pipelineOptions.value.length ||
+    pipelineOptions.value.some((option) => option.value === pipeline)
+  if (!pipelineExists) return
+
+  deals.value = {}
+  loadMore.value = 1
+  triggerResize.value += 1
+  selectedPipeline.value = pipeline
+}
+
+function getPipelineFromRouteView() {
+  if (!route.query.view) return ''
+  const view = getView(route.query.view, route.params.viewType, 'CRM Deal')
+  return getPipelineFromFilters(view?.filters)
+}
+
+function getPipelineFromFilters(filters) {
+  if (!filters) return ''
+  if (typeof filters === 'string') {
+    try {
+      filters = JSON.parse(filters)
+    } catch {
+      return ''
+    }
+  }
+
+  if (Array.isArray(filters)) {
+    const pipeline = getPipelineFromFilterTuple(filters)
+    if (pipeline) return pipeline
+    for (const filter of filters) {
+      const pipeline = getPipelineFromFilterTuple(filter)
+      if (pipeline) return pipeline
+    }
+    return ''
+  }
+
+  return getPipelineFromFilterValue(filters?.pipeline)
+}
+
+function getPipelineFromFilterValue(pipeline) {
+  if (!pipeline) return ''
+  if (typeof pipeline === 'string') return pipeline
+  if (!Array.isArray(pipeline)) return ''
+
+  const operator = pipeline[0]?.toLowerCase?.()
+  if (['=', 'equals'].includes(operator) && typeof pipeline[1] === 'string') {
+    return pipeline[1]
+  }
+  return ''
+}
+
+function getPipelineFromFilterTuple(filter) {
+  if (!Array.isArray(filter)) return ''
+
+  if (filter[1] === 'pipeline') {
+    return getPipelineFromOperatorValue(filter[2], filter[3])
+  }
+
+  if (filter[0] === 'pipeline') {
+    return getPipelineFromOperatorValue(filter[1], filter[2])
+  }
+
+  return getPipelineFromFilterValue(filter)
+}
+
+function getPipelineFromOperatorValue(operator, value) {
+  operator = operator?.toLowerCase?.()
+  if (['=', 'equals'].includes(operator) && typeof value === 'string') {
+    return value
+  }
+  return ''
+}
 
 function getRow(name, field) {
   function getValue(value) {
@@ -423,7 +629,7 @@ function parseRows(rows, columns = []) {
         _rows[row] = website(deal.website)
       } else if (row == 'status') {
         _rows[row] = {
-          label: deal.status,
+          label: __(getDealStatus(deal.status)?.deal_status || deal.status),
           color: getDealStatus(deal.status)?.color,
         }
       } else if (row == 'sla_status') {
@@ -485,14 +691,81 @@ function parseRows(rows, columns = []) {
   })
 }
 
+function getFreezeState(deal) {
+  let state = {
+    _freezeLevel: 0,
+    _freezeProgress: 0,
+    _freezeDays: 0,
+    _freezeTooltip: '',
+  }
+
+  if (deals.value?.data?.view_type !== 'kanban') return state
+  let freezeEffectSetting =
+    selectedPipelineSettings.value?.enable_kanban_freeze_effect
+  if (freezeEffectSetting === 0 || freezeEffectSetting === false) {
+    return state
+  }
+  if (!deal.modified) return state
+
+  let statusType = getDealStatus(deal.status)?.type
+  if (['Won', 'Lost'].includes(statusType)) return state
+
+  let modifiedAt = parseFreezeDate(deal.modified)
+  if (Number.isNaN(modifiedAt.getTime())) return state
+
+  let days = Math.max(
+    0,
+    Math.floor((Date.now() - modifiedAt.getTime()) / millisecondsInDay),
+  )
+  if (days < freezeThresholdDays) return state
+
+  let progress = Math.min(days / deepFreezeThresholdDays, 1)
+  let level = days >= deepFreezeThresholdDays ? 2 : 1
+
+  return {
+    _freezeLevel: level,
+    _freezeProgress: progress,
+    _freezeDays: days,
+    _freezeTooltip: __('No activity for {0} days', [days]),
+  }
+}
+
+function parseFreezeDate(value) {
+  if (value instanceof Date) return value
+
+  let normalized = String(value)
+    .trim()
+    .replace(' ', 'T')
+    .replace(/(\.\d{3})\d+/, '$1')
+
+  let date = new Date(normalized)
+  if (!Number.isNaN(date.getTime())) return date
+
+  return new Date(value)
+}
+
 function onNewClick(column) {
   let column_field = deals.value.params.column_field
+
+  resetDefaults()
 
   if (column_field) {
     defaults[column_field] = column.column.name
   }
 
   showDealModal.value = true
+}
+
+function openDealModal() {
+  resetDefaults()
+  showDealModal.value = true
+}
+
+function resetDefaults() {
+  Object.keys(defaults).forEach((key) => delete defaults[key])
+  if (selectedPipeline.value) {
+    defaults.pipeline = selectedPipeline.value
+  }
 }
 
 function actions(itemName) {

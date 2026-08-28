@@ -1,6 +1,6 @@
 import { usersStore } from '@/stores/users'
 import { dayjs, createListResource } from 'frappe-ui'
-import { sameArrayContents } from '@/utils'
+import { getFormat, sameArrayContents } from '@/utils'
 import { computed, ref } from 'vue'
 import { allTimeSlots } from '@/components/Calendar/utils'
 
@@ -158,7 +158,7 @@ export function useEvent({
     startTime,
     endTime,
     isFullDay = false,
-    format = 'h:mm a',
+    format = 'HH:mm',
   ) => {
     const start = dayjs(startTime)
     const end = dayjs(endTime)
@@ -168,7 +168,10 @@ export function useEvent({
     return `${start.format(format)} - ${end.format(format)}`
   }
 
-  const startDate = (startTime, format = 'ddd, D MMM YYYY') => {
+  const startDate = (
+    startTime,
+    format = getFormat('', '', true, false, false),
+  ) => {
     const start = dayjs(startTime)
     return start.format(format)
   }

@@ -40,7 +40,12 @@
     v-if="doc.name"
     class="flex h-12 items-center justify-between gap-2 border-b px-3 py-2.5"
   >
-    <AssignTo v-model="assignees.data" doctype="CRM Lead" :docname="leadId" />
+    <AssignTo
+      v-if="canWrite"
+      v-model="assignees.data"
+      doctype="CRM Lead"
+      :docname="leadId"
+    />
     <div class="flex items-center gap-2">
       <CustomActions
         v-if="document._actions?.length"
@@ -85,6 +90,13 @@
             />
           </div>
         </div>
+        <LeadConversation
+          v-else-if="tab.name == 'Messenger'"
+          :leadName="leadId"
+          :lead="doc"
+          :phone="doc.mobile_no || doc.phone"
+          :active="tabs[tabIndex]?.name === 'Messenger'"
+        />
         <Activities
           v-else
           v-model:reload="reload"
@@ -139,6 +151,7 @@ import IndicatorIcon from '@/components/Icons/IndicatorIcon.vue'
 import LostReasonModal from '@/components/Modals/LostReasonModal.vue'
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import Activities from '@/components/Activities/Activities.vue'
+import LeadConversation from '@/components/LeadMessenger/LeadConversation.vue'
 import AssignTo from '@/components/AssignTo.vue'
 import SidePanelLayout from '@/components/SidePanelLayout.vue'
 import SLASection from '@/components/SLASection.vue'
@@ -186,11 +199,13 @@ const {
   triggerOnChange,
   triggerOnRender,
   assignees,
+  permissions,
   document,
   scripts,
   error,
 } = useDocument('CRM Lead', props.leadId)
 
+const canWrite = computed(() => permissions.data?.permissions?.write || false)
 const doc = computed(() => document.doc || {})
 
 onMounted(async () => {
@@ -300,6 +315,11 @@ const tabs = computed(() => {
       icon: CommentIcon,
     },
     {
+      name: 'Messenger',
+      label: __('Переписка'),
+      icon: CommentIcon,
+    },
+    {
       name: 'Data',
       label: __('Data'),
       icon: DetailsIcon,
@@ -361,7 +381,7 @@ function updateField(name, value) {
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(err.messages?.[0] || __('Error updating field'))
+      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }

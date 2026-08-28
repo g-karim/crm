@@ -6,9 +6,9 @@
     @close="activeSettingsPage = ''"
   >
     <template #body>
-      <div class="flex h-[calc(100vh_-_8rem)] bg-surface-gray-1">
+      <div class="flex h-[calc(100vh_-_8rem)] min-h-0 bg-surface-gray-1">
         <div
-          class="flex flex-col m-1 rounded-l-lg w-56 shrink-0 bg-surface-gray-1 overflow-y-auto"
+          class="m-1 flex min-h-0 w-56 shrink-0 flex-col overflow-y-auto rounded-l-lg bg-surface-gray-1"
         >
           <template v-for="(tab, i) in tabs" :key="tab.label">
             <div v-if="!tab.hideLabel && i != 0" class="mx-1 mb-0.5 mt-[5px]" />
@@ -38,7 +38,7 @@
           </template>
         </div>
         <div
-          class="flex flex-col flex-1 overflow-y-auto bg-surface-elevation-2"
+          class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-elevation-2"
         >
           <component :is="activeTab.component" v-if="activeTab" />
         </div>
@@ -52,33 +52,26 @@ import LucideNetwork from '~icons/lucide/network'
 import MonitorCogIcon from '~icons/lucide/monitor-cog'
 import LucideTextCursorInput from '~icons/lucide/text-cursor-input'
 import SlidersIcon from '@/components/Icons/SlidersIcon.vue'
-import SparkleIcon from '@/components/Icons/SparkleIcon.vue'
 import CalendarIcon from '@/components/Icons/CalendarIcon.vue'
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
 import ERPNextIcon from '@/components/Icons/ERPNextIcon.vue'
-import PhoneIcon from '@/components/Icons/PhoneIcon.vue'
-import Email2Icon from '@/components/Icons/Email2Icon.vue'
 import EmailTemplateIcon from '@/components/Icons/EmailTemplateIcon.vue'
 import SettingsIcon from '@/components/Icons/SettingsIcon.vue'
 import SettingsIcon2 from '@/components/Icons/SettingsIcon2.vue'
 import Users from '@/components/Settings/Users.vue'
 import Hierarchy from '@/components/Settings/Hierarchy/Hierarchy.vue'
-import InviteUserPage from '@/components/Settings/InviteUserPage.vue'
 import ProfilePage from '@/components/Settings/Profile/ProfilePage.vue'
 import PreferencesSettings from '@/components/Settings/PreferencesSettings.vue'
 import WhatsAppSettings from '@/components/Settings/WhatsAppSettings.vue'
 import ERPNextSettings from '@/components/Settings/ERPNextSettings.vue'
 import LeadSyncSourcePage from '@/components/Settings/LeadSyncing/LeadSyncSourcePage.vue'
 import DefaultsSettings from '@/components/Settings/DefaultsSettings.vue'
-import BrandSettings from '@/components/Settings/BrandSettings.vue'
 import CalendarSettings from '@/components/Settings/CalendarSettings.vue'
-import HomeActions from '@/components/Settings/HomeActions.vue'
 import FormsSettings from '@/components/Settings/Forms/FormsSettings.vue'
+import SalesPipelines from '@/components/Settings/SalesPipelines.vue'
 import GeneralSettings from '@/components/Settings/GeneralSettings.vue'
 import DashboardSettings from '@/components/Settings/DashboardSettings.vue'
 import EmailTemplatePage from '@/components/Settings/EmailTemplate/EmailTemplatePage.vue'
-import TelephonyPage from '@/components/Settings/Telephony/TelephonyPage.vue'
-import EmailConfig from '@/components/Settings/EmailConfig.vue'
 import Icon from '@/components/Icon.vue'
 import { usersStore } from '@/stores/users'
 import {
@@ -138,14 +131,14 @@ const tabs = computed(() => {
           icon: MonitorCogIcon,
         },
         {
-          label: __('Brand'),
-          icon: SparkleIcon,
-          component: markRaw(BrandSettings),
-        },
-        {
           label: __('Calendar'),
           icon: CalendarIcon,
           component: markRaw(CalendarSettings),
+        },
+        {
+          label: __('Sales Pipelines'),
+          icon: 'git-branch',
+          component: markRaw(SalesPipelines),
         },
       ],
       condition: () => isManager(),
@@ -160,12 +153,6 @@ const tabs = computed(() => {
           condition: () => isManager(),
         },
         {
-          label: __('Invite User'),
-          icon: 'user-plus',
-          component: markRaw(InviteUserPage),
-          condition: () => isManager(),
-        },
-        {
           label: __('Sales Hierarchy'),
           icon: LucideNetwork,
           component: markRaw(Hierarchy),
@@ -175,16 +162,10 @@ const tabs = computed(() => {
       condition: () => isManager(),
     },
     {
-      label: __('Email'),
+      label: __('Templates'),
       items: [
         {
-          label: __('Accounts'),
-          icon: Email2Icon,
-          component: markRaw(EmailConfig),
-          condition: () => isManager(),
-        },
-        {
-          label: __('Templates'),
+          label: __('Email Templates'),
           icon: EmailTemplateIcon,
           component: markRaw(EmailTemplatePage),
         },
@@ -212,24 +193,8 @@ const tabs = computed(() => {
       condition: () => isManager(),
     },
     {
-      label: __('Customization'),
-      items: [
-        {
-          label: __('Home Actions'),
-          component: markRaw(HomeActions),
-          icon: 'house',
-        },
-      ],
-      condition: () => isManager(),
-    },
-    {
       label: __('Integrations', null, 'FCRM'),
       items: [
-        {
-          label: __('Telephony'),
-          icon: PhoneIcon,
-          component: markRaw(TelephonyPage),
-        },
         {
           label: __('WhatsApp'),
           icon: WhatsAppIcon,
@@ -237,7 +202,7 @@ const tabs = computed(() => {
           condition: () => isWhatsappInstalled.value && isManager(),
         },
         {
-          label: __('ERPNext'),
+          label: __('EXP ERP'),
           icon: ERPNextIcon,
           component: markRaw(ERPNextSettings),
           condition: () => isManager(),
@@ -264,17 +229,23 @@ const tabs = computed(() => {
   })
 })
 
-const activeTab = ref(tabs.value[0].items[0])
+const activeTab = ref()
+
+const settingItems = computed(() => tabs.value.map((tab) => tab.items).flat())
+
+function getFallbackTab() {
+  return tabs.value[0]?.items?.[0]
+}
 
 function setActiveTab(tabName) {
   activeTab.value =
-    (tabName &&
-      tabs.value
-        .map((tab) => tab.items)
-        .flat()
-        .find((tab) => tab.label === tabName)) ||
-    tabs.value[0].items[0]
+    (tabName && settingItems.value.find((tab) => tab.label === tabName)) ||
+    getFallbackTab()
 }
 
-watch(activeSettingsPage, (activePage) => setActiveTab(activePage))
+watch(activeSettingsPage, (activePage) => setActiveTab(activePage), {
+  immediate: true,
+})
+
+watch(tabs, () => setActiveTab(activeSettingsPage.value))
 </script>

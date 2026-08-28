@@ -5,11 +5,7 @@
         <div class="mb-5 flex items-center justify-between">
           <div class="flex gap-2 items-center">
             <h3 class="text-3xl-semibold leading-6 text-ink-gray-9">
-              {{
-                editMode
-                  ? __('Edit ' + (doctypeTitle || doctype))
-                  : __('Create ' + (doctypeTitle || doctype))
-              }}
+              {{ modalTitle }}
             </h3>
           </div>
           <div class="flex items-center gap-1">
@@ -103,6 +99,18 @@ const layout = createResource({
 
 const error = ref(null)
 const editMode = computed(() => Boolean(document.doc?.name))
+const modalTitle = computed(() => {
+  const action = editMode.value ? 'Edit' : 'Create'
+  const title = props.doctypeTitle || props.doctype
+  const exactTitle = `${action} ${title}`
+  const translatedExactTitle = __(exactTitle)
+
+  if (translatedExactTitle !== exactTitle) {
+    return translatedExactTitle
+  }
+
+  return __(`${action} {0}`, [__(title)])
+})
 
 const _create = createResource({
   url: 'frappe.client.insert',
@@ -122,7 +130,7 @@ const _create = createResource({
       error.value = __('Mandatory field error: {0}', [fieldName])
       return
     }
-    error.value = err.messages?.[0] || 'Could not create document'
+    error.value = __(err.messages?.[0] || 'Could not create document')
   },
 })
 
@@ -144,7 +152,7 @@ function update() {
       show.value = false
     },
     onError: (err) => {
-      error.value = err.messages?.[0] || 'Could not update document'
+      error.value = __(err.messages?.[0] || 'Could not update document')
     },
   })
 }

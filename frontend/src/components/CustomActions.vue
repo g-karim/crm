@@ -3,7 +3,7 @@
     <Button
       v-for="action in normalActions"
       :key="action.label"
-      :label="action.label"
+      :label="__(action.label)"
       @click="action.onClick(close)"
     >
       <template v-if="action.icon" #prefix>
@@ -18,7 +18,7 @@
     <div v-for="g in groupedWithLabelActions" :key="g.label">
       <Dropdown v-slot="{ open }" :options="g.action">
         <Button
-          :label="g.label"
+          :label="__(g.label)"
           :iconRight="open ? 'chevron-up' : 'chevron-down'"
         />
       </Dropdown>
@@ -76,7 +76,7 @@ const groupedActions = computed(() => {
       group: __('Actions'),
       hideLabel: true,
       items: _normalActions.map((action) => ({
-        label: action.label,
+        label: __(action.label),
         onClick: () => action.onClick(props.close),
         icon: action.icon,
       })),
@@ -94,6 +94,7 @@ const groupedActions = computed(() => {
       action.items = action.items.map((item) => {
         return {
           ...item,
+          label: __(item.label),
           onClick: () => item.onClick(props.close),
         }
       })

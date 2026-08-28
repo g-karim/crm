@@ -231,6 +231,7 @@ import RatingInput from '@/components/Controls/RatingInput.vue'
 import MultipleAvatar from '@/components/MultipleAvatar.vue'
 import ListBulkActions from '@/components/ListBulkActions.vue'
 import ListRows from '@/components/ListViews/ListRows.vue'
+import ListFooter from '@/components/ListViews/ListFooter.vue'
 import { isTranslatable, formatDuration } from '@/utils'
 import {
   Avatar,
@@ -239,7 +240,6 @@ import {
   ListHeaderItem,
   ListSelectBanner,
   ListRowItem,
-  ListFooter,
   Dropdown,
   Tooltip,
 } from 'frappe-ui'
