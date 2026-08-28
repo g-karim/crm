@@ -43,7 +43,7 @@
             class="mt-1 h-1 overflow-hidden rounded bg-surface-gray-3"
           >
             <div
-              class="h-full bg-surface-blue-3 transition-all"
+              class="h-full bg-surface-blue-7 transition-all"
               :style="{ width: `${item.progress}%` }"
             />
           </div>

@@ -55,9 +55,10 @@
               <WhatsAppIcon v-else-if="n.type == 'WhatsApp'" class="size-7" />
               <UserAvatar v-else :user="n.from_user.name" size="lg" />
             </div>
-            <div>
+            <div class="min-w-0 flex-1">
               <div
                 v-if="n.notification_text"
+                class="[overflow-wrap:anywhere]"
                 v-html="sanitizeHTML(n.notification_text)"
               />
               <div v-else class="mb-2 space-x-1 leading-5 text-ink-gray-5">

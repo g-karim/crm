@@ -6,6 +6,21 @@ const conversationSource = readFileSync(
   resolve(process.cwd(), 'src/components/LeadMessenger/LeadConversation.vue'),
   'utf8',
 )
+const composerAttachmentsSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'src/components/LeadMessenger/ComposerAttachments.vue',
+  ),
+  'utf8',
+)
+const desktopNotificationsSource = readFileSync(
+  resolve(process.cwd(), 'src/components/Notifications.vue'),
+  'utf8',
+)
+const mobileNotificationsSource = readFileSync(
+  resolve(process.cwd(), 'src/pages/MobileNotification.vue'),
+  'utf8',
+)
 
 describe('messenger responsive markup', () => {
   it('applies reply highlighting to the bubble instead of the full row', () => {
@@ -42,6 +57,21 @@ describe('messenger responsive markup', () => {
     expect(conversationSource).toContain(
       "return 'w-64 !max-w-[94%] sm:!max-w-64'",
     )
+  })
+
+  it('keeps upload progress visible with the current semantic palette', () => {
+    expect(composerAttachmentsSource).toContain('bg-surface-blue-7')
+    expect(composerAttachmentsSource).not.toContain('bg-surface-blue-3')
+  })
+
+  it('lets long notification previews shrink and wrap on every layout', () => {
+    for (let source of [
+      desktopNotificationsSource,
+      mobileNotificationsSource,
+    ]) {
+      expect(source).toContain('<div class="min-w-0 flex-1">')
+      expect(source).toContain('class="[overflow-wrap:anywhere]"')
+    }
   })
 
   it('gates every mutation surface with backend operator permissions', () => {
