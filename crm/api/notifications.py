@@ -1,36 +1,31 @@
 import frappe
-from frappe.query_builder import Order
-from frappe.query_builder.functions import Coalesce
+from frappe import _
 from frappe.utils import add_to_date, cint, now_datetime
+
+from crm.fcrm.doctype.crm_notification.crm_notification import (
+	can_access_notification,
+	get_notification_visibility_condition,
+)
 
 
 @frappe.whitelist()
-def get_notifications(limit=100):
+def get_notifications(limit: int = 100):
 	limit = min(max(cint(limit) or 100, 1), 100)
-	Notification = frappe.qb.DocType("CRM Notification")
-	rows = (
-		frappe.qb.from_(Notification)
-		.select(
-			Notification.name,
-			Notification.creation,
-			Notification.last_event_at,
-			Notification.last_event_id,
-			Notification.event_count,
-			Notification.from_user,
-			Notification.type,
-			Notification.to_user,
-			Notification.read,
-			Notification.notification_text,
-			Notification.notification_type_doctype,
-			Notification.notification_type_doc,
-			Notification.reference_doctype,
-			Notification.reference_name,
-			Notification.message,
-		)
-		.where(Notification.to_user == frappe.session.user)
-		.orderby(Coalesce(Notification.last_event_at, Notification.creation), order=Order.desc)
-		.limit(limit + 1)
-	).run(as_dict=True)
+	visibility_condition = get_notification_visibility_condition()
+	rows = frappe.db.sql(
+		f"""
+		select
+			name, creation, last_event_at, last_event_id, event_count, from_user,
+			type, to_user, `read`, notification_text, notification_type_doctype,
+			notification_type_doc, reference_doctype, reference_name, message
+		from `tabCRM Notification`
+		where to_user = %s and {visibility_condition}
+		order by coalesce(last_event_at, creation) desc
+		limit %s
+		""",
+		(frappe.session.user, limit + 1),
+		as_dict=True,
+	)
 	has_more = len(rows) > limit
 	rows = rows[:limit]
 	from_users = {row.from_user for row in rows if row.from_user}
@@ -69,10 +64,10 @@ def get_notifications(limit=100):
 		)
 
 	unread_count = frappe.db.sql(
-		"""
+		f"""
 		select coalesce(sum(case when type = 'Messenger' then greatest(coalesce(event_count, 1), 1) else 1 end), 0)
 		from `tabCRM Notification`
-		where to_user = %s and `read` = 0
+		where to_user = %s and `read` = 0 and {visibility_condition}
 		""",
 		frappe.session.user,
 	)[0][0]
@@ -88,10 +83,10 @@ def mark_messenger_as_read(conversation: str, last_event_id: str):
 		as_dict=True,
 	)
 	if not conversation_row or conversation_row.reference_doctype != "CRM Lead":
-		frappe.throw("Conversation was not found.", frappe.DoesNotExistError)
+		frappe.throw(_("Conversation was not found."), frappe.DoesNotExistError)
 	lead = frappe.get_doc("CRM Lead", conversation_row.reference_name)
 	if not frappe.has_permission("CRM Lead", "read", doc=lead):
-		frappe.throw("You are not permitted to access this CRM record.", frappe.PermissionError)
+		frappe.throw(_("You are not permitted to access this CRM record."), frappe.PermissionError)
 
 	rows = frappe.db.sql(
 		"""
@@ -99,10 +94,12 @@ def mark_messenger_as_read(conversation: str, last_event_id: str):
 		from `tabCRM Notification`
 		where to_user = %s and type = 'Messenger'
 			and notification_type_doctype = 'Messenger Conversation'
-			and notification_type_doc = %s and `read` = 0
+			and notification_type_doc = %s
+			and reference_doctype = 'CRM Lead'
+			and reference_name = %s and `read` = 0
 		for update
 		""",
-		(frappe.session.user, conversation),
+		(frappe.session.user, conversation, conversation_row.reference_name),
 		as_dict=True,
 	)
 	if not rows or any(row.last_event_id != last_event_id for row in rows):
@@ -115,29 +112,44 @@ def mark_messenger_as_read(conversation: str, last_event_id: str):
 @frappe.whitelist(methods=["POST"])
 def mark_as_read(notification: str):
 	row = _lock_notification(notification)
-	if not row or row.to_user != frappe.session.user or row.read:
+	if not row or row.to_user != frappe.session.user or row.read or not can_access_notification(row):
 		return {"ok": True, "marked": 0}
 	_mark_locked_notification_read(row.name)
 	return {"ok": True, "marked": 1}
 
 
 @frappe.whitelist(methods=["POST"])
-def mark_all_as_read(limit=500):
+def mark_all_as_read(limit: int = 500):
 	limit = min(max(cint(limit) or 500, 1), 500)
-	names = frappe.get_all(
-		"CRM Notification",
-		filters={"to_user": frappe.session.user, "read": False},
-		pluck="name",
-		order_by="creation asc",
-		limit_page_length=limit,
+	visibility_condition = get_notification_visibility_condition()
+	rows = frappe.db.sql(
+		f"""
+		select name
+		from `tabCRM Notification`
+		where to_user = %s and `read` = 0 and {visibility_condition}
+		order by creation asc
+		limit %s
+		""",
+		(frappe.session.user, limit),
+		as_dict=True,
 	)
 	marked = 0
-	for name in names:
-		row = _lock_notification(name)
-		if row and row.to_user == frappe.session.user and not row.read:
+	for candidate in rows:
+		row = _lock_notification(candidate.name)
+		if row and row.to_user == frappe.session.user and not row.read and can_access_notification(row):
 			_mark_locked_notification_read(row.name)
 			marked += 1
-	has_more = bool(frappe.db.exists("CRM Notification", {"to_user": frappe.session.user, "read": False}))
+	has_more = bool(
+		frappe.db.sql(
+			f"""
+			select 1
+			from `tabCRM Notification`
+			where to_user = %s and `read` = 0 and {visibility_condition}
+			limit 1
+			""",
+			frappe.session.user,
+		)
+	)
 	return {"ok": True, "marked": marked, "has_more": has_more}
 
 
@@ -158,7 +170,12 @@ def get_hash(notification):
 
 def _lock_notification(name):
 	rows = frappe.db.sql(
-		"select name, to_user, `read` from `tabCRM Notification` where name = %s for update",
+		"""
+		select name, to_user, `read`, type, reference_doctype, reference_name
+		from `tabCRM Notification`
+		where name = %s
+		for update
+		""",
 		name,
 		as_dict=True,
 	)

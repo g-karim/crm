@@ -4,6 +4,7 @@
 from unittest.mock import patch
 
 import frappe
+from frappe import client
 from frappe.tests import IntegrationTestCase, UnitTestCase
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_to_date, now_datetime
@@ -12,6 +13,7 @@ from crm.api.notifications import (
 	cleanup_messenger_notifications,
 	get_hash,
 	get_notifications,
+	mark_all_as_read,
 	mark_messenger_as_read,
 )
 from crm.fcrm.doctype.crm_notification.crm_notification import CRMNotification, has_permission
@@ -58,10 +60,28 @@ class TestCRMNotification(UnitTestCase):
 	def test_messenger_hash_opens_conversation_tab(self):
 		self.assertEqual(get_hash(frappe._dict(type="Messenger")), "#messenger")
 
-	def test_realtime_notification_is_published_after_commit(self):
+	def test_messenger_notification_with_unknown_or_missing_reference_is_not_readable(self):
+		unknown = frappe._dict(
+			type="Messenger",
+			to_user=USER1,
+			reference_doctype="CRM Contact",
+			reference_name="CONTACT-1",
+		)
+		self.assertFalse(has_permission(unknown, "read", USER1))
+
+		missing = frappe._dict(
+			type="Messenger",
+			to_user=USER1,
+			reference_doctype="CRM Lead",
+			reference_name="MISSING-LEAD",
+		)
+		with patch.object(frappe.db, "exists", return_value=False):
+			self.assertFalse(has_permission(missing, "read", USER1))
+
+	def test_ordinary_realtime_notification_is_published_after_commit(self):
 		doc = frappe._dict(
 			name="NOTIFICATION-1",
-			type="Messenger",
+			type="Mention",
 			to_user="manager@example.com",
 			reference_name="LEAD-1",
 		)
@@ -70,7 +90,7 @@ class TestCRMNotification(UnitTestCase):
 
 		publish.assert_called_once_with(
 			"crm_notification",
-			{"name": "NOTIFICATION-1", "type": "Messenger", "reference_name": "LEAD-1"},
+			{"name": "NOTIFICATION-1", "type": "Mention", "reference_name": "LEAD-1"},
 			user="manager@example.com",
 			after_commit=True,
 		)
@@ -156,6 +176,115 @@ class TestMessengerNotificationLifecycle(IntegrationTestCase):
 		row = next(item for item in result["notifications"] if item["name"] == self.notification.name)
 		self.assertEqual(row["last_event_id"], self.message.name)
 
+	def test_revoked_lead_access_hides_messenger_notification_and_unread_count(self):
+		frappe.db.set_value("CRM Lead", self.lead.name, "lead_owner", USER1, update_modified=False)
+		frappe.set_user(USER1)
+		self.assertTrue(frappe.has_permission("CRM Lead", "read", doc=self.lead))
+		notification = frappe.get_doc(
+			{
+				"doctype": "CRM Notification",
+				"to_user": USER1,
+				"type": "Messenger",
+				"notification_type_doctype": "Messenger Conversation",
+				"notification_type_doc": self.conversation.name,
+				"reference_doctype": "CRM Lead",
+				"reference_name": self.lead.name,
+				"event_count": 3,
+				"last_event_at": self.message.message_datetime,
+				"last_event_id": self.message.name,
+				"aggregation_key": frappe.generate_hash(length=64),
+			}
+		).insert(ignore_permissions=True)
+
+		visible = get_notifications()
+		self.assertIn(notification.name, {row["name"] for row in visible["notifications"]})
+		self.assertGreaterEqual(visible["unread_count"], notification.event_count)
+
+		frappe.set_user("Administrator")
+		frappe.db.set_value("CRM Lead", self.lead.name, "lead_owner", "Administrator", update_modified=False)
+		frappe.set_user(USER1)
+		self.assertFalse(frappe.has_permission("CRM Lead", "read", doc=self.lead))
+
+		hidden = get_notifications()
+		self.assertNotIn(notification.name, {row["name"] for row in hidden["notifications"]})
+		self.assertEqual(hidden["unread_count"], visible["unread_count"] - notification.event_count)
+
+	def test_revoked_read_role_hides_owned_lead_messenger_notification(self):
+		user = self._make_sales_user()
+		messenger, _ordinary = self._make_user_notifications(user)
+		frappe.set_user(user)
+		self.assertTrue(frappe.has_permission("CRM Lead", "read", doc=self.lead))
+
+		self._revoke_user_sales_role(user)
+		self.assertFalse(frappe.has_permission("CRM Lead", "read", doc=self.lead))
+
+		result = get_notifications()
+		self.assertNotIn(messenger.name, {row["name"] for row in result["notifications"]})
+
+	def test_mark_all_has_no_more_when_only_inaccessible_messenger_rows_remain(self):
+		user = self._make_sales_user()
+		messenger, ordinary = self._make_user_notifications(user)
+		self._revoke_user_sales_role(user)
+
+		result = mark_all_as_read()
+
+		self.assertFalse(result["has_more"])
+		self.assertEqual(result["marked"], 1)
+		messenger.reload()
+		ordinary.reload()
+		self.assertFalse(messenger.read)
+		self.assertTrue(ordinary.read)
+
+	def test_standard_list_hides_revoked_messenger_but_keeps_ordinary_notification(self):
+		messenger, ordinary = self._make_user_notifications()
+		frappe.set_user(USER1)
+		fields = ["name", "reference_name", "notification_text", "notification_type_doc", "last_event_id"]
+		filters = {"name": ["in", [messenger.name, ordinary.name]]}
+
+		readable = client.get_list("CRM Notification", fields=fields, filters=filters)
+		self.assertEqual({row.name for row in readable}, {messenger.name, ordinary.name})
+
+		self._revoke_user_lead_access()
+		hidden = client.get_list("CRM Notification", fields=fields, filters=filters)
+		self.assertEqual({row.name for row in hidden}, {ordinary.name})
+
+	def test_standard_document_read_denies_revoked_messenger_but_keeps_ordinary_notification(self):
+		messenger, ordinary = self._make_user_notifications()
+		frappe.set_user(USER1)
+		self.assertEqual(client.get("CRM Notification", messenger.name).name, messenger.name)
+		self.assertEqual(client.get("CRM Notification", ordinary.name).name, ordinary.name)
+
+		self._revoke_user_lead_access()
+		with self.assertRaises(frappe.PermissionError):
+			client.get("CRM Notification", messenger.name)
+		self.assertEqual(client.get("CRM Notification", ordinary.name).name, ordinary.name)
+
+	def test_realtime_suppresses_messenger_notification_after_access_is_revoked(self):
+		frappe.db.set_value("CRM Lead", self.lead.name, "lead_owner", USER1, update_modified=False)
+		doc = frappe._dict(
+			name="NOTIFICATION-1",
+			type="Messenger",
+			to_user=USER1,
+			reference_doctype="CRM Lead",
+			reference_name=self.lead.name,
+			notification_text="Sensitive preview",
+			notification_type_doc=self.conversation.name,
+			last_event_id=self.message.name,
+		)
+		with (
+			patch.object(type(frappe.db.after_commit), "add", autospec=True) as add_after_commit,
+			patch.object(frappe, "publish_realtime") as publish,
+		):
+			CRMNotification.on_update(doc)
+			publish.assert_not_called()
+			add_after_commit.assert_called_once()
+			queued_callback = add_after_commit.call_args.args[1]
+
+			self._revoke_user_lead_access()
+			queued_callback()
+
+			publish.assert_not_called()
+
 	def test_retention_deletes_only_expired_messenger_notifications(self):
 		old = add_to_date(now_datetime(), days=-100)
 		whatsapp = frappe.get_doc(
@@ -207,3 +336,56 @@ class TestMessengerNotificationLifecycle(IntegrationTestCase):
 		self.assertEqual(rows[0].event_count, 5)
 		self.assertEqual(len(rows[0].aggregation_key), 64)
 		self.assertEqual(rows[0].last_event_id, self.message.name)
+
+	def _make_user_notifications(self, user=USER1):
+		frappe.set_user("Administrator")
+		frappe.db.set_value("CRM Lead", self.lead.name, "lead_owner", user, update_modified=False)
+		messenger = frappe.get_doc(
+			{
+				"doctype": "CRM Notification",
+				"to_user": user,
+				"type": "Messenger",
+				"notification_type_doctype": "Messenger Conversation",
+				"notification_type_doc": self.conversation.name,
+				"reference_doctype": "CRM Lead",
+				"reference_name": self.lead.name,
+				"notification_text": "Sensitive preview",
+				"last_event_id": self.message.name,
+				"aggregation_key": frappe.generate_hash(length=64),
+			}
+		).insert(ignore_permissions=True)
+		ordinary = frappe.get_doc(
+			{
+				"doctype": "CRM Notification",
+				"to_user": user,
+				"type": "Mention",
+				"notification_text": "Ordinary notification",
+			}
+		).insert(ignore_permissions=True)
+		return messenger, ordinary
+
+	def _revoke_user_lead_access(self):
+		frappe.set_user("Administrator")
+		frappe.db.set_value("CRM Lead", self.lead.name, "lead_owner", "Administrator", update_modified=False)
+		frappe.set_user(USER1)
+		self.assertFalse(frappe.has_permission("CRM Lead", "read", doc=self.lead))
+
+	def _make_sales_user(self):
+		frappe.set_user("Administrator")
+		email = f"notification-permission-{frappe.generate_hash(length=8)}@example.com"
+		user = frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": "Notification Permission",
+				"send_welcome_email": 0,
+			}
+		).insert(ignore_permissions=True)
+		user.add_roles("Sales User")
+		return email
+
+	def _revoke_user_sales_role(self, user):
+		frappe.set_user("Administrator")
+		frappe.get_doc("User", user).remove_roles("Sales User")
+		frappe.clear_cache(user=user)
+		frappe.set_user(user)
