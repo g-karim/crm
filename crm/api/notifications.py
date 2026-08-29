@@ -1,30 +1,39 @@
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Coalesce, Sum
 from frappe.utils import add_to_date, cint, now_datetime
 
 from crm.fcrm.doctype.crm_notification.crm_notification import (
 	can_access_notification,
-	get_notification_visibility_condition,
 )
 
 
 @frappe.whitelist()
 def get_notifications(limit: int = 100):
 	limit = min(max(cint(limit) or 100, 1), 100)
-	visibility_condition = get_notification_visibility_condition()
-	rows = frappe.db.sql(
-		f"""
-		select
-			name, creation, last_event_at, last_event_id, event_count, from_user,
-			type, to_user, `read`, notification_text, notification_type_doctype,
-			notification_type_doc, reference_doctype, reference_name, message
-		from `tabCRM Notification`
-		where to_user = %s and {visibility_condition}
-		order by coalesce(last_event_at, creation) desc
-		limit %s
-		""",
-		(frappe.session.user, limit + 1),
-		as_dict=True,
+	Notification = frappe.qb.DocType("CRM Notification")
+	rows = (
+		_visible_notifications_query(Notification)
+		.select(
+			Notification.name,
+			Notification.creation,
+			Notification.last_event_at,
+			Notification.last_event_id,
+			Notification.event_count,
+			Notification.from_user,
+			Notification.type,
+			Notification.to_user,
+			Notification.read,
+			Notification.notification_text,
+			Notification.notification_type_doctype,
+			Notification.notification_type_doc,
+			Notification.reference_doctype,
+			Notification.reference_name,
+			Notification.message,
+		)
+		.orderby(Coalesce(Notification.last_event_at, Notification.creation), order=frappe.qb.desc)
+		.limit(limit + 1)
+		.run(as_dict=True)
 	)
 	has_more = len(rows) > limit
 	rows = rows[:limit]
@@ -63,14 +72,21 @@ def get_notifications(limit: int = 100):
 			}
 		)
 
-	unread_count = frappe.db.sql(
-		f"""
-		select coalesce(sum(case when type = 'Messenger' then greatest(coalesce(event_count, 1), 1) else 1 end), 0)
-		from `tabCRM Notification`
-		where to_user = %s and `read` = 0 and {visibility_condition}
-		""",
-		frappe.session.user,
-	)[0][0]
+	unread_value = (
+		frappe.qb.terms.Case()
+		.when(
+			Notification.type == "Messenger",
+			frappe.qb.terms.Function("greatest", Coalesce(Notification.event_count, 1), 1),
+		)
+		.else_(1)
+	)
+	unread_count = (
+		_visible_notifications_query(Notification)
+		.select(Coalesce(Sum(unread_value), 0).as_("unread_count"))
+		.where(Notification.read == 0)
+		.run(as_dict=True)[0]
+		.unread_count
+	)
 	return {"notifications": notifications, "unread_count": cint(unread_count), "has_more": has_more}
 
 
@@ -121,17 +137,14 @@ def mark_as_read(notification: str):
 @frappe.whitelist(methods=["POST"])
 def mark_all_as_read(limit: int = 500):
 	limit = min(max(cint(limit) or 500, 1), 500)
-	visibility_condition = get_notification_visibility_condition()
-	rows = frappe.db.sql(
-		f"""
-		select name
-		from `tabCRM Notification`
-		where to_user = %s and `read` = 0 and {visibility_condition}
-		order by creation asc
-		limit %s
-		""",
-		(frappe.session.user, limit),
-		as_dict=True,
+	Notification = frappe.qb.DocType("CRM Notification")
+	rows = (
+		_visible_notifications_query(Notification)
+		.select(Notification.name)
+		.where(Notification.read == 0)
+		.orderby(Notification.creation)
+		.limit(limit)
+		.run(as_dict=True)
 	)
 	marked = 0
 	for candidate in rows:
@@ -140,17 +153,35 @@ def mark_all_as_read(limit: int = 500):
 			_mark_locked_notification_read(row.name)
 			marked += 1
 	has_more = bool(
-		frappe.db.sql(
-			f"""
-			select 1
-			from `tabCRM Notification`
-			where to_user = %s and `read` = 0 and {visibility_condition}
-			limit 1
-			""",
-			frappe.session.user,
-		)
+		_visible_notifications_query(Notification)
+		.select(Notification.name)
+		.where(Notification.read == 0)
+		.limit(1)
+		.run()
 	)
 	return {"ok": True, "marked": marked, "has_more": has_more}
+
+
+def _visible_notifications_query(Notification):
+	visibility = Notification.type != "Messenger"
+	for doctype in ("CRM Lead", "CRM Deal"):
+		if not frappe.has_permission(doctype, "read"):
+			continue
+
+		Reference = frappe.qb.DocType(doctype)
+		readable_references = frappe.get_list(
+			doctype,
+			fields=[Reference.name],
+			order_by=None,
+			run=False,
+		)
+		visibility |= (
+			(Notification.type == "Messenger")
+			& (Notification.reference_doctype == doctype)
+			& Notification.reference_name.isin(readable_references)
+		)
+
+	return frappe.qb.from_(Notification).where(Notification.to_user == frappe.session.user).where(visibility)
 
 
 def get_hash(notification):
