@@ -206,6 +206,10 @@ export function isSingleStickerAttachmentSet(attachments = []) {
   return attachments.length === 1 && attachments[0]?.type === 'sticker'
 }
 
+export function isSingleLocationAttachmentSet(attachments = []) {
+  return attachments.length === 1 && attachments[0]?.type === 'location'
+}
+
 export function getSingleImageBubbleWidthClass(image = {}) {
   return 'w-fit max-w-full'
 }

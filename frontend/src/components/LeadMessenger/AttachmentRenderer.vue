@@ -10,7 +10,9 @@
           : 'w-full min-w-0'
         : singleImage
           ? 'w-fit'
-          : 'w-fit max-w-[20rem]'
+          : singleLocation
+            ? 'w-full'
+            : 'w-fit max-w-[20rem]'
     "
   >
     <template v-for="segment in segments" :key="segment.key">
@@ -101,6 +103,7 @@ import {
   getAttachmentState,
   getMessengerAttachmentTitle,
   isSingleImageAttachmentSet,
+  isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
 } from '@/utils/messengerAttachments'
 import { computed, ref } from 'vue'
@@ -128,6 +131,9 @@ const singleImage = computed(() =>
 )
 const singleSticker = computed(() =>
   isSingleStickerAttachmentSet(props.attachments),
+)
+const singleLocation = computed(() =>
+  isSingleLocationAttachmentSet(props.attachments),
 )
 const availableMedia = computed(() =>
   props.attachments.flatMap((attachment) => {

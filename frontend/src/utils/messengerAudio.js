@@ -24,6 +24,22 @@ export function downsampleWaveform(values = [], target = 64) {
   return result
 }
 
+export function resampleWaveform(values = [], target = 64) {
+  let samples = sanitizeWaveform(values)
+  target = Math.max(1, Math.floor(Number(target) || 1))
+  if (!samples.length) return []
+  if (samples.length >= target) return downsampleWaveform(samples, target)
+  if (samples.length === 1) return Array(target).fill(samples[0])
+
+  return Array.from({ length: target }, (_, index) => {
+    let position = (index * (samples.length - 1)) / (target - 1)
+    let left = Math.floor(position)
+    let right = Math.min(Math.ceil(position), samples.length - 1)
+    let ratio = position - left
+    return Math.round(samples[left] + (samples[right] - samples[left]) * ratio)
+  })
+}
+
 export function normalizeWaveform(values = []) {
   let samples = sanitizeWaveform(values)
   if (!samples.length) return []
@@ -33,7 +49,7 @@ export function normalizeWaveform(values = []) {
 }
 
 export function prepareWaveform(values = [], target = 64) {
-  return normalizeWaveform(downsampleWaveform(values, target))
+  return normalizeWaveform(resampleWaveform(values, target))
 }
 
 export function formatAudioTime(seconds) {

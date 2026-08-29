@@ -518,6 +518,7 @@ import {
 import {
   getSingleImageBubbleWidthClass,
   isSingleImageAttachmentSet,
+  isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
 } from '@/utils/messengerAttachments'
 import {
@@ -1734,6 +1735,9 @@ function messageBubbleWidthClass(message) {
   }
   if (isStickerOnlyForwardContext(message.forward_context)) {
     return 'w-64 !max-w-[94%] sm:!max-w-64'
+  }
+  if (isSingleLocationAttachmentSet(message.attachments)) {
+    return 'w-[21.5rem] !max-w-[94%] sm:!max-w-[21.5rem]'
   }
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
   return getSingleImageBubbleWidthClass(message.attachments[0])

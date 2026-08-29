@@ -15,6 +15,7 @@ import {
   getSingleImageMediaWidthClass,
   groupMessengerAttachments,
   isSingleImageAttachmentSet,
+  isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
@@ -163,6 +164,18 @@ describe('messenger attachment contract v1', () => {
       isSingleStickerAttachmentSet([
         { id: 'S-1', type: 'sticker' },
         { id: 'S-2', type: 'sticker' },
+      ]),
+    ).toBe(false)
+  })
+
+  it('classifies only a single location as fixed-width location content', () => {
+    expect(
+      isSingleLocationAttachmentSet([{ id: 'GEO-1', type: 'location' }]),
+    ).toBe(true)
+    expect(
+      isSingleLocationAttachmentSet([
+        { id: 'GEO-1', type: 'location' },
+        { id: 'I-1', type: 'image' },
       ]),
     ).toBe(false)
   })

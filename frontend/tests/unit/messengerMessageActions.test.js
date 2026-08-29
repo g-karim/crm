@@ -96,13 +96,13 @@ describe('messenger message actions', () => {
     ).toEqual({ tombstone: true, edited: false, text: '' })
   })
 
-  it('does not treat background attachment updates as visible edits', () => {
+  it('trusts the canonical backend edit flag for attachment-only messages', () => {
     expect(
       getMessengerMessageDisplay(
         editable({
           text: '',
           message_type: 'sticker',
-          is_edited: 1,
+          is_edited: 0,
           last_update_source: 'provider_history',
         }),
       ).edited,
@@ -111,15 +111,10 @@ describe('messenger message actions', () => {
       getMessengerMessageDisplay(
         editable({
           text: '',
-          message_type: 'audio',
+          message_type: 'image',
           is_edited: 1,
-          last_update_source: 'attachment_job',
+          attachments: [{ id: 'I-1', type: 'image' }],
         }),
-      ).edited,
-    ).toBe(false)
-    expect(
-      getMessengerMessageDisplay(
-        editable({ text: 'Исправленная подпись', is_edited: 1 }),
       ).edited,
     ).toBe(true)
   })

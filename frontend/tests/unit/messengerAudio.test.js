@@ -7,6 +7,7 @@ import {
   normalizeWaveform,
   normalizeAudioVolume,
   prepareWaveform,
+  resampleWaveform,
   sanitizeWaveform,
 } from '@/utils/messengerAudio'
 import { readFileSync } from 'node:fs'
@@ -45,6 +46,12 @@ describe('messenger audio player helpers', () => {
 
   it('preserves peaks while downsampling provider data', () => {
     expect(downsampleWaveform([1, 2, 80, 3, 4, 5, 6, 7], 2)).toEqual([80, 7])
+  })
+
+  it('expands short provider waveforms to one consistent bar count', () => {
+    expect(resampleWaveform([0, 255], 5)).toEqual([0, 64, 128, 191, 255])
+    expect(prepareWaveform([0, 64, 255], 64)).toHaveLength(64)
+    expect(prepareWaveform([128], 64)).toHaveLength(64)
   })
 
   it('normalizes low-amplitude recordings by their actual peak', () => {

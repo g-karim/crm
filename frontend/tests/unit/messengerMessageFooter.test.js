@@ -121,11 +121,12 @@ describe('message footer metadata', () => {
     expect(deleted.querySelector('[data-message-edited]')).toBeNull()
   })
 
-  it('hides noisy provider edit flags on content without text', () => {
+  it('renders the canonical edit flag for attachment-only content', () => {
     let sticker = mountComponent(MessageFooterMetadata, {
       message: message({
         text: '',
         message_type: 'sticker',
+        is_edited: 0,
         last_update_source: 'provider_history',
       }),
     })
@@ -133,12 +134,17 @@ describe('message footer metadata', () => {
       message: message({
         text: '',
         message_type: 'audio',
+        is_edited: 0,
         last_update_source: 'attachment_job',
       }),
+    })
+    let album = mountComponent(MessageFooterMetadata, {
+      message: message({ text: '', message_type: 'image', is_edited: 1 }),
     })
 
     expect(sticker.querySelector('[data-message-edited]')).toBeNull()
     expect(voice.querySelector('[data-message-edited]')).toBeNull()
+    expect(album.querySelector('[data-message-edited]')).not.toBeNull()
   })
 
   it('does not render the old edited label in message content', () => {

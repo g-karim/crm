@@ -59,6 +59,12 @@ describe('messenger responsive markup', () => {
     )
   })
 
+  it('keeps a single location bubble independent from channel label length', () => {
+    expect(conversationSource).toContain(
+      "return 'w-[21.5rem] !max-w-[94%] sm:!max-w-[21.5rem]'",
+    )
+  })
+
   it('keeps upload progress visible with the current semantic palette', () => {
     expect(composerAttachmentsSource).toContain('bg-surface-blue-7')
     expect(composerAttachmentsSource).not.toContain('bg-surface-blue-3')

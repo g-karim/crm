@@ -11,13 +11,9 @@ export function getMessengerMessageActions(message = {}) {
 }
 
 export function getMessengerMessageDisplay(message = {}) {
-  let hasEditableContent = Boolean(String(message.text || '').trim())
   return {
     tombstone: message.status === 'deleted',
-    edited:
-      message.status !== 'deleted' &&
-      Boolean(message.is_edited) &&
-      hasEditableContent,
+    edited: message.status !== 'deleted' && Boolean(message.is_edited),
     text: message.status === 'deleted' ? '' : message.text || '',
   }
 }
