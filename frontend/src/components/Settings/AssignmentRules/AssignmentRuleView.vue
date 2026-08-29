@@ -70,9 +70,11 @@
               >
                 <div>
                   {{
-                    priorityOptions.find(
-                      (option) => option.value == assignmentRuleData.priority,
-                    )?.label
+                    __(
+                      priorityOptions.find(
+                        (option) => option.value == assignmentRuleData.priority,
+                      )?.label || '',
+                    )
                   }}
                 </div>
                 <span class="lucide-chevron-down size-4" aria-hidden="true" />
@@ -93,7 +95,7 @@
                     }
                   "
                 >
-                  {{ option.label }}
+                  {{ __(option.label) }}
                   <span
                     v-if="assignmentRuleData.priority == option.value"
                     class="lucide-check size-4"
@@ -127,11 +129,11 @@
             v-model="assignmentRuleData.documentType"
             :options="[
               {
-                label: 'Lead',
+                label: __('Lead'),
                 value: 'CRM Lead',
               },
               {
-                label: 'Deal',
+                label: __('Deal'),
                 value: 'CRM Deal',
               },
             ]"
@@ -151,12 +153,6 @@
                   documentType,
                 ])
               }}
-              <a
-                class="font-medium underline"
-                href="https://docs.frappe.io/crm/assignment-rule"
-                target="_blank"
-                >{{ __('Learn about conditions') }}</a
-              >
             </span>
             <div v-if="isOldSla && step.data">
               <Popover trigger="hover" :hoverDelay="0.25" placement="top-end">
@@ -231,12 +227,6 @@
                   [documentType],
                 )
               }}
-              <a
-                class="font-medium underline"
-                href="https://docs.frappe.io/crm/assignment-rule"
-                target="_blank"
-                >{{ __('Learn about conditions') }}</a
-              >
             </span>
             <div
               v-if="
@@ -744,9 +734,9 @@ const updateAssignmentRule = async () => {
         : null,
     },
   }).catch((er) => {
-    const error =
-      er?.messages?.[0] ||
-      __('Some error occurred while updating assignment rule')
+    const error = __(
+      er?.messages?.[0] || 'Some error occurred while updating assignment rule',
+    )
     toast.error(error)
     isLoading.value = false
   })
@@ -759,9 +749,10 @@ const updateAssignmentRule = async () => {
       old_name: assignmentRuleData.value.name,
       new_name: assignmentRuleData.value.assignmentRuleName,
     }).catch(async (er) => {
-      const error =
+      const error = __(
         er?.messages?.[0] ||
-        __('Some error occurred while renaming assignment rule')
+          'Some error occurred while renaming assignment rule',
+      )
       toast.error(error)
       // Reset assignment rule to previous state
       await getAssignmentRuleData.reload()

@@ -205,6 +205,7 @@
                         :value="row[field.fieldname]"
                         variant="outline"
                         :format="getFormat('', '', false, true, false)"
+                        :use12Hour="false"
                         input-class="border-none text-sm text-ink-gray-8"
                         @change="(v) => fieldChange(v, field, row)"
                       />
@@ -775,10 +776,13 @@ function getDefaultValue(defaultValue, fieldtype) {
 
 const getOptions = (options) => {
   if (Array.isArray(options)) {
-    return options
+    return options.map((option) => ({
+      ...option,
+      label: __(option.label || option.value || ''),
+    }))
   } else if (typeof options === 'string') {
     return options.split('\n').map((option) => {
-      return { label: option, value: option }
+      return { label: __(option), value: option }
     })
   } else {
     return []

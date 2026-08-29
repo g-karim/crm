@@ -5,17 +5,26 @@ import json
 
 import frappe
 from frappe import _
-from frappe.desk.form.assign_to import _add as assign
 from frappe.model.document import Document
 from frappe.utils import validate_email_address
 
+from crm.api.todo import allow_internal_lead_assignment
 from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
 from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import (
 	add_status_change_log,
 )
 from crm.fcrm.doctype.utils import add_or_remove_lost_reason_section_in_sidepanel
 
-LEAD_DEAL_FIELD_MAP = {"lead_owner": "deal_owner"}
+try:
+	from frappe.desk.form.assign_to import _add as assign
+except ImportError:
+	from frappe.desk.form.assign_to import add as assign
+
+
+LEAD_DEAL_FIELD_MAP = {
+	"lead_owner": "deal_owner",
+	"planned_deal_pipeline": "pipeline",
+}
 
 
 class CRMLead(Document):
@@ -60,6 +69,7 @@ class CRMLead(Document):
 		no_of_employees: DF.Literal["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"]
 		organization: DF.Data | None
 		phone: DF.Data | None
+		planned_deal_pipeline: DF.Link | None
 		products: DF.Table[CRMProducts]
 		response_by: DF.Datetime | None
 		rolling_responses: DF.Table[CRMRollingResponseTime]
@@ -177,7 +187,11 @@ class CRMLead(Document):
 					# the agent is already set as an assignee
 					return
 
-		assign({"assign_to": [agent], "doctype": "CRM Lead", "name": self.name}, ignore_permissions=True)
+		with allow_internal_lead_assignment():
+			assign(
+				{"assign_to": [agent], "doctype": "CRM Lead", "name": self.name},
+				ignore_permissions=True,
+			)
 
 	def share_with_agent(self, agent):
 		if not agent:
@@ -336,7 +350,6 @@ class CRMLead(Document):
 
 	def create_deal(self, contact, organization, deal=None):
 		new_deal = frappe.new_doc("CRM Deal")
-
 		restricted_fieldtypes = [
 			"Tab Break",
 			"Section Break",

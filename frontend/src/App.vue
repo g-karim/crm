@@ -17,11 +17,24 @@ import EventNotificationPopup from '@/components/EventNotificationPopup.vue'
 import DoctypeModals from '@/components/Modals/DoctypeModals.vue'
 import { Dialogs } from '@/utils/dialogs'
 import { sessionStore } from '@/stores/session'
+import { notificationsStore } from '@/stores/notifications'
+import { globalStore } from '@/stores/global'
 import { FrappeUIProvider, setConfig, useTheme } from 'frappe-ui'
-import { computed, defineAsyncComponent, provide } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  onBeforeUnmount,
+  onMounted,
+  provide,
+} from 'vue'
 
 const session = sessionStore()
 provide('session', session)
+
+const { $socket } = globalStore()
+const { initializeRealtime, disposeRealtime } = notificationsStore()
+onMounted(() => initializeRealtime($socket))
+onBeforeUnmount(disposeRealtime)
 
 const { setTheme } = useTheme()
 if (!localStorage.getItem('theme')) {

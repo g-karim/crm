@@ -41,7 +41,7 @@
       type="text"
       :placeholder="getPlaceholder(field)"
       :disabled="true"
-      :description="field.description"
+      :description="getDescription(field)"
     />
     <Grid
       v-else-if="field.fieldtype === 'Table'"
@@ -59,7 +59,7 @@
       :class="field.prefix ? 'prefix' : ''"
       :options="field.options"
       :placeholder="getPlaceholder(field)"
-      :description="field.description"
+      :description="getDescription(field)"
       @update:modelValue="(e) => fieldChange(e, field)"
     >
       <template v-if="field.prefix" #prefix>
@@ -72,7 +72,7 @@
         class="form-control"
         type="checkbox"
         :disabled="Boolean(field.read_only)"
-        :description="field.description"
+        :description="getDescription(field)"
         @change="(e) => fieldChange(e.target.checked, field)"
       />
       <label
@@ -161,6 +161,7 @@
       v-else-if="field.fieldtype === 'Time'"
       :value="data[field.fieldname]"
       :format="getFormat('', '', false, true, false)"
+      :use12Hour="false"
       :placeholder="getPlaceholder(field)"
       input-class="border-none"
       @change="(v) => fieldChange(v, field)"
@@ -188,14 +189,14 @@
       type="textarea"
       :value="data[field.fieldname]"
       :placeholder="getPlaceholder(field)"
-      :description="field.description"
+      :description="getDescription(field)"
       @change="fieldChange($event.target.value, field)"
     />
     <Password
       v-else-if="field.fieldtype === 'Password'"
       :value="data[field.fieldname]"
       :placeholder="getPlaceholder(field)"
-      :description="field.description"
+      :description="getDescription(field)"
       @change="fieldChange($event.target.value, field)"
     />
     <FormattedInput
@@ -204,7 +205,7 @@
       :placeholder="getPlaceholder(field)"
       :value="data[field.fieldname] || '0'"
       :disabled="Boolean(field.read_only)"
-      :description="field.description"
+      :description="getDescription(field)"
       @change="fieldChange($event.target.value, field)"
     />
     <FormattedInput
@@ -213,7 +214,7 @@
       :value="getFormattedPercent(field.fieldname, data)"
       :placeholder="getPlaceholder(field)"
       :disabled="Boolean(field.read_only)"
-      :description="field.description"
+      :description="getDescription(field)"
       @change="fieldChange(flt($event.target.value), field)"
     />
     <FormattedInput
@@ -222,7 +223,7 @@
       :value="getFormattedFloat(field.fieldname, data)"
       :placeholder="getPlaceholder(field)"
       :disabled="Boolean(field.read_only)"
-      :description="field.description"
+      :description="getDescription(field)"
       @change="fieldChange(flt($event.target.value), field)"
     />
     <FormattedInput
@@ -231,7 +232,7 @@
       :value="getFormattedCurrency(field.fieldname, data, parentDoc)"
       :placeholder="getPlaceholder(field)"
       :disabled="Boolean(field.read_only)"
-      :description="field.description"
+      :description="getDescription(field)"
       @change="fieldChange(flt($event.target.value), field)"
     />
     <DurationInput
@@ -239,7 +240,7 @@
       :value="data[field.fieldname]"
       :placeholder="getPlaceholder(field)"
       :disabled="Boolean(field.read_only)"
-      :description="field.description"
+      :description="getDescription(field)"
       @change="(v) => fieldChange(v, field)"
     />
     <RatingInput
@@ -251,7 +252,7 @@
     />
     <ButtonControl
       v-else-if="field.fieldtype === 'Button'"
-      :label="field.label"
+      :label="__(field.label)"
       :icon="field.icon"
       :theme="getButtonTheme(field.button_color)"
       :variant="getButtonVariant(field.button_color)"
@@ -288,7 +289,7 @@
       :placeholder="getPlaceholder(field)"
       :value="data[field.fieldname]"
       :disabled="Boolean(field.read_only)"
-      :description="field.description"
+      :description="getDescription(field)"
       :error="
         Boolean(data[field.fieldname]) && !validatePhone(data[field.fieldname])
           ? __('Enter a valid phone number')
@@ -348,6 +349,7 @@ import {
   parseLinkFilters,
   applyStateFieldOptions,
 } from '@/utils/fieldTransforms'
+import { getPlaceholderLabel } from '@/utils/fieldPlaceholders'
 import { usersStore } from '@/stores/users'
 import { useDocument } from '@/data/document'
 
@@ -496,12 +498,17 @@ const field = computed(() => {
 
   if (field.fieldtype == 'Select' && typeof field.options === 'string') {
     field.options = field.options.split('\n').map((option) => {
-      return { label: option, value: option }
+      return { label: __(option), value: option }
     })
 
     if (field.options[0].value !== '' && !field.reqd) {
       field.options.unshift({ label: '', value: '' })
     }
+  } else if (field.fieldtype == 'Select' && Array.isArray(field.options)) {
+    field.options = field.options.map((option) => ({
+      ...option,
+      label: __(option.label || option.value || ''),
+    }))
   }
 
   if (field.fieldtype === 'Link' && field.options === 'User') {
@@ -547,7 +554,7 @@ const field = computed(() => {
   let _field = {
     ...field,
     filters: parseLinkFilters(field.link_filters),
-    placeholder: field.placeholder || field.label,
+    placeholder: field.placeholder,
     display_via_depends_on: displayViaDependsOn,
     mandatory_via_depends_on: evaluateDependsOnValue(
       field.mandatory_depends_on,
@@ -590,22 +597,48 @@ const resolvedHtml = computed(() => {
 })
 
 const getPlaceholder = (field) => {
-  if (field.placeholder) {
+  if (field.placeholder && !isGeneratedPlaceholder(field)) {
     return __(field.placeholder)
   }
-  if (['Select', 'Link'].includes(field.fieldtype)) {
-    return __('Select {0}', [__(field.label)])
-  } else {
-    return __('Enter {0}', [__(field.label)])
+
+  if (['Link', 'Dynamic Link', 'User'].includes(field.fieldtype)) {
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
   }
+
+  if (field.fieldtype === 'Select') {
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
+  }
+
+  return __('Enter {0}', [getPlaceholderLabel(field.label)])
+}
+
+const getDescription = (field) => {
+  return field.description ? __(field.description) : field.description
+}
+
+function isGeneratedPlaceholder(field) {
+  if (!field.placeholder || !field.label) return false
+
+  const label = field.label
+  const translatedLabel = __(field.label)
+  const placeholders = ['Add', 'Select'].flatMap((prefix) => [
+    `${prefix} ${label}...`,
+    __(`${prefix} {0}...`, [label]),
+    __(`${prefix} {0}...`, [translatedLabel]),
+  ])
+
+  return placeholders.includes(field.placeholder)
 }
 
 const getOptions = (options) => {
   if (Array.isArray(options)) {
-    return options
+    return options.map((option) => ({
+      ...option,
+      label: __(option.label || option.value || ''),
+    }))
   } else if (typeof options === 'string') {
     return options.split('\n').map((option) => {
-      return { label: option, value: option }
+      return { label: __(option), value: option }
     })
   } else {
     return []

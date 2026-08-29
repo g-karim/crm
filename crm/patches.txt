@@ -30,3 +30,17 @@ crm.patches.v1_0.add_forecasting_section_in_quick_entry
 crm.patches.v1_0.set_persona_captured_for_existing_sites
 crm.patches.v1_0.add_enrichment_fields_to_layouts
 crm.patches.v1_0.reorder_address_quick_entry_layout
+crm.patches.v1_0.setup_sales_pipelines #16-06-2026
+crm.patches.v1_0.add_sales_pipeline_fields_to_layouts #17-06-2026
+crm.patches.v1_0.add_deal_name_to_layouts #17-06-2026
+crm.patches.v1_0.reorganize_deal_data_layouts #17-06-2026
+crm.patches.v1_0.add_external_import_fields #17-06-2026
+crm.patches.v1_0.rename_amo_import_fields_to_external #17-06-2026
+crm.patches.v1_0.add_sales_pipeline_rule_fields #17-06-2026
+crm.patches.v1_0.add_sales_pipeline_rule_modes #20-06-2026
+crm.patches.v1_0.ensure_exp_crm_branding #20-06-2026
+crm.patches.v1_0.update_crm_dropdown_items #20-06-2026
+crm.patches.v1_0.hide_legacy_erpnext_crm #20-06-2026
+crm.patches.v1_0.cleanup_exp_theme_crm_state #20-06-2026
+crm.patches.v1_0.migrate_messenger_notification_aggregates #23-08-2026
+crm.patches.v1_0.enable_kanban_freeze_effect_for_pipelines #27-06-2026

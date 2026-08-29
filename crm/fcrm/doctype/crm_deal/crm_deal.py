@@ -3,13 +3,23 @@
 
 import frappe
 from frappe import _
-from frappe.desk.form.assign_to import _add as assign
 from frappe.model.document import Document
 
 from crm.api.exchange_rate import get_exchange_rate
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
+	get_default_deal_status,
+	get_default_pipeline,
+	resolve_deal_status,
+	resolve_sales_pipeline,
+)
 from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
 from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import add_status_change_log
 from crm.fcrm.doctype.utils import add_or_remove_lost_reason_section_in_sidepanel
+
+try:
+	from frappe.desk.form.assign_to import _add as assign
+except ImportError:
+	from frappe.desk.form.assign_to import add as assign
 
 
 class CRMDeal(Document):
@@ -29,11 +39,16 @@ class CRMDeal(Document):
 		from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import CRMStatusChangeLog
 
 		annual_revenue: DF.Currency
+		external_source: DF.Data | None
+		external_record_id: DF.Data | None
+		external_pipeline_id: DF.Data | None
+		external_status_id: DF.Data | None
 		closed_date: DF.Date | None
 		communication_status: DF.Link | None
 		contact: DF.Link | None
 		contacts: DF.Table[CRMContacts]
 		currency: DF.Link | None
+		deal_name: DF.Data | None
 		deal_owner: DF.Link | None
 		deal_value: DF.Currency
 		email: DF.Data | None
@@ -61,6 +76,8 @@ class CRMDeal(Document):
 		organization: DF.Link | None
 		organization_name: DF.Data | None
 		phone: DF.Data | None
+		pipeline: DF.Link
+		pipeline_label: DF.Data | None
 		probability: DF.Percent
 		products: DF.Table[CRMProducts]
 		response_by: DF.Datetime | None
@@ -72,6 +89,7 @@ class CRMDeal(Document):
 		source: DF.Link | None
 		status: DF.Link
 		status_change_log: DF.Table[CRMStatusChangeLog]
+		status_label: DF.Data | None
 		territory: DF.Link | None
 		total: DF.Currency
 		website: DF.Data | None
@@ -84,10 +102,15 @@ class CRMDeal(Document):
 		enrich_form_submission(self)
 
 	def before_validate(self):
+		self.validate_external_source_required()
+		self.normalize_import_fields()
 		self.set_sla()
 
 	def validate(self):
+		self.validate_pipeline()
 		self.validate_status()
+		self.validate_status_pipeline()
+		self.validate_external_record_id()
 		self.set_primary_contact()
 		self.set_primary_email_mobile_no()
 		if not self.is_new() and self.has_value_changed("deal_owner") and self.deal_owner:
@@ -99,6 +122,7 @@ class CRMDeal(Document):
 				self.closed_date = frappe.utils.nowdate()
 		self.validate_forecasting_fields()
 		self.validate_lost_reason()
+		self.emit_pipeline_rule_warnings()
 		self.update_exchange_rate()
 		if self.organization and (self.is_new() or self.has_value_changed("organization")):
 			self.copy_enrichment_from_organization()
@@ -117,12 +141,269 @@ class CRMDeal(Document):
 	def before_save(self):
 		self.apply_sla()
 
+	def normalize_import_fields(self):
+		resolved_pipeline = resolve_sales_pipeline(
+			self.pipeline_label,
+			self.external_pipeline_id,
+			self.external_source,
+		)
+		if resolved_pipeline:
+			if self.pipeline and self.pipeline != resolved_pipeline:
+				frappe.throw(
+					_("Pipeline {0} does not match imported pipeline {1}.").format(
+						frappe.bold(self.pipeline),
+						frappe.bold(resolved_pipeline),
+					),
+					frappe.ValidationError,
+				)
+			self.pipeline = resolved_pipeline
+
+		resolved_status = resolve_deal_status(
+			self.status_label,
+			self.pipeline,
+			self.external_status_id,
+			self.external_source,
+		)
+		if resolved_status:
+			if self.status and self.status != resolved_status:
+				frappe.throw(
+					_("Deal stage {0} does not match imported stage {1}.").format(
+						frappe.bold(self.status),
+						frappe.bold(resolved_status),
+					),
+					frappe.ValidationError,
+				)
+			self.status = resolved_status
+
+		if self.status and not self.pipeline:
+			self.pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
+
 	def validate_status(self):
-		if self.is_new() and not self.status:
-			if frappe.db.exists("CRM Deal Status", "Qualification"):
-				self.status = "Qualification"
-			else:
-				self.status = frappe.get_all("CRM Deal Status", {"type": "Open"}, pluck="name")[0]
+		if self.status and self.pipeline and self.has_value_changed("pipeline") and not self.has_value_changed("status"):
+			status_pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
+			if status_pipeline and status_pipeline != self.pipeline:
+				self.status = None
+
+		if not self.status:
+			self.status = get_default_deal_status(self.pipeline)
+
+		if not self.status:
+			frappe.throw(
+				_("Please add at least one open stage in pipeline {0}.").format(frappe.bold(self.pipeline)),
+				frappe.ValidationError,
+			)
+
+	def validate_pipeline(self):
+		if not self.pipeline and self.status:
+			self.pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
+
+		if not self.pipeline:
+			self.pipeline = get_default_pipeline()
+
+		if frappe.db.get_value("CRM Sales Pipeline", self.pipeline, "archived"):
+			frappe.throw(_("Cannot use archived pipeline {0}.").format(frappe.bold(self.pipeline)))
+
+	def validate_status_pipeline(self):
+		if not self.status or not self.pipeline:
+			return
+
+		status_pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
+		if not status_pipeline:
+			frappe.throw(
+				_("Deal stage {0} is not assigned to a sales pipeline.").format(frappe.bold(self.status)),
+				frappe.ValidationError,
+			)
+
+		if status_pipeline != self.pipeline:
+			frappe.throw(
+				_("Deal stage {0} does not belong to pipeline {1}.").format(
+					frappe.bold(self.status),
+					frappe.bold(self.pipeline),
+				),
+				frappe.ValidationError,
+			)
+
+	def validate_external_source_required(self):
+		external_fields = [
+			"external_record_id",
+			"external_pipeline_id",
+			"external_status_id",
+		]
+		if not self.external_source and any(self.get(field) for field in external_fields):
+			frappe.throw(
+				_("External source is required when using external import IDs."),
+				frappe.ValidationError,
+			)
+
+	def validate_external_record_id(self):
+		if not self.external_record_id:
+			return
+
+		filters = {
+			"name": ["!=", self.name],
+			"external_record_id": self.external_record_id,
+		}
+		if self.external_source:
+			filters["external_source"] = self.external_source
+
+		existing = frappe.db.exists("CRM Deal", filters)
+		if existing:
+			frappe.throw(
+				_("External record ID {0} is already linked to deal {1}.").format(
+					frappe.bold(self.external_record_id),
+					frappe.bold(existing),
+				),
+				frappe.DuplicateEntryError,
+			)
+
+	def get_pipeline_stage_order(self):
+		return frappe.get_all(
+			"CRM Deal Status",
+			filters={"pipeline": self.pipeline},
+			fields=["name", "deal_status", "position", "type"],
+			order_by="position asc, modified asc",
+		)
+
+	def emit_pipeline_rule_warnings(self):
+		warnings, blocks = self.get_pipeline_rule_messages()
+		self._pipeline_rule_warnings = warnings
+		self._pipeline_rule_blocks = blocks
+
+		if blocks:
+			frappe.throw(
+				"<br>".join(blocks),
+				title=_("Pipeline Rules"),
+				exc=frappe.ValidationError,
+			)
+
+		if warnings:
+			frappe.msgprint(
+				warnings,
+				title=_("Pipeline Warnings"),
+				as_list=True,
+				indicator="orange",
+				alert=True,
+			)
+
+	def get_pipeline_rule_warnings(self) -> list[str]:
+		warnings, _blocks = self.get_pipeline_rule_messages()
+		return warnings
+
+	def get_pipeline_rule_messages(self) -> tuple[list[str], list[str]]:
+		if self.is_new() or not self.has_value_changed("status") or not self.pipeline or not self.status:
+			return [], []
+
+		previous = self.get_doc_before_save()
+		if not previous or not previous.status or previous.status == self.status:
+			return [], []
+
+		rules = frappe.db.get_value(
+			"CRM Sales Pipeline",
+			self.pipeline,
+			[
+				"warn_on_stage_skip",
+				"warn_on_stage_backwards",
+				"warn_on_closing_without_required_fields",
+				"stage_skip_rule",
+				"stage_backwards_rule",
+				"closing_fields_rule",
+				"required_fields_before_closing",
+			],
+			as_dict=True,
+		)
+		if not rules:
+			return [], []
+
+		stage_skip_rule = self.get_pipeline_rule_mode(rules, "stage_skip_rule", "warn_on_stage_skip")
+		stage_backwards_rule = self.get_pipeline_rule_mode(
+			rules, "stage_backwards_rule", "warn_on_stage_backwards"
+		)
+		closing_fields_rule = self.get_pipeline_rule_mode(
+			rules,
+			"closing_fields_rule",
+			"warn_on_closing_without_required_fields",
+		)
+
+		if all(rule == "Allow" for rule in [stage_skip_rule, stage_backwards_rule, closing_fields_rule]):
+			return [], []
+
+		stages = self.get_pipeline_stage_order()
+		stage_map = {stage.name: stage for stage in stages}
+		previous_stage = stage_map.get(previous.status)
+		current_stage = stage_map.get(self.status)
+		if not previous_stage or not current_stage:
+			return [], []
+
+		warnings = []
+		blocks = []
+		stage_index = {stage.name: index for index, stage in enumerate(stages)}
+		previous_position = stage_index[previous_stage.name]
+		current_position = stage_index[current_stage.name]
+
+		if stage_skip_rule != "Allow" and current_position > previous_position + 1:
+			message = _("Deal moved from {0} to {1}, skipping intermediate stages.").format(
+				frappe.bold(previous_stage.deal_status),
+				frappe.bold(current_stage.deal_status),
+			)
+			self.append_pipeline_rule_message(message, stage_skip_rule, warnings, blocks)
+
+		if stage_backwards_rule != "Allow" and current_position < previous_position:
+			message = _("Deal moved backwards from {0} to {1}.").format(
+				frappe.bold(previous_stage.deal_status),
+				frappe.bold(current_stage.deal_status),
+			)
+			self.append_pipeline_rule_message(message, stage_backwards_rule, warnings, blocks)
+
+		if (
+			closing_fields_rule != "Allow"
+			and current_stage.type in ["Won", "Lost"]
+			and rules.required_fields_before_closing
+		):
+			missing_fields = self.get_missing_pipeline_rule_fields(rules.required_fields_before_closing)
+			if missing_fields:
+				message = _("Deal was closed without these fields: {0}.").format(
+					", ".join(frappe.bold(field) for field in missing_fields),
+				)
+				self.append_pipeline_rule_message(message, closing_fields_rule, warnings, blocks)
+
+		return warnings, blocks
+
+	def get_pipeline_rule_mode(self, rules, fieldname: str, legacy_fieldname: str) -> str:
+		mode = rules.get(fieldname) or ""
+		if mode in ["Allow", "Warn", "Block"]:
+			return mode
+		return "Warn" if rules.get(legacy_fieldname) else "Allow"
+
+	def append_pipeline_rule_message(self, message: str, mode: str, warnings: list[str], blocks: list[str]):
+		if mode == "Block":
+			blocks.append(message)
+		elif mode == "Warn":
+			warnings.append(message)
+
+	def get_missing_pipeline_rule_fields(self, required_fields: str) -> list[str]:
+		fieldnames = []
+		for row in required_fields.replace(",", "\n").splitlines():
+			fieldname = row.strip()
+			if fieldname and fieldname not in fieldnames:
+				fieldnames.append(fieldname)
+
+		missing_fields = []
+		for fieldname in fieldnames:
+			if self.has_pipeline_rule_field_value(fieldname):
+				continue
+
+			df = self.meta.get_field(fieldname)
+			missing_fields.append(df.label if df and df.label else fieldname)
+
+		return missing_fields
+
+	def has_pipeline_rule_field_value(self, fieldname: str) -> bool:
+		value = self.get(fieldname)
+		if isinstance(value, str):
+			return bool(value.strip())
+		if isinstance(value, list):
+			return bool(value)
+		return value not in [None, ""]
 
 	def set_primary_contact(self, contact=None):
 		if not self.contacts:
@@ -246,7 +527,11 @@ class CRMDeal(Document):
 		"""
 		Update the closed date based on the "Won" status.
 		"""
-		if self.status == "Won" and not self.closed_date:
+		if (
+			self.status
+			and frappe.get_cached_value("CRM Deal Status", self.status, "type") == "Won"
+			and not self.closed_date
+		):
 			self.closed_date = frappe.utils.nowdate()
 
 	def update_default_probability(self):
@@ -302,6 +587,12 @@ class CRMDeal(Document):
 	def default_list_data():
 		columns = [
 			{
+				"label": "Deal Name",
+				"type": "Data",
+				"key": "deal_name",
+				"width": "14rem",
+			},
+			{
 				"label": "Organization",
 				"type": "Link",
 				"key": "organization",
@@ -349,6 +640,7 @@ class CRMDeal(Document):
 		]
 		rows = [
 			"name",
+			"deal_name",
 			"organization",
 			"annual_revenue",
 			"status",
@@ -369,8 +661,8 @@ class CRMDeal(Document):
 	def default_kanban_settings():
 		return {
 			"column_field": "status",
-			"title_field": "organization",
-			"kanban_fields": '["annual_revenue", "email", "mobile_no", "_assign", "modified"]',
+			"title_field": "deal_name",
+			"kanban_fields": '["organization", "annual_revenue", "email", "mobile_no", "_assign", "modified"]',
 		}
 
 
@@ -495,3 +787,8 @@ def create_deal(doc: dict):
 
 	deal.insert(ignore_permissions=True)
 	return deal.name
+
+
+def on_doctype_update():
+	frappe.db.add_index("CRM Deal", ["external_source", "external_record_id"])
+	frappe.db.add_index("CRM Deal", ["external_source", "external_pipeline_id", "external_status_id"])

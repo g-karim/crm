@@ -13,13 +13,7 @@
     <div class="mt-8 flex items-center justify-between gap-2">
       <div>
         <div class="text-base-medium text-ink-gray-8">
-          {{
-            __('{0} routing', [
-              assignmentRuleData.documentType == 'CRM Lead'
-                ? __('Lead')
-                : __('Deal'),
-            ])
-          }}
+          {{ routingLabel }}
         </div>
         <div class="text-p-sm text-ink-gray-6 mt-1">
           {{
@@ -38,9 +32,11 @@
             >
               <div>
                 {{
-                  documentRoutingOptions.find(
-                    (option) => option.value == assignmentRuleData.rule,
-                  )?.label
+                  __(
+                    documentRoutingOptions.find(
+                      (option) => option.value == assignmentRuleData.rule,
+                    )?.label || '',
+                  )
                 }}
               </div>
               <span class="lucide-chevron-down size-4" aria-hidden="true" />
@@ -62,7 +58,7 @@
                 "
               >
                 <span>
-                  {{ option.label }}
+                  {{ __(option.label) }}
                 </span>
                 <span
                   v-if="assignmentRuleData.rule == option.value"
@@ -133,6 +129,11 @@ const documentType = computed(() =>
   assignmentRuleData.value.documentType == 'CRM Lead'
     ? __('leads')
     : __('deals'),
+)
+const routingLabel = computed(() =>
+  assignmentRuleData.value.documentType == 'CRM Lead'
+    ? __('Lead routing')
+    : __('Deal routing'),
 )
 
 const documentRoutingOptions = [

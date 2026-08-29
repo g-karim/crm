@@ -6,14 +6,6 @@
           <h2 class="flex text-2xl-semibold leading-none h-5">
             {{ __('Sales Hierarchy') }}
           </h2>
-          <Tooltip :text="__('View documentation')">
-            <a
-              href="https://docs.frappe.io/crm/settings/sales-hierarchy"
-              target="_blank"
-            >
-              <LucideCircleQuestionMark class="h-4 w-4 text-ink-gray-6" />
-            </a>
-          </Tooltip>
         </div>
         <p class="text-p-base text-ink-gray-6">
           {{
@@ -252,13 +244,11 @@ import { useDragDrop } from './useDragDrop'
 import { globalStore } from '@/stores/global'
 import { usersStore } from '@/stores/users'
 import LucideNetwork from '~icons/lucide/network'
-import LucideCircleQuestionMark from '~icons/lucide/circle-question-mark'
 import {
   Button,
   Dialog,
   LoadingIndicator,
   TextInput,
-  Tooltip,
   call,
   createDocumentResource,
   createListResource,
@@ -287,7 +277,7 @@ const fcrmSettings = createDocumentResource({
   auto: true,
   setValue: {
     onError(error) {
-      toast.error(error?.messages?.[0] || __('Failed to update setting'))
+      toast.error(__(error?.messages?.[0] || 'Failed to update setting'))
     },
   },
 })
@@ -470,7 +460,7 @@ async function reparent(name, newParent) {
     toast.success(__('Updated reports to'))
     nodes.reload()
   } catch (e) {
-    toast.error(e?.messages?.[0] || __('Could not update report to'))
+    toast.error(__(e?.messages?.[0] || 'Could not update report to'))
   }
 }
 
@@ -509,7 +499,7 @@ async function bulkAdd(parent, userIds) {
     }
     if (lastError) {
       toast.error(
-        lastError?.messages?.[0] || __('Some users could not be added'),
+        __(lastError?.messages?.[0] || 'Some users could not be added'),
       )
     }
     await nodes.reload()

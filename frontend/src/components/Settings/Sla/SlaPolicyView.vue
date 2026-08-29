@@ -74,11 +74,11 @@
               class="w-full"
               :options="[
                 {
-                  label: 'Lead',
+                  label: __('Lead'),
                   value: 'CRM Lead',
                 },
                 {
-                  label: 'Deal',
+                  label: __('Deal'),
                   value: 'CRM Deal',
                 },
               ]"
@@ -142,11 +142,15 @@
                 class="flex flex-col gap-3 items-center text-center text-ink-gray-7 text-sm mb-2 border border-outline-gray-3 rounded-md p-3 py-4"
               >
                 <span class="text-p-sm">
-                  Conditions for this SLA were created from
-                  <a :href="deskUrl" target="_blank" class="underline">desk</a>
-                  which are not compatible with this UI, you will need to
-                  recreate the conditions here if you want to manage and add new
-                  conditions from this UI.
+                  {{ __('Conditions for this SLA were created from') }}
+                  <a :href="deskUrl" target="_blank" class="underline">
+                    {{ __('desk') }}
+                  </a>
+                  {{
+                    __(
+                      'which are not compatible with this UI, you will need to recreate the conditions here if you want to manage and add new conditions from this UI.',
+                    )
+                  }}
                 </span>
                 <Button
                   :label="__('I understand, add conditions')"
@@ -447,10 +451,10 @@ const createSla = () => {
         })
       },
       onError(err) {
-        const message = err?.messages?.[0]
-        toast.error(
-          message || __('Some error occurred while creating SLA policy'),
+        const message = __(
+          err?.messages?.[0] || 'Some error occurred while creating SLA Policy',
         )
+        toast.error(message)
       },
     },
   )
@@ -484,18 +488,19 @@ const updateSla = async () => {
     },
     {
       onError(err) {
-        const message = err?.messages?.[0]
-        toast.error(
-          message || __('Some error occurred while updating SLA policy'),
+        const message = __(
+          err?.messages?.[0] || 'Some error occurred while updating SLA policy',
         )
+        toast.error(message)
       },
     },
   )
 
   if (slaData.value.name !== slaData.value.sla_name) {
     await renameSlaResource.submit().catch(async (er) => {
-      const error =
-        er?.messages?.[0] || __('Some error occurred while renaming SLA policy')
+      const error = __(
+        er?.messages?.[0] || 'Some error occurred while renaming SLA policy',
+      )
       toast.error(error)
       // Reset assignment rule to previous state
       await getSlaResource.reload()

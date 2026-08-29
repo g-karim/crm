@@ -6,6 +6,7 @@ from frappe.desk.form.assign_to import add as assign_add
 from frappe.desk.form.assign_to import remove as assign_remove
 from frappe.tests import IntegrationTestCase
 
+from crm.api.doc import get_data
 from crm.fcrm.doctype.crm_deal.api import get_deal_contacts
 from crm.fcrm.doctype.crm_deal.crm_deal import (
 	add_contact,
@@ -13,6 +14,7 @@ from crm.fcrm.doctype.crm_deal.crm_deal import (
 	remove_contact,
 	set_primary_contact,
 )
+from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_pipeline
 
 
 class TestCRMDeal(IntegrationTestCase):
@@ -30,6 +32,318 @@ class TestCRMDeal(IntegrationTestCase):
 		self.assertTrue(deal.name)
 		self.assertTrue(deal.organization)
 		self.assertEqual(deal.annual_revenue, 1000000)
+
+	def test_deal_uses_default_pipeline(self):
+		"""Test that deals get the default pipeline when none is provided"""
+		deal = create_test_deal(organization="Default Pipeline Org")
+		self.assertEqual(deal.pipeline, get_default_pipeline())
+		self.assertEqual(frappe.db.get_value("CRM Deal Status", deal.status, "pipeline"), deal.pipeline)
+
+	def test_deal_rejects_stage_from_another_pipeline(self):
+		"""Test that a deal stage must belong to the selected pipeline"""
+		pipeline = create_test_pipeline("Mismatch Pipeline")
+
+		with self.assertRaises(frappe.exceptions.ValidationError):
+			create_test_deal(
+				organization="Mismatch Pipeline Org",
+				pipeline=pipeline.name,
+				status="Qualification",
+			)
+
+	def test_deal_pipeline_change_resets_stage(self):
+		"""Test that changing pipeline resets the deal to that pipeline's default stage"""
+		pipeline = create_test_pipeline("Reset Pipeline")
+		stage = create_test_deal_status("Reset Stage", pipeline.name)
+		deal = create_test_deal(organization="Reset Pipeline Org")
+
+		deal.pipeline = pipeline.name
+		deal.save()
+		deal.reload()
+
+		self.assertEqual(deal.pipeline, pipeline.name)
+		self.assertEqual(deal.status, stage.name)
+
+	def test_deal_kanban_columns_are_limited_to_selected_pipeline(self):
+		"""Test that deal kanban columns are generated from the selected pipeline"""
+		first_pipeline = create_test_pipeline("Kanban First Pipeline")
+		first_stage = create_test_deal_status("Shared Label", first_pipeline.name)
+		second_pipeline = create_test_pipeline("Kanban Second Pipeline")
+		second_stage = create_test_deal_status("Shared Label", second_pipeline.name)
+
+		first_deal = create_test_deal(
+			organization="First Pipeline Kanban Org",
+			pipeline=first_pipeline.name,
+			status=first_stage.name,
+		)
+		create_test_deal(
+			organization="Second Pipeline Kanban Org",
+			pipeline=second_pipeline.name,
+			status=second_stage.name,
+		)
+
+		data = get_data(
+			doctype="CRM Deal",
+			filters={"pipeline": first_pipeline.name},
+			order_by="modified desc",
+			column_field="status",
+			rows=["name", "status", "pipeline"],
+			view={"view_type": "kanban"},
+		)
+
+		self.assertEqual([column["column"]["name"] for column in data["data"]], [first_stage.name])
+		self.assertEqual(data["data"][0]["column"]["label"], first_stage.deal_status)
+		self.assertEqual([deal.name for deal in data["data"][0]["data"]], [first_deal.name])
+
+	def test_deal_view_pipeline_filter_overrides_default_pipeline_filter(self):
+		"""Test that a saved view pipeline filter is not overwritten by the selected pipeline filter"""
+		first_pipeline = create_test_pipeline("View First Pipeline")
+		first_stage = create_test_deal_status("View First Stage", first_pipeline.name)
+		second_pipeline = create_test_pipeline("View Second Pipeline")
+		second_stage = create_test_deal_status("View Second Stage", second_pipeline.name)
+
+		first_deal = create_test_deal(
+			organization="First Pipeline View Org",
+			pipeline=first_pipeline.name,
+			status=first_stage.name,
+		)
+		create_test_deal(
+			organization="Second Pipeline View Org",
+			pipeline=second_pipeline.name,
+			status=second_stage.name,
+		)
+
+		data = get_data(
+			doctype="CRM Deal",
+			filters={"pipeline": first_pipeline.name},
+			default_filters={"pipeline": second_pipeline.name},
+			order_by="modified desc",
+			rows=["name", "pipeline"],
+			view={"view_type": "list"},
+		)
+
+		self.assertEqual([deal.name for deal in data["data"]], [first_deal.name])
+
+	def test_import_stage_label_resolves_with_pipeline_label(self):
+		"""Test that CSV import labels resolve stages inside the selected pipeline"""
+		stage_label = f"Shared Import Stage {frappe.generate_hash(length=8)}"
+		first_pipeline = create_test_pipeline("Import Label First Pipeline")
+		second_pipeline = create_test_pipeline("Import Label Second Pipeline")
+		first_stage = create_test_deal_status(stage_label, first_pipeline.name, exact_title=True)
+		create_test_deal_status(stage_label, second_pipeline.name, exact_title=True)
+
+		deal = create_test_deal(
+			organization="Import Label Org",
+			pipeline_label=first_pipeline.pipeline_name,
+			status_label=stage_label,
+		)
+
+		self.assertEqual(deal.pipeline, first_pipeline.name)
+		self.assertEqual(deal.status, first_stage.name)
+
+	def test_import_stage_label_without_pipeline_rejects_ambiguous_stage(self):
+		"""Test that duplicate stage labels require pipeline context during import"""
+		stage_label = f"Ambiguous Import Stage {frappe.generate_hash(length=8)}"
+		first_pipeline = create_test_pipeline("Ambiguous First Pipeline")
+		second_pipeline = create_test_pipeline("Ambiguous Second Pipeline")
+		create_test_deal_status(stage_label, first_pipeline.name, exact_title=True)
+		create_test_deal_status(stage_label, second_pipeline.name, exact_title=True)
+
+		with self.assertRaises(frappe.exceptions.ValidationError):
+			create_test_deal(
+				organization="Ambiguous Import Org",
+				status_label=stage_label,
+			)
+
+	def test_import_external_ids_resolve_pipeline_and_stage(self):
+		"""Test that external IDs can resolve the deal pipeline and stage"""
+		pipeline = create_test_pipeline("External Import Pipeline")
+		pipeline.external_source = "bitrix24"
+		pipeline.external_pipeline_id = f"bitrix-pipeline-{frappe.generate_hash(length=8)}"
+		pipeline.save()
+		stage = create_test_deal_status(
+			"External Import Stage",
+			pipeline.name,
+			external_status_id=f"bitrix-status-{frappe.generate_hash(length=8)}",
+		)
+
+		deal = create_test_deal(
+			organization="External Import Org",
+			external_source="bitrix24",
+			external_pipeline_id=pipeline.external_pipeline_id,
+			external_status_id=stage.external_status_id,
+			external_record_id=f"bitrix-deal-{frappe.generate_hash(length=8)}",
+		)
+
+		self.assertEqual(deal.pipeline, pipeline.name)
+		self.assertEqual(deal.status, stage.name)
+
+	def test_external_record_id_must_be_unique(self):
+		"""Test that external record IDs cannot create duplicate imported deals"""
+		external_record_id = f"external-deal-{frappe.generate_hash(length=8)}"
+		create_test_deal(
+			organization="External Unique Org",
+			external_source="bitrix24",
+			external_record_id=external_record_id,
+		)
+
+		with self.assertRaises(frappe.DuplicateEntryError):
+			create_test_deal(
+				organization="External Duplicate Org",
+				external_source="bitrix24",
+				external_record_id=external_record_id,
+				)
+
+	def test_external_record_id_requires_external_source(self):
+		"""Test that external IDs require source context to avoid ambiguous imports"""
+		with self.assertRaises(frappe.exceptions.ValidationError):
+			create_test_deal(
+				organization="External Source Required Org",
+				external_record_id=f"external-deal-{frappe.generate_hash(length=8)}",
+			)
+
+	def test_external_record_id_can_repeat_across_sources(self):
+		"""Test that the same external record ID can exist for different source systems"""
+		external_record_id = f"external-deal-{frappe.generate_hash(length=8)}"
+		first = create_test_deal(
+			organization="First Source Org",
+			external_source="amocrm",
+			external_record_id=external_record_id,
+		)
+		second = create_test_deal(
+			organization="Second Source Org",
+			external_source="bitrix24",
+			external_record_id=external_record_id,
+		)
+
+		self.assertNotEqual(first.name, second.name)
+
+	def test_stage_skip_warning_does_not_block_save(self):
+		"""Test that skipping stages emits a soft warning and still saves the deal"""
+		pipeline = create_test_pipeline("Warning Skip Pipeline", stage_skip_rule="Warn")
+		first_stage = create_test_deal_status("Skip Stage One", pipeline.name, position=1)
+		create_test_deal_status("Skip Stage Two", pipeline.name, position=2)
+		third_stage = create_test_deal_status("Skip Stage Three", pipeline.name, position=3)
+		deal = create_test_deal(
+			organization="Warning Skip Org",
+			pipeline=pipeline.name,
+			status=first_stage.name,
+		)
+
+		deal.status = third_stage.name
+		deal.save()
+
+		self.assertEqual(deal.status, third_stage.name)
+		self.assertTrue(
+			any("skipping intermediate stages" in warning for warning in deal._pipeline_rule_warnings)
+		)
+
+	def test_stage_skip_warning_uses_stage_order_not_position_gap(self):
+		"""Test that adjacent stages with non-contiguous positions do not warn as skipped"""
+		pipeline = create_test_pipeline("Warning Position Gap Pipeline", stage_skip_rule="Warn")
+		first_stage = create_test_deal_status("Gap Stage One", pipeline.name, position=10)
+		second_stage = create_test_deal_status("Gap Stage Two", pipeline.name, position=20)
+		deal = create_test_deal(
+			organization="Warning Position Gap Org",
+			pipeline=pipeline.name,
+			status=first_stage.name,
+		)
+
+		deal.status = second_stage.name
+		deal.save()
+
+		self.assertEqual(deal.status, second_stage.name)
+		self.assertFalse(
+			any("skipping intermediate stages" in warning for warning in deal._pipeline_rule_warnings)
+		)
+
+	def test_stage_backwards_warning_does_not_block_save(self):
+		"""Test that moving backwards emits a soft warning and still saves the deal"""
+		pipeline = create_test_pipeline("Warning Backwards Pipeline", stage_backwards_rule="Warn")
+		first_stage = create_test_deal_status("Back Stage One", pipeline.name, position=1)
+		second_stage = create_test_deal_status("Back Stage Two", pipeline.name, position=2)
+		deal = create_test_deal(
+			organization="Warning Backwards Org",
+			pipeline=pipeline.name,
+			status=second_stage.name,
+		)
+
+		deal.status = first_stage.name
+		deal.save()
+
+		self.assertEqual(deal.status, first_stage.name)
+		self.assertTrue(any("moved backwards" in warning for warning in deal._pipeline_rule_warnings))
+
+	def test_closing_required_fields_warning_does_not_block_save(self):
+		"""Test that closing without configured fields emits a soft warning and still saves"""
+		pipeline = create_test_pipeline(
+			"Warning Closing Pipeline",
+			closing_fields_rule="Warn",
+			required_fields_before_closing="contact, expected_closure_date",
+		)
+		open_stage = create_test_deal_status("Closing Open Stage", pipeline.name, position=1)
+		won_stage = create_test_deal_status("Closing Won Stage", pipeline.name, type="Won", position=2)
+		deal = create_test_deal(
+			organization="Warning Closing Org",
+			pipeline=pipeline.name,
+			status=open_stage.name,
+		)
+
+		deal.status = won_stage.name
+		deal.save()
+
+		self.assertEqual(deal.status, won_stage.name)
+		self.assertTrue(any("closed without these fields" in warning for warning in deal._pipeline_rule_warnings))
+		self.assertTrue(any("Contact" in warning for warning in deal._pipeline_rule_warnings))
+
+	def test_stage_skip_block_prevents_save(self):
+		"""Test that skipping stages can be blocked by pipeline rules"""
+		pipeline = create_test_pipeline("Block Skip Pipeline", stage_skip_rule="Block")
+		first_stage = create_test_deal_status("Block Skip Stage One", pipeline.name, position=1)
+		create_test_deal_status("Block Skip Stage Two", pipeline.name, position=2)
+		third_stage = create_test_deal_status("Block Skip Stage Three", pipeline.name, position=3)
+		deal = create_test_deal(
+			organization="Block Skip Org",
+			pipeline=pipeline.name,
+			status=first_stage.name,
+		)
+
+		deal.status = third_stage.name
+		with self.assertRaises(frappe.ValidationError):
+			deal.save()
+
+	def test_stage_backwards_block_prevents_save(self):
+		"""Test that moving backwards can be blocked by pipeline rules"""
+		pipeline = create_test_pipeline("Block Backwards Pipeline", stage_backwards_rule="Block")
+		first_stage = create_test_deal_status("Block Back Stage One", pipeline.name, position=1)
+		second_stage = create_test_deal_status("Block Back Stage Two", pipeline.name, position=2)
+		deal = create_test_deal(
+			organization="Block Backwards Org",
+			pipeline=pipeline.name,
+			status=second_stage.name,
+		)
+
+		deal.status = first_stage.name
+		with self.assertRaises(frappe.ValidationError):
+			deal.save()
+
+	def test_closing_required_fields_block_prevents_save(self):
+		"""Test that closing without configured fields can be blocked"""
+		pipeline = create_test_pipeline(
+			"Block Closing Pipeline",
+			closing_fields_rule="Block",
+			required_fields_before_closing="contact, expected_closure_date",
+		)
+		open_stage = create_test_deal_status("Block Closing Open Stage", pipeline.name, position=1)
+		won_stage = create_test_deal_status("Block Closing Won Stage", pipeline.name, type="Won", position=2)
+		deal = create_test_deal(
+			organization="Block Closing Org",
+			pipeline=pipeline.name,
+			status=open_stage.name,
+		)
+
+		deal.status = won_stage.name
+		with self.assertRaises(frappe.ValidationError):
+			deal.save()
 
 	def test_set_primary_contact(self):
 		"""Test setting primary contact from contacts table"""
@@ -461,6 +775,33 @@ def create_test_deal(**kwargs):
 			)
 
 	data = {"doctype": "CRM Deal"}
+	data.update(kwargs)
+	return frappe.get_doc(data).insert()
+
+
+def create_test_pipeline(title, **kwargs):
+	"""Helper function to create a CRM Sales Pipeline for testing"""
+	data = {
+		"doctype": "CRM Sales Pipeline",
+		"pipeline_name": f"{title} {frappe.generate_hash(length=8)}",
+		"enabled": 1,
+		"position": 99,
+	}
+	data.update(kwargs)
+	return frappe.get_doc(data).insert()
+
+
+def create_test_deal_status(title, pipeline, exact_title=False, **kwargs):
+	"""Helper function to create a CRM Deal Status for testing"""
+	data = {
+		"doctype": "CRM Deal Status",
+		"deal_status": title if exact_title else f"{title} {frappe.generate_hash(length=8)}",
+		"pipeline": pipeline,
+		"type": "Open",
+		"probability": 10,
+		"position": 1,
+		"color": "gray",
+	}
 	data.update(kwargs)
 	return frappe.get_doc(data).insert()
 

@@ -9,9 +9,9 @@ export const filterableFields = createResource({
       // max width, so a long one stretches the whole list.
       .map(({ description, ...field }) => {
         return {
-          label: field.label,
-          value: field.fieldname,
           ...field,
+          label: __(field.label || field.fieldname),
+          value: field.fieldname,
         }
       })
     return data

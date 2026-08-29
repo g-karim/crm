@@ -70,6 +70,7 @@ const processedTabs = computed(() => {
       const processedTab = tabOverrides ? { ...tab, ...tabOverrides } : tab
       return {
         ...processedTab,
+        label: processedTab.label ? __(processedTab.label) : processedTab.label,
         sections: processedTab.sections.map((section) => {
           const sectionOverrides = ov[section.name]
           return sectionOverrides

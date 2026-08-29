@@ -177,16 +177,16 @@ def get_permlevel_access(permission_type="write", doctype=None, parent_doctype=N
 
 
 def get_field_obj(field):
-	field["placeholder"] = field.get("placeholder") or "Add " + field.label + "..."
-
-	if field.fieldtype == "Link":
-		field["placeholder"] = field.get("placeholder") or "Select " + field.label + "..."
+	if field.fieldtype in ["Link", "Dynamic Link", "User"]:
+		field["placeholder"] = field.get("placeholder") or _("Select {0}...").format(_(field.label))
 	elif field.fieldtype == "Select" and field.options:
-		field["placeholder"] = field.get("placeholder") or "Select " + field.label + "..."
+		field["placeholder"] = field.get("placeholder") or _("Select {0}...").format(_(field.label))
 		field["options"] = [{"label": option, "value": option} for option in field.options.split("\n")]
+	else:
+		field["placeholder"] = field.get("placeholder") or _("Add {0}...").format(_(field.label))
 
 	if field.read_only:
-		field["tooltip"] = "This field is read only and cannot be edited."
+		field["tooltip"] = _("This field is read only and cannot be edited.")
 
 	return field
 

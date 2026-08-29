@@ -294,7 +294,7 @@ def get_data(
 
 	if default_filters:
 		default_filters = frappe.parse_json(default_filters)
-		filters.update(default_filters)
+		filters = merge_default_filters(doctype, filters, default_filters)
 
 	is_default = True
 	data = []
@@ -371,7 +371,9 @@ def get_data(
 		if not rows:
 			rows = default_rows
 
-		if not kanban_columns and column_field:
+		if doctype == "CRM Deal" and column_field == "status" and filters.get("pipeline"):
+			kanban_columns = get_deal_pipeline_kanban_columns(filters.get("pipeline"), kanban_columns)
+		elif not kanban_columns and column_field:
 			field_meta = frappe.get_meta(doctype).get_field(column_field)
 			if field_meta.fieldtype == "Link":
 				kanban_columns = frappe.get_all(
@@ -549,12 +551,51 @@ def parse_list_data(data, doctype):
 	return data
 
 
+def get_deal_pipeline_kanban_columns(pipeline, existing_columns=None):
+	existing_columns = frappe.parse_json(existing_columns or "[]")
+	existing_by_name = {column.get("name"): column for column in existing_columns if column.get("name")}
+	filters = {"pipeline": pipeline}
+	if frappe.get_meta("CRM Deal Status").has_field("archived"):
+		filters["archived"] = 0
+
+	statuses = frappe.get_all(
+		"CRM Deal Status",
+		fields=["name", "deal_status", "color"],
+		filters=filters,
+		order_by="position asc, modified asc",
+	)
+
+	columns = []
+	for status in statuses:
+		existing = existing_by_name.get(status.name, {})
+		column = {
+			"name": status.name,
+			"label": status.deal_status or status.name,
+			"color": status.color,
+		}
+		if existing.get("page_length"):
+			column["page_length"] = existing.get("page_length")
+		if existing.get("order"):
+			column["order"] = existing.get("order")
+		columns.append(column)
+
+	return columns
+
+
 def convert_filter_to_tuple(doctype, filters):
 	if isinstance(filters, dict):
 		filters_items = filters.items()
 		filters = []
 		for key, value in filters_items:
 			filters.append(make_filter_tuple(doctype, key, value))
+	return filters
+
+
+def merge_default_filters(doctype, filters, default_filters):
+	for key, value in default_filters.items():
+		if doctype == "CRM Deal" and key == "pipeline" and filters.get("pipeline"):
+			continue
+		filters[key] = value
 	return filters
 
 

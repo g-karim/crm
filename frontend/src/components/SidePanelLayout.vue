@@ -10,7 +10,7 @@
           <CollapsibleSection
             labelClass="px-2 font-semibold"
             headerClass="h-8"
-            :label="section.label"
+            :label="__(section.label)"
             :hideLabel="!section.label"
             :opened="section.opened"
           >
@@ -152,9 +152,7 @@
                           "
                           doctype="User"
                           :filters="field.filters"
-                          :placeholder="
-                            __('Select') + ' ' + field.label + '...'
-                          "
+                          :placeholder="field.placeholder"
                           :hideMe="true"
                           @change="(v) => fieldChange(v, field)"
                         >
@@ -203,6 +201,7 @@
                           <TimePicker
                             :value="doc[field.fieldname]"
                             :format="getFormat('', '', false, true, false)"
+                            :use12Hour="false"
                             :placeholder="field.placeholder"
                             @change="(v) => fieldChange(v, field)"
                           />
@@ -435,6 +434,7 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import SidePanelModal from '@/components/Modals/SidePanelModal.vue'
 import { getMeta } from '@/stores/meta'
 import { parseLinkFilters } from '@/utils/fieldTransforms'
+import { getPlaceholderLabel } from '@/utils/fieldPlaceholders'
 import { usersStore } from '@/stores/users'
 import { isMobileView } from '@/composables/settings'
 import {
@@ -519,12 +519,17 @@ function parsedField(field) {
 
   if (field.fieldtype == 'Select' && typeof field.options === 'string') {
     field.options = field.options.split('\n').map((option) => {
-      return { label: option, value: option }
+      return { label: __(option), value: option }
     })
 
     if (field.options[0].value !== '' && !field.reqd) {
       field.options.unshift({ label: '', value: '' })
     }
+  } else if (field.fieldtype == 'Select' && Array.isArray(field.options)) {
+    field.options = field.options.map((option) => ({
+      ...option,
+      label: __(option.label || option.value || ''),
+    }))
   }
 
   if (field.fieldtype === 'Link' && field.options === 'User') {
@@ -552,7 +557,7 @@ function parsedField(field) {
   let _field = {
     ...field,
     filters: parseLinkFilters(field.link_filters),
-    placeholder: field.placeholder || field.label,
+    placeholder: getPlaceholder(field),
     display_via_depends_on: evaluateDependsOnValue(field.depends_on, doc.value),
     mandatory_via_depends_on: evaluateDependsOnValue(
       field.mandatory_depends_on,
@@ -563,6 +568,40 @@ function parsedField(field) {
 
   _field.visible = isFieldVisible(_field, overrides?.hidden)
   return _field
+}
+
+function getPlaceholder(field) {
+  if (field.placeholder && !isGeneratedPlaceholder(field)) {
+    return __(field.placeholder)
+  }
+
+  if (field.fieldtype === 'User') {
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
+  }
+
+  if (['Link', 'Dynamic Link'].includes(field.fieldtype)) {
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
+  }
+
+  if (field.fieldtype === 'Select') {
+    return __('Select {0}...', [getPlaceholderLabel(field.label)])
+  }
+
+  return __(field.label)
+}
+
+function isGeneratedPlaceholder(field) {
+  if (!field.placeholder || !field.label) return false
+
+  const label = field.label
+  const translatedLabel = __(field.label)
+  const placeholders = ['Add', 'Select'].flatMap((prefix) => [
+    `${prefix} ${label}...`,
+    __(`${prefix} {0}...`, [label]),
+    __(`${prefix} {0}...`, [translatedLabel]),
+  ])
+
+  return placeholders.includes(field.placeholder)
 }
 
 const instance = getCurrentInstance()

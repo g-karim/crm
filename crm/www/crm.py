@@ -2,11 +2,14 @@
 # GNU GPLv3 License. See license.txt
 
 import frappe
+import frappe.sessions
 from frappe import _, get_installed_apps
 from frappe.integrations.frappe_providers.frappecloud_billing import is_fc_site
-from frappe.translate import get_messages_for_boot, get_translated_doctypes
+from frappe.translate import get_messages_for_boot, get_translated_doctypes, get_user_lang
 from frappe.utils import cint, get_system_timezone
 from frappe.utils.telemetry import capture
+
+from crm.branding import APP_NAME, APP_ROUTE
 
 no_cache = 1
 
@@ -15,7 +18,7 @@ def get_context():
 	from crm.api import check_app_permission
 
 	if not check_app_permission():
-		frappe.throw(_("You do not have permission to access Frappe CRM"), frappe.PermissionError)
+		frappe.throw(_("You do not have permission to access {0}").format(APP_NAME), frappe.PermissionError)
 
 	redirect_to_set_password()
 
@@ -64,9 +67,13 @@ def get_context_for_dev():
 
 
 def get_boot():
+	lang = get_user_lang()
+	frappe.local.lang = lang
+
 	return frappe._dict(
 		{
 			"frappe_version": frappe.__version__,
+			"lang": lang,
 			"default_route": get_default_route(),
 			"site_name": frappe.local.site,
 			"socketio_port": frappe.conf.socketio_port,
@@ -114,4 +121,4 @@ def get_state_options() -> dict[str, list[str]]:
 
 
 def get_default_route():
-	return "/crm"
+	return APP_ROUTE

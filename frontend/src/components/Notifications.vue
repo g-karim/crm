@@ -18,11 +18,11 @@
         </div>
         <div class="flex gap-1 mr-3">
           <Button
-            v-if="activeTab == 'all' && notifications.data?.length"
+            v-if="activeTab == 'all' && notificationItems.length"
             :tooltip="__('Mark all as read')"
             :icon="MarkAsDoneIcon"
             variant="ghost"
-            @click="markAllAsRead"
+            @click="handleMarkAllAsRead"
           />
         </div>
       </div>
@@ -33,27 +33,32 @@
       />
       <div v-if="activeTab == 'all'" class="flex h-full">
         <div
-          v-if="notifications.data?.length"
+          v-if="notificationItems.length"
           class="divide-y divide-outline-elevation-2 overflow-auto text-base"
         >
           <RouterLink
-            v-for="n in notifications.data"
-            :key="n.comment"
+            v-for="n in notificationItems"
+            :key="n.name"
             :to="getRoute(n)"
             class="flex cursor-pointer items-start gap-2.5 px-4 py-2.5 hover:bg-surface-gray-2"
-            @click="markAsRead(n.comment || n.notification_type_doc)"
+            @click="markAsRead(n)"
           >
             <div class="mt-1 flex items-center gap-2.5">
               <div
                 class="size-[5px] rounded-full"
                 :class="[n.read ? 'bg-transparent' : 'bg-surface-gray-10']"
               />
-              <WhatsAppIcon v-if="n.type == 'WhatsApp'" class="size-7" />
+              <MessageCircleIcon
+                v-if="n.type == 'Messenger'"
+                class="size-7 text-ink-blue-6"
+              />
+              <WhatsAppIcon v-else-if="n.type == 'WhatsApp'" class="size-7" />
               <UserAvatar v-else :user="n.from_user.name" size="lg" />
             </div>
-            <div>
+            <div class="min-w-0 flex-1">
               <div
                 v-if="n.notification_text"
+                class="[overflow-wrap:anywhere]"
                 v-html="sanitizeHTML(n.notification_text)"
               />
               <div v-else class="mb-2 space-x-1 leading-5 text-ink-gray-5">
@@ -68,15 +73,21 @@
                 </span>
               </div>
               <div class="text-sm text-ink-gray-5">
-                {{ __(timeAgo(n.creation)) }}
+                {{ __(timeAgo(n.last_event_at || n.creation)) }}
+                <Badge
+                  v-if="n.type == 'Messenger' && n.event_count > 1"
+                  class="ml-1"
+                  :label="n.event_count"
+                  variant="subtle"
+                />
               </div>
             </div>
           </RouterLink>
         </div>
         <EmptyState
           v-else
-          title="No New Notifications"
-          description="You have no new notifications"
+          :title="__('No New Notifications')"
+          :description="__('You have no new notifications')"
           :icon="NotificationsIcon"
           width="lg"
         />
@@ -90,6 +101,7 @@
 </template>
 <script setup>
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
+import MessageCircleIcon from '~icons/lucide/message-circle'
 import MarkAsDoneIcon from '@/components/Icons/MarkAsDoneIcon.vue'
 import NotificationsIcon from '@/components/Icons/NotificationsIcon.vue'
 import EventNotificationsArea from '@/components/EventNotificationsArea.vue'
@@ -106,14 +118,17 @@ import { timeAgo, sanitizeHTML } from '@/utils'
 import { onClickOutside } from '@vueuse/core'
 import { useTelemetry } from 'frappe-ui/frappe'
 import { TabButtons } from 'frappe-ui'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 
 const { $socket } = globalStore()
-const { mark_as_read, toggle, mark_doc_as_read } = notificationsStore()
+const { markAllAsRead, toggle, markNotificationAsRead } = notificationsStore()
 const { handleEventNotification } = useEventNotificationAlert()
 const { capture } = useTelemetry()
 
 const activeTab = ref('all')
+const notificationItems = computed(
+  () => notifications.data?.notifications || [],
+)
 const tabs = [
   { label: __('All'), value: 'all' },
   { label: __('Events'), value: 'events' },
@@ -131,23 +146,23 @@ onClickOutside(
   },
 )
 
-function markAsRead(doc) {
+function markAsRead(notification) {
   capture('notification_mark_as_read')
-  mark_doc_as_read(doc)
+  if (notification.type !== 'Messenger')
+    markNotificationAsRead(notification.name)
+  toggle()
 }
 
-function markAllAsRead() {
+function handleMarkAllAsRead() {
   capture('notification_mark_all_as_read')
-  mark_as_read.reload()
+  markAllAsRead()
 }
 
 onBeforeUnmount(() => {
-  $socket.off('crm_notification')
   $socket.off('event_notification')
 })
 
 onMounted(() => {
-  $socket.on('crm_notification', () => notifications.reload())
   $socket.on('event_notification', (data) => handleEventNotification(data))
 })
 
@@ -165,6 +180,10 @@ function getRoute(notification) {
     name: notification.route_name,
     params: params,
     hash: notification.hash,
+    query:
+      notification.type === 'Messenger'
+        ? { messenger_conversation: notification.notification_type_doc }
+        : undefined,
   }
 }
 </script>

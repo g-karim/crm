@@ -35,7 +35,7 @@
             :iconRight="open ? 'chevron-up' : 'chevron-down'"
           >
             <template #prefix>
-              <IndicatorIcon :class="getDealStatus(doc.status).color" />
+              <IndicatorIcon :class="getDealStatus(doc.status)?.color" />
             </template>
           </Button>
         </template>
@@ -374,12 +374,7 @@ import SidePanelLayout from '@/components/SidePanelLayout.vue'
 import SLASection from '@/components/SLASection.vue'
 import CustomActions from '@/components/CustomActions.vue'
 import EnrichFromWebsite from '@/components/EnrichFromWebsite.vue'
-import {
-  openWebsite,
-  setupCustomizations,
-  copyToClipboard,
-  isTranslatable,
-} from '@/utils'
+import { openWebsite, setupCustomizations, copyToClipboard } from '@/utils'
 import { getView } from '@/utils/view'
 import { getSettings } from '@/stores/settings'
 import { globalStore } from '@/stores/global'
@@ -558,8 +553,14 @@ const statuses = computed(() => {
   let customStatuses = document.statuses?.length
     ? document.statuses
     : document._statuses || []
-  return statusOptions('deal', customStatuses, triggerStatusChange)
+  return statusOptions('deal', customStatuses, triggerStatusChange, {
+    pipeline: doc.value.pipeline,
+  })
 })
+
+const dealStatuses = computed(() =>
+  statusOptions('deal', [], null, { pipeline: doc.value.pipeline }),
+)
 
 usePageMeta(() => {
   return {
@@ -640,22 +641,55 @@ if (!sections.data) sections.fetch()
 function getParsedSections(_sections) {
   _sections.forEach((section) => {
     if (section.name == 'contacts_section') return
-    section.columns[0].fields.forEach((field) => {
-      if (field.fieldname == 'organization') {
-        field.create = (value, close) => {
-          _organization.value.organization_name = value
-          showOrganizationModal.value = true
-          close()
+    section.columns?.forEach((column) => {
+      column.fields?.forEach((field) => {
+        prepareDealField(field)
+
+        if (field.fieldname == 'organization') {
+          field.create = (value, close) => {
+            _organization.value.organization_name = value
+            showOrganizationModal.value = true
+            close()
+          }
+          field.link = (org) =>
+            router.push({
+              name: 'Organization',
+              params: { organizationId: org },
+            })
         }
-        field.link = (org) =>
-          router.push({
-            name: 'Organization',
-            params: { organizationId: org },
-          })
-      }
+      })
     })
   })
   return _sections
+}
+
+watch(dealStatuses, () => updateDealStatusFields())
+
+watch(
+  () => doc.value.pipeline,
+  (pipeline, oldPipeline) => {
+    if (!pipeline || pipeline === oldPipeline) return
+    let currentStatus = getDealStatus(doc.value.status)
+    if (currentStatus?.pipeline !== pipeline) {
+      doc.value.status = dealStatuses.value[0]?.value || ''
+    }
+  },
+)
+
+function prepareDealField(field) {
+  if (field.fieldname == 'status') {
+    field.fieldtype = 'Select'
+    field.options = dealStatuses.value
+    field.prefix = getDealStatus(doc.value.status)?.color
+  }
+}
+
+function updateDealStatusFields() {
+  sections.data?.forEach((section) => {
+    section.columns?.forEach((column) => {
+      column.fields?.forEach((field) => prepareDealField(field))
+    })
+  })
 }
 
 const showContactModal = ref(false)
@@ -761,12 +795,22 @@ function updateField(name, value) {
   }
 
   value = Array.isArray(name) ? '' : value
-  let oldValues = Array.isArray(name) ? {} : doc.value[name]
+  let oldValues = Array.isArray(name)
+    ? {}
+    : name == 'pipeline'
+      ? { pipeline: doc.value.pipeline, status: doc.value.status }
+      : doc.value[name]
 
   if (Array.isArray(name)) {
     name.forEach((field) => (doc.value[field] = value))
   } else {
     doc.value[name] = value
+    if (name == 'pipeline') {
+      let currentStatus = getDealStatus(doc.value.status)
+      if (currentStatus?.pipeline !== value) {
+        doc.value.status = dealStatuses.value[0]?.value || ''
+      }
+    }
   }
 
   document.save.submit(null, {
@@ -774,10 +818,13 @@ function updateField(name, value) {
     onError: (err) => {
       if (Array.isArray(name)) {
         name.forEach((field) => (doc.value[field] = oldValues[field]))
+      } else if (name == 'pipeline') {
+        doc.value.pipeline = oldValues.pipeline
+        doc.value.status = oldValues.status
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(err.messages?.[0] || __('Error updating field'))
+      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }
@@ -797,8 +844,8 @@ function openEmailBox() {
 }
 
 function statusLabel(status) {
-  if (isTranslatable('CRM Deal Status')) return __(status)
-  return status
+  let label = getDealStatus(status)?.deal_status || status
+  return __(label)
 }
 
 const showLostReasonModal = ref(false)

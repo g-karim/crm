@@ -7,7 +7,7 @@ frappe.listview_settings["CRM Product"] = {
       );
       if (enabled) {
         frappe.show_alert({
-          message: __("Create products as Items in ERPNext"),
+          message: __("Create products as Items in EXP ERP"),
           indicator: "blue",
         });
         frappe.set_route("Form", "Item", "new");

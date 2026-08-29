@@ -42,11 +42,11 @@
       doctype="CRM Task"
     >
       <div v-if="column.key === 'due_date' && item">
-        <Tooltip :text="item && formatDate(item, 'ddd, MMM D, YYYY | hh:mm a')">
+        <Tooltip :text="item && formatDate(item, dateTimeFormat)">
           <div class="flex items-center gap-2 truncate text-base">
             <div><CalendarIcon /></div>
             <div class="truncate">
-              {{ formatDate(item, 'D MMM, hh:mm a') }}
+              {{ formatDate(item, shortDateTimeFormat) }}
             </div>
           </div>
         </Tooltip>
@@ -191,8 +191,10 @@ import CalendarIcon from '@/components/Icons/CalendarIcon.vue'
 import RatingInput from '@/components/Controls/RatingInput.vue'
 import ListBulkActions from '@/components/ListBulkActions.vue'
 import ListRows from '@/components/ListViews/ListRows.vue'
+import ListFooter from '@/components/ListViews/ListFooter.vue'
 import {
   formatDate,
+  getFormat,
   isTranslatable,
   formatDuration,
   sanitizeHTML,
@@ -204,7 +206,6 @@ import {
   ListHeaderItem,
   ListSelectBanner,
   ListRowItem,
-  ListFooter,
   Dropdown,
   Tooltip,
 } from 'frappe-ui'
@@ -245,8 +246,13 @@ function onColumnWidthUpdated({ width, save }, column) {
   if (save) emit('columnWidthUpdated', column)
 }
 
+const dateFormat = getFormat('', '', true, false, false)
+const dateTimeFormat = `${dateFormat} | HH:mm`
+const shortDateTimeFormat = `${dateFormat} HH:mm`
+
 function getLabel(label, column) {
   if (column.type === 'Duration') return formatDuration(label)
+  if (column.type === 'Select') return __(label)
   if (column.options && isTranslatable(column.options)) return __(label)
   return label
 }

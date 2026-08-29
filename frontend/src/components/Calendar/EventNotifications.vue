@@ -36,7 +36,8 @@
                 v-model="notification.time"
                 class="flex-1 shrink-0"
                 variant="outline"
-                :placeholder="__('08:00 AM')"
+                :use12Hour="false"
+                :placeholder="__('08:00')"
               />
             </div>
             <div class="flex items-center gap-2 w-full">
@@ -249,9 +250,9 @@ const notificationSummary = computed(() => {
       }
       if (props.isAllDay) {
         let time = formatTime(n.time)
-        return `${n.before} ${intervalLabel} before at ${time}`
+        return __('{0} {1} before at {2}', [n.before, intervalLabel, time])
       } else {
-        return `${n.before} ${intervalLabel} before`
+        return __('{0} {1} before', [n.before, intervalLabel])
       }
     })
     .join(', ')
@@ -261,11 +262,20 @@ function formatTime(time) {
   if (!time) {
     time = '08:00'
   }
-  const [hours, minutes] = time.split(':').map(Number)
-  const period = hours >= 12 ? 'pm' : 'am'
-  const formattedHours = hours % 12 || 12
-  return `${formattedHours.toString().padStart(1, '0')}:${minutes
-    .toString()
-    .padStart(2, '0')} ${period}`
+  const [hours = '0', minutes = '0'] = time.split(':')
+  const date = new Date()
+  date.setHours(Number(hours), Number(minutes), 0, 0)
+  const timeFormat = window.sysdefaults?.time_format || 'HH:mm:ss'
+  const uses12Hour = /h|a/i.test(timeFormat) && !timeFormat.includes('HH')
+
+  return new Intl.DateTimeFormat(
+    globalThis.frappe?.boot?.lang === 'ru' ? 'ru-RU' : undefined,
+    {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: timeFormat.includes('ss') ? '2-digit' : undefined,
+      hour12: uses12Hour,
+    },
+  ).format(date)
 }
 </script>

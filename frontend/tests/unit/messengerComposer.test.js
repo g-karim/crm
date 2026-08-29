@@ -1,0 +1,294 @@
+import {
+  createComposerAttachmentController,
+  isVideoFile,
+  validateComposerFileMix,
+} from '@/utils/messengerComposer'
+import { describe, expect, it, vi } from 'vitest'
+
+function file(name, type = 'application/octet-stream') {
+  return new File(['content'], name, { type })
+}
+
+function harness(
+  upload = vi.fn(async (value) => ({ name: `FILE-${value.name}` })),
+) {
+  let urls = []
+  let revoked = []
+  let changes = []
+  let discard = vi.fn(async () => {})
+  let controller = createComposerAttachmentController({
+    upload,
+    discard,
+    scope: () => 'CONVERSATION-1',
+    createObjectURL: (value) => {
+      let url = `blob:${value.name}`
+      urls.push(url)
+      return url
+    },
+    revokeObjectURL: (url) => revoked.push(url),
+    validateFiles: (files) => ({ files }),
+    onChange: (items) => changes.push(items),
+  })
+  return { controller, upload, discard, urls, revoked, changes }
+}
+
+describe('messenger composer attachments', () => {
+  it('recognizes VK document fallback video formats by MIME or extension', () => {
+    expect(isVideoFile(file('clip.bin', 'video/mp4'))).toBe(true)
+    expect(isVideoFile(file('clip.MOV'))).toBe(true)
+    expect(isVideoFile(file('clip.avi', 'video/x-msvideo'))).toBe(false)
+  })
+
+  it('adds an image from clipboard and uploads it', async () => {
+    let image = file('paste.png', 'image/png')
+    let current = harness()
+    let event = {
+      clipboardData: {
+        items: [{ kind: 'file', getAsFile: () => image }],
+      },
+      preventDefault: vi.fn(),
+    }
+
+    expect(current.controller.handlePaste(event)).toBe(true)
+    await vi.waitFor(() =>
+      expect(current.controller.getItems()[0].status).toBe('uploaded'),
+    )
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(current.urls).toEqual(['blob:paste.png'])
+  })
+
+  it('does not intercept ordinary text paste', () => {
+    let current = harness()
+    let event = {
+      clipboardData: { items: [{ kind: 'string' }] },
+      preventDefault: vi.fn(),
+    }
+
+    expect(current.controller.handlePaste(event)).toBe(false)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(current.controller.getItems()).toEqual([])
+  })
+
+  it('handles the same bubbling paste event only once', async () => {
+    let image = file('single.png', 'image/png')
+    let current = harness()
+    let event = {
+      clipboardData: {
+        items: [{ kind: 'file', getAsFile: () => image }],
+      },
+      preventDefault: vi.fn(),
+    }
+
+    expect(current.controller.handlePaste(event)).toBe(true)
+    expect(current.controller.handlePaste(event)).toBe(true)
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toHaveLength(1),
+    )
+    expect(current.upload).toHaveBeenCalledOnce()
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('treats two separate paste events as two attachments', async () => {
+    let image = file('twice.png', 'image/png')
+    let current = harness()
+    let makeEvent = () => ({
+      clipboardData: {
+        items: [{ kind: 'file', getAsFile: () => image }],
+      },
+      preventDefault: vi.fn(),
+    })
+
+    current.controller.handlePaste(makeEvent())
+    current.controller.handlePaste(makeEvent())
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toHaveLength(2),
+    )
+    expect(current.upload).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses the same pipeline for drag-and-drop', async () => {
+    let current = harness()
+    let event = {
+      dataTransfer: { files: [file('drop.pdf', 'application/pdf')] },
+      preventDefault: vi.fn(),
+    }
+
+    expect(current.controller.handleDrop(event)).toBe(true)
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toEqual(['FILE-drop.pdf']),
+    )
+    expect(current.upload).toHaveBeenCalledOnce()
+  })
+
+  it('removes local state, revokes preview and discards the temporary File', async () => {
+    let current = harness()
+    let [item] = current.controller.addFiles([file('remove.png', 'image/png')])
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toHaveLength(1),
+    )
+
+    await current.controller.remove(item.id)
+
+    expect(current.controller.getItems()).toEqual([])
+    expect(current.revoked).toEqual(['blob:remove.png'])
+    expect(current.discard).toHaveBeenCalledWith(
+      ['FILE-remove.png'],
+      'CONVERSATION-1',
+    )
+  })
+
+  it('freezes an immutable uploaded snapshot until send completes', async () => {
+    let current = harness()
+    let [item] = current.controller.addFiles([file('send.pdf')])
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toEqual(['FILE-send.pdf']),
+    )
+
+    expect(current.controller.freeze()).toEqual(['FILE-send.pdf'])
+    expect(current.controller.isFrozen()).toBe(true)
+    expect(current.controller.addFiles([file('late.pdf')])).toEqual([])
+    await current.controller.remove(item.id)
+    current.controller.retry(item.id)
+    expect(current.controller.readyFileNames()).toEqual(['FILE-send.pdf'])
+
+    current.controller.unfreeze()
+    await current.controller.remove(item.id)
+    expect(current.controller.getItems()).toEqual([])
+  })
+
+  it('releases accepted files locally without server cleanup', async () => {
+    let current = harness()
+    current.controller.addFiles([file('accepted.pdf')])
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toHaveLength(1),
+    )
+
+    current.controller.freeze()
+    current.controller.release()
+
+    expect(current.controller.getItems()).toEqual([])
+    expect(current.discard).not.toHaveBeenCalled()
+  })
+
+  it('discards an upload that finishes after its composer scope reset', async () => {
+    let resolveUpload
+    let upload = vi.fn(
+      () => new Promise((resolve) => (resolveUpload = resolve)),
+    )
+    let current = harness(upload)
+    current.controller.addFiles([file('stale.pdf')])
+
+    await current.controller.discard()
+    resolveUpload({ name: 'FILE-stale.pdf' })
+
+    await vi.waitFor(() =>
+      expect(current.discard).toHaveBeenCalledWith(
+        ['FILE-stale.pdf'],
+        'CONVERSATION-1',
+      ),
+    )
+    expect(current.controller.getItems()).toEqual([])
+  })
+
+  it('keeps a failed upload and retries the same File', async () => {
+    let upload = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ name: 'FILE-retry' })
+    let current = harness(upload)
+    let [item] = current.controller.addFiles([file('retry.jpg', 'image/jpeg')])
+    await vi.waitFor(() =>
+      expect(current.controller.getItems()[0].status).toBe('failed'),
+    )
+
+    await current.controller.retry(item.id)
+
+    expect(current.controller.getItems()[0].status).toBe('uploaded')
+    expect(current.controller.readyFileNames()).toEqual(['FILE-retry'])
+    expect(upload).toHaveBeenCalledTimes(2)
+  })
+
+  it('enforces MAX attachment mixing in the shared pipeline', () => {
+    let result = validateComposerFileMix(
+      [file('document.pdf', 'application/pdf')],
+      [{ file: file('photo.jpg', 'image/jpeg') }],
+      { supportsAttachments: true, channelType: 'max' },
+    )
+    expect(result.files).toEqual([])
+    expect(result.error).toContain('MAX')
+  })
+
+  it('allows 12 mixed MAX images and videos but rejects the thirteenth', () => {
+    let media = Array.from({ length: 12 }, (_, index) =>
+      file(
+        index % 2 ? `video-${index}.mp4` : `image-${index}.jpg`,
+        index % 2 ? 'video/mp4' : 'image/jpeg',
+      ),
+    )
+    let context = {
+      supportsAttachments: true,
+      channelType: 'max',
+      maxAttachmentCount: 12,
+    }
+
+    expect(validateComposerFileMix(media, [], context).error).toBeUndefined()
+    expect(
+      validateComposerFileMix(
+        [...media, file('extra.webp', 'image/webp')],
+        [],
+        context,
+      ).files,
+    ).toEqual([])
+  })
+
+  it('rejects 13 MAX files as one batch with one warning', () => {
+    let onError = vi.fn()
+    let upload = vi.fn()
+    let context = {
+      supportsAttachments: true,
+      channelType: 'max',
+      maxAttachmentCount: 12,
+    }
+    let controller = createComposerAttachmentController({
+      upload,
+      maxFiles: 12,
+      validateFiles: (files, existing) =>
+        validateComposerFileMix(files, existing, context),
+      onError,
+    })
+    let files = Array.from({ length: 13 }, (_, index) =>
+      file(`image-${index}.jpg`, 'image/jpeg'),
+    )
+
+    expect(controller.addFiles(files)).toEqual([])
+    expect(onError).toHaveBeenCalledOnce()
+    expect(upload).not.toHaveBeenCalled()
+    expect(controller.getItems()).toEqual([])
+
+    controller.addFiles(files.slice(0, 11))
+    onError.mockClear()
+    upload.mockClear()
+    expect(controller.addFiles(files.slice(11))).toEqual([])
+    expect(onError).toHaveBeenCalledOnce()
+    expect(upload).not.toHaveBeenCalled()
+    expect(controller.getItems()).toHaveLength(11)
+  })
+
+  it('applies the capability attachment limit to every provider', () => {
+    let result = validateComposerFileMix(
+      [file('third.jpg', 'image/jpeg')],
+      [
+        { file: file('first.jpg', 'image/jpeg') },
+        { file: file('second.jpg', 'image/jpeg') },
+      ],
+      {
+        supportsAttachments: true,
+        channelType: 'custom',
+        maxAttachmentCount: 2,
+      },
+    )
+
+    expect(result.files).toEqual([])
+    expect(result.error).toContain('2')
+  })
+})
