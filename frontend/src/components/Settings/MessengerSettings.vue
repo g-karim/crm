@@ -1,23 +1,23 @@
 <template>
   <SettingsLayoutBase
-    :title="__('Каналы сообщений')"
+    :title="__('Message Channels')"
     :description="
       __(
-        'Подключайте Telegram, VK, MAX, Avito и Wazzup и отвечайте клиентам из карточки лида.',
+        'Connect Telegram, VK, MAX, Avito, WhatsApp, and other channels, and reply to customers from lead records.',
       )
     "
   >
     <template #header-actions>
       <div class="flex items-center gap-2">
         <Button
-          :label="__('Сохранить настройки')"
+          :label="__('Save Settings')"
           variant="subtle"
           :disabled="!settingsDirty"
           :loading="savingSettings"
           @click="saveGlobalSettings"
         />
         <Button
-          :label="__('Новый канал')"
+          :label="__('New Channel')"
           icon-left="lucide-plus"
           variant="solid"
           @click="openNewChannel"
@@ -37,12 +37,12 @@
           <div class="flex items-center justify-between gap-6 p-4">
             <div>
               <div class="text-base-medium text-ink-gray-8">
-                {{ __('Включить Messenger') }}
+                {{ __('Messaging') }}
               </div>
               <div class="mt-1 text-p-sm text-ink-gray-5">
                 {{
                   __(
-                    'Главный переключатель приёма и отправки сообщений через подключённые каналы.',
+                    'Controls incoming and outgoing messages for all connected channels.',
                   )
                 }}
               </div>
@@ -53,12 +53,12 @@
           <div class="flex items-center justify-between gap-6 p-4">
             <div>
               <div class="text-base-medium text-ink-gray-8">
-                {{ __('Создавать лиды из новых диалогов') }}
+                {{ __('Create leads from new conversations') }}
               </div>
               <div class="mt-1 text-p-sm text-ink-gray-5">
                 {{
                   __(
-                    'Если входящий диалог ещё не связан с CRM, Messenger создаст новый лид.',
+                    'Create a new lead when an incoming conversation is not linked to CRM.',
                   )
                 }}
               </div>
@@ -69,12 +69,12 @@
           <div class="flex items-center justify-between gap-6 p-4">
             <div>
               <div class="text-base-medium text-ink-gray-8">
-                {{ __('Хранить сырые webhook-события') }}
+                {{ __('Store raw webhook events') }}
               </div>
               <div class="mt-1 text-p-sm text-ink-gray-5">
                 {{
                   __(
-                    'Нужно только для диагностики. В рабочем режиме рекомендуется оставить выключенным.',
+                    'Use this only for diagnostics. Keep it disabled in normal operation.',
                   )
                 }}
               </div>
@@ -94,7 +94,7 @@
               class="size-4 transition-transform"
               :class="showAdvanced && 'rotate-90'"
             />
-            {{ __('Webhook и Avito OAuth') }}
+            {{ __('Webhooks and Avito OAuth') }}
           </button>
           <div
             v-if="showAdvanced"
@@ -103,36 +103,32 @@
             <FormControl
               v-model="settings.webhook_secret"
               type="password"
-              :label="__('Общий Webhook Secret')"
+              :label="__('Shared Webhook Secret')"
               :placeholder="
                 secretPlaceholder(settings.webhook_secret_configured)
               "
-              :description="
-                __('Оставьте пустым, чтобы сохранить текущий секрет.')
-              "
+              :description="__('Leave blank to keep the current secret.')"
             />
             <FormControl
               v-model="settings.oauth_site_url"
               type="text"
-              label="OAuth Site URL"
+              :label="__('OAuth Site URL')"
               placeholder="https://crm.example.com"
             />
             <FormControl
               v-model="settings.avito_oauth_broker_url"
               type="text"
-              label="Avito OAuth Broker URL"
+              :label="__('Avito OAuth Broker URL')"
               placeholder="https://broker.example.com"
             />
             <FormControl
               v-model="settings.avito_oauth_broker_secret"
               type="password"
-              label="Avito OAuth Broker Secret"
+              :label="__('Avito OAuth Broker Secret')"
               :placeholder="
                 secretPlaceholder(settings.avito_oauth_broker_secret_configured)
               "
-              :description="
-                __('Оставьте пустым, чтобы сохранить текущий секрет.')
-              "
+              :description="__('Leave blank to keep the current secret.')"
             />
           </div>
         </section>
@@ -141,13 +137,11 @@
           <div class="mb-3 flex items-end justify-between">
             <div>
               <h3 class="text-lg-semibold text-ink-gray-8">
-                {{ __('Подключённые каналы') }}
+                {{ __('Connected Channels') }}
               </h3>
               <p class="mt-1 text-p-sm text-ink-gray-5">
                 {{
-                  __(
-                    'Один канал соответствует одному аккаунту, сообществу или боту.',
-                  )
+                  __('Each channel represents one account, community, or bot.')
                 }}
               </p>
             </div>
@@ -172,18 +166,18 @@
               />
             </div>
             <div class="mt-3 text-base-medium text-ink-gray-7">
-              {{ __('Каналов пока нет') }}
+              {{ __('No channels yet') }}
             </div>
             <div class="mt-1 max-w-md text-p-sm text-ink-gray-5">
               {{
                 __(
-                  'Создайте канал, сохраните токен и завершите подключение к провайдеру.',
+                  'Create a channel, save its token, and complete the connection.',
                 )
               }}
             </div>
             <Button
               class="mt-4"
-              :label="__('Создать канал')"
+              :label="__('Create Channel')"
               variant="solid"
               @click="openNewChannel"
             />
@@ -234,7 +228,7 @@
   <Dialog
     v-model:open="showChannelDialog"
     :options="{
-      title: channelDraft.channel ? __('Настройка канала') : __('Новый канал'),
+      title: channelDraft.channel ? __('Channel Settings') : __('New Channel'),
     }"
     size="xl"
   >
@@ -249,7 +243,7 @@
               {{ channelTitle(channelDraft) }}
             </div>
             <div class="text-p-sm text-ink-gray-5">
-              {{ messengerProviderLabel(channelDraft.provider) }}
+              {{ localizedProviderLabel(channelDraft.provider) }}
             </div>
           </div>
           <Badge
@@ -265,15 +259,15 @@
             type="select"
             required
             :disabled="Boolean(channelDraft.channel)"
-            :options="MESSENGER_PROVIDER_OPTIONS"
-            :label="__('Провайдер')"
+            :options="providerOptions"
+            :label="__('Provider')"
             @update:modelValue="changeProvider"
           />
           <FormControl
             v-model="channelDraft.custom_display_name"
             type="text"
-            :label="__('Название канала')"
-            :placeholder="__('Например, Отдел продаж')"
+            :label="__('Channel Name')"
+            :placeholder="__('For example, Sales')"
           />
 
           <FormControl
@@ -282,14 +276,14 @@
             type="select"
             required
             :options="wazzupPlatforms"
-            :label="__('Платформа')"
+            :label="__('Platform')"
           />
           <FormControl
             v-if="channelDraft.provider === 'wazzup'"
             v-model="channelDraft.provider_channel_id"
             type="text"
             required
-            :label="__('ID канала Wazzup')"
+            :label="__('Channel ID')"
             placeholder="channelId / plainId"
           />
 
@@ -298,8 +292,8 @@
             v-model="channelDraft.external_account_id"
             type="text"
             required
-            :label="__('Сообщество VK')"
-            :placeholder="__('ID или короткое имя сообщества')"
+            :label="__('VK Community')"
+            :placeholder="__('Community ID or short name')"
           />
 
           <FormControl
@@ -307,7 +301,7 @@
             v-model="channelDraft.auth_type"
             type="select"
             :options="avitoAuthTypes"
-            :label="__('Способ подключения Avito')"
+            :label="__('Avito Connection Method')"
           />
           <FormControl
             v-if="
@@ -317,7 +311,7 @@
             v-model="channelDraft.external_account_id"
             type="text"
             required
-            label="Avito Account ID"
+            :label="__('Avito Account ID')"
           />
           <FormControl
             v-if="
@@ -327,7 +321,7 @@
             v-model="channelDraft.client_id"
             type="text"
             required
-            label="Client ID"
+            :label="__('Client ID')"
           />
 
           <FormControl
@@ -335,9 +329,9 @@
             v-model="channelDraft.api_token"
             type="password"
             :required="!channelDraft.api_token_configured"
-            :label="apiTokenLabel"
+            :label="__(apiTokenLabel)"
             :placeholder="secretPlaceholder(channelDraft.api_token_configured)"
-            :description="__('Оставьте пустым, чтобы сохранить текущий токен.')"
+            :description="__('Leave blank to keep the current token.')"
           />
           <FormControl
             v-if="
@@ -347,13 +341,11 @@
             v-model="channelDraft.client_secret"
             type="password"
             :required="!channelDraft.client_secret_configured"
-            label="Client Secret"
+            :label="__('Client Secret')"
             :placeholder="
               secretPlaceholder(channelDraft.client_secret_configured)
             "
-            :description="
-              __('Оставьте пустым, чтобы сохранить текущий секрет.')
-            "
+            :description="__('Leave blank to keep the current secret.')"
           />
         </div>
 
@@ -363,7 +355,7 @@
         >
           {{
             __(
-              'Для подключения webhook CRM должна быть доступна провайдеру по публичному HTTPS-адресу.',
+              'CRM must be available at a public HTTPS address to connect webhooks.',
             )
           }}
         </div>
@@ -372,7 +364,7 @@
           v-if="channelDraft.auth_error"
           class="rounded-lg bg-surface-red-1 px-3 py-2 text-p-sm text-ink-red-3"
         >
-          {{ channelDraft.auth_error }}
+          {{ clientProviderMessage(channelDraft.auth_error) }}
         </div>
 
         <div
@@ -381,21 +373,21 @@
         >
           <Button
             v-if="isDirectMessengerProvider(channelDraft.provider)"
-            :label="__('Проверить')"
+            :label="__('Test')"
             variant="subtle"
             :loading="channelAction === 'test'"
             @click="runChannelAction('test')"
           />
           <Button
             v-if="isDirectMessengerProvider(channelDraft.provider)"
-            :label="__('Подключить / исправить')"
+            :label="__('Connect / Repair')"
             variant="solid"
             :loading="channelAction === 'connect'"
             @click="runChannelAction('connect')"
           />
           <Button
             v-if="isDirectMessengerProvider(channelDraft.provider)"
-            :label="__('Обновить статус')"
+            :label="__('Refresh Status')"
             variant="subtle"
             :loading="channelAction === 'status'"
             @click="runChannelAction('status')"
@@ -405,7 +397,7 @@
               channelDraft.provider === 'avito_direct' &&
               channelDraft.auth_type === 'authorization_code'
             "
-            :label="__('Подключить Avito')"
+            :label="__('Connect Avito')"
             variant="solid"
             :loading="channelAction === 'avito-oauth'"
             @click="runChannelAction('avito-oauth')"
@@ -415,7 +407,7 @@
               channelDraft.provider === 'avito_direct' &&
               channelDraft.auth_type !== 'authorization_code'
             "
-            :label="__('Зарегистрировать webhook')"
+            :label="__('Register Webhook')"
             variant="subtle"
             :loading="channelAction === 'avito-webhook'"
             @click="runChannelAction('avito-webhook')"
@@ -425,7 +417,7 @@
               isDirectMessengerProvider(channelDraft.provider) &&
               channelDraft.enabled
             "
-            :label="__('Отключить')"
+            :label="__('Disconnect')"
             variant="subtle"
             theme="red"
             :loading="channelAction === 'disconnect'"
@@ -439,12 +431,12 @@
     <template #actions>
       <div class="flex w-full justify-end gap-2">
         <Button
-          :label="__('Закрыть')"
+          :label="__('Close')"
           variant="subtle"
           @click="showChannelDialog = false"
         />
         <Button
-          :label="channelDraft.channel ? __('Сохранить') : __('Создать канал')"
+          :label="channelDraft.channel ? __('Save') : __('Create Channel')"
           variant="solid"
           :loading="savingChannel"
           @click="saveChannel"
@@ -512,10 +504,17 @@ const wazzupPlatforms = [
   { label: 'Telegram', value: 'telegram' },
 ]
 const avitoAuthTypes = [
-  { label: 'OAuth', value: 'authorization_code' },
-  { label: 'Client ID / Secret', value: 'client_credentials' },
-  { label: 'API Token', value: 'api_token' },
+  { label: __('OAuth'), value: 'authorization_code' },
+  { label: __('Client ID / Secret'), value: 'client_credentials' },
+  { label: __('API Token'), value: 'api_token' },
 ]
+
+const providerOptions = computed(() =>
+  MESSENGER_PROVIDER_OPTIONS.map((option) => ({
+    ...option,
+    label: __(option.label),
+  })),
+)
 
 const settingsDirty = computed(
   () => settingsSnapshot.value && settingsSnapshot.value !== settingsState(),
@@ -570,7 +569,9 @@ async function loadSettings(isRefresh = false, channelsOnly = false) {
     channels.value = result.channels || []
   } catch (error) {
     toast.error(
-      error?.messages?.[0] || __('Не удалось загрузить настройки Messenger.'),
+      clientProviderMessage(
+        error?.messages?.[0] || 'Could not load message channel settings.',
+      ),
     )
   } finally {
     loading.value = false
@@ -597,10 +598,12 @@ async function saveGlobalSettings() {
     settings.webhook_secret = ''
     settings.avito_oauth_broker_secret = ''
     settingsSnapshot.value = settingsState()
-    toast.success(__('Настройки Messenger сохранены.'))
+    toast.success(__('Message channel settings saved.'))
   } catch (error) {
     toast.error(
-      error?.messages?.[0] || __('Не удалось сохранить настройки Messenger.'),
+      clientProviderMessage(
+        error?.messages?.[0] || 'Could not save message channel settings.',
+      ),
     )
   } finally {
     savingSettings.value = false
@@ -648,10 +651,11 @@ async function saveChannel() {
     await loadSettings(true, true)
     let fresh = channels.value.find((row) => row.name === result.name) || result
     openChannel(fresh)
-    toast.success(wasNew ? __('Канал создан.') : __('Канал сохранён.'))
+    toast.success(wasNew ? __('Channel created.') : __('Channel saved.'))
   } catch (saveError) {
-    channelError.value =
-      saveError?.messages?.[0] || __('Не удалось сохранить канал.')
+    channelError.value = clientProviderMessage(
+      saveError?.messages?.[0] || 'Could not save the channel.',
+    )
   } finally {
     savingChannel.value = false
   }
@@ -673,9 +677,7 @@ async function runChannelAction(action) {
     if (action === 'avito-oauth') params.return_url = window.location.href
     let result = await call(methods[action], params)
     if (!result?.ok) {
-      throw new Error(
-        result?.message || __('Операция провайдера завершилась ошибкой.'),
-      )
+      throw new Error(result?.message || __('The provider operation failed.'))
     }
     if (result.authorization_url) {
       window.open(result.authorization_url, '_blank', 'noopener')
@@ -685,12 +687,15 @@ async function runChannelAction(action) {
       (row) => row.name === channelDraft.value.channel,
     )
     if (fresh) openChannel(fresh)
-    toast.success(result.message || __('Операция выполнена.'))
+    toast.success(
+      clientProviderMessage(result.message || 'Operation completed.'),
+    )
   } catch (error) {
-    channelError.value =
+    channelError.value = clientProviderMessage(
       error?.messages?.[0] ||
-      error?.message ||
-      __('Операция провайдера завершилась ошибкой.')
+        error?.message ||
+        'The provider operation failed.',
+    )
   } finally {
     channelAction.value = ''
   }
@@ -701,12 +706,12 @@ function channelTitle(channel) {
     channel.custom_display_name ||
     channel.provider_display_name ||
     channel.label ||
-    messengerProviderLabel(channel.provider)
+    localizedProviderLabel(channel.provider)
   )
 }
 
 function providerDescription(channel) {
-  let parts = [messengerProviderLabel(channel.provider)]
+  let parts = [localizedProviderLabel(channel.provider)]
   if (channel.platform) parts.push(channel.platform)
   if (channel.external_account_id) parts.push(channel.external_account_id)
   else if (channel.provider_channel_id) parts.push(channel.provider_channel_id)
@@ -718,8 +723,19 @@ function providerInitial(provider) {
   return label === 'Telegram Bot' ? 'TG' : label.slice(0, 2).toUpperCase()
 }
 
+function localizedProviderLabel(provider) {
+  return __(messengerProviderLabel(provider))
+}
+
 function secretPlaceholder(configured) {
-  return configured ? __('Секрет уже сохранён') : __('Введите секрет')
+  return configured ? __('Secret already saved') : __('Enter secret')
+}
+
+function clientProviderMessage(message) {
+  let text = String(message || '')
+  if (!text) return ''
+  if (/wazzup(?:24)?/i.test(text)) return __('The provider operation failed.')
+  return __(text)
 }
 
 onMounted(() => loadSettings())

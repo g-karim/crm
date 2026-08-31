@@ -2,11 +2,23 @@ import {
   applyMessengerProviderDefaults,
   buildMessengerChannelPayload,
   makeMessengerChannelDraft,
+  MESSENGER_PROVIDER_OPTIONS,
   messengerChannelState,
   validateMessengerChannelDraft,
 } from '@/utils/messengerSettings'
 
 describe('messengerSettings', () => {
+  it('keeps the gateway brand out of customer-facing provider labels', () => {
+    const gateway = MESSENGER_PROVIDER_OPTIONS.find(
+      (option) => option.value === 'wazzup',
+    )
+
+    expect(gateway.label).toBe('WhatsApp & Telegram')
+    expect(
+      MESSENGER_PROVIDER_OPTIONS.map((option) => option.label).join(' '),
+    ).not.toContain('Wazzup')
+  })
+
   it('creates provider-aware drafts without exposing saved secrets', () => {
     expect(
       makeMessengerChannelDraft({
@@ -63,26 +75,24 @@ describe('messengerSettings', () => {
 
   it('validates required credentials for each provider', () => {
     expect(validateMessengerChannelDraft(makeMessengerChannelDraft())).toBe(
-      'Укажите API-токен.',
+      'Enter an API token.',
     )
 
     let wazzup = makeMessengerChannelDraft({ provider: 'wazzup' })
     wazzup.api_token = 'secret'
-    expect(validateMessengerChannelDraft(wazzup)).toBe(
-      'Укажите ID канала Wazzup.',
-    )
+    expect(validateMessengerChannelDraft(wazzup)).toBe('Enter a channel ID.')
 
     let avito = makeMessengerChannelDraft({ provider: 'avito_direct' })
     expect(validateMessengerChannelDraft(avito)).toBe('')
     avito.auth_type = 'client_credentials'
     expect(validateMessengerChannelDraft(avito)).toBe(
-      'Укажите ID аккаунта Avito.',
+      'Enter an Avito account ID.',
     )
   })
 
   it('maps channel connection states for the list', () => {
     expect(messengerChannelState({ enabled: 0 })).toEqual({
-      label: 'Выключен',
+      label: 'Channel Disabled',
       theme: 'gray',
     })
     expect(
@@ -91,6 +101,6 @@ describe('messengerSettings', () => {
         provider: 'telegram_bot',
         state: 'connected',
       }),
-    ).toEqual({ label: 'Подключён', theme: 'green' })
+    ).toEqual({ label: 'Channel Connected', theme: 'green' })
   })
 })

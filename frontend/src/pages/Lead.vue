@@ -454,7 +454,7 @@ const tabs = computed(() => {
     },
     {
       name: 'Messenger',
-      label: __('Переписка'),
+      label: __('Messages'),
       icon: CommentIcon,
     },
     {

@@ -6,7 +6,7 @@
       ref="mapElement"
       class="h-40 w-full bg-surface-gray-2"
       role="img"
-      :aria-label="__('Геолокация: {0}', [coordinateText])"
+      :aria-label="__('Location: {0}', [coordinateText])"
     />
     <div class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
       <div class="min-w-0">
@@ -24,7 +24,7 @@
         rel="noopener noreferrer"
         class="shrink-0 text-ink-blue-6 hover:underline"
       >
-        {{ __('Открыть карту') }}
+        {{ __('Open Map') }}
       </a>
     </div>
   </div>

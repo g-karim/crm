@@ -6,6 +6,7 @@ from frappe.rate_limiter import rate_limit
 from frappe.translate import get_all_translations
 from frappe.utils import cstr, split_emails, validate_email_address
 
+from crm.translations import get_crm_translations
 from crm.utils import is_frappe_version
 
 
@@ -16,7 +17,9 @@ def get_translations():
 	else:
 		language = frappe.db.get_single_value("System Settings", "language")
 
-	return get_all_translations(language)
+	translations = get_all_translations(language)
+	translations.update(get_crm_translations(language))
+	return translations
 
 
 @frappe.whitelist()

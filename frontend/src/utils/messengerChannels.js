@@ -10,31 +10,31 @@ const PLATFORM_LABELS = {
 }
 
 const DELIVERY_LABELS = {
-  queued: 'В очереди',
-  sending: 'Отправляется',
-  retrying: 'Повторная попытка',
-  unknown: 'Результат неизвестен',
-  sent: 'Отправлено',
-  delivered: 'Доставлено',
-  read: 'Прочитано',
-  failed: 'Ошибка',
+  queued: 'Queued',
+  sending: 'Sending',
+  retrying: 'Retrying',
+  unknown: 'Result unknown',
+  sent: 'Sent',
+  delivered: 'Delivered',
+  read: 'Read by recipient',
+  failed: 'Delivery failed',
 }
 
 const DELIVERY_STATES = Object.keys(DELIVERY_LABELS)
 
-const RUSSIAN_MONTHS = [
-  'января',
-  'февраля',
-  'марта',
-  'апреля',
-  'мая',
-  'июня',
-  'июля',
-  'августа',
-  'сентября',
-  'октября',
-  'ноября',
-  'декабря',
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ]
 
 export function getMessengerDayKey(messageDatetime) {
@@ -52,12 +52,12 @@ export function getMessengerDateLabel(messageDatetime, now = dayjsLocal()) {
   if (!date?.isValid() || !currentDate?.isValid()) return ''
 
   let dayKey = date.format('YYYY-MM-DD')
-  if (dayKey === currentDate.format('YYYY-MM-DD')) return 'Сегодня'
+  if (dayKey === currentDate.format('YYYY-MM-DD')) return translate('Today')
   if (dayKey === currentDate.subtract(1, 'day').format('YYYY-MM-DD')) {
-    return 'Вчера'
+    return translate('Yesterday')
   }
 
-  let label = `${date.date()} ${RUSSIAN_MONTHS[date.month()]}`
+  let label = `${date.date()} ${translate(MONTHS[date.month()])}`
   return date.year() === currentDate.year() ? label : `${label} ${date.year()}`
 }
 
@@ -178,12 +178,12 @@ export function shouldShowMessengerText(message = {}) {
 }
 
 export function getMessengerDeliveryLabel(message = {}) {
-  if (isMaxVideoProcessingMessage(message)) return 'MAX обрабатывает видео'
+  if (isMaxVideoProcessingMessage(message)) return 'MAX is processing the video'
   if (
     message?.provider === 'telegram_bot' &&
     getMessengerDeliveryState(message) === 'sent'
   ) {
-    return 'Отправлено в Telegram; статус прочтения недоступен'
+    return 'Sent to Telegram; read status is unavailable'
   }
   return DELIVERY_LABELS[getMessengerDeliveryState(message)] || ''
 }
@@ -206,7 +206,7 @@ export function getMessengerConversationNotice(conversation = {}) {
     return {
       type: 'warning',
       message:
-        'Клиент удалил диалог MAX. Отправка недоступна до повторного запуска бота.',
+        'The customer deleted the MAX conversation. Sending is unavailable until the bot is restarted.',
       blocksSend: true,
     }
   }
@@ -214,14 +214,15 @@ export function getMessengerConversationNotice(conversation = {}) {
     return {
       type: 'warning',
       message:
-        'Клиент остановил бота MAX. Отправка недоступна до возобновления диалога.',
+        'The customer stopped the MAX bot. Sending is unavailable until the conversation resumes.',
       blocksSend: true,
     }
   }
   if (conversation?.provider_history_cleared_at) {
     return {
       type: 'info',
-      message: 'Клиент очистил историю диалога в MAX. История в CRM сохранена.',
+      message:
+        'The customer cleared the MAX conversation history. The CRM history was preserved.',
       blocksSend: false,
     }
   }
@@ -283,6 +284,10 @@ export function getMessengerCapabilities(channel = {}) {
 
 function normalizePlatform(value) {
   return `${value || ''}`.trim().toLowerCase()
+}
+
+function translate(value) {
+  return globalThis.__ ? globalThis.__(value) : value
 }
 
 function humanizePlatform(value) {

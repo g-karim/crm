@@ -9,7 +9,7 @@ export const MESSENGER_PROVIDER_OPTIONS = [
   { label: 'VK', value: 'vk_direct' },
   { label: 'MAX', value: 'max_direct' },
   { label: 'Avito', value: 'avito_direct' },
-  { label: 'Wazzup', value: 'wazzup' },
+  { label: 'WhatsApp & Telegram', value: 'wazzup' },
 ]
 
 const PROVIDER_DEFAULTS = {
@@ -91,7 +91,7 @@ export function buildMessengerChannelPayload(draft) {
 }
 
 export function validateMessengerChannelDraft(draft) {
-  if (!draft.provider) return 'Выберите провайдера.'
+  if (!draft.provider) return 'Select a provider.'
   if (
     ['telegram_bot', 'vk_direct', 'max_direct', 'wazzup'].includes(
       draft.provider,
@@ -99,17 +99,17 @@ export function validateMessengerChannelDraft(draft) {
     !draft.api_token_configured &&
     !clean(draft.api_token)
   ) {
-    return 'Укажите API-токен.'
+    return 'Enter an API token.'
   }
   if (draft.provider === 'vk_direct' && !clean(draft.external_account_id)) {
-    return 'Укажите ID или короткое имя сообщества VK.'
+    return 'Enter a VK community ID or short name.'
   }
   if (draft.provider === 'wazzup') {
     if (!['whatsapp', 'telegram'].includes(draft.platform)) {
-      return 'Выберите платформу Wazzup.'
+      return 'Select a messaging platform.'
     }
     if (!clean(draft.provider_channel_id)) {
-      return 'Укажите ID канала Wazzup.'
+      return 'Enter a channel ID.'
     }
   }
   if (draft.provider === 'avito_direct') {
@@ -117,12 +117,12 @@ export function validateMessengerChannelDraft(draft) {
       draft.auth_type !== 'authorization_code' &&
       !clean(draft.external_account_id)
     ) {
-      return 'Укажите ID аккаунта Avito.'
+      return 'Enter an Avito account ID.'
     }
     if (draft.auth_type === 'client_credentials') {
-      if (!clean(draft.client_id)) return 'Укажите Client ID Avito.'
+      if (!clean(draft.client_id)) return 'Enter the Avito Client ID.'
       if (!draft.client_secret_configured && !clean(draft.client_secret)) {
-        return 'Укажите Client Secret Avito.'
+        return 'Enter the Avito Client Secret.'
       }
     }
     if (
@@ -130,7 +130,7 @@ export function validateMessengerChannelDraft(draft) {
       !draft.api_token_configured &&
       !clean(draft.api_token)
     ) {
-      return 'Укажите API-токен Avito.'
+      return 'Enter an Avito API token.'
     }
   }
   return ''
@@ -138,18 +138,18 @@ export function validateMessengerChannelDraft(draft) {
 
 export function messengerChannelState(channel = {}) {
   if (!channel.enabled) {
-    return { label: 'Выключен', theme: 'gray' }
+    return { label: 'Channel Disabled', theme: 'gray' }
   }
   if (isDirectMessengerProvider(channel.provider)) {
     if (channel.state === 'connected') {
-      return { label: 'Подключён', theme: 'green' }
+      return { label: 'Channel Connected', theme: 'green' }
     }
     if (channel.state === 'degraded') {
-      return { label: 'Требует внимания', theme: 'orange' }
+      return { label: 'Needs Attention', theme: 'orange' }
     }
-    return { label: 'Не подключён', theme: 'red' }
+    return { label: 'Channel Not Connected', theme: 'red' }
   }
-  return { label: 'Включён', theme: 'green' }
+  return { label: 'Channel Enabled', theme: 'green' }
 }
 
 function clean(value) {

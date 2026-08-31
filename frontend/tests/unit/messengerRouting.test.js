@@ -100,7 +100,7 @@ describe('messenger routing', () => {
         channel: 'TG',
         last_message: { message_type: 'video' },
       }).label,
-    ).toContain('Видео')
+    ).toContain('Video')
   })
 
   it('pins reply to the source conversation regardless of selected channel', () => {

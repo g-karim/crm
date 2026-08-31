@@ -56,7 +56,7 @@ describe('forwarded message stack', () => {
     })
 
     expect(root.querySelectorAll('[data-forward-item]')).toHaveLength(2)
-    expect(root.textContent).toContain('Пересланное сообщение')
+    expect(root.textContent).toContain('Forwarded Message')
     expect(root.textContent).toContain('Мария')
     expect(root.textContent).toContain('Первое сообщение')
     expect(root.textContent).toContain('Вложенное сообщение')
@@ -98,7 +98,7 @@ describe('forwarded message stack', () => {
       ],
     })
 
-    expect(root.textContent).toContain('Исходное сообщение')
+    expect(root.textContent).toContain('Original Message')
     expect(root.textContent.indexOf('Исходный текст')).toBeLessThan(
       root.textContent.indexOf('Ответ'),
     )
@@ -130,8 +130,8 @@ describe('forwarded message stack', () => {
       version: 1,
       items: [{ key: 'forward-0', relation: 'forward', items: [] }],
     })
-    expect(root.textContent).toContain('Пересланное сообщение')
-    expect(root.textContent).not.toContain('недоступно')
+    expect(root.textContent).toContain('Forwarded Message')
+    expect(root.textContent).not.toContain('unavailable')
   })
 
   it('shows unavailable and truncation fallbacks explicitly', () => {
@@ -148,7 +148,7 @@ describe('forwarded message stack', () => {
       ],
     })
 
-    expect(root.textContent).toContain('Вложение недоступно')
+    expect(root.textContent).toContain('Attachment unavailable')
     expect(root.querySelector('[data-forward-truncated]')).not.toBeNull()
   })
 })

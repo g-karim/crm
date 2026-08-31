@@ -119,7 +119,7 @@ describe('messenger rich content', () => {
       },
     })
 
-    expect(root.textContent).toContain('Голосовое сообщение')
+    expect(root.textContent).toContain('Voice message')
     expect(root.textContent).not.toContain('voice.ogg')
     expect(root.querySelector('[data-messenger-audio]').className).toContain(
       'w-[min(22rem,calc(100vw-3rem))]',
@@ -170,7 +170,7 @@ describe('messenger rich content', () => {
       },
     })
 
-    expect(root.textContent).toContain('Контакт')
+    expect(root.textContent).toContain('Contact')
     expect(root.textContent).toContain('Иван Иванов')
     expect(root.textContent).not.toContain('Подтверждён MAX')
     expect(root.textContent).not.toContain('Не подтверждён MAX')
@@ -184,8 +184,8 @@ describe('messenger rich content', () => {
       contact: { phones: [], verified: false, max_user_id: '12345' },
     })
 
-    expect(root.textContent).toContain('Контакт')
-    expect(root.textContent).toContain('Имя не указано')
+    expect(root.textContent).toContain('Contact')
+    expect(root.textContent).toContain('Name not provided')
     expect(root.textContent).not.toContain('Не подтверждён MAX')
     expect(root.textContent).not.toContain('12345')
     expect(root.querySelector('a')).toBeNull()
@@ -251,9 +251,7 @@ describe('messenger rich content', () => {
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true')
     expect(buttons[1].textContent).toContain('#64 1')
     expect(buttons[2].textContent).toContain('✦ 1')
-    expect(buttons[2].getAttribute('title')).toBe(
-      'Пользовательская реакция Telegram',
-    )
+    expect(buttons[2].getAttribute('title')).toBe('Custom Telegram Reaction')
     expect(buttons[2].disabled).toBe(true)
     expect(buttons).toHaveLength(3)
 

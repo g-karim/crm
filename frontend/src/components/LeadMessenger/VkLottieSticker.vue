@@ -20,7 +20,7 @@
       v-else-if="!ready || reducedMotion"
       class="flex size-full items-center justify-center rounded-lg bg-surface-gray-2 p-3 text-center text-xs text-ink-gray-5"
     >
-      {{ __('Стикер недоступен') }}
+      {{ __('Sticker unavailable') }}
     </div>
   </div>
 </template>

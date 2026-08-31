@@ -82,9 +82,9 @@ describe('messenger responsive markup', () => {
 
   it('gates every mutation surface with backend operator permissions', () => {
     expect(conversationSource).toContain('v-if="permissions.can_operate"')
-    expect(conversationSource).toContain("{{ __('Только чтение') }}")
+    expect(conversationSource).toContain("{{ __('Read Only') }}")
     expect(conversationSource).toContain(
-      "__('Для этого лида пока нет доступных сообщений.')",
+      "__('There are no available messages for this lead yet.')",
     )
     expect(conversationSource).toContain(
       ':can-send="Boolean(item.message.can_react)"',

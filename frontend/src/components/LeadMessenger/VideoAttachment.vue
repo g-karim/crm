@@ -27,7 +27,7 @@
         data-video-loading
         class="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-black/20"
         role="status"
-        :aria-label="__('Загрузка видео')"
+        :aria-label="__('Loading Video')"
       >
         <span
           class="grid size-10 place-items-center rounded-full bg-black/65 text-white shadow-sm"
@@ -61,7 +61,7 @@
       data-video-frame
       class="group relative block w-full overflow-hidden bg-black text-left"
       :style="mediaAspectStyle"
-      :aria-label="__('Воспроизвести видео')"
+      :aria-label="__('Play Video')"
       @click="activate"
     >
       <img
@@ -167,7 +167,7 @@
           class="text-xs text-ink-blue-6 hover:underline"
           @click="retryLocal"
         >
-          {{ __('Повторить воспроизведение') }}
+          {{ __('Replay') }}
         </button>
       </div>
       <a
@@ -283,17 +283,15 @@ const showBackdrop = computed(
   () => mediaDimensions.value.letterboxed && Boolean(backdropSource.value),
 )
 const actionLabel = computed(() =>
-  props.provider === 'vk_direct'
-    ? __('Смотреть в VK Видео')
-    : __('Открыть источник'),
+  props.provider === 'vk_direct' ? __('Watch on VK Video') : __('Open Source'),
 )
 const statusLabel = computed(() => {
-  if (immediateExternalFallback.value) return __('Доступно только во VK')
+  if (immediateExternalFallback.value) return __('Available only on VK')
   if (state.value.busy) return state.value.label
-  if (state.value.unsupported) return __('Формат видео не поддерживается')
+  if (state.value.unsupported) return __('Video format is not supported')
   if (props.provider === 'vk_direct' && !playable.value && action.value)
-    return __('Доступно только во VK')
-  if (!playable.value && !action.value) return __('Видео недоступно')
+    return __('Available only on VK')
+  if (!playable.value && !action.value) return __('Video unavailable')
   return ''
 })
 const showFooter = computed(

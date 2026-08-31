@@ -49,11 +49,11 @@ export function voiceLevelFromTimeDomain(values = []) {
 export function voiceRecorderError(error) {
   let name = error?.name || ''
   if (name === 'NotAllowedError' || name === 'SecurityError')
-    return 'Доступ к микрофону запрещён.'
-  if (name === 'NotFoundError') return 'Микрофон не найден.'
+    return 'Microphone access was denied.'
+  if (name === 'NotFoundError') return 'Microphone not found.'
   if (name === 'NotReadableError' || name === 'AbortError')
-    return 'Микрофон занят или недоступен.'
-  return error?.message || 'Не удалось начать запись.'
+    return 'The microphone is busy or unavailable.'
+  return error?.message || 'Could not start recording.'
 }
 
 export function createMessengerVoiceRecorder({
@@ -114,14 +114,14 @@ export function createMessengerVoiceRecorder({
     ) {
       publish({
         state: 'error',
-        error: 'Для записи микрофона требуется HTTPS.',
+        error: 'HTTPS is required to record audio.',
       })
       return
     }
     if (!mediaDevices?.getUserMedia || !MediaRecorderClass || !mimeType) {
       publish({
         state: 'error',
-        error: 'Запись голосовых не поддерживается этим браузером.',
+        error: 'Voice recording is not supported by this browser.',
       })
       return
     }
@@ -212,7 +212,7 @@ export function createMessengerVoiceRecorder({
         state: 'error',
         blob: null,
         url: '',
-        error: 'Запись превысила допустимый размер.',
+        error: 'The recording exceeded the size limit.',
       })
       return
     }

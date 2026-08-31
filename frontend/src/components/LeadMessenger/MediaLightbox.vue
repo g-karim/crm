@@ -40,7 +40,7 @@
           ref="mediaElement"
           data-lightbox-image
           :src="current.url"
-          :alt="current.file_name || __('Изображение')"
+          :alt="current.file_name || __('Image')"
           class="max-h-full max-w-full object-contain will-change-transform"
           :style="mediaStyle"
           draggable="false"
@@ -52,7 +52,7 @@
           data-lightbox-unavailable
           class="rounded-xl border border-white/20 bg-black/70 px-4 py-3 text-sm text-white"
         >
-          {{ __('Медиа недоступно') }}
+          {{ __('Media unavailable') }}
         </div>
       </div>
 
@@ -64,8 +64,8 @@
           data-lightbox-download
           :href="current.download_url"
           class="grid size-9 place-items-center rounded-lg text-white transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30"
-          :aria-label="__('Скачать')"
-          :title="__('Скачать')"
+          :aria-label="__('Download')"
+          :title="__('Download')"
         >
           <DownloadIcon class="size-4" />
         </a>
@@ -74,7 +74,7 @@
           type="button"
           class="grid size-9 place-items-center rounded-lg transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30 disabled:opacity-40 disabled:hover:scale-100"
           :disabled="scale <= MIN_SCALE || mediaFailed"
-          :aria-label="__('Уменьшить')"
+          :aria-label="__('Zoom Out')"
           @click="setScale(scale - SCALE_STEP)"
         >
           <MinusIcon class="size-4" />
@@ -84,7 +84,7 @@
           type="button"
           class="min-w-14 rounded-lg px-2 py-2 text-xs font-medium transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30 disabled:opacity-40 disabled:hover:scale-100"
           :disabled="mediaFailed"
-          :aria-label="__('Сбросить масштаб')"
+          :aria-label="__('Reset Zoom')"
           @click="resetView"
         >
           {{ Math.round(scale * 100) }}%
@@ -94,7 +94,7 @@
           type="button"
           class="grid size-9 place-items-center rounded-lg transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30 disabled:opacity-40 disabled:hover:scale-100"
           :disabled="scale >= MAX_SCALE || mediaFailed"
-          :aria-label="__('Увеличить')"
+          :aria-label="__('Zoom In')"
           @click="setScale(scale + SCALE_STEP)"
         >
           <PlusIcon class="size-4" />
@@ -103,7 +103,7 @@
           data-lightbox-close
           type="button"
           class="grid size-9 place-items-center rounded-lg transition duration-150 ease-out hover:scale-105 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/30"
-          :aria-label="__('Закрыть')"
+          :aria-label="__('Close')"
           @click="emit('close')"
         >
           <XIcon class="size-4" />
@@ -115,7 +115,7 @@
         data-lightbox-previous
         type="button"
         class="absolute left-2 z-10 grid size-11 place-items-center rounded-full border border-white/20 bg-black/65 p-0 leading-none text-white shadow transition duration-150 ease-out hover:scale-105 hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/20 sm:left-6"
-        :aria-label="__('Предыдущее медиа')"
+        :aria-label="__('Previous Media')"
         @click="move(-1)"
       >
         <span class="grid size-full place-items-center leading-none">
@@ -127,7 +127,7 @@
         data-lightbox-next
         type="button"
         class="absolute right-2 z-10 grid size-11 place-items-center rounded-full border border-white/20 bg-black/65 p-0 leading-none text-white shadow transition duration-150 ease-out hover:scale-105 hover:bg-black/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90 active:bg-white/20 sm:right-6"
-        :aria-label="__('Следующее медиа')"
+        :aria-label="__('Next Media')"
         @click="move(1)"
       >
         <span class="grid size-full place-items-center leading-none">

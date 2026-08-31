@@ -52,7 +52,7 @@
             class="mt-1 !h-5 !px-1 text-xs"
             variant="ghost"
             :disabled="disabled || frozen"
-            :label="__('Повторить')"
+            :label="__('Retry')"
             @click="controller.retry(item.id)"
           />
         </div>
@@ -60,7 +60,7 @@
           class="absolute right-0 top-0 !size-6 translate-x-1/3 -translate-y-1/3 rounded-full shadow-sm"
           icon="x"
           :disabled="disabled || frozen"
-          :aria-label="__('Удалить вложение')"
+          :aria-label="__('Remove Attachment')"
           @click="controller.remove(item.id)"
         />
       </div>
@@ -151,10 +151,10 @@ function handleDrop(event) {
 }
 
 function itemStatus(item) {
-  if (item.status === 'uploaded') return __('Готово')
-  if (item.status === 'uploading') return __('Загрузка {0}%', [item.progress])
-  if (item.status === 'failed') return item.error || __('Ошибка загрузки')
-  return __('Ожидание')
+  if (item.status === 'uploaded') return __('Ready')
+  if (item.status === 'uploading') return __('Uploading {0}%', [item.progress])
+  if (item.status === 'failed') return item.error || __('Upload failed')
+  return __('Waiting')
 }
 
 async function discard() {

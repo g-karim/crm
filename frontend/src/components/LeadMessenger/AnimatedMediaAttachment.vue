@@ -6,7 +6,7 @@
       data-animated-media
       class="relative block max-w-full overflow-hidden rounded-lg bg-black text-left"
       :style="frameStyle"
-      :aria-label="__('Открыть анимацию')"
+      :aria-label="__('Open Animation')"
       @click="emit('open-media', attachment)"
     >
       <img
@@ -26,7 +26,7 @@
         v-if="imageAnimation"
         data-animated-image
         :src="source"
-        :alt="attachment.file_name || __('Анимация')"
+        :alt="attachment.file_name || __('Animation')"
         class="relative z-10 size-full object-contain"
         loading="lazy"
         @load="handleImageLoad"

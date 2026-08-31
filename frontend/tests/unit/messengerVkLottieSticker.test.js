@@ -67,7 +67,8 @@ beforeEach(() => {
       json: vi.fn().mockResolvedValue(animationData()),
     }),
   )
-  vi.stubGlobal('matchMedia',
+  vi.stubGlobal(
+    'matchMedia',
     vi.fn().mockReturnValue({
       matches: false,
       addEventListener: vi.fn(),
@@ -92,7 +93,10 @@ describe('VK Lottie sticker', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/sticker'),
-      expect.objectContaining({ credentials: 'same-origin', redirect: 'error' }),
+      expect.objectContaining({
+        credentials: 'same-origin',
+        redirect: 'error',
+      }),
     )
     await vi.waitFor(() =>
       expect(loadAnimation).toHaveBeenCalledWith(
@@ -122,17 +126,21 @@ describe('VK Lottie sticker', () => {
     expect(root.querySelector('img')?.getAttribute('src')).toBe(
       '/api/sticker-preview',
     )
-    expect(root.firstElementChild.getAttribute('aria-label')).toBe('Стикер')
-    expect(root.querySelector('img')?.getAttribute('alt')).toBe('Стикер')
+    expect(root.firstElementChild.getAttribute('aria-label')).toBe('Sticker')
+    expect(root.querySelector('img')?.getAttribute('alt')).toBe('Sticker')
     expect(root.textContent).not.toContain('sticker.json')
   })
 
   it('rejects animations with external assets and keeps the preview', async () => {
     fetch.mockResolvedValue({
       ok: true,
-      json: vi.fn().mockResolvedValue(
-        animationData({ assets: [{ id: 'image_0', u: 'https://evil.test/' }] }),
-      ),
+      json: vi
+        .fn()
+        .mockResolvedValue(
+          animationData({
+            assets: [{ id: 'image_0', u: 'https://evil.test/' }],
+          }),
+        ),
     })
     let root = mountSticker()
     await settle()

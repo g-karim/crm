@@ -11,7 +11,7 @@
         {{ sender }}
       </span>
       <Badge class="max-w-full" variant="subtle" :label="source" />
-      <Badge v-if="failed" theme="red" variant="subtle" :label="__('Ошибка')" />
+      <Badge v-if="failed" theme="red" variant="subtle" :label="__('Failed')" />
     </div>
 
     <Dropdown
@@ -27,7 +27,7 @@
         size="sm"
         :loading="loading"
         :disabled="loading"
-        :aria-label="__('Действия с сообщением')"
+        :aria-label="__('Message Actions')"
       />
     </Dropdown>
   </div>
@@ -53,27 +53,27 @@ const menuOptions = computed(() =>
   getMessengerMessageActions(props.message).map((action) => {
     if (action === 'reply') {
       return {
-        label: __('Ответить'),
+        label: __('Reply'),
         icon: 'corner-up-left',
         onClick: () => emit('reply'),
       }
     }
     if (action === 'retry') {
       return {
-        label: __('Повторить отправку'),
+        label: __('Retry Sending'),
         icon: 'refresh-cw',
         onClick: () => emit('retry'),
       }
     }
     if (action === 'edit') {
       return {
-        label: __('Редактировать'),
+        label: __('Edit'),
         icon: 'edit-3',
         onClick: () => emit('start-edit'),
       }
     }
     return {
-      label: __('Удалить для всех'),
+      label: __('Delete for Everyone'),
       icon: 'trash-2',
       onClick: () => emit('delete'),
     }

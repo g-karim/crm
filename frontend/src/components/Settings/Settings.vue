@@ -199,7 +199,7 @@ const tabs = computed(() => {
       label: __('Integrations', null, 'FCRM'),
       items: [
         {
-          label: __('Каналы сообщений'),
+          label: __('Message Channels'),
           icon: LucideMessagesSquare,
           component: markRaw(MessengerSettings),
           condition: () => isMessengerInstalled.value && isManager(),

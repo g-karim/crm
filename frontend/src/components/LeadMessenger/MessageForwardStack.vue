@@ -14,8 +14,8 @@
         <span class="shrink-0 font-medium">
           {{
             item.relation === 'reply'
-              ? __('Исходное сообщение')
-              : __('Пересланное сообщение')
+              ? __('Original Message')
+              : __('Forwarded Message')
           }}
         </span>
         <span v-if="formattedTime(item.message_datetime)" class="shrink-0">
@@ -55,7 +55,7 @@
         "
         class="text-sm italic text-ink-gray-5"
       >
-        {{ __('Вложение недоступно') }}
+        {{ __('Attachment unavailable') }}
       </div>
       <MessageForwardStack
         v-if="forwardItems(item).length"
@@ -70,7 +70,7 @@
       data-forward-truncated
       class="text-xs italic text-ink-gray-5"
     >
-      {{ __('Часть пересланных сообщений скрыта') }}
+      {{ __('Some forwarded messages are hidden') }}
     </div>
   </div>
 </template>

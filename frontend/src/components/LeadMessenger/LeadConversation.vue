@@ -5,14 +5,14 @@
     >
       <div class="min-w-0">
         <div class="text-xl font-semibold text-ink-gray-8">
-          {{ __('Переписка') }}
+          {{ __('Messages') }}
         </div>
         <div class="mt-1 truncate text-sm text-ink-gray-5">
           {{ contactLine }}
         </div>
       </div>
       <Button
-        :label="__('Обновить')"
+        :label="__('Refresh')"
         iconLeft="refresh-cw"
         :loading="loading"
         @click="loadAll"
@@ -24,7 +24,7 @@
       class="flex flex-1 flex-col items-center justify-center gap-3 text-xl font-medium text-ink-gray-4"
     >
       <LoadingIndicator class="h-6 w-6" />
-      <span>{{ __('Загрузка...') }}</span>
+      <span>{{ __('Loading...') }}</span>
     </div>
 
     <div v-else class="relative flex min-h-0 flex-1 flex-col">
@@ -56,22 +56,22 @@
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
         {{
-          __(
-            'У лида не указан телефон. Добавьте телефон, чтобы начать переписку.',
-          )
+          __('This lead has no phone number. Add one to start a conversation.')
         }}
       </div>
       <div
         v-if="permissions.can_operate && !channels.length"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
-        {{ __('Нет активных каналов для отправки сообщений.') }}
+        {{ __('There are no active channels for sending messages.') }}
       </div>
       <div
         v-if="permissions.can_operate && selectedRequiresInbound"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7 sm:mx-10"
       >
-        {{ __('Сначала должно прийти входящее сообщение в выбранном канале.') }}
+        {{
+          __('An incoming message must arrive in the selected channel first.')
+        }}
       </div>
 
       <div class="relative min-h-0 flex-1">
@@ -92,15 +92,15 @@
           >
             <CommentIcon class="size-8 text-ink-gray-4" />
             <div class="text-lg font-medium text-ink-gray-8">
-              {{ __('Переписки пока нет') }}
+              {{ __('No messages yet') }}
             </div>
             <div class="max-w-md text-base text-ink-gray-5">
               {{
                 permissions.can_operate
                   ? __(
-                      'Выберите канал и отправьте первое сообщение этому лиду.',
+                      'Select a channel and send the first message to this lead.',
                     )
-                  : __('Для этого лида пока нет доступных сообщений.')
+                  : __('There are no available messages for this lead yet.')
               }}
             </div>
           </div>
@@ -112,7 +112,7 @@
                 class="flex items-center justify-center py-1"
               >
                 <span class="text-xs font-medium text-ink-gray-5">
-                  {{ item.dateLabel }}
+                  {{ __(item.dateLabel) }}
                 </span>
               </div>
               <div
@@ -190,7 +190,9 @@
                     :loading="
                       messageActionState.pendingMessage === item.message.name
                     "
-                    :error="messageActionState.errors[item.message.name] || ''"
+                    :error="
+                      __(messageActionState.errors[item.message.name] || '')
+                    "
                     :shouldShowText="shouldShowMessengerText(item.message)"
                     @update:draft="messageActions.setDraft"
                     @save-edit="messageActions.saveEdit(item.message)"
@@ -234,7 +236,7 @@
               v-if="typingActive"
               class="w-fit rounded-md bg-surface-gray-1 px-3 py-2 text-sm italic text-ink-gray-5"
             >
-              {{ __('{0} печатает…', [clientDisplayName]) }}
+              {{ __('{0} is typing…', [clientDisplayName]) }}
             </div>
           </div>
         </div>
@@ -247,7 +249,7 @@
             class="pointer-events-auto max-w-full shadow-md"
             variant="solid"
             iconLeft="arrow-down"
-            :label="__('Новые сообщения: {0}', [newMessageCount])"
+            :label="__('New messages: {0}', [newMessageCount])"
             @click="scrollToBottom"
           />
         </div>
@@ -270,7 +272,7 @@
           <Button
             variant="ghost"
             icon="x"
-            :aria-label="__('Отменить ответ')"
+            :aria-label="__('Cancel Reply')"
             @click="cancelReply"
           />
         </div>
@@ -278,7 +280,7 @@
           v-if="draggingFiles"
           class="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-outline-blue-3 bg-surface-blue-1/90 text-sm font-medium text-ink-blue-6"
         >
-          {{ __('Перетащите файлы сюда') }}
+          {{ __('Drop files here') }}
         </div>
         <div class="mb-2 grid gap-2 sm:grid-cols-2">
           <FormControl
@@ -292,7 +294,7 @@
               replyTarget ||
               preparedHandoff
             "
-            :placeholder="__('Платформа')"
+            :placeholder="__('Platform')"
           />
           <FormControl
             v-if="conversationCandidates.length > 1"
@@ -305,7 +307,7 @@
               Boolean(replyTarget) ||
               Boolean(preparedHandoff)
             "
-            :placeholder="__('Внешний чат')"
+            :placeholder="__('External Chat')"
           />
         </div>
         <div
@@ -314,14 +316,14 @@
           class="mb-2 rounded-md border border-outline-gray-2 bg-surface-gray-1 p-3"
         >
           <div class="mb-2 text-xs font-medium text-ink-gray-5">
-            {{ __('Подготовлен переход. Текст нельзя изменить.') }}
+            {{ __('The handoff is ready. The text cannot be changed.') }}
           </div>
           <div class="whitespace-pre-wrap text-sm text-ink-gray-8">
             {{ preparedHandoff.message }}
           </div>
           <div class="mt-3 flex justify-end">
             <Button
-              :label="__('Отменить')"
+              :label="__('Cancel')"
               variant="ghost"
               :loading="handoffCancelling"
               :disabled="sendingMessage"
@@ -336,7 +338,7 @@
           class="mb-2 min-h-20 w-full"
           :rows="3"
           :disabled="baseSendDisabled || Boolean(pendingLocation)"
-          :placeholder="__('Введите сообщение...')"
+          :placeholder="__('Enter a message...')"
           @keydown.enter.stop="sendOnEnter"
           @update:modelValue="handleComposerInput"
           @paste.stop="handleComposerPaste"
@@ -364,7 +366,7 @@
           <Button
             variant="ghost"
             icon="x"
-            :aria-label="__('Удалить геопозицию')"
+            :aria-label="__('Remove Location')"
             @click="pendingLocation = null"
           />
         </div>
@@ -399,10 +401,10 @@
             type="select"
             :options="handoffChannelOptions"
             :disabled="handoffLoading || sendingMessage || voiceActive"
-            :placeholder="__('Перейти в другой мессенджер')"
+            :placeholder="__('Move to another channel')"
           />
           <Button
-            :label="__('Подготовить переход')"
+            :label="__('Prepare Handoff')"
             :loading="handoffLoading"
             :disabled="
               !handoffTargetChannel ||
@@ -422,7 +424,7 @@
               v-if="!preparedHandoff && selectedCapabilities.voice.send"
               variant="ghost"
               icon="mic"
-              :aria-label="__('Записать голосовое сообщение')"
+              :aria-label="__('Record a Voice Message')"
               :disabled="
                 baseSendDisabled ||
                 voiceActive ||
@@ -435,7 +437,7 @@
               v-if="!preparedHandoff && selectedCapabilities.location.send"
               variant="ghost"
               icon="map-pin"
-              :aria-label="__('Добавить геопозицию')"
+              :aria-label="__('Add Location')"
               :disabled="
                 baseSendDisabled ||
                 voiceActive ||
@@ -462,7 +464,7 @@
             />
             <Button
               variant="solid"
-              :label="__('Отправить')"
+              :label="__('Send')"
               iconLeft="send"
               :loading="sendingMessage"
               :disabled="
@@ -479,7 +481,7 @@
         </div>
       </div>
       <div v-else class="border-t px-4 py-4 text-sm text-ink-gray-5 sm:px-10">
-        {{ __('Только чтение') }}
+        {{ __('Read Only') }}
       </div>
     </div>
     <LocationPickerDialog
@@ -756,21 +758,21 @@ const composerHint = computed(() => {
   if (conversationNotice.value.blocksSend)
     return __(conversationNotice.value.message)
   if (needsConversationChoice.value)
-    return __('Выберите конкретный внешний чат.')
+    return __('Select a specific external chat.')
   if (selectedRequiresInbound.value) {
-    return __('Сначала должно прийти входящее сообщение в выбранном канале.')
+    return __('An incoming message must arrive in the selected channel first.')
   }
-  if (missingPhone.value) return __('Добавьте телефон в карточке лида.')
-  if (!channels.value.length) return __('Нет доступного канала отправки.')
+  if (missingPhone.value) return __('Add a phone number to the lead record.')
+  if (!channels.value.length) return __('No sending channel is available.')
   if (
     selectedCapabilities.value.video.send_fallback === 'document' &&
     pendingAttachments.value.some((item) => isVideoFile(item.file))
   ) {
     return __(
-      'VK отправит видео как документ: получателю потребуется скачать файл; нативного плеера VK не будет.',
+      'VK will send the video as a document. The recipient will need to download it, and the VK player will not be available.',
     )
   }
-  return __('Enter отправляет сообщение, Shift+Enter добавляет новую строку.')
+  return __('Enter sends the message. Shift+Enter adds a new line.')
 })
 const replyComposerContext = computed(() => {
   if (!replyTarget.value) return null
@@ -861,7 +863,7 @@ const messageSync = createMessengerSyncController({
     }
   },
   onError(error) {
-    handleError(error, __('Не удалось синхронизировать сообщения.'))
+    handleError(error, __('Could not sync messages.'))
   },
   onTyping(payload) {
     if (payload.conversation !== selectedConversation.value?.name) return
@@ -890,9 +892,7 @@ const readController = createMessengerReadController({
     if (conversation) conversation.unread_count = result.unread_count
   },
   onError(error) {
-    toast.error(
-      __(error?.message || 'Не удалось отметить сообщения прочитанными.'),
-    )
+    toast.error(__(error?.message || 'Could not mark messages as read.'))
   },
 })
 
@@ -976,7 +976,7 @@ async function initialize(leadChanged = false) {
     ])
     scheduleMessengerNotificationRead()
   } catch (error) {
-    handleError(error, __('Не удалось загрузить сообщения.'))
+    handleError(error, __('Could not load messages.'))
   } finally {
     loadingMessages.value = false
   }
@@ -990,13 +990,13 @@ function confirmDeleteMessage(message) {
   )
     return
   $dialog({
-    title: __('Удалить сообщение для всех?'),
+    title: __('Delete the message for everyone?'),
     message: __(
-      'Сообщение будет удалено у всех участников. В CRM останется отметка об удалении.',
+      'The message will be deleted for all participants. CRM will keep a deletion marker.',
     ),
     actions: [
       {
-        label: __('Удалить для всех'),
+        label: __('Delete for Everyone'),
         variant: 'solid',
         theme: 'red',
         onClick: async (close) => {
@@ -1018,7 +1018,7 @@ async function loadAll() {
       messageSync.loadSnapshot(),
     ])
   } catch (error) {
-    handleError(error, __('Не удалось обновить сообщения.'))
+    handleError(error, __('Could not refresh messages.'))
   } finally {
     loadingMessages.value = false
   }
@@ -1033,12 +1033,12 @@ async function loadChannels() {
       reference_name: props.leadName,
     })
     if (!result?.ok)
-      throw new Error(result?.message || __('Не удалось загрузить каналы.'))
+      throw new Error(result?.message || __('Could not load channels.'))
     channels.value = result.channels || []
     applyPermissions(result.permissions)
     ensureSelectedChannel()
   } catch (error) {
-    handleError(error, __('Не удалось загрузить каналы.'))
+    handleError(error, __('Could not load channels.'))
   } finally {
     loadingChannels.value = false
   }
@@ -1056,13 +1056,13 @@ async function loadConversations() {
       },
     )
     if (!result?.ok)
-      throw new Error(result?.message || __('Не удалось загрузить переписку.'))
+      throw new Error(result?.message || __('Could not load the conversation.'))
     conversations.value = result.conversations || []
     applyPermissions(result.permissions)
     ensureSelectedChannel()
     applyRequestedConversation()
   } catch (error) {
-    handleError(error, __('Не удалось загрузить переписку.'))
+    handleError(error, __('Could not load the conversation.'))
   } finally {
     loadingConversation.value = false
   }
@@ -1127,7 +1127,7 @@ async function sendMessage() {
     (text || pendingAttachments.value.length || replyTarget.value)
   ) {
     genericError.value = __(
-      'Геолокацию можно отправить только отдельным сообщением.',
+      'A location can only be sent as a separate message.',
     )
     return
   }
@@ -1197,12 +1197,12 @@ async function sendMessage() {
         )
       )
         preparedHandoff.value = null
-      throw new Error(result?.message || __('Не удалось отправить сообщение.'))
+      throw new Error(result?.message || __('Could not send the message.'))
     } else {
       composerTyping.reset()
     }
   } catch (error) {
-    handleError(error, __('Не удалось отправить сообщение.'))
+    handleError(error, __('Could not send the message.'))
   } finally {
     if (!accepted) composerAttachments.value?.unfreeze()
     sendingMessage.value = false
@@ -1242,9 +1242,11 @@ async function resolveConversationForSend() {
 
   genericError.value =
     result?.reason === 'ambiguous_conversation'
-      ? __('Выберите конкретный внешний чат.')
-      : result?.message ||
-        __('Для выбранного канала ещё нет переписки с этим лидом.')
+      ? __('Select a specific external chat.')
+      : __(
+          result?.message ||
+            'The selected channel has no conversation with this lead yet.',
+        )
   return null
 }
 
@@ -1260,14 +1262,14 @@ async function prepareHandoff() {
     selectedChannel.value = handoffTargetChannel.value
     selectedConversationName.value = handoffAction.conversation.name
     handoffTargetChannel.value = ''
-    toast.success(__('Переключились на существующий внешний чат.'))
+    toast.success(__('Switched to an existing external chat.'))
     return
   }
   if (handoffAction.state === 'ambiguous') {
     selectedChannel.value = handoffTargetChannel.value
     selectedConversationName.value = ''
     handoffTargetChannel.value = ''
-    genericError.value = __('Выберите конкретный внешний чат.')
+    genericError.value = __('Select a specific external chat.')
     return
   }
   if (
@@ -1277,7 +1279,7 @@ async function prepareHandoff() {
     replyTarget.value
   ) {
     genericError.value = __(
-      'Очистите текущий черновик и вложения перед подготовкой перехода.',
+      'Clear the current draft and attachments before preparing a handoff.',
     )
     return
   }
@@ -1290,7 +1292,7 @@ async function prepareHandoff() {
       target_channel: handoffTargetChannel.value,
     })
     if (!result?.ok)
-      throw new Error(result?.message || __('Не удалось подготовить переход.'))
+      throw new Error(result?.message || __('Could not prepare the handoff.'))
     preparedHandoff.value = {
       handoff: result.handoff,
       message: result.message || '',
@@ -1300,7 +1302,7 @@ async function prepareHandoff() {
     }
     handoffTargetChannel.value = ''
   } catch (error) {
-    handleError(error, __('Не удалось подготовить переход.'))
+    handleError(error, __('Could not prepare the handoff.'))
   } finally {
     handoffLoading.value = false
   }
@@ -1315,13 +1317,13 @@ async function cancelPreparedHandoff() {
       handoff: preparedHandoff.value.handoff,
     })
     if (!result?.ok)
-      throw new Error(result?.message || __('Не удалось отменить переход.'))
+      throw new Error(result?.message || __('Could not cancel the handoff.'))
     preparedHandoff.value = null
     clientRequestId.value = ''
     clientRequestFingerprint.value = ''
     nextTick(() => textareaRef.value?.el?.focus?.())
   } catch (error) {
-    handleError(error, __('Не удалось отменить переход.'))
+    handleError(error, __('Could not cancel the handoff.'))
   } finally {
     handoffCancelling.value = false
   }
@@ -1347,25 +1349,25 @@ function integrationWarningMessage(result = {}) {
     resultMessage.includes('avito')
   ) {
     return __(
-      'Интеграция Avito не настроена: укажите Avito account id и API token. Сообщение сохранено локально со статусом ошибки.',
+      'The Avito integration is not configured. Enter the Avito account ID and API token. The message was saved locally with an error status.',
     )
   }
 
   if (provider === 'wazzup' || resultMessage.includes('wazzup')) {
     return __(
-      'Интеграция Wazzup не настроена: включите интеграцию и укажите API token. Сообщение сохранено локально со статусом ошибки.',
+      'The WhatsApp or Telegram channel is not configured. Enable the integration and enter an API token. The message was saved locally with an error status.',
     )
   }
 
   return __(
-    'Интеграция мессенджера не настроена. Сообщение сохранено локально со статусом ошибки.',
+    'The messaging integration is not configured. The message was saved locally with an error status.',
   )
 }
 
 async function createConversation() {
   if (selectedCapabilities.value.requires_inbound) {
     genericError.value = __(
-      'Сначала должно прийти входящее сообщение в выбранном канале.',
+      'An incoming message must arrive in the selected channel first.',
     )
     return null
   }
@@ -1379,11 +1381,11 @@ async function createConversation() {
   )
 
   if (result?.reason === 'missing_phone') {
-    genericError.value = __('У лида не указан телефон.')
+    genericError.value = __('This lead has no phone number.')
     return null
   }
   if (!result?.ok) {
-    throw new Error(result?.message || __('Не удалось создать переписку.'))
+    throw new Error(result?.message || __('Could not create the conversation.'))
   }
 
   let conversation = result.conversation
@@ -1469,7 +1471,7 @@ async function handleMessagesScroll() {
   try {
     await messageSync.loadOlder()
   } catch (error) {
-    handleError(error, __('Не удалось загрузить предыдущие сообщения.'))
+    handleError(error, __('Could not load previous messages.'))
   } finally {
     loadingHistory.value = false
   }
@@ -1483,7 +1485,7 @@ function startReply(message) {
   )
     return
   if (pendingLocation.value) {
-    genericError.value = __('Удалите геолокацию перед подготовкой ответа.')
+    genericError.value = __('Remove the location before preparing a reply.')
     return
   }
   let conversation = resolveMessengerReplyConversation(
@@ -1492,7 +1494,7 @@ function startReply(message) {
   )
   if (!conversation) {
     genericError.value = __(
-      'Не удалось определить внешний чат исходного сообщения.',
+      'Could not identify the external chat for the original message.',
     )
     return
   }
@@ -1516,7 +1518,7 @@ function selectLocation(location) {
     replyTarget.value
   ) {
     genericError.value = __(
-      'Геолокацию можно отправить только отдельным сообщением.',
+      'A location can only be sent as a separate message.',
     )
     return
   }
@@ -1535,13 +1537,13 @@ function retryMessage(message) {
     return
   }
   $dialog({
-    title: __('Повторить отправку?'),
+    title: __('Retry sending?'),
     message: __(
-      'VK мог уже принять сообщение. Повторная отправка использует тот же идентификатор запроса.',
+      'VK may have already accepted the message. Retrying uses the same request ID.',
     ),
     actions: [
       {
-        label: __('Повторить отправку'),
+        label: __('Retry Sending'),
         variant: 'solid',
         onClick: async (close) => {
           if (await messageActions.retryMessage(message, true)) close()
@@ -1565,7 +1567,7 @@ async function navigateToReply(messageName) {
         return
       messageSync.mergeExternal(result.message)
     } catch (error) {
-      handleError(error, __('Не удалось загрузить исходное сообщение.'))
+      handleError(error, __('Could not load the original message.'))
       return
     }
   }
@@ -1714,8 +1716,8 @@ watch(
 function messageSender(message) {
   if (message.direction === 'outbound')
     return message.crm_user
-      ? getUser(message.crm_user)?.full_name || __('Оператор')
-      : __('Оператор')
+      ? getUser(message.crm_user)?.full_name || __('Agent')
+      : __('Agent')
   return clientDisplayName.value
 }
 

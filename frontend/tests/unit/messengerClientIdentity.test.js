@@ -13,7 +13,7 @@ describe('messenger client display identity', () => {
         lead: { lead_name: '560784880' },
         conversation: { client_name: '560784880' },
       }),
-    ).toBe('Клиент')
+    ).toBe('Client')
   })
 
   it('keeps the editable lead name authoritative across channels', () => {

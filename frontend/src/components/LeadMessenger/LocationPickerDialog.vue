@@ -1,8 +1,5 @@
 <template>
-  <Dialog
-    v-model="show"
-    :options="{ title: __('Отправить геопозицию'), size: '3xl' }"
-  >
+  <Dialog v-model="show" :options="{ title: __('Send Location'), size: '3xl' }">
     <template #body-content>
       <div
         ref="mapElement"
@@ -14,13 +11,9 @@
     </template>
     <template #actions>
       <div class="flex justify-end gap-2">
+        <Button :label="__('Cancel')" variant="outline" @click="show = false" />
         <Button
-          :label="__('Отменить')"
-          variant="outline"
-          @click="show = false"
-        />
-        <Button
-          :label="__('Добавить геопозицию')"
+          :label="__('Add Location')"
           variant="solid"
           :disabled="!selected"
           @click="confirm"

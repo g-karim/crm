@@ -218,7 +218,7 @@ async function mountConversation(props = {}) {
   await nextTick()
   await new Promise((resolve) => setTimeout(resolve, 0))
   await nextTick()
-  await vi.waitFor(() => expect(root.textContent).not.toContain('Загрузка'))
+  await vi.waitFor(() => expect(root.textContent).not.toContain('Loading'))
   await nextTick()
   return root
 }
@@ -227,11 +227,11 @@ describe('messenger permission rendering', () => {
   it('renders read-only history without composer or handoff controls', async () => {
     let root = await mountConversation()
 
-    expect(root.textContent).toContain('Только чтение')
-    expect(root.textContent).not.toContain('Отправить')
-    expect(root.textContent).not.toContain('Подготовить переход')
+    expect(root.textContent).toContain('Read Only')
+    expect(root.textContent).not.toContain('Send')
+    expect(root.textContent).not.toContain('Prepare Handoff')
     expect(
-      root.querySelector('input[placeholder="Введите сообщение..."]'),
+      root.querySelector('input[placeholder="Enter a message..."]'),
     ).toBeNull()
   })
 
@@ -239,20 +239,18 @@ describe('messenger permission rendering', () => {
     permissions = { ...permissions, can_operate: true }
     let root = await mountConversation()
 
-    expect(root.textContent).not.toContain('Только чтение')
-    expect(root.textContent).toContain('Отправить')
-    expect(root.textContent).toContain('Подготовить переход')
+    expect(root.textContent).not.toContain('Read Only')
+    expect(root.textContent).toContain('Send')
+    expect(root.textContent).toContain('Prepare Handoff')
     expect(
-      root.querySelector('input[placeholder="Введите сообщение..."]'),
+      root.querySelector('input[placeholder="Enter a message..."]'),
     ).not.toBeNull()
   })
 
   it('does not send Enter while an IME composition is active', async () => {
     permissions = { ...permissions, can_operate: true }
     let root = await mountConversation()
-    let composer = root.querySelector(
-      'input[placeholder="Введите сообщение..."]',
-    )
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
     composer.value = 'составляемый текст'
     composer.dispatchEvent(new Event('input'))
     composer.dispatchEvent(
@@ -318,9 +316,7 @@ describe('messenger permission rendering', () => {
   it('closes an active composer when a delta revokes operator permission', async () => {
     permissions = { ...permissions, can_operate: true }
     let root = await mountConversation()
-    let composer = root.querySelector(
-      'input[placeholder="Введите сообщение..."]',
-    )
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
     composer.value = 'unsent draft'
     composer.dispatchEvent(new Event('input'))
 
@@ -332,9 +328,9 @@ describe('messenger permission rendering', () => {
       conversation: 'CONVERSATION-1',
     })
 
-    await vi.waitFor(() => expect(root.textContent).toContain('Только чтение'))
+    await vi.waitFor(() => expect(root.textContent).toContain('Read Only'))
     expect(
-      root.querySelector('input[placeholder="Введите сообщение..."]'),
+      root.querySelector('input[placeholder="Enter a message..."]'),
     ).toBeNull()
   })
 
@@ -342,13 +338,13 @@ describe('messenger permission rendering', () => {
     permissions = { ...permissions, can_operate: true }
     let root = await mountConversation()
     let target = root.querySelector(
-      'input[placeholder="Перейти в другой мессенджер"]',
+      'input[placeholder="Move to another channel"]',
     )
     target.value = 'CHANNEL-2'
     target.dispatchEvent(new Event('input'))
     await nextTick()
     ;[...root.querySelectorAll('button')]
-      .find((button) => button.textContent === 'Подготовить переход')
+      .find((button) => button.textContent === 'Prepare Handoff')
       .click()
 
     await vi.waitFor(() =>
@@ -358,13 +354,13 @@ describe('messenger permission rendering', () => {
     )
     expect(root.textContent).toContain(preparedResult.message)
     expect(
-      root.querySelector('input[placeholder="Введите сообщение..."]'),
+      root.querySelector('input[placeholder="Enter a message..."]'),
     ).toBeNull()
-    expect(root.querySelector('input[placeholder="Платформа"]').disabled).toBe(
+    expect(root.querySelector('input[placeholder="Platform"]').disabled).toBe(
       true,
     )
     ;[...root.querySelectorAll('button')]
-      .find((button) => button.textContent === 'Отправить')
+      .find((button) => button.textContent === 'Send')
       .click()
 
     await vi.waitFor(() =>
@@ -387,13 +383,13 @@ describe('messenger permission rendering', () => {
     permissions = { ...permissions, can_operate: true }
     let root = await mountConversation()
     let target = root.querySelector(
-      'input[placeholder="Перейти в другой мессенджер"]',
+      'input[placeholder="Move to another channel"]',
     )
     target.value = 'CHANNEL-2'
     target.dispatchEvent(new Event('input'))
     await nextTick()
     ;[...root.querySelectorAll('button')]
-      .find((button) => button.textContent === 'Подготовить переход')
+      .find((button) => button.textContent === 'Prepare Handoff')
       .click()
     await vi.waitFor(() =>
       expect(
@@ -401,7 +397,7 @@ describe('messenger permission rendering', () => {
       ).not.toBeNull(),
     )
     ;[...root.querySelectorAll('button')]
-      .find((button) => button.textContent === 'Отменить')
+      .find((button) => button.textContent === 'Cancel')
       .click()
 
     await vi.waitFor(() =>
@@ -419,13 +415,13 @@ describe('messenger permission rendering', () => {
     permissions = { ...permissions, can_operate: true }
     let root = await mountConversation()
     let target = root.querySelector(
-      'input[placeholder="Перейти в другой мессенджер"]',
+      'input[placeholder="Move to another channel"]',
     )
     target.value = 'CHANNEL-2'
     target.dispatchEvent(new Event('input'))
     await nextTick()
     ;[...root.querySelectorAll('button')]
-      .find((button) => button.textContent === 'Подготовить переход')
+      .find((button) => button.textContent === 'Prepare Handoff')
       .click()
     await vi.waitFor(() =>
       expect(
@@ -438,7 +434,7 @@ describe('messenger permission rendering', () => {
       return defaultCall(method, args)
     })
     ;[...root.querySelectorAll('button')]
-      .find((button) => button.textContent === 'Отправить')
+      .find((button) => button.textContent === 'Send')
       .click()
 
     await vi.waitFor(() =>
@@ -452,13 +448,13 @@ describe('messenger permission rendering', () => {
     permissions = { ...permissions, can_operate: true }
     let root = await mountConversation()
     let target = root.querySelector(
-      'input[placeholder="Перейти в другой мессенджер"]',
+      'input[placeholder="Move to another channel"]',
     )
     target.value = 'CHANNEL-2'
     target.dispatchEvent(new Event('input'))
     await nextTick()
     ;[...root.querySelectorAll('button')]
-      .find((button) => button.textContent === 'Подготовить переход')
+      .find((button) => button.textContent === 'Prepare Handoff')
       .click()
     await vi.waitFor(() =>
       expect(
@@ -476,7 +472,7 @@ describe('messenger permission rendering', () => {
       return defaultCall(method, args)
     })
     ;[...root.querySelectorAll('button')]
-      .find((button) => button.textContent === 'Отправить')
+      .find((button) => button.textContent === 'Send')
       .click()
 
     await vi.waitFor(() =>

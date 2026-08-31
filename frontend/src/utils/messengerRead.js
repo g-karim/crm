@@ -34,9 +34,7 @@ export function createMessengerReadController(options) {
       { conversation: conversation.name, up_to_message: message.name },
     )
     if (!result?.ok)
-      throw new Error(
-        result?.message || 'Не удалось отметить сообщения прочитанными.',
-      )
+      throw new Error(result?.message || 'Could not mark messages as read.')
     lastRequested.set(
       conversation.name,
       Math.max(cmid, Number(result.up_to_cmid) || 0),

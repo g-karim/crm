@@ -123,7 +123,7 @@ describe('messenger media lightbox', () => {
     await nextTick()
     expect(
       body.querySelector('[data-lightbox-unavailable]').textContent,
-    ).toContain('Медиа недоступно')
+    ).toContain('Media unavailable')
     expect(body.querySelector('[data-lightbox-animation]')).toBeNull()
     expect(body.querySelector('[data-lightbox-zoom-in]').disabled).toBe(true)
   })

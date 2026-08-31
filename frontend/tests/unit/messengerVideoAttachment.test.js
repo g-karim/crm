@@ -99,7 +99,7 @@ describe('external messenger video', () => {
     expect(root.textContent).not.toContain('Видео клиента')
     expect(root.textContent).not.toContain('preview.jpg')
     expect(root.textContent).toContain('1:05')
-    expect(root.textContent).toContain('Открыть источник')
+    expect(root.textContent).toContain('Open Source')
     expect(root.textContent).not.toContain('Открыть в VK')
     expect(root.querySelector('a')?.getAttribute('href')).toBe('/api/open-vk')
     expect(root.querySelector('video')).toBeNull()
@@ -133,10 +133,10 @@ describe('external messenger video', () => {
       'vk_direct',
     )
 
-    expect(maxRoot.textContent).not.toContain('Открыть источник')
+    expect(maxRoot.textContent).not.toContain('Open Source')
     expect(maxRoot.querySelector('a')).toBeNull()
-    expect(vkRoot.textContent).toContain('Доступно только во VK')
-    expect(vkRoot.textContent).toContain('Смотреть в VK Видео')
+    expect(vkRoot.textContent).toContain('Available only on VK')
+    expect(vkRoot.textContent).toContain('Watch on VK Video')
     expect(vkRoot.querySelector('a')?.getAttribute('href')).toBe('/api/open-vk')
     expect(
       vkRoot.querySelector('[data-video-external-action]').className,
@@ -170,8 +170,8 @@ describe('external messenger video', () => {
     expect(
       frame.querySelector('img:not([data-media-backdrop])').className,
     ).toContain('object-contain')
-    expect(root.textContent).toContain('Доступно только во VK')
-    expect(root.textContent).toContain('Смотреть в VK Видео')
+    expect(root.textContent).toContain('Available only on VK')
+    expect(root.textContent).toContain('Watch on VK Video')
     expect(
       root.querySelector('[data-video-external-action]').getAttribute('href'),
     ).toBe('/api/open-vk')
@@ -233,7 +233,7 @@ describe('external messenger video', () => {
 
     expect(root.textContent).toContain('0:04')
     expect(root.textContent).not.toContain('66:40')
-    expect(root.textContent).not.toContain('Открыть источник')
+    expect(root.textContent).not.toContain('Open Source')
   })
 
   it('shows a local first-frame preview before playback', async () => {
@@ -334,8 +334,8 @@ describe('external messenger video', () => {
     expect(root.querySelector('iframe')).toBeNull()
     expect(root.querySelector('[data-test-play-icon]')).toBeNull()
     expect(root.querySelector('button')).toBeNull()
-    expect(root.textContent).toContain('Доступно только во VK')
-    expect(root.textContent).toContain('Смотреть в VK Видео')
+    expect(root.textContent).toContain('Available only on VK')
+    expect(root.textContent).toContain('Watch on VK Video')
   })
 
   it('shows the VK fallback immediately for a pending external-only video', () => {
@@ -352,8 +352,8 @@ describe('external messenger video', () => {
       'vk_direct',
     )
 
-    expect(root.textContent).toContain('Доступно только во VK')
-    expect(root.textContent).toContain('Смотреть в VK Видео')
+    expect(root.textContent).toContain('Available only on VK')
+    expect(root.textContent).toContain('Watch on VK Video')
     expect(
       root.querySelector('[data-video-external-action]').getAttribute('href'),
     ).toBe('/api/open-vk-pending')
@@ -376,7 +376,7 @@ describe('external messenger video', () => {
       'vk_direct',
     )
 
-    expect(root.textContent).toContain('Ожидает загрузки')
+    expect(root.textContent).toContain('Pending download')
     expect(root.querySelector('[data-video-external-action]')).toBeNull()
     expect(
       root.querySelector('[data-test-attachment-card]').dataset.status,
@@ -400,7 +400,7 @@ describe('external messenger video', () => {
 
     expect(root.querySelector('video')).toBeNull()
     expect(root.querySelector('[data-test-play-icon]')).toBeNull()
-    expect(root.textContent).toContain('Доступно только во VK')
+    expect(root.textContent).toContain('Available only on VK')
   })
 
   it('captures a safe blurred backdrop from a local portrait video', async () => {

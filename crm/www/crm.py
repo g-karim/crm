@@ -10,6 +10,7 @@ from frappe.utils import cint, get_system_timezone
 from frappe.utils.telemetry import capture
 
 from crm.branding import APP_NAME, APP_ROUTE
+from crm.translations import get_crm_translations
 
 no_cache = 1
 
@@ -69,6 +70,8 @@ def get_context_for_dev():
 def get_boot():
 	lang = get_user_lang()
 	frappe.local.lang = lang
+	translated_messages = get_messages_for_boot()
+	translated_messages.update(get_crm_translations(lang))
 
 	return frappe._dict(
 		{
@@ -85,7 +88,7 @@ def get_boot():
 			"demo_data_created": frappe.db.get_default("crm_demo_data_created") == "1",
 			"is_fc_site": is_fc_site(),
 			"translated_doctypes": get_translated_doctypes(),
-			"translated_messages": get_messages_for_boot(),
+			"translated_messages": translated_messages,
 			"timezone": {
 				"system": get_system_timezone(),
 				"user": frappe.db.get_value("User", frappe.session.user, "time_zone")

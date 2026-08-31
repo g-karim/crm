@@ -8,16 +8,16 @@ const BUSY_STATUSES = new Set([
 ])
 
 const STATUS_LABELS = {
-  pending: 'Ожидает загрузки',
-  processing: 'Обрабатывается',
-  downloading: 'Загружается',
-  retrying: 'Повторная загрузка',
-  available: 'Доступно',
-  external: 'Открыть во внешнем сервисе',
-  uploading: 'Отправляется',
-  uploaded: 'Загружено',
-  failed: 'Ошибка загрузки',
-  unsupported: 'Не поддерживается',
+  pending: 'Pending download',
+  processing: 'Processing',
+  downloading: 'Downloading',
+  retrying: 'Retrying download',
+  available: 'Available',
+  external: 'Open in external service',
+  uploading: 'Uploading',
+  uploaded: 'Uploaded',
+  failed: 'Upload failed',
+  unsupported: 'Unsupported',
 }
 
 const REPLY_ATTACHMENT_TYPE_ALIASES = {
@@ -29,29 +29,29 @@ const REPLY_ATTACHMENT_TYPE_ALIASES = {
 }
 
 const REPLY_ATTACHMENT_LABELS = {
-  image: ['Изображение', 'Изображения'],
-  video: ['Видео', 'Видео'],
-  audio: ['Аудио', 'Аудио'],
-  voice: ['Голосовое сообщение', 'Голосовые сообщения'],
-  file: ['Документ', 'Документы'],
-  link: ['Ссылка', 'Ссылки'],
-  sticker: ['Стикер', 'Стикеры'],
-  location: ['Геолокация', 'Геолокации'],
-  contact: ['Контакт', 'Контакты'],
-  unsupported: ['Вложение', 'Вложения'],
+  image: ['Image', 'Images'],
+  video: ['Video', 'Videos'],
+  audio: ['Audio', 'Audio files'],
+  voice: ['Voice message', 'Voice messages'],
+  file: ['Document', 'Documents'],
+  link: ['Link', 'Links'],
+  sticker: ['Sticker', 'Stickers'],
+  location: ['Location', 'Locations'],
+  contact: ['Contact', 'Contacts'],
+  unsupported: ['Attachment', 'Attachments'],
 }
 
 const ATTACHMENT_TITLES = {
-  image: 'Изображение',
-  video: 'Видео',
-  audio: 'Аудио',
-  voice: 'Голосовое сообщение',
-  file: 'Файл',
-  link: 'Ссылка',
-  sticker: 'Стикер',
-  location: 'Геолокация',
-  contact: 'Контакт',
-  unsupported: 'Неподдерживаемое вложение',
+  image: 'Image',
+  video: 'Video',
+  audio: 'Audio',
+  voice: 'Voice message',
+  file: 'File',
+  link: 'Link',
+  sticker: 'Sticker',
+  location: 'Location',
+  contact: 'Contact',
+  unsupported: 'Unsupported attachment',
 }
 
 const TECHNICAL_FILENAMES = new Set([
@@ -92,7 +92,7 @@ export function getMessengerReplyAttachmentLabel(snapshot = {}) {
     type = REPLY_ATTACHMENT_TYPE_ALIASES[type] || type
     return REPLY_ATTACHMENT_LABELS[type] ? type : 'unsupported'
   })
-  if (new Set(normalizedTypes).size > 1) return 'Вложения'
+  if (new Set(normalizedTypes).size > 1) return 'Attachments'
 
   let labels = REPLY_ATTACHMENT_LABELS[normalizedTypes[0]]
   return labels[attachmentTypes.length > 1 ? 1 : 0]
@@ -105,7 +105,7 @@ export function getMessengerAttachmentTitle(attachment = {}) {
     type === 'sticker' &&
     ['failed', 'unsupported'].includes(attachment.status)
   ) {
-    return 'Стикер недоступен'
+    return 'Sticker unavailable'
   }
   if (
     [
@@ -135,7 +135,7 @@ export function getMessengerAttachmentTitle(attachment = {}) {
 export function getMessengerMessagePreview(message = {}) {
   if (message.display_text) return String(message.display_text)
   if (String(message.text || '').trim()) return String(message.text).trim()
-  return ATTACHMENT_TITLES[message.message_type] || 'Вложение'
+  return ATTACHMENT_TITLES[message.message_type] || 'Attachment'
 }
 
 export function isTechnicalAttachmentName(value) {
@@ -297,9 +297,9 @@ export function visibleImageAttachments(attachments = []) {
 export function formatAttachmentSize(bytes) {
   let value = Number(bytes || 0)
   if (!value) return ''
-  if (value < 1024) return `${value} Б`
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)} КБ`
-  return `${(value / 1024 / 1024).toFixed(1)} МБ`
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`
+  return `${(value / 1024 / 1024).toFixed(1)} MB`
 }
 
 export function formatAttachmentDuration(milliseconds) {

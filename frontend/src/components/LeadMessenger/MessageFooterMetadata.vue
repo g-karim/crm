@@ -5,7 +5,7 @@
     class="mt-1 flex items-center justify-end gap-1.5 whitespace-nowrap text-xs text-ink-gray-5"
   >
     <span v-if="display.edited" data-message-edited class="shrink-0">
-      {{ __('ред.') }}
+      {{ __('edited') }}
     </span>
     <Tooltip
       v-if="message.message_datetime"

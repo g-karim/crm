@@ -188,9 +188,8 @@ function providerError(result, action) {
 }
 
 function fallbackMessage(action) {
-  if (action === 'retry_outbound')
-    return 'Не удалось повторить отправку сообщения.'
+  if (action === 'retry_outbound') return 'Could not retry sending the message.'
   return action === 'edit'
-    ? 'Не удалось отредактировать сообщение.'
-    : 'Не удалось удалить сообщение для всех.'
+    ? 'Could not edit the message.'
+    : 'Could not delete the message for everyone.'
 }

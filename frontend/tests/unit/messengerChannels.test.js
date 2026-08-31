@@ -178,7 +178,7 @@ describe('messengerChannels', () => {
         direction: 'outbound',
         delivery_status: 'failed',
       }),
-    ).toBe('Ошибка')
+    ).toBe('Delivery failed')
 
     expect(
       getMessengerDeliveryLabel({
@@ -187,7 +187,7 @@ describe('messengerChannels', () => {
         status: 'sent',
         read_at: null,
       }),
-    ).toBe('Отправлено в Telegram; статус прочтения недоступен')
+    ).toBe('Sent to Telegram; read status is unavailable')
 
     expect(
       getMessengerDeliveryLabel({
@@ -197,7 +197,7 @@ describe('messengerChannels', () => {
         provider_status: 'attachment.not.ready',
         message_type: 'video',
       }),
-    ).toBe('MAX обрабатывает видео')
+    ).toBe('MAX is processing the video')
   })
 
   it('describes MAX lifecycle states without affecting other providers', () => {
@@ -302,7 +302,7 @@ describe('messengerChannels', () => {
     let items = buildMessengerMessageItems(messages, '2026-07-16 09:00:00')
 
     expect(items.map((item) => item.message)).toEqual(messages)
-    expect(items.map((item) => item.dateLabel)).toEqual(['Сегодня', ''])
+    expect(items.map((item) => item.dateLabel)).toEqual(['Today', ''])
   })
 
   it('groups only adjacent MAX forward-only messages within five seconds', () => {
@@ -403,26 +403,26 @@ describe('messengerChannels', () => {
       '2026-07-16 09:00:00',
     )
 
-    expect(items.map((item) => item.dateLabel)).toEqual(['Вчера', 'Сегодня'])
+    expect(items.map((item) => item.dateLabel)).toEqual(['Yesterday', 'Today'])
   })
 
   it('formats today and yesterday labels', () => {
     let now = '2026-07-16 09:00:00'
 
-    expect(getMessengerDateLabel('2026-07-16 08:00:00', now)).toBe('Сегодня')
-    expect(getMessengerDateLabel('2026-07-15 08:00:00', now)).toBe('Вчера')
+    expect(getMessengerDateLabel('2026-07-16 08:00:00', now)).toBe('Today')
+    expect(getMessengerDateLabel('2026-07-15 08:00:00', now)).toBe('Yesterday')
   })
 
   it('formats current-year dates without a year', () => {
     expect(
       getMessengerDateLabel('2026-07-15 08:00:00', '2026-08-01 09:00:00'),
-    ).toBe('15 июля')
+    ).toBe('15 July')
   })
 
   it('formats dates from another year with a year', () => {
     expect(
       getMessengerDateLabel('2025-07-15 08:00:00', '2026-07-16 09:00:00'),
-    ).toBe('15 июля 2025')
+    ).toBe('15 July 2025')
   })
 
   it('uses the configured user timezone near midnight', () => {
@@ -437,7 +437,7 @@ describe('messengerChannels', () => {
       '2026-07-16 09:00:00',
     )
 
-    expect(items.map((item) => item.dateLabel)).toEqual(['Вчера', 'Сегодня'])
+    expect(items.map((item) => item.dateLabel)).toEqual(['Yesterday', 'Today'])
   })
 
   it('handles an empty message list', () => {

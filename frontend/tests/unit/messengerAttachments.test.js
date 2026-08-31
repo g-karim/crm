@@ -81,13 +81,13 @@ describe('messenger attachment contract v1', () => {
         is_voice: true,
         file_name: 'voice.ogg',
       }),
-    ).toBe('Голосовое сообщение')
+    ).toBe('Voice message')
     expect(
       getMessengerAttachmentTitle({
         type: 'video',
         file_name: 'video-note.mp4',
       }),
-    ).toBe('Видео')
+    ).toBe('Video')
     expect(
       getMessengerAttachmentTitle({
         type: 'file',
@@ -106,26 +106,26 @@ describe('messenger attachment contract v1', () => {
         type: 'unsupported',
         fallback_text: 'Неподдерживаемое вложение MAX: share',
       }),
-    ).toBe('Неподдерживаемое вложение')
+    ).toBe('Unsupported attachment')
     expect(
       getMessengerAttachmentTitle({
         type: 'link',
         title: 'Provider-specific page title',
       }),
-    ).toBe('Ссылка')
+    ).toBe('Link')
     expect(
       getMessengerAttachmentTitle({
         type: 'audio',
         file_name: 'audio.mp3',
       }),
-    ).toBe('Аудио')
+    ).toBe('Audio')
     expect(
       getMessengerAttachmentTitle({
         type: 'sticker',
         status: 'unsupported',
         file_name: 'sticker.tgs',
       }),
-    ).toBe('Стикер недоступен')
+    ).toBe('Sticker unavailable')
   })
 
   it('builds human last-message previews without raw type markers', () => {
@@ -135,7 +135,7 @@ describe('messenger attachment contract v1', () => {
         display_text: 'Голосовое сообщение',
       }),
     ).toBe('Голосовое сообщение')
-    expect(getMessengerMessagePreview({ message_type: 'video' })).toBe('Видео')
+    expect(getMessengerMessagePreview({ message_type: 'video' })).toBe('Video')
   })
 
   it('classifies only a single standalone image as single-image layout', () => {

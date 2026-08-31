@@ -14,6 +14,6 @@ export function getMessengerClientDisplayName({ lead, conversation } = {}) {
     candidates
       .map((value) => String(value || '').trim())
       .find((value) => value && !isProviderIdentifierLabel(value)) ||
-    __('Клиент')
+    __('Client')
   )
 }

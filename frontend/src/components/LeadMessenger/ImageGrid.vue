@@ -29,7 +29,7 @@
     <img
       v-if="singleImage.url && getAttachmentState(singleImage).active"
       :src="singleImage.url"
-      :alt="singleImage.file_name || __('Изображение')"
+      :alt="singleImage.file_name || __('Image')"
       :width="imageDimension(singleImage.width)"
       :height="imageDimension(singleImage.height)"
       class="relative z-10 block size-full max-w-full object-contain"
@@ -68,7 +68,7 @@
       <img
         v-if="image.url && getAttachmentState(image).active"
         :src="image.url"
-        :alt="image.file_name || __('Изображение')"
+        :alt="image.file_name || __('Image')"
         class="size-full object-cover"
         loading="lazy"
       />

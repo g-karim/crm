@@ -51,7 +51,9 @@ export function createComposerAttachmentController(options) {
     files = validation.files || files
     let available = Math.max(maxFiles - items.length, 0)
     if (files.length > available) {
-      options.onError?.(`Можно выбрать не более ${maxFiles} вложений.`)
+      options.onError?.(
+        translate('You can select at most {0} attachments.', [maxFiles]),
+      )
       return []
     }
     if (!files.length) return []
@@ -192,7 +194,10 @@ export function createComposerAttachmentController(options) {
 
 export function validateComposerFileMix(files, existing, context = {}) {
   if (!context.supportsAttachments) {
-    return { files: [], error: 'Выбранный канал не поддерживает вложения.' }
+    return {
+      files: [],
+      error: translate('The selected channel does not support attachments.'),
+    }
   }
   let combined = [...existing.map((item) => item.file), ...files].filter(
     Boolean,
@@ -203,7 +208,7 @@ export function validateComposerFileMix(files, existing, context = {}) {
   if (combined.length > maxFiles) {
     return {
       files: [],
-      error: `Можно выбрать не более ${maxFiles} вложений.`,
+      error: translate('You can select at most {0} attachments.', [maxFiles]),
     }
   }
   if (context.channelType !== 'max') return { files }
@@ -217,7 +222,10 @@ export function validateComposerFileMix(files, existing, context = {}) {
   if (valid) return { files }
   return {
     files: [],
-    error: `MAX поддерживает до ${maxFiles} изображений/видео либо один файл/аудио без смешивания.`,
+    error: translate(
+      'MAX supports up to {0} images or videos, or one file or audio attachment without mixing types.',
+      [maxFiles],
+    ),
   }
 }
 
@@ -247,8 +255,13 @@ function uploadErrorMessage(error) {
     try {
       return JSON.parse(JSON.parse(error._server_messages)[0]).message
     } catch {
-      return 'Не удалось загрузить файл.'
+      return translate('Could not upload the file.')
     }
   }
-  return 'Не удалось загрузить файл.'
+  return translate('Could not upload the file.')
+}
+
+function translate(message, values = []) {
+  if (globalThis.__) return globalThis.__(message, values)
+  return message.replace(/{(\d+)}/g, (match, index) => values[index] ?? match)
 }

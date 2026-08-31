@@ -11,19 +11,19 @@
         :rows="3"
         :disabled="loading"
         :maxlength="message.edit_max_length || undefined"
-        :placeholder="__('Введите сообщение...')"
+        :placeholder="__('Enter a message...')"
         @update:modelValue="$emit('update:draft', $event)"
         @keydown.esc.stop="$emit('cancel-edit')"
       />
       <div class="flex justify-end gap-2">
         <Button
-          :label="__('Отменить')"
+          :label="__('Cancel')"
           variant="ghost"
           :disabled="loading"
           @click="$emit('cancel-edit')"
         />
         <Button
-          :label="__('Сохранить')"
+          :label="__('Save')"
           variant="solid"
           :loading="loading"
           :disabled="!canSaveMessengerMessageEdit(message, draft)"
@@ -38,7 +38,7 @@
         class="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
         :class="display.tombstone ? 'italic text-ink-gray-5' : ''"
       >
-        {{ display.tombstone ? __('Сообщение удалено') : display.text }}
+        {{ display.tombstone ? __('Message deleted') : display.text }}
       </div>
     </template>
 

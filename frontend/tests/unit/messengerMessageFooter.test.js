@@ -71,7 +71,7 @@ describe('message footer metadata', () => {
     let footer = root.querySelector('[data-message-footer]')
 
     expect(footerOrder(root)).toEqual(['edited', 'time'])
-    expect(footer.textContent).toContain('ред.')
+    expect(footer.textContent).toContain('edited')
     expect(footer.textContent).toContain('20:04')
     expect(root.querySelector('[data-message-delivery]')).toBeNull()
     expect(footer.className).toContain('whitespace-nowrap')
@@ -105,7 +105,7 @@ describe('message footer metadata', () => {
     expect(delivery.className).not.toContain('text-ink-blue-5')
     expect(delivery.querySelectorAll('svg')).toHaveLength(1)
     expect(delivery.closest('[data-test-tooltip]').title).toBe(
-      'Отправлено в Telegram; статус прочтения недоступен',
+      'Sent to Telegram; read status is unavailable',
     )
   })
 

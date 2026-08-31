@@ -14,7 +14,7 @@
       :aria-pressed="reaction.reaction_id === ownReactionId"
       :title="
         reaction.reaction_type === 'custom_emoji'
-          ? __('Пользовательская реакция Telegram')
+          ? __('Custom Telegram Reaction')
           : undefined
       "
       @click="toggleReaction(reaction.reaction_id)"
@@ -30,7 +30,7 @@
       class="fixed z-[1000] grid max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[19rem] grid-cols-[repeat(auto-fit,minmax(2.25rem,1fr))] justify-items-center gap-1 overflow-y-auto overscroll-contain rounded-lg border border-outline-gray-2 bg-surface-base p-2 shadow-xl"
       :style="pickerStyle"
       role="menu"
-      :aria-label="__('Выберите реакцию')"
+      :aria-label="__('Choose Reaction')"
       @click.stop
       @contextmenu.prevent
     >
@@ -45,7 +45,7 @@
             : ''
         "
         :disabled="pending"
-        :aria-label="`${__('Реакция')} ${reaction.emoji}`"
+        :aria-label="`${__('Reaction')} ${reaction.emoji}`"
         :aria-pressed="reaction.reaction_id === ownReactionId"
         role="menuitemradio"
         @click="toggleReaction(reaction.reaction_id)"
@@ -142,11 +142,11 @@ async function toggleReaction(reactionId) {
       catalog_signature: catalogSignature.value,
     })
     if (!result?.ok)
-      throw new Error(result?.message || __('Не удалось изменить реакцию.'))
+      throw new Error(result?.message || __('Could not update the reaction.'))
     pickerOpen.value = false
     emit('changed', result.reaction_state)
   } catch (error) {
-    toast.error(__(error?.message || 'Не удалось изменить реакцию.'))
+    toast.error(__(error?.message || 'Could not update the reaction.'))
   } finally {
     pending.value = false
   }

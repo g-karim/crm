@@ -80,7 +80,7 @@ describe('message reply quote', () => {
       state: 'unavailable',
       snapshot: { sender_name: 'Клиент', text: 'Исходный текст' },
     })
-    expect(root.textContent).toContain('Сообщение не загружено')
+    expect(root.textContent).toContain('Message not loaded')
     expect(root.textContent).toContain('Исходный текст')
   })
 
@@ -90,7 +90,7 @@ describe('message reply quote', () => {
       state: 'deleted',
       snapshot: { text: 'secret old text' },
     })
-    expect(root.textContent).toContain('Сообщение удалено')
+    expect(root.textContent).toContain('Message deleted')
     expect(root.textContent).not.toContain('secret old text')
   })
 
@@ -104,7 +104,7 @@ describe('message reply quote', () => {
         text: 'Исходный текст',
       },
     })
-    expect(root.textContent).toContain('Клиент')
+    expect(root.textContent).toContain('Client')
     expect(root.textContent).not.toContain('560784880')
   })
 
@@ -140,9 +140,9 @@ describe('message reply quote', () => {
       },
     })
 
-    expect(attachment.textContent).toContain('Вложение')
-    expect(message.textContent).toContain('Пересланное сообщение')
-    expect(message.textContent).not.toContain('Исходное сообщение недоступно')
+    expect(attachment.textContent).toContain('Attachment')
+    expect(message.textContent).toContain('Forwarded message')
+    expect(message.textContent).not.toContain('Original message unavailable')
   })
 
   it('keeps an outer comment above forwarded-content classification', () => {
@@ -155,26 +155,26 @@ describe('message reply quote', () => {
       },
     })
     expect(root.textContent).toContain('Комментарий отправителя')
-    expect(root.textContent).not.toContain('Вложение')
+    expect(root.textContent).not.toContain('Attachment')
   })
 
   it.each([
-    ['image', 'Изображение'],
-    ['photo', 'Изображение'],
-    ['video', 'Видео'],
-    ['audio', 'Аудио'],
-    ['audio_message', 'Голосовое сообщение'],
-    ['voice', 'Голосовое сообщение'],
-    ['file', 'Документ'],
-    ['doc', 'Документ'],
-    ['document', 'Документ'],
-    ['link', 'Ссылка'],
-    ['sticker', 'Стикер'],
-    ['location', 'Геолокация'],
-    ['geo', 'Геолокация'],
-    ['contact', 'Контакт'],
-    ['unsupported', 'Вложение'],
-    ['provider-specific', 'Вложение'],
+    ['image', 'Image'],
+    ['photo', 'Image'],
+    ['video', 'Video'],
+    ['audio', 'Audio'],
+    ['audio_message', 'Voice message'],
+    ['voice', 'Voice message'],
+    ['file', 'Document'],
+    ['doc', 'Document'],
+    ['document', 'Document'],
+    ['link', 'Link'],
+    ['sticker', 'Sticker'],
+    ['location', 'Location'],
+    ['geo', 'Location'],
+    ['contact', 'Contact'],
+    ['unsupported', 'Attachment'],
+    ['provider-specific', 'Attachment'],
   ])('labels a single %s attachment as %s', (type, label) => {
     let root = mount({
       message: 'MSG-ATTACHMENT',
@@ -186,17 +186,17 @@ describe('message reply quote', () => {
   })
 
   it.each([
-    ['image', 'Изображения'],
-    ['photo', 'Изображения'],
-    ['video', 'Видео'],
-    ['audio_message', 'Голосовые сообщения'],
-    ['voice', 'Голосовые сообщения'],
-    ['doc', 'Документы'],
-    ['link', 'Ссылки'],
-    ['sticker', 'Стикеры'],
-    ['geo', 'Геолокации'],
-    ['contact', 'Контакты'],
-    ['provider-specific', 'Вложения'],
+    ['image', 'Images'],
+    ['photo', 'Images'],
+    ['video', 'Videos'],
+    ['audio_message', 'Voice messages'],
+    ['voice', 'Voice messages'],
+    ['doc', 'Documents'],
+    ['link', 'Links'],
+    ['sticker', 'Stickers'],
+    ['geo', 'Locations'],
+    ['contact', 'Contacts'],
+    ['provider-specific', 'Attachments'],
   ])('labels repeated %s attachments as %s', (type, label) => {
     let root = mount({
       message: 'MSG-ATTACHMENTS',
@@ -214,7 +214,7 @@ describe('message reply quote', () => {
       snapshot: { attachment_types: ['photo', 'doc'] },
     })
 
-    expect(root.textContent).toContain('Вложения')
+    expect(root.textContent).toContain('Attachments')
   })
 
   it('uses a normalized or legacy message type when attachment types are absent', () => {
@@ -229,7 +229,7 @@ describe('message reply quote', () => {
       snapshot: { message_type: 'photo' },
     })
 
-    expect(contact.textContent).toContain('Контакт')
-    expect(photo.textContent).toContain('Изображение')
+    expect(contact.textContent).toContain('Contact')
+    expect(photo.textContent).toContain('Image')
   })
 })

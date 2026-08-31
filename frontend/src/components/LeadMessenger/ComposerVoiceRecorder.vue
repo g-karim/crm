@@ -4,7 +4,7 @@
       v-if="showTrigger && state.state === 'idle'"
       variant="ghost"
       icon="mic"
-      :aria-label="__('Записать голосовое сообщение')"
+      :aria-label="__('Record a Voice Message')"
       :disabled="disabled"
       @click="startRecording"
     />
@@ -29,7 +29,7 @@
           v-if="state.state === 'paused'"
           class="text-xs font-medium text-ink-amber-6"
         >
-          {{ __('Пауза') }}
+          {{ __('Pause') }}
         </span>
         <div
           class="flex h-7 min-w-24 flex-1 items-center gap-px overflow-hidden"
@@ -45,48 +45,48 @@
           v-if="state.canPause && state.state === 'recording'"
           variant="ghost"
           icon="pause"
-          :aria-label="__('Пауза')"
+          :aria-label="__('Pause')"
           @click="recorder.pause()"
         />
         <Button
           v-if="state.canPause && state.state === 'paused'"
           variant="ghost"
           icon="play"
-          :aria-label="__('Продолжить')"
+          :aria-label="__('Resume')"
           @click="recorder.resume()"
         />
         <Button
           variant="solid"
           icon="square"
-          :aria-label="__('Остановить запись')"
+          :aria-label="__('Stop Recording')"
           :disabled="state.state === 'stopping'"
           @click="recorder.stop()"
         />
         <Button
           variant="ghost"
           icon="trash-2"
-          :aria-label="__('Удалить запись')"
+          :aria-label="__('Delete Recording')"
           @click="recorder.reset()"
         />
       </div>
 
       <div v-else-if="state.blob" class="flex flex-col gap-2">
         <div v-if="state.error" class="text-sm text-ink-red-8">
-          {{ state.error }}
+          {{ __(state.error) }}
         </div>
         <MessengerAudioPlayer :attachment="previewAttachment" />
         <div class="flex justify-end gap-2">
           <Button
             variant="ghost"
             icon="trash-2"
-            :label="__('Удалить')"
+            :label="__('Delete')"
             :disabled="sending"
             @click="recorder.reset()"
           />
           <Button
             variant="solid"
             iconLeft="send"
-            :label="__('Отправить голосовое')"
+            :label="__('Send Voice Message')"
             :loading="sending"
             :disabled="sending || !state.durationMs"
             @click="send"
@@ -96,12 +96,12 @@
 
       <div v-else class="flex items-center justify-between gap-2 text-sm">
         <span :class="state.error ? 'text-ink-red-8' : 'text-ink-gray-6'">
-          {{ state.error || stateLabel }}
+          {{ state.error ? __(state.error) : stateLabel }}
         </span>
         <Button
           variant="ghost"
           icon="x"
-          :aria-label="__('Закрыть')"
+          :aria-label="__('Close')"
           @click="recorder.reset()"
         />
       </div>
@@ -171,10 +171,10 @@ const previewAttachment = computed(() => ({
 const stateLabel = computed(
   () =>
     ({
-      requesting_permission: __('Запрашиваем доступ к микрофону…'),
-      stopping: __('Готовим запись…'),
-      uploading_to_crm: __('Загружаем голосовое…'),
-    })[state.value.state] || __('Подготовка записи…'),
+      requesting_permission: __('Requesting microphone access…'),
+      stopping: __('Preparing recording…'),
+      uploading_to_crm: __('Uploading voice message…'),
+    })[state.value.state] || __('Preparing recording…'),
 )
 
 function startRecording() {
@@ -214,14 +214,14 @@ async function send() {
     let body = await response.json()
     let result = body.message || body
     if (!response.ok || !result?.ok)
-      throw new Error(result?.error || __('Не удалось отправить голосовое.'))
+      throw new Error(result?.error || __('Could not send the voice message.'))
     emit('queued', result)
     clientRequestId = ''
     recorder.reset()
   } catch (error) {
     recorder.setExternalState(
       'error',
-      error?.message || __('Не удалось отправить голосовое.'),
+      error?.message || __('Could not send the voice message.'),
     )
     toast.error(state.value.error)
   } finally {

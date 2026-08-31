@@ -38,7 +38,7 @@
         class="flex h-8 touch-none cursor-pointer items-center gap-[2px] rounded px-1 outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
         role="slider"
         tabindex="0"
-        :aria-label="__('Позиция воспроизведения')"
+        :aria-label="__('Playback Position')"
         :aria-valuemin="0"
         :aria-valuemax="Math.round(duration)"
         :aria-valuenow="Math.round(currentTime)"
@@ -68,7 +68,7 @@
         max="1"
         step="0.001"
         :value="progress"
-        :aria-label="__('Позиция воспроизведения')"
+        :aria-label="__('Playback Position')"
         @input="seekToFraction($event.target.value)"
       />
 
@@ -77,7 +77,7 @@
           class="!size-9 shrink-0 !p-0"
           variant="ghost"
           :icon="playing ? 'pause' : 'play'"
-          :aria-label="playing ? __('Пауза') : __('Воспроизвести')"
+          :aria-label="playing ? __('Pause') : __('Play')"
           :disabled="Boolean(error)"
           @click="togglePlayback"
         />
@@ -90,7 +90,7 @@
             class="!size-9 shrink-0 !p-0"
             variant="ghost"
             :icon="muted || !volume ? 'volume-x' : 'volume-2'"
-            :aria-label="muted ? __('Включить звук') : __('Выключить звук')"
+            :aria-label="muted ? __('Unmute') : __('Mute')"
             @click="toggleMute"
           />
           <input
@@ -100,7 +100,7 @@
             max="1"
             step="0.05"
             :value="muted ? 0 : volume"
-            :aria-label="__('Громкость')"
+            :aria-label="__('Volume')"
             @input="setVolume($event.target.value)"
           />
         </div>
@@ -203,7 +203,7 @@ function onEnded() {
 function onError() {
   playing.value = false
   loading.value = false
-  error.value = __('Не удалось воспроизвести аудио')
+  error.value = __('Could not play the audio')
 }
 
 function seekToFraction(value) {

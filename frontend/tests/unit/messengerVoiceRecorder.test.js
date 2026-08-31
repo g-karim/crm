@@ -95,17 +95,15 @@ describe('messenger voice recorder', () => {
     FakeMediaRecorder.last.emit(new Blob(['four']))
 
     expect(recorder.getSnapshot().state).toBe('error')
-    expect(recorder.getSnapshot().error).toContain('допустимый размер')
+    expect(recorder.getSnapshot().error).toContain('size limit')
     expect(track.stop).toHaveBeenCalled()
   })
 
   it('sanitizes/downsamples waveform and maps permission errors', () => {
     expect(sanitizeVoiceWaveform([-20, 20, 300], 3)).toEqual([0, 20, 255])
     expect(sanitizeVoiceWaveform(Array(512).fill(100), 256)).toHaveLength(256)
-    expect(voiceRecorderError({ name: 'NotAllowedError' })).toContain(
-      'запрещён',
-    )
-    expect(voiceRecorderError({ name: 'NotFoundError' })).toContain('не найден')
+    expect(voiceRecorderError({ name: 'NotAllowedError' })).toContain('denied')
+    expect(voiceRecorderError({ name: 'NotFoundError' })).toContain('not found')
   })
 
   it('uses an absolute noise-gated level for the live waveform', () => {
