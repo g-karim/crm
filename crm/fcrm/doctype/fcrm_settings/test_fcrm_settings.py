@@ -77,6 +77,7 @@ class TestFCRMSettings(IntegrationTestCase):
 	def test_forecasting_adds_section_to_sidepanel(self):
 		"""Side panel should get a labeled Forecasted Sales section after the contacts section"""
 		self.set_forecasting(0)
+		self.remove_forecasting_fields_from_sidepanel()
 		self.set_forecasting(1)
 
 		sections = json.loads(frappe.db.get_value("CRM Fields Layout", "CRM Deal-Side Panel", "layout"))
@@ -91,6 +92,21 @@ class TestFCRMSettings(IntegrationTestCase):
 		self.set_forecasting(0)
 		sections = json.loads(frappe.db.get_value("CRM Fields Layout", "CRM Deal-Side Panel", "layout"))
 		self.assertFalse(any(s.get("name") == "forecasted_sales_section" for s in sections))
+
+	def remove_forecasting_fields_from_sidepanel(self):
+		"""Make the generated-section behavior independent of the installed default layout."""
+		doc = frappe.get_doc("CRM Fields Layout", "CRM Deal-Side Panel")
+		layout = json.loads(doc.layout)
+		for section in layout:
+			for column in section.get("columns") or []:
+				column["fields"] = [
+					field
+					for field in column.get("fields") or []
+					if ((field.get("fieldname") or field.get("name")) if isinstance(field, dict) else field)
+					not in FORECASTING_FIELDS
+				]
+		doc.layout = json.dumps(layout)
+		doc.save(ignore_permissions=True)
 
 	def test_forecasting_adds_section_to_quick_entry_with_tabs_layout(self):
 		"""Layouts saved from the layout editor are wrapped in tabs and should also work"""

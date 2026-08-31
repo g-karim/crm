@@ -54,7 +54,7 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 			},
 		)
 		self.ensure_desktop_icon(
-			"Frappe CRM",
+			APP_NAME,
 			{
 				"label": APP_NAME,
 				"app": "crm",
@@ -68,7 +68,7 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 		hide_legacy_erpnext_crm()
 
 		self.assertEqual(frappe.db.get_value("Desktop Icon", "CRM", "hidden"), 1)
-		self.assertEqual(frappe.db.get_value("Desktop Icon", "Frappe CRM", "hidden"), 0)
+		self.assertEqual(frappe.db.get_value("Desktop Icon", APP_NAME, "hidden"), 0)
 
 	def test_hide_legacy_erpnext_crm_workspace(self):
 		if not frappe.db.table_exists("Workspace"):
@@ -76,14 +76,16 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 
 		workspace = self.ensure_workspace(
 			"CRM",
-			{
-				"label": "CRM",
-				"title": "CRM",
-				"module": "CRM",
-				"app": "erpnext",
-				"public": 1,
-				"is_hidden": 0,
-			},
+			self.with_optional_workspace_app(
+				{
+					"label": "CRM",
+					"title": "CRM",
+					"module": "CRM",
+					"public": 1,
+					"is_hidden": 0,
+				},
+				"erpnext",
+			),
 		)
 
 		hide_legacy_erpnext_crm()
@@ -113,8 +115,13 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 			return frappe.get_doc("Desktop Icon", name)
 
 		doc = frappe.get_doc({"doctype": "Desktop Icon", "name": name, **values})
-		doc.insert(ignore_permissions=True)
+		doc.insert(ignore_permissions=True, ignore_links=True)
 		return doc
+
+	def with_optional_workspace_app(self, values, app):
+		if frappe.db.has_column("Workspace", "app"):
+			values["app"] = app
+		return values
 
 	def ensure_workspace(self, name, values):
 		if frappe.db.exists("Workspace", name):

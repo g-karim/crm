@@ -319,8 +319,11 @@ class TestMessengerNotificationLifecycle(IntegrationTestCase):
 			}
 		).insert(ignore_permissions=True)
 
-		migrate_aggregates()
-		migrate_aggregates()
+		# DDL causes an implicit MariaDB commit and would persist all records created
+		# by setUp. Index creation is migration plumbing, not part of this aggregate test.
+		with patch("crm.patches.v1_0.migrate_messenger_notification_aggregates._add_notification_index"):
+			migrate_aggregates()
+			migrate_aggregates()
 
 		rows = frappe.get_all(
 			"CRM Notification",

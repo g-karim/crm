@@ -38,6 +38,10 @@ class TestDashboard(IntegrationTestCase):
 	def setUpClass(cls):
 		"""Set up test records once for all tests"""
 		super().setUpClass()
+		# Deal fixtures are expressed in USD. Fresh sites can use another base
+		# currency, which would make validation fetch and apply live exchange rates.
+		frappe.db.set_single_value("FCRM Settings", "currency", "USD")
+		frappe.clear_cache(doctype="FCRM Settings")
 
 		# Mark timestamp before creating test data
 		cls.test_start_time = frappe.utils.now()
@@ -60,6 +64,7 @@ class TestDashboard(IntegrationTestCase):
 	def tearDownClass(cls):
 		"""Clean up test records after all tests"""
 		frappe.db.rollback()
+		frappe.clear_cache(doctype="FCRM Settings")
 		super().tearDownClass()
 
 	def test_get_total_leads(self):
