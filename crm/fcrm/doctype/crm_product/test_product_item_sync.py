@@ -7,18 +7,14 @@ ITEM_GROUP = "All Item Groups"
 def enable_product_sync():
 	"""CI installs ERPNext but leaves the integration off; enable it and create the link fields.
 
-	Mirrors what configuring the integration does, so the sync hooks and the
-	``erpnext_item_code`` / ``crm_product_code`` custom fields are in place.
+	Saving the settings mirrors the real configuration flow and creates the
+	``erpnext_item_code`` / ``crm_product_code`` custom fields when needed.
 	"""
 	settings = frappe.get_single("ERPNext CRM Settings")
 	settings.enabled = 1
 	settings.is_erpnext_in_different_site = 0
 	settings.sync_products = 1
 	settings.save(ignore_permissions=True)
-
-	from crm.patches.v1_0.create_custom_fields_for_product_item_sync import execute
-
-	execute()
 
 
 def set_bidirectional_product_sync(value):
@@ -105,6 +101,7 @@ class TestItemHooks(FrappeTestCase):
 		if not frappe.db.exists("DocType", "Item"):
 			self.skipTest("ERPNext not installed")
 		enable_product_sync()
+		frappe.db.delete("Item Price", {"item_code": ["like", "HOOK-%"]})
 		frappe.db.delete("CRM Product", {"product_code": ["like", "HOOK-%"]})
 		frappe.db.delete("Item", {"item_code": ["like", "HOOK-%"]})
 
@@ -153,6 +150,7 @@ class TestReconcileJob(FrappeTestCase):
 		if not frappe.db.exists("DocType", "Item"):
 			self.skipTest("ERPNext not installed")
 		enable_product_sync()
+		frappe.db.delete("Item Price", {"item_code": ["like", "JOB-%"]})
 		frappe.db.delete("CRM Product", {"product_code": ["like", "JOB-%"]})
 		frappe.db.delete("Item", {"item_code": ["like", "JOB-%"]})
 		settings = frappe.get_single("ERPNext CRM Settings")
@@ -232,6 +230,7 @@ class TestCRMToERPNextCreate(FrappeTestCase):
 		if not frappe.db.exists("DocType", "Item"):
 			self.skipTest("ERPNext not installed")
 		enable_product_sync()
+		frappe.db.delete("Item Price", {"item_code": ["like", "PUSH-%"]})
 		frappe.db.delete("CRM Product", {"product_code": ["like", "PUSH-%"]})
 		frappe.db.delete("Item", {"item_code": ["like", "PUSH-%"]})
 
