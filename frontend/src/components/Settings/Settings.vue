@@ -51,6 +51,7 @@ import LucideLayoutDashboard from '~icons/lucide/layout-dashboard'
 import LucideNetwork from '~icons/lucide/network'
 import MonitorCogIcon from '~icons/lucide/monitor-cog'
 import LucideTextCursorInput from '~icons/lucide/text-cursor-input'
+import LucideMessagesSquare from '~icons/lucide/messages-square'
 import SlidersIcon from '@/components/Icons/SlidersIcon.vue'
 import CalendarIcon from '@/components/Icons/CalendarIcon.vue'
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
@@ -65,6 +66,7 @@ import PreferencesSettings from '@/components/Settings/PreferencesSettings.vue'
 import WhatsAppSettings from '@/components/Settings/WhatsAppSettings.vue'
 import ERPNextSettings from '@/components/Settings/ERPNextSettings.vue'
 import LeadSyncSourcePage from '@/components/Settings/LeadSyncing/LeadSyncSourcePage.vue'
+import MessengerSettings from '@/components/Settings/MessengerSettings.vue'
 import DefaultsSettings from '@/components/Settings/DefaultsSettings.vue'
 import CalendarSettings from '@/components/Settings/CalendarSettings.vue'
 import FormsSettings from '@/components/Settings/Forms/FormsSettings.vue'
@@ -80,6 +82,7 @@ import {
   disableSettingModalOutsideClick,
 } from '@/composables/settings'
 import { isWhatsappInstalled } from '@/composables/whatsapp'
+import { isMessengerInstalled } from '@/composables/messenger'
 import { Dialog, Avatar, SidebarItem } from 'frappe-ui'
 import { ref, markRaw, computed, watch, h } from 'vue'
 import AssignmentRulePage from './AssignmentRules/AssignmentRulePage.vue'
@@ -195,6 +198,12 @@ const tabs = computed(() => {
     {
       label: __('Integrations', null, 'FCRM'),
       items: [
+        {
+          label: __('Каналы сообщений'),
+          icon: LucideMessagesSquare,
+          component: markRaw(MessengerSettings),
+          condition: () => isMessengerInstalled.value && isManager(),
+        },
         {
           label: __('WhatsApp'),
           icon: WhatsAppIcon,
