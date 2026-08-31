@@ -58,17 +58,24 @@ def hide_legacy_erpnext_crm_workspaces():
 		workspace = frappe.db.get_value(
 			"Workspace",
 			name,
-			["name", "label", "module", "app", "is_hidden"],
+			_get_workspace_fields(),
 			as_dict=True,
 		)
 		if workspace and is_legacy_erpnext_crm_workspace(workspace):
 			frappe.db.set_value("Workspace", name, "is_hidden", 1, update_modified=False)
 
 
+def _get_workspace_fields() -> list[str]:
+	fields = ["name", "label", "module", "is_hidden"]
+	if frappe.db.has_column("Workspace", "app"):
+		fields.append("app")
+	return fields
+
+
 def is_legacy_erpnext_crm_workspace(workspace) -> bool:
-	if workspace.app == "crm":
+	if workspace.get("app") == "crm":
 		return False
-	if workspace.app == "erpnext":
+	if workspace.get("app") == "erpnext":
 		return True
 	return workspace.name == LEGACY_ERP_CRM_LABEL and workspace.module == LEGACY_ERP_CRM_LABEL
 

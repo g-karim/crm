@@ -1,9 +1,11 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
 from crm.branding import APP_FAVICON_URL, APP_LOGO_URL, APP_NAME, ensure_crm_branding_defaults
 from crm.cleanup import cleanup_exp_theme_crm_state
-from crm.desk import hide_legacy_erpnext_crm
+from crm.desk import _get_workspace_fields, hide_legacy_erpnext_crm
 from crm.dropdown import ensure_crm_dropdown_items
 
 
@@ -87,6 +89,10 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 		hide_legacy_erpnext_crm()
 
 		self.assertEqual(frappe.db.get_value("Workspace", workspace.name, "is_hidden"), 1)
+
+	def test_workspace_query_supports_frappe_without_legacy_app_column(self):
+		with patch.object(frappe.db, "has_column", return_value=False):
+			self.assertNotIn("app", _get_workspace_fields())
 
 	def test_cleanup_exp_theme_crm_state_is_idempotent(self):
 		cleanup_exp_theme_crm_state()
