@@ -175,6 +175,7 @@ import { useDocument } from '@/data/document'
 import { isMobileView } from '@/composables/settings'
 import { whatsappEnabled } from '@/composables/whatsapp'
 import { useActiveTabManager } from '@/composables/useActiveTabManager'
+import { useVisitedRecords } from '@/composables/useVisitedRecords'
 import {
   createResource,
   Dropdown,
@@ -221,8 +222,11 @@ const isLeadConversionDisabled = computed(
   () => doc.value.status && getLeadStatus(doc.value.status)?.type === 'Lost',
 )
 
+const { markVisited } = useVisitedRecords('CRM Lead')
+
 onMounted(async () => {
   if (document.doc) await triggerOnRender()
+  markVisited(props.leadId)
 })
 
 watch(error, (err) => {
