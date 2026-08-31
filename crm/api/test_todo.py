@@ -3,7 +3,7 @@
 
 import frappe
 import frappe.share
-from frappe.desk.form.assign_to import add, remove
+from frappe.desk.form.assign_to import _add, _remove, add, remove
 from frappe.tests import IntegrationTestCase
 
 from crm.api.todo import allow_internal_lead_assignment
@@ -45,13 +45,14 @@ class TestLeadAssignmentPermissions(IntegrationTestCase):
 			("assignment-other@example.com", True),
 		):
 			with self.assertRaises(frappe.PermissionError):
-				add(
+				assign = _add if ignore_permissions else add
+				assign(
 					{
 						"doctype": "CRM Lead",
 						"name": self.lead.name,
 						"assign_to": [assignee],
 					},
-					ignore_permissions=ignore_permissions,
+					**({"ignore_permissions": True} if ignore_permissions else {}),
 				)
 
 		self.assertFalse(
@@ -89,7 +90,7 @@ class TestLeadAssignmentPermissions(IntegrationTestCase):
 
 		frappe.set_user("assignment-reader@example.com")
 		with self.assertRaises(frappe.PermissionError):
-			remove(
+			_remove(
 				"CRM Lead",
 				self.lead.name,
 				"assignment-writer@example.com",
