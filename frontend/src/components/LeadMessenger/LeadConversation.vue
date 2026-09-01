@@ -724,7 +724,9 @@ const channelOptions = computed(() =>
   buildMessengerChannelOptions(channels.value),
 )
 const conversationOptions = computed(() =>
-  conversationCandidates.value.map(messengerConversationOption),
+  conversationCandidates.value.map((conversation) =>
+    messengerConversationOption(conversation, __),
+  ),
 )
 const handoffChannelOptions = computed(() =>
   buildMessengerChannelOptions(

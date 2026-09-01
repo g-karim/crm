@@ -29,7 +29,10 @@ export function resolveMessengerConversationSelection({
   }
 }
 
-export function messengerConversationOption(conversation = {}) {
+export function messengerConversationOption(
+  conversation = {},
+  translate = (message) => message,
+) {
   let platform =
     conversation.channel_info?.label ||
     conversation.platform ||
@@ -40,7 +43,7 @@ export function messengerConversationOption(conversation = {}) {
     conversation.external_chat_id_masked ||
     maskExternalChatId(conversation.external_chat_id)
   let lastMessage = conversation.last_message
-    ? getMessengerMessagePreview(conversation.last_message)
+    ? translate(getMessengerMessagePreview(conversation.last_message))
     : ''
   let label = [
     platform,
