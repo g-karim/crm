@@ -137,7 +137,12 @@
                     )
                       ? 'ring-2 ring-outline-blue-3'
                       : '',
+                    permissions.can_operate &&
+                    item.message.direction === 'inbound'
+                      ? 'cursor-pointer hover:ring-1 hover:ring-outline-blue-2'
+                      : '',
                   ]"
+                  @click="selectInboundMessage(item.message, $event)"
                   @contextmenu="openReactionPicker(item.message, $event)"
                 >
                   <span
@@ -262,6 +267,28 @@
         @dragleave="draggingFiles = false"
         @drop="handleComposerDrop"
       >
+        <div
+          v-if="routingMismatch"
+          data-testid="conversation-routing-warning"
+          class="mb-2 flex flex-col gap-2 rounded-md border border-outline-amber-2 bg-surface-amber-1 px-3 py-2 text-sm text-ink-gray-8 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>{{ routingWarningText }}</span>
+          <Button
+            data-testid="conversation-routing-switch"
+            class="shrink-0"
+            variant="ghost"
+            :label="__('Switch')"
+            :disabled="sendingMessage"
+            @click="retargetComposerToLatestInbound"
+          />
+        </div>
+        <div
+          v-if="routingError"
+          data-testid="conversation-routing-error"
+          class="mb-2 rounded-md border border-outline-red-1 bg-surface-red-1 px-3 py-2 text-sm text-ink-red-8"
+        >
+          {{ routingError }}
+        </div>
         <div v-if="replyTarget" class="mb-2 flex items-start gap-2">
           <MessageReplyQuote
             class="min-w-0 flex-1"
@@ -284,7 +311,7 @@
         </div>
         <div class="mb-2 grid gap-2 sm:grid-cols-2">
           <FormControl
-            v-model="selectedChannel"
+            :model-value="selectedChannel"
             type="select"
             :options="channelOptions"
             :disabled="
@@ -295,10 +322,11 @@
               preparedHandoff
             "
             :placeholder="__('Platform')"
+            @update:modelValue="selectChannelManually"
           />
           <FormControl
             v-if="conversationCandidates.length > 1"
-            v-model="selectedConversationName"
+            :model-value="selectedConversationName"
             type="select"
             :options="conversationOptions"
             :disabled="
@@ -308,6 +336,7 @@
               Boolean(preparedHandoff)
             "
             :placeholder="__('External Chat')"
+            @update:modelValue="selectConversationManually"
           />
         </div>
         <div
@@ -353,7 +382,7 @@
           :disabled="
             baseSendDisabled || voiceActive || Boolean(pendingLocation)
           "
-          @change="pendingAttachments = $event"
+          @change="handleAttachmentsChange"
         />
         <div
           v-if="pendingLocation"
@@ -389,8 +418,10 @@
           "
           :max-size-bytes="selectedCapabilities.voice.max_size_bytes"
           :scope-key="voiceScopeKey"
-          @active-change="voiceActive = $event"
+          @active-change="handleVoiceActive"
+          @draft-change="voiceDraft = $event"
           @queued="voiceQueued"
+          @send-requested="requestVoiceSend"
         />
         <div
           v-if="!preparedHandoff && handoffChannelOptions.length"
@@ -431,7 +462,7 @@
                 Boolean(pendingAttachments.length) ||
                 Boolean(pendingLocation)
               "
-              @click="voiceRecorder?.start()"
+              @click="startVoiceRecording"
             />
             <Button
               v-if="!preparedHandoff && selectedCapabilities.location.send"
@@ -475,7 +506,7 @@
                   !pendingAttachments.length &&
                   !pendingLocation)
               "
-              @click="sendMessage"
+              @click="requestSendMessage"
             />
           </div>
         </div>
@@ -567,10 +598,12 @@ const loadingHistory = ref(false)
 const loadingChannels = ref(false)
 const sendingMessage = ref(false)
 const conversations = ref([])
+const latestInbound = ref(null)
 const messages = ref([])
 const channels = ref([])
 const selectedChannel = ref('')
 const selectedConversationName = ref('')
+const selectionMode = ref('auto')
 const handoffTargetChannel = ref('')
 const handoffLoading = ref(false)
 const handoffCancelling = ref(false)
@@ -582,8 +615,10 @@ const pendingAttachments = ref([])
 const pendingLocation = ref(null)
 const locationPickerOpen = ref(false)
 const voiceActive = ref(false)
+const voiceDraft = ref(null)
 const sendWarning = ref('')
 const genericError = ref('')
+const routingError = ref('')
 const permissions = ref({
   can_read: false,
   can_operate: false,
@@ -662,8 +697,34 @@ const conversationByName = computed(() => {
   })
   return map
 })
+const latestInboundConversation = computed(() => {
+  let conversation = conversationByName.value[latestInbound.value?.conversation]
+  return conversation?.status === 'Archived' ? null : conversation || null
+})
 const selectedChannelDoc = computed(
   () => channelByName.value[selectedChannel.value] || null,
+)
+const routingMismatch = computed(() => {
+  if (
+    !permissions.value.can_operate ||
+    replyTarget.value ||
+    preparedHandoff.value ||
+    !latestInboundConversation.value ||
+    !selectedChannel.value ||
+    needsConversationChoice.value
+  )
+    return false
+  return (
+    selectedConversation.value?.name !== latestInboundConversation.value.name
+  )
+})
+const routingWarningText = computed(() =>
+  __('The latest inbound message arrived in {0}, but {1} is selected.', [
+    conversationRoutingLabel(latestInboundConversation.value),
+    selectedConversation.value
+      ? conversationRoutingLabel(selectedConversation.value)
+      : channelRoutingLabel(selectedChannelDoc.value),
+  ]),
 )
 const selectedChannelType = computed(() =>
   getMessengerChannelType(
@@ -854,13 +915,11 @@ const messageSync = createMessengerSyncController({
     ) {
       clearTyping()
     }
-    if (
-      incoming.some(
-        (message) =>
-          message.conversation &&
-          !conversationByName.value[message.conversation],
-      )
-    ) {
+    let hasUnknownConversation = incoming.some(
+      (message) =>
+        message.conversation && !conversationByName.value[message.conversation],
+    )
+    if (hasInbound || hasUnknownConversation) {
       refreshConversations()
     }
   },
@@ -916,6 +975,7 @@ function setEditorElement(messageName, element) {
 
 function startMessageEdit(message) {
   if (!permissions.value.can_operate) return false
+  pinSelection()
   return openMessengerMessageEditor(message, {
     startEdit: messageActions.startEdit,
     nextTick,
@@ -955,6 +1015,7 @@ watch(
 
 async function initialize(leadChanged = false) {
   genericError.value = ''
+  routingError.value = ''
   sendWarning.value = ''
   newMessageCount.value = 0
   loadingMessages.value = true
@@ -963,8 +1024,11 @@ async function initialize(leadChanged = false) {
     applyPermissions()
     messages.value = []
     conversations.value = []
+    latestInbound.value = null
     selectedChannel.value = ''
     selectedConversationName.value = ''
+    selectionMode.value = 'auto'
+    appliedRouteConversation = ''
     handoffTargetChannel.value = ''
     messageEditorElements.clear()
   }
@@ -1013,10 +1077,7 @@ async function loadAll() {
   sendWarning.value = ''
   loadingMessages.value = true
   try {
-    await Promise.all([
-      loadSelectionContext(),
-      messageSync.loadSnapshot(),
-    ])
+    await Promise.all([loadSelectionContext(), messageSync.loadSnapshot()])
   } catch (error) {
     handleError(error, __('Could not refresh messages.'))
   } finally {
@@ -1062,6 +1123,7 @@ async function loadConversations() {
     if (!result?.ok)
       throw new Error(result?.message || __('Could not load the conversation.'))
     conversations.value = result.conversations || []
+    latestInbound.value = result.latest_inbound || null
     applyPermissions(result.permissions)
   } catch (error) {
     handleError(error, __('Could not load the conversation.'))
@@ -1076,7 +1138,23 @@ async function refreshConversations() {
 }
 
 function reconcileSelection() {
-  ensureSelectedChannel()
+  if (
+    selectionMode.value === 'pinned' &&
+    selectedConversationName.value &&
+    !activeConversationByName(selectedConversationName.value)
+  ) {
+    selectionMode.value = 'auto'
+    selectedConversationName.value = ''
+  }
+
+  if (selectionMode.value === 'auto' && latestInboundConversation.value) {
+    preserveComposerDuringScopeChange(() => {
+      selectedChannel.value = latestInboundConversation.value.channel
+      selectedConversationName.value = latestInboundConversation.value.name
+    })
+  } else {
+    ensureSelectedChannel()
+  }
   applyRequestedConversation()
 }
 
@@ -1103,13 +1181,95 @@ function applyRequestedConversation() {
   let requested = `${route.query.messenger_conversation || ''}`
   if (!requested || requested === appliedRouteConversation) return
   let conversation = conversations.value.find((row) => row.name === requested)
-  if (!conversation) return
-  selectedChannel.value = conversation.channel
-  selectedConversationName.value = conversation.name
+  if (!conversation || conversation.status === 'Archived') return
+  pinSelection()
+  preserveComposerDuringScopeChange(() => {
+    selectedChannel.value = conversation.channel
+    selectedConversationName.value = conversation.name
+  })
   appliedRouteConversation = requested
 }
 
+function activeConversationByName(name) {
+  let conversation = conversationByName.value[name]
+  return conversation?.status === 'Archived' ? null : conversation || null
+}
+
+function pinSelection() {
+  selectionMode.value = 'pinned'
+}
+
+async function selectChannelManually(channel) {
+  channel = `${channel || ''}`
+  pinSelection()
+  routingError.value = ''
+  if (!channel || channel === selectedChannel.value) return
+
+  let resolved = resolveMessengerConversationSelection({
+    conversations: conversations.value,
+    channel,
+  })
+  if (resolved.conversation && isComposerDirty()) {
+    await retargetComposerToConversation(resolved.conversation)
+    return
+  }
+  if (!isComposerDirty()) {
+    selectedChannel.value = channel
+    return
+  }
+
+  let target = {
+    channel,
+    channel_info: channelByName.value[channel] || null,
+  }
+  let compatibilityError = composerRetargetError(target)
+  if (compatibilityError) {
+    routingError.value = __(compatibilityError)
+    return
+  }
+  if (resolved.state === 'missing' && pendingAttachments.value.length) {
+    routingError.value = __(
+      'Remove attachments before switching to a channel without an existing conversation.',
+    )
+    return
+  }
+  if (resolved.state === 'missing' && voiceDraft.value) {
+    routingError.value = __(
+      'Delete the voice draft before switching to a channel without an existing conversation.',
+    )
+    return
+  }
+
+  composerAttachments.value?.preserveScopeChange?.()
+  if (voiceDraft.value) voiceRecorder.value?.retarget?.()
+  preserveComposerDuringScopeChange(() => {
+    selectedChannel.value = channel
+    selectedConversationName.value = ''
+  })
+}
+
+async function selectConversationManually(conversationName) {
+  conversationName = `${conversationName || ''}`
+  pinSelection()
+  routingError.value = ''
+  if (!conversationName || conversationName === selectedConversationName.value)
+    return
+  let conversation = activeConversationByName(conversationName)
+  if (!conversation) {
+    routingError.value = __(
+      'This external conversation is not available for sending.',
+    )
+    return
+  }
+  if (isComposerDirty()) {
+    await retargetComposerToConversation(conversation)
+    return
+  }
+  selectedConversationName.value = conversation.name
+}
+
 function handleComposerInput(value) {
+  if (`${value || ''}`.length) pinSelection()
   composerTyping.input({
     text: value,
     conversation: selectedConversation.value?.name,
@@ -1121,6 +1281,171 @@ function handleComposerInput(value) {
       !voiceActive.value &&
       !pendingAttachments.value.length,
   })
+}
+
+function handleAttachmentsChange(items) {
+  if (items?.length) pinSelection()
+  pendingAttachments.value = items || []
+}
+
+function requestSendMessage() {
+  if (routingMismatch.value) {
+    openRoutingConfirmation(() => sendMessage())
+    return
+  }
+  sendMessage()
+}
+
+function openRoutingConfirmation(continueSend) {
+  let latest = latestInboundConversation.value
+  if (!latest || !routingMismatch.value) {
+    continueSend()
+    return
+  }
+  let currentLabel = selectedConversation.value
+    ? conversationRoutingLabel(selectedConversation.value)
+    : channelRoutingLabel(selectedChannelDoc.value)
+  $dialog({
+    title: __('Check sending conversation'),
+    message: routingWarningText.value,
+    actions: [
+      {
+        label: __('Send through {0}', [currentLabel]),
+        variant: 'solid',
+        onClick(close) {
+          close()
+          continueSend()
+        },
+      },
+      {
+        label: __('Switch to {0}', [conversationRoutingLabel(latest)]),
+        onClick: async (close) => {
+          if (await retargetComposerToConversation(latest)) close()
+        },
+      },
+      {
+        label: __('Cancel'),
+        onClick(close) {
+          close()
+        },
+      },
+    ],
+  })
+}
+
+async function retargetComposerToLatestInbound() {
+  return retargetComposerToConversation(latestInboundConversation.value)
+}
+
+async function retargetComposerToConversation(target) {
+  target = activeConversationByName(target?.name)
+  if (!target) {
+    routingError.value = __(
+      'This external conversation is not available for sending.',
+    )
+    return false
+  }
+  if (target.name === selectedConversation.value?.name) {
+    pinSelection()
+    routingError.value = ''
+    return true
+  }
+
+  routingError.value = ''
+  let compatibilityError = composerRetargetError(target)
+  if (compatibilityError) {
+    routingError.value = __(compatibilityError)
+    return false
+  }
+
+  try {
+    await composerAttachments.value?.retarget?.(target.name)
+    if (voiceDraft.value) voiceRecorder.value?.retarget?.()
+    pinSelection()
+    preserveComposerDuringScopeChange(() => {
+      selectedChannel.value = target.channel
+      selectedConversationName.value = target.name
+    })
+    await nextTick()
+    return true
+  } catch (error) {
+    routingError.value = __(
+      error?.messages?.[0] ||
+        error?.message ||
+        'Could not switch the external conversation.',
+    )
+    return false
+  }
+}
+
+function composerRetargetError(target) {
+  if (replyTarget.value)
+    return 'Cancel the reply before switching conversations.'
+  if (preparedHandoff.value)
+    return 'Cancel the prepared handoff before switching conversations.'
+  if (messageActionState.value.editingMessage)
+    return 'Finish editing the message before switching conversations.'
+
+  let channel =
+    channelByName.value[target.channel] || target.channel_info || target
+  let capabilities = getMessengerCapabilities(channel)
+  if (pendingAttachments.value.some((item) => item.status !== 'uploaded')) {
+    return 'Wait for attachments to finish uploading before switching.'
+  }
+  if (pendingAttachments.value.length) {
+    let validation = validateComposerFileMix([], pendingAttachments.value, {
+      supportsAttachments: capabilities.supports_attachments,
+      channelType: getMessengerChannelType(channel),
+      maxAttachmentCount: capabilities.max_attachment_count,
+    })
+    if (validation.error) return validation.error
+  }
+  if (pendingLocation.value && !capabilities.location.send) {
+    return 'The target conversation does not support location messages.'
+  }
+  if (voiceActive.value && !voiceDraft.value) {
+    return 'Stop recording the voice message before switching conversations.'
+  }
+  if (voiceDraft.value) {
+    if (!capabilities.voice.send) {
+      return 'The target conversation does not support voice messages.'
+    }
+    if (
+      voiceDraft.value.durationMs >
+      capabilities.voice.max_duration_seconds * 1000
+    ) {
+      return 'The voice message exceeds the target conversation duration limit.'
+    }
+    if (voiceDraft.value.sizeBytes > capabilities.voice.max_size_bytes) {
+      return 'The voice message exceeds the target conversation size limit.'
+    }
+  }
+  return ''
+}
+
+function conversationRoutingLabel(conversation = {}) {
+  return messengerConversationOption(conversation, __).label
+}
+
+function channelRoutingLabel(channel = {}) {
+  return __(getMessengerPlatformLabel(channel || {}))
+}
+
+function startVoiceRecording() {
+  pinSelection()
+  voiceRecorder.value?.start()
+}
+
+function handleVoiceActive(active) {
+  voiceActive.value = active
+  if (active) pinSelection()
+}
+
+function requestVoiceSend(metadata) {
+  voiceDraft.value = metadata || voiceDraft.value
+  let send = () => voiceRecorder.value?.send()
+  if (routingMismatch.value) openRoutingConfirmation(send)
+  else send()
 }
 
 async function sendMessage() {
@@ -1265,19 +1590,33 @@ async function resolveConversationForSend() {
 async function prepareHandoff() {
   if (!permissions.value.can_operate) return
   if (!handoffTargetChannel.value || !selectedConversation.value) return
+  pinSelection()
   genericError.value = ''
   let handoffAction = resolveMessengerHandoffAction(
     conversations.value,
     handoffTargetChannel.value,
   )
   if (handoffAction.state === 'switch') {
-    selectedChannel.value = handoffTargetChannel.value
-    selectedConversationName.value = handoffAction.conversation.name
+    if (
+      isComposerDirty() &&
+      !(await retargetComposerToConversation(handoffAction.conversation))
+    )
+      return
+    if (!isComposerDirty()) {
+      selectedChannel.value = handoffTargetChannel.value
+      selectedConversationName.value = handoffAction.conversation.name
+    }
     handoffTargetChannel.value = ''
     toast.success(__('Switched to an existing external chat.'))
     return
   }
   if (handoffAction.state === 'ambiguous') {
+    if (isComposerDirty()) {
+      genericError.value = __(
+        'Clear the current draft and attachments before preparing a handoff.',
+      )
+      return
+    }
     selectedChannel.value = handoffTargetChannel.value
     selectedConversationName.value = ''
     handoffTargetChannel.value = ''
@@ -1423,7 +1762,7 @@ function makeClientRequestId() {
 function sendOnEnter(event) {
   if (event.isComposing || event.shiftKey) return
   event.preventDefault()
-  sendMessage()
+  requestSendMessage()
 }
 
 function handleComposerPaste(event) {
@@ -1452,6 +1791,48 @@ function handleComposerDrop(event) {
 async function voiceQueued() {
   cancelReply()
   await Promise.all([refreshConversations(), messageSync.syncDelta()])
+}
+
+async function selectInboundMessage(message, event) {
+  if (
+    !permissions.value.can_operate ||
+    message?.direction !== 'inbound' ||
+    sendingMessage.value ||
+    eventTargetsInteractiveElement(event)
+  )
+    return
+  let conversation = activeConversationByName(message.conversation)
+  if (!conversation) {
+    routingError.value = __(
+      'This external conversation is not available for sending.',
+    )
+    return
+  }
+  if (conversation.name === selectedConversation.value?.name) {
+    pinSelection()
+    return
+  }
+  await retargetComposerToConversation(conversation)
+}
+
+function eventTargetsInteractiveElement(event) {
+  return Boolean(
+    event?.target?.closest?.(
+      'a, button, input, textarea, select, video, audio, [role="button"], [role="slider"], [data-attachment-renderer], [contenteditable="true"]',
+    ),
+  )
+}
+
+function isComposerDirty() {
+  return Boolean(
+    draftText.value ||
+    pendingAttachments.value.length ||
+    pendingLocation.value ||
+    voiceActive.value ||
+    replyTarget.value ||
+    preparedHandoff.value ||
+    messageActionState.value.editingMessage,
+  )
 }
 
 function scrollToBottom() {
@@ -1510,6 +1891,7 @@ function startReply(message) {
     )
     return
   }
+  pinSelection()
   resetComposer()
   preserveComposerDuringScopeChange(() => {
     selectedChannel.value = conversation.channel
@@ -1534,6 +1916,7 @@ function selectLocation(location) {
     )
     return
   }
+  pinSelection()
   pendingLocation.value = location
 }
 
@@ -1816,6 +2199,7 @@ async function resetComposer() {
   let handoff = preparedHandoff.value
   preparedHandoff.value = null
   draftText.value = ''
+  voiceDraft.value = null
   pendingLocation.value = null
   locationPickerOpen.value = false
   handoffTargetChannel.value = ''
@@ -1823,6 +2207,7 @@ async function resetComposer() {
   clientRequestFingerprint.value = ''
   draggingFiles.value = false
   sendWarning.value = ''
+  routingError.value = ''
   cancelReply()
   clearTyping()
   composerTyping.reset()

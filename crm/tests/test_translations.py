@@ -12,6 +12,14 @@ class TestCRMTranslations(TestCase):
 		self.assertEqual(translations["Play"], "Воспроизвести")
 		self.assertEqual(translations["Pause"], "Пауза")
 		self.assertEqual(translations["Resume"], "Продолжить")
+		self.assertEqual(
+			translations["Check sending conversation"],
+			"Проверить переписку отправки",
+		)
+		self.assertEqual(
+			translations["Could not move attachments to the selected conversation."],
+			"Не удалось перенести вложения в выбранную переписку.",
+		)
 
 	def test_gateway_brand_is_not_exposed_in_customer_translations(self):
 		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS))
