@@ -861,7 +861,7 @@ const messageSync = createMessengerSyncController({
           !conversationByName.value[message.conversation],
       )
     ) {
-      loadConversations()
+      refreshConversations()
     }
   },
   onError(error) {
@@ -874,7 +874,7 @@ const messageSync = createMessengerSyncController({
     else showTyping(payload.expires_in_ms)
   },
   onConversationStateChanged() {
-    loadConversations()
+    refreshConversations()
   },
 })
 
@@ -970,8 +970,7 @@ async function initialize(leadChanged = false) {
   }
   try {
     await Promise.all([
-      loadChannels(),
-      loadConversations(),
+      loadSelectionContext(),
       leadChanged
         ? messageSync.setLead(props.leadName)
         : messageSync.start(props.leadName),
@@ -1015,8 +1014,7 @@ async function loadAll() {
   loadingMessages.value = true
   try {
     await Promise.all([
-      loadChannels(),
-      loadConversations(),
+      loadSelectionContext(),
       messageSync.loadSnapshot(),
     ])
   } catch (error) {
@@ -1024,6 +1022,11 @@ async function loadAll() {
   } finally {
     loadingMessages.value = false
   }
+}
+
+async function loadSelectionContext() {
+  await Promise.all([loadChannels(), loadConversations()])
+  reconcileSelection()
 }
 
 async function loadChannels() {
@@ -1038,7 +1041,6 @@ async function loadChannels() {
       throw new Error(result?.message || __('Could not load channels.'))
     channels.value = result.channels || []
     applyPermissions(result.permissions)
-    ensureSelectedChannel()
   } catch (error) {
     handleError(error, __('Could not load channels.'))
   } finally {
@@ -1061,13 +1063,21 @@ async function loadConversations() {
       throw new Error(result?.message || __('Could not load the conversation.'))
     conversations.value = result.conversations || []
     applyPermissions(result.permissions)
-    ensureSelectedChannel()
-    applyRequestedConversation()
   } catch (error) {
     handleError(error, __('Could not load the conversation.'))
   } finally {
     loadingConversation.value = false
   }
+}
+
+async function refreshConversations() {
+  await loadConversations()
+  reconcileSelection()
+}
+
+function reconcileSelection() {
+  ensureSelectedChannel()
+  applyRequestedConversation()
 }
 
 function ensureSelectedChannel() {
@@ -1208,7 +1218,7 @@ async function sendMessage() {
   } finally {
     if (!accepted) composerAttachments.value?.unfreeze()
     sendingMessage.value = false
-    await Promise.all([loadConversations(), messageSync.syncDelta()])
+    await Promise.all([refreshConversations(), messageSync.syncDelta()])
   }
 }
 
@@ -1441,7 +1451,7 @@ function handleComposerDrop(event) {
 
 async function voiceQueued() {
   cancelReply()
-  await Promise.all([loadConversations(), messageSync.syncDelta()])
+  await Promise.all([refreshConversations(), messageSync.syncDelta()])
 }
 
 function scrollToBottom() {

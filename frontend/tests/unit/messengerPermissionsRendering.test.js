@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => {
   let handlers = new Map()
   return {
     call: vi.fn(),
+    route: { query: {} },
     socket: {
       on: vi.fn((event, handler) => {
         let listeners = handlers.get(event) || []
@@ -68,7 +69,7 @@ vi.mock('@/stores/users', () => ({
   }),
 }))
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => mocks.route,
 }))
 
 const emptyComponent = vi.hoisted(() => () => ({
@@ -111,6 +112,8 @@ let mounted = []
 let permissions
 let preparedResult
 let snapshotMessages
+let channelRows
+let conversationRows
 
 const channel = (name) => ({
   name,
@@ -144,27 +147,30 @@ beforeEach(() => {
     message: 'Перейдите в другой канал\nCRM-ABCDEFGHIJKLMNOPQRSTUVWXYZ',
   }
   snapshotMessages = []
+  channelRows = [channel('CHANNEL-1'), channel('CHANNEL-2')]
+  conversationRows = [
+    {
+      name: 'CONVERSATION-1',
+      channel: 'CHANNEL-1',
+      status: 'Open',
+      external_chat_id: 'chat-1',
+    },
+  ]
+  mocks.route.query = {}
   mocks.socket.reset()
   vi.clearAllMocks()
   mocks.call.mockImplementation(async (method) => {
     if (method.endsWith('get_channels')) {
       return {
         ok: true,
-        channels: [channel('CHANNEL-1'), channel('CHANNEL-2')],
+        channels: channelRows,
         permissions,
       }
     }
     if (method.endsWith('get_conversations')) {
       return {
         ok: true,
-        conversations: [
-          {
-            name: 'CONVERSATION-1',
-            channel: 'CHANNEL-1',
-            status: 'Open',
-            external_chat_id: 'chat-1',
-          },
-        ],
+        conversations: conversationRows,
         permissions,
       }
     }
@@ -200,6 +206,14 @@ beforeEach(() => {
   })
 })
 
+function deferred() {
+  let resolve
+  let promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 afterEach(() => {
   for (let { app, root } of mounted) {
     app.unmount()
@@ -222,6 +236,203 @@ async function mountConversation(props = {}) {
   await nextTick()
   return root
 }
+
+function deferSelectionRequests() {
+  let channelsRequest = deferred()
+  let conversationsRequest = deferred()
+  let defaultCall = mocks.call.getMockImplementation()
+  mocks.call.mockImplementation((method, args) => {
+    if (method.endsWith('get_channels')) return channelsRequest.promise
+    if (method.endsWith('get_conversations'))
+      return conversationsRequest.promise
+    return defaultCall(method, args)
+  })
+  return {
+    resolveChannels() {
+      channelsRequest.resolve({ ok: true, channels: channelRows, permissions })
+    },
+    resolveConversations() {
+      conversationsRequest.resolve({
+        ok: true,
+        conversations: conversationRows,
+        permissions,
+      })
+    },
+  }
+}
+
+async function resolveSelectionRequests(requests, first) {
+  await vi.waitFor(() => {
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('get_channels')),
+    ).toBe(true)
+    expect(
+      mocks.call.mock.calls.some(([method]) =>
+        method.endsWith('get_conversations'),
+      ),
+    ).toBe(true)
+  })
+  if (first === 'channels') {
+    requests.resolveChannels()
+    await nextTick()
+    requests.resolveConversations()
+  } else {
+    requests.resolveConversations()
+    await nextTick()
+    requests.resolveChannels()
+  }
+}
+
+describe('messenger initial selection', () => {
+  it.each(['channels', 'conversations'])(
+    'selects the first conversation channel when %s resolve first',
+    async (first) => {
+      permissions = { ...permissions, can_operate: true }
+      conversationRows = [
+        {
+          name: 'CONVERSATION-2',
+          channel: 'CHANNEL-2',
+          status: 'Open',
+          external_chat_id: 'chat-2',
+        },
+      ]
+      let requests = deferSelectionRequests()
+      let mounting = mountConversation()
+
+      await resolveSelectionRequests(requests, first)
+      let root = await mounting
+
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-2',
+      )
+    },
+  )
+
+  it('falls back to the first channel when there are no conversations', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = []
+
+    let root = await mountConversation()
+
+    expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+      'CHANNEL-1',
+    )
+  })
+
+  it.each(['channels', 'conversations'])(
+    'applies a requested conversation when %s resolve first',
+    async (first) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        channel('CHANNEL-1'),
+        channel('CHANNEL-2'),
+        channel('CHANNEL-3'),
+      ]
+      conversationRows = [
+        {
+          name: 'CONVERSATION-RECENT',
+          channel: 'CHANNEL-2',
+          status: 'Open',
+        },
+        {
+          name: 'CONVERSATION-REQUESTED-1',
+          channel: 'CHANNEL-3',
+          status: 'Open',
+        },
+        {
+          name: 'CONVERSATION-REQUESTED-2',
+          channel: 'CHANNEL-3',
+          status: 'Open',
+        },
+      ]
+      mocks.route.query = {
+        messenger_conversation: 'CONVERSATION-REQUESTED-2',
+      }
+      let requests = deferSelectionRequests()
+      let mounting = mountConversation()
+
+      await resolveSelectionRequests(requests, first)
+      let root = await mounting
+
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-3',
+      )
+      expect(
+        root.querySelector('input[placeholder="External Chat"]').value,
+      ).toBe('CONVERSATION-REQUESTED-2')
+    },
+  )
+
+  it('preserves a valid explicit selection across refresh and realtime reload', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = [
+      {
+        name: 'CONVERSATION-2',
+        channel: 'CHANNEL-2',
+        status: 'Open',
+      },
+      {
+        name: 'CONVERSATION-1A',
+        channel: 'CHANNEL-1',
+        status: 'Open',
+        external_chat_id: 'chat-1a',
+      },
+      {
+        name: 'CONVERSATION-1B',
+        channel: 'CHANNEL-1',
+        status: 'Open',
+        external_chat_id: 'chat-1b',
+      },
+    ]
+    let root = await mountConversation()
+    let platform = root.querySelector('input[placeholder="Platform"]')
+    platform.value = 'CHANNEL-1'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+    let externalChat = root.querySelector(
+      'input[placeholder="External Chat"]',
+    )
+    externalChat.value = 'CONVERSATION-1B'
+    externalChat.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    let channelLoads = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('get_channels'),
+    ).length
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Refresh')
+      .click()
+    await vi.waitFor(() =>
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('get_channels'),
+        ).length,
+      ).toBeGreaterThan(channelLoads),
+    )
+    expect(platform.value).toBe('CHANNEL-1')
+    expect(externalChat.value).toBe('CONVERSATION-1B')
+
+    let conversationLoads = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('get_conversations'),
+    ).length
+    mocks.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONVERSATION-2',
+      conversation_state_changed: true,
+    })
+    await vi.waitFor(() =>
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('get_conversations'),
+        ).length,
+      ).toBeGreaterThan(conversationLoads),
+    )
+    expect(platform.value).toBe('CHANNEL-1')
+    expect(externalChat.value).toBe('CONVERSATION-1B')
+  })
+})
 
 describe('messenger permission rendering', () => {
   it('renders read-only history without composer or handoff controls', async () => {
