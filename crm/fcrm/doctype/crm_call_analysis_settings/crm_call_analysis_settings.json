@@ -1,0 +1,86 @@
+{
+ "actions": [],
+ "creation": "2026-09-02 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "api_base_url",
+  "api_key",
+  "transcription_model",
+  "summary_model",
+  "language",
+  "max_recording_mb"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable Call Analysis"
+  },
+  {
+   "default": "https://openrouter.ai/api/v1",
+   "fieldname": "api_base_url",
+   "fieldtype": "Data",
+   "label": "AI Service URL",
+   "mandatory_depends_on": "eval:doc.enabled"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "default": "openai/whisper-large-v3",
+   "fieldname": "transcription_model",
+   "fieldtype": "Data",
+   "label": "Transcription Model",
+   "mandatory_depends_on": "eval:doc.enabled"
+  },
+  {
+   "default": "google/gemini-3.1-flash-lite-preview",
+   "fieldname": "summary_model",
+   "fieldtype": "Data",
+   "label": "Summary Model",
+   "mandatory_depends_on": "eval:doc.enabled"
+  },
+  {
+   "default": "Auto",
+   "fieldname": "language",
+   "fieldtype": "Select",
+   "label": "Preferred Language",
+   "options": "Auto\nRussian\nEnglish"
+  },
+  {
+   "default": "25",
+   "description": "Recordings larger than this limit are not sent to the AI service.",
+   "fieldname": "max_recording_mb",
+   "fieldtype": "Int",
+   "label": "Maximum Recording Size (MB)"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "FCRM",
+ "name": "CRM Call Analysis Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

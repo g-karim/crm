@@ -25,6 +25,21 @@
   "receiver",
   "caller",
   "recording_url",
+  "ai_analysis_section",
+  "ai_analysis_status",
+  "ai_analysis_requested_on",
+  "ai_analysis_started_on",
+  "ai_analyzed_on",
+  "ai_analysis_requested_by",
+  "ai_analysis_language",
+  "ai_transcription_model",
+  "ai_summary_model",
+  "ai_transcript",
+  "ai_summary",
+  "ai_key_points",
+  "ai_next_steps",
+  "ai_sentiment",
+  "ai_analysis_error",
   "end_time",
   "note",
   "section_break_kebz",
@@ -96,6 +111,126 @@
    "fieldname": "recording_url",
    "fieldtype": "Small Text",
    "label": "Recording URL"
+  },
+  {
+   "fieldname": "ai_analysis_section",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "Call Analysis"
+  },
+  {
+   "fieldname": "ai_analysis_status",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Call Analysis Status",
+   "no_copy": 1,
+   "options": "\nQueued\nProcessing\nCompleted\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_analysis_requested_on",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Call Analysis Requested On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_analysis_started_on",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Call Analysis Started On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_analyzed_on",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Call Analyzed On",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_analysis_requested_by",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Call Analysis Requested By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_analysis_language",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Call Analysis Language",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_transcription_model",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Transcription Model",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_summary_model",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Summary Model",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_transcript",
+   "fieldtype": "Long Text",
+   "hidden": 1,
+   "label": "Call Transcript",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_summary",
+   "fieldtype": "Long Text",
+   "hidden": 1,
+   "label": "Call Summary",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_key_points",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Call Key Points",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_next_steps",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Call Next Steps",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_sentiment",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Call Sentiment",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_analysis_error",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Call Analysis Error",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "fieldname": "end_time",

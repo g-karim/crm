@@ -65,6 +65,24 @@ class TestCRMCallLog(IntegrationTestCase):
 
 		self.assertEqual(call.recording_url, recording_url)
 
+	def test_replacing_recording_clears_previous_ai_analysis(self):
+		call = create_test_call_log(recording_url="https://example.com/first.mp3")
+		call.db_set(
+			{
+				"ai_analysis_status": "Completed",
+				"ai_transcript": "Old transcript",
+				"ai_summary": "Old summary",
+			}
+		)
+		call.reload()
+
+		call.recording_url = "https://example.com/replacement.mp3"
+		call.save()
+
+		self.assertFalse(call.ai_analysis_status)
+		self.assertFalse(call.ai_transcript)
+		self.assertFalse(call.ai_summary)
+
 	def test_has_link_method(self):
 		"""Test has_link method to check if document link exists"""
 		# Create a lead for linking
@@ -253,6 +271,7 @@ class TestCRMCallLog(IntegrationTestCase):
 		self.assertIn("_duration", result)
 		self.assertIn("_tasks", result)
 		self.assertIn("_notes", result)
+		self.assertIn("_call_analysis", result)
 
 	def test_get_call_log_with_reference_lead(self):
 		"""Test get_call_log API with reference to CRM Lead"""

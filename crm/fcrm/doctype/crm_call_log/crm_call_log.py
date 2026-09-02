@@ -20,6 +20,20 @@ class CRMCallLog(Document):
 		from frappe.types import DF
 
 		caller: DF.Link | None
+		ai_analysis_error: DF.SmallText | None
+		ai_analysis_language: DF.Data | None
+		ai_analysis_requested_by: DF.Link | None
+		ai_analysis_requested_on: DF.Datetime | None
+		ai_analysis_started_on: DF.Datetime | None
+		ai_analysis_status: DF.Literal["", "Queued", "Processing", "Completed", "Failed"]
+		ai_analyzed_on: DF.Datetime | None
+		ai_key_points: DF.JSON | None
+		ai_next_steps: DF.JSON | None
+		ai_sentiment: DF.Data | None
+		ai_summary: DF.LongText | None
+		ai_summary_model: DF.Data | None
+		ai_transcript: DF.LongText | None
+		ai_transcription_model: DF.Data | None
 		duration: DF.Duration | None
 		end_time: DF.Datetime | None
 		id: DF.Data | None
@@ -52,6 +66,29 @@ class CRMCallLog(Document):
 			self.id = generate_hash(length=12)
 		if not self.telephony_medium:
 			self.telephony_medium = "Manual"
+
+	def validate(self):
+		if not self.is_new() and self.has_value_changed("recording_url"):
+			self._clear_call_analysis()
+
+	def _clear_call_analysis(self):
+		for fieldname in (
+			"ai_analysis_status",
+			"ai_analysis_requested_on",
+			"ai_analysis_started_on",
+			"ai_analyzed_on",
+			"ai_analysis_requested_by",
+			"ai_analysis_language",
+			"ai_transcription_model",
+			"ai_summary_model",
+			"ai_transcript",
+			"ai_summary",
+			"ai_key_points",
+			"ai_next_steps",
+			"ai_sentiment",
+			"ai_analysis_error",
+		):
+			self.set(fieldname, None)
 
 	@staticmethod
 	def default_list_data():
@@ -188,7 +225,7 @@ def parse_call_log(call):
 
 @frappe.whitelist()
 def get_call_log(name: str):
-	call = frappe.get_cached_doc(
+	call_doc = frappe.get_cached_doc(
 		"CRM Call Log",
 		name,
 		fields=[
@@ -207,7 +244,13 @@ def get_call_log(name: str):
 			"reference_docname",
 			"creation",
 		],
-	).as_dict()
+	)
+	call_doc.check_permission("read")
+	call = call_doc.as_dict()
+
+	from crm.call_analysis.config import get_public_status
+
+	call["_call_analysis"] = get_public_status()
 
 	call = parse_call_log(call)
 
