@@ -71,6 +71,7 @@
 <script setup>
 import {
   createComposerAttachmentController,
+  retargetComposerTemporaryFiles,
   validateComposerFileMix,
 } from '@/utils/messengerComposer'
 import { Button, FileUploadHandler, call, toast } from 'frappe-ui'
@@ -88,6 +89,7 @@ const emit = defineEmits(['change'])
 const fileInput = ref(null)
 const items = ref([])
 const frozen = ref(false)
+let preserveNextConversationChange = false
 
 const controller = createComposerAttachmentController({
   maxFiles: () => props.maxFiles,
@@ -178,11 +180,35 @@ function unfreeze() {
   controller.unfreeze()
 }
 
+async function retarget(conversation) {
+  let fileNames = controller.readyFileNames()
+  let scopes = controller.getScopes()
+  if (scopes.length > 1) {
+    throw new Error(__('Could not identify the attachment conversation.'))
+  }
+  await retargetComposerTemporaryFiles(call, {
+    sourceConversation: scopes[0] || props.conversation,
+    targetConversation: conversation,
+    files: fileNames,
+  })
+  controller.retargetScope(conversation)
+  preserveNextConversationChange = true
+}
+
+function preserveScopeChange() {
+  preserveNextConversationChange = true
+}
+
 onBeforeUnmount(() => controller.discard())
 watch(
   () => props.conversation,
   (conversation, previousConversation) => {
-    if (conversation !== previousConversation) controller.discard()
+    if (conversation === previousConversation) return
+    if (preserveNextConversationChange) {
+      preserveNextConversationChange = false
+      return
+    }
+    controller.discard()
   },
 )
 
@@ -194,6 +220,8 @@ defineExpose({
   release,
   freeze,
   unfreeze,
+  retarget,
+  preserveScopeChange,
   hasBlockingItems: controller.hasBlockingItems,
   readyFileNames: controller.readyFileNames,
 })

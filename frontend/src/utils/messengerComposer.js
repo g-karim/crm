@@ -137,6 +137,13 @@ export function createComposerAttachmentController(options) {
     notify()
   }
 
+  function retargetScope(scope) {
+    items.forEach((item) => {
+      item.scope = scope
+    })
+    notify()
+  }
+
   async function discardFiles(fileNames, scope) {
     fileNames = [...new Set((fileNames || []).filter(Boolean))]
     if (fileNames.length) await options.discard?.(fileNames, scope)
@@ -179,9 +186,13 @@ export function createComposerAttachmentController(options) {
     release,
     freeze,
     unfreeze,
+    retargetScope,
     handlePaste,
     handleDrop,
     getItems: () => [...items],
+    getScopes: () => [
+      ...new Set(items.map((item) => item.scope).filter(Boolean)),
+    ],
     isFrozen: () => frozen,
     hasBlockingItems: () => items.some((item) => item.status !== 'uploaded'),
     readyFileNames: () =>
@@ -190,6 +201,34 @@ export function createComposerAttachmentController(options) {
         .map((item) => item.uploadedFile?.name)
         .filter(Boolean),
   }
+}
+
+export async function retargetComposerTemporaryFiles(
+  call,
+  { sourceConversation = '', targetConversation = '', files = [] } = {},
+) {
+  files = [...new Set((files || []).filter(Boolean))]
+  if (!files.length) return { ok: true, retargeted: [] }
+  if (!sourceConversation || !targetConversation) {
+    throw new Error(
+      translate('Could not identify the attachment conversation.'),
+    )
+  }
+  let result = await call(
+    'crm_messenger.api.attachments.retarget_temporary_files',
+    {
+      source_conversation: sourceConversation,
+      target_conversation: targetConversation,
+      files,
+    },
+  )
+  if (!result?.ok) {
+    throw new Error(
+      result?.message ||
+        translate('Could not move attachments to the selected conversation.'),
+    )
+  }
+  return result
 }
 
 export function validateComposerFileMix(files, existing, context = {}) {

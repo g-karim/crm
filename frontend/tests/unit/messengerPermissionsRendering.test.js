@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => {
   let handlers = new Map()
   return {
+    attachmentPreserve: vi.fn(),
+    attachmentRetarget: vi.fn(async () => {}),
     call: vi.fn(),
+    dialog: vi.fn(),
+    route: { query: {} },
+    voiceRetarget: vi.fn(),
+    voiceSend: vi.fn(),
     socket: {
       on: vi.fn((event, handler) => {
         let listeners = handlers.get(event) || []
@@ -60,7 +66,7 @@ vi.mock('frappe-ui', () => ({
 }))
 
 vi.mock('@/stores/global', () => ({
-  globalStore: () => ({ $dialog: vi.fn(), $socket: mocks.socket }),
+  globalStore: () => ({ $dialog: mocks.dialog, $socket: mocks.socket }),
 }))
 vi.mock('@/stores/users', () => ({
   usersStore: () => ({
@@ -68,7 +74,7 @@ vi.mock('@/stores/users', () => ({
   }),
 }))
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => mocks.route,
 }))
 
 const emptyComponent = vi.hoisted(() => () => ({
@@ -86,6 +92,7 @@ vi.mock('@/components/LeadMessenger/MessageReactions.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageReplyQuote.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
   default: {
+    emits: ['change'],
     methods: {
       discard() {},
       freeze() {
@@ -93,14 +100,30 @@ vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
       },
       unfreeze() {},
       release() {},
+      retarget(conversation) {
+        return mocks.attachmentRetarget(conversation)
+      },
+      preserveScopeChange() {
+        mocks.attachmentPreserve()
+      },
       openFileSelector() {},
     },
-    template: '<span />',
+    template:
+      "<button data-testid=\"mock-attachment-draft\" @click=\"$emit('change', [{ status: 'uploaded', file: { name: 'draft.pdf', type: 'application/pdf' } }])\">attachment draft</button>",
   },
 }))
 vi.mock('@/components/LeadMessenger/ComposerVoiceRecorder.vue', () => ({
   default: {
-    methods: { reset() {}, start() {} },
+    methods: {
+      reset() {},
+      start() {},
+      send() {
+        mocks.voiceSend()
+      },
+      retarget() {
+        mocks.voiceRetarget()
+      },
+    },
     template: '<span />',
   },
 }))
@@ -111,8 +134,11 @@ let mounted = []
 let permissions
 let preparedResult
 let snapshotMessages
+let channelRows
+let conversationRows
+let latestInbound
 
-const channel = (name) => ({
+const channel = (name, capabilities = {}) => ({
   name,
   provider: 'telegram_bot',
   platform: 'telegram',
@@ -126,6 +152,7 @@ const channel = (name) => ({
     location: { send: false },
     reactions: { receive: true, send: true },
     video: {},
+    ...capabilities,
   },
 })
 
@@ -144,27 +171,32 @@ beforeEach(() => {
     message: 'Перейдите в другой канал\nCRM-ABCDEFGHIJKLMNOPQRSTUVWXYZ',
   }
   snapshotMessages = []
+  channelRows = [channel('CHANNEL-1'), channel('CHANNEL-2')]
+  conversationRows = [
+    {
+      name: 'CONVERSATION-1',
+      channel: 'CHANNEL-1',
+      status: 'Open',
+      external_chat_id: 'chat-1',
+    },
+  ]
+  latestInbound = null
+  mocks.route.query = {}
   mocks.socket.reset()
   vi.clearAllMocks()
   mocks.call.mockImplementation(async (method) => {
     if (method.endsWith('get_channels')) {
       return {
         ok: true,
-        channels: [channel('CHANNEL-1'), channel('CHANNEL-2')],
+        channels: channelRows,
         permissions,
       }
     }
     if (method.endsWith('get_conversations')) {
       return {
         ok: true,
-        conversations: [
-          {
-            name: 'CONVERSATION-1',
-            channel: 'CHANNEL-1',
-            status: 'Open',
-            external_chat_id: 'chat-1',
-          },
-        ],
+        conversations: conversationRows,
+        latest_inbound: latestInbound,
         permissions,
       }
     }
@@ -200,6 +232,14 @@ beforeEach(() => {
   })
 })
 
+function deferred() {
+  let resolve
+  let promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 afterEach(() => {
   for (let { app, root } of mounted) {
     app.unmount()
@@ -222,6 +262,459 @@ async function mountConversation(props = {}) {
   await nextTick()
   return root
 }
+
+function deferSelectionRequests() {
+  let channelsRequest = deferred()
+  let conversationsRequest = deferred()
+  let defaultCall = mocks.call.getMockImplementation()
+  mocks.call.mockImplementation((method, args) => {
+    if (method.endsWith('get_channels')) return channelsRequest.promise
+    if (method.endsWith('get_conversations'))
+      return conversationsRequest.promise
+    return defaultCall(method, args)
+  })
+  return {
+    resolveChannels() {
+      channelsRequest.resolve({ ok: true, channels: channelRows, permissions })
+    },
+    resolveConversations() {
+      conversationsRequest.resolve({
+        ok: true,
+        conversations: conversationRows,
+        latest_inbound: latestInbound,
+        permissions,
+      })
+    },
+  }
+}
+
+async function resolveSelectionRequests(requests, first) {
+  await vi.waitFor(() => {
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('get_channels')),
+    ).toBe(true)
+    expect(
+      mocks.call.mock.calls.some(([method]) =>
+        method.endsWith('get_conversations'),
+      ),
+    ).toBe(true)
+  })
+  if (first === 'channels') {
+    requests.resolveChannels()
+    await nextTick()
+    requests.resolveConversations()
+  } else {
+    requests.resolveConversations()
+    await nextTick()
+    requests.resolveChannels()
+  }
+}
+
+describe('messenger initial selection', () => {
+  it('selects the conversation containing the latest inbound message', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = [
+      { name: 'CONVERSATION-1', channel: 'CHANNEL-1', status: 'Open' },
+      { name: 'CONVERSATION-2', channel: 'CHANNEL-2', status: 'Open' },
+    ]
+    latestInbound = {
+      message: 'MESSAGE-2',
+      conversation: 'CONVERSATION-2',
+      channel: 'CHANNEL-2',
+      message_datetime: '2026-08-28 10:00:00',
+      creation: '2026-08-28 10:00:00',
+    }
+
+    let root = await mountConversation()
+
+    expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+      'CHANNEL-2',
+    )
+    expect(
+      root.querySelector('[data-testid="conversation-routing-warning"]'),
+    ).toBeNull()
+  })
+
+  it.each(['channels', 'conversations'])(
+    'selects the first conversation channel when %s resolve first',
+    async (first) => {
+      permissions = { ...permissions, can_operate: true }
+      conversationRows = [
+        {
+          name: 'CONVERSATION-2',
+          channel: 'CHANNEL-2',
+          status: 'Open',
+          external_chat_id: 'chat-2',
+        },
+      ]
+      let requests = deferSelectionRequests()
+      let mounting = mountConversation()
+
+      await resolveSelectionRequests(requests, first)
+      let root = await mounting
+
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-2',
+      )
+    },
+  )
+
+  it('falls back to the first channel when there are no conversations', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = []
+
+    let root = await mountConversation()
+
+    expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+      'CHANNEL-1',
+    )
+  })
+
+  it.each(['channels', 'conversations'])(
+    'applies a requested conversation when %s resolve first',
+    async (first) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        channel('CHANNEL-1'),
+        channel('CHANNEL-2'),
+        channel('CHANNEL-3'),
+      ]
+      conversationRows = [
+        {
+          name: 'CONVERSATION-RECENT',
+          channel: 'CHANNEL-2',
+          status: 'Open',
+        },
+        {
+          name: 'CONVERSATION-REQUESTED-1',
+          channel: 'CHANNEL-3',
+          status: 'Open',
+        },
+        {
+          name: 'CONVERSATION-REQUESTED-2',
+          channel: 'CHANNEL-3',
+          status: 'Open',
+        },
+      ]
+      mocks.route.query = {
+        messenger_conversation: 'CONVERSATION-REQUESTED-2',
+      }
+      let requests = deferSelectionRequests()
+      let mounting = mountConversation()
+
+      await resolveSelectionRequests(requests, first)
+      let root = await mounting
+
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-3',
+      )
+      expect(
+        root.querySelector('input[placeholder="External Chat"]').value,
+      ).toBe('CONVERSATION-REQUESTED-2')
+    },
+  )
+
+  it('preserves a valid explicit selection across refresh and realtime reload', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = [
+      {
+        name: 'CONVERSATION-2',
+        channel: 'CHANNEL-2',
+        status: 'Open',
+      },
+      {
+        name: 'CONVERSATION-1A',
+        channel: 'CHANNEL-1',
+        status: 'Open',
+        external_chat_id: 'chat-1a',
+      },
+      {
+        name: 'CONVERSATION-1B',
+        channel: 'CHANNEL-1',
+        status: 'Open',
+        external_chat_id: 'chat-1b',
+      },
+    ]
+    latestInbound = {
+      message: 'MESSAGE-2',
+      conversation: 'CONVERSATION-2',
+      channel: 'CHANNEL-2',
+      message_datetime: '2026-08-28 10:00:00',
+      creation: '2026-08-28 10:00:00',
+    }
+    let root = await mountConversation()
+    let platform = root.querySelector('input[placeholder="Platform"]')
+    platform.value = 'CHANNEL-1'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+    let externalChat = root.querySelector('input[placeholder="External Chat"]')
+    externalChat.value = 'CONVERSATION-1B'
+    externalChat.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    let channelLoads = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('get_channels'),
+    ).length
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Refresh')
+      .click()
+    await vi.waitFor(() =>
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('get_channels'),
+        ).length,
+      ).toBeGreaterThan(channelLoads),
+    )
+    expect(platform.value).toBe('CHANNEL-1')
+    expect(externalChat.value).toBe('CONVERSATION-1B')
+
+    let conversationLoads = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('get_conversations'),
+    ).length
+    mocks.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONVERSATION-2',
+      conversation_state_changed: true,
+    })
+    await vi.waitFor(() =>
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('get_conversations'),
+        ).length,
+      ).toBeGreaterThan(conversationLoads),
+    )
+    expect(platform.value).toBe('CHANNEL-1')
+    expect(externalChat.value).toBe('CONVERSATION-1B')
+  })
+
+  it('does not replace a draft-pinned conversation with a newer inbound', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = [
+      { name: 'CONVERSATION-1', channel: 'CHANNEL-1', status: 'Open' },
+      { name: 'CONVERSATION-2', channel: 'CHANNEL-2', status: 'Open' },
+    ]
+    latestInbound = {
+      message: 'MESSAGE-1',
+      conversation: 'CONVERSATION-1',
+      channel: 'CHANNEL-1',
+      message_datetime: '2026-08-28 10:00:00',
+      creation: '2026-08-28 10:00:00',
+    }
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+    composer.value = 'Keep this draft on conversation 1'
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    latestInbound = {
+      message: 'MESSAGE-2',
+      conversation: 'CONVERSATION-2',
+      channel: 'CHANNEL-2',
+      message_datetime: '2026-08-28 10:01:00',
+      creation: '2026-08-28 10:01:00',
+    }
+
+    mocks.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONVERSATION-2',
+      conversation_state_changed: true,
+    })
+
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('[data-testid="conversation-routing-warning"]'),
+      ).not.toBeNull(),
+    )
+    expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+      'CHANNEL-1',
+    )
+    expect(composer.value).toBe('Keep this draft on conversation 1')
+  })
+})
+
+describe('messenger conversation routing guard', () => {
+  function prepareRoutingFixture({ attachments = false } = {}) {
+    permissions = { ...permissions, can_operate: true }
+    let capabilityOverrides = attachments ? { supports_attachments: true } : {}
+    channelRows = [
+      channel('CHANNEL-1', capabilityOverrides),
+      channel('CHANNEL-2', capabilityOverrides),
+    ]
+    conversationRows = [
+      {
+        name: 'CONVERSATION-1',
+        channel: 'CHANNEL-1',
+        status: 'Open',
+        external_chat_id: 'chat-1',
+      },
+      {
+        name: 'CONVERSATION-2',
+        channel: 'CHANNEL-2',
+        status: 'Open',
+        external_chat_id: 'chat-2',
+      },
+    ]
+    latestInbound = {
+      message: 'MESSAGE-2',
+      conversation: 'CONVERSATION-2',
+      channel: 'CHANNEL-2',
+      message_datetime: '2026-08-28 10:01:00',
+      creation: '2026-08-28 10:01:00',
+    }
+  }
+
+  async function selectConversationOne(root, text = '') {
+    let platform = root.querySelector('input[placeholder="Platform"]')
+    platform.value = 'CHANNEL-1'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+    if (text) {
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = text
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+    }
+  }
+
+  function sendButton(root) {
+    return [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Send',
+    )
+  }
+
+  it('shows the mismatch warning only for a different selected conversation', async () => {
+    prepareRoutingFixture()
+    channelRows[0].label = 'Telegram - Support'
+    channelRows[1].label = 'Telegram - Sales'
+    conversationRows[0].client_name = 'Иван'
+    conversationRows[0].last_message_at = '2026-08-28 10:00:00'
+    conversationRows[1].client_name = 'Пётр'
+    conversationRows[1].last_message_at = '2026-08-28 10:01:00'
+    let root = await mountConversation()
+
+    expect(
+      root.querySelector('[data-testid="conversation-routing-warning"]'),
+    ).toBeNull()
+
+    await selectConversationOne(root)
+
+    let warning = root.querySelector(
+      '[data-testid="conversation-routing-warning"]',
+    )
+    expect(warning).not.toBeNull()
+    expect(warning.textContent).toContain('Telegram - Sales')
+    expect(warning.textContent).toContain('Telegram - Support')
+    expect(warning.textContent).not.toContain('Иван')
+    expect(warning.textContent).not.toContain('Пётр')
+    expect(warning.textContent).not.toContain('CONVERSATION-')
+    expect(warning.textContent).not.toContain('2026-08-28')
+  })
+
+  it('confirms and sends through the intentionally selected conversation', async () => {
+    prepareRoutingFixture()
+    channelRows[0].label = 'Telegram - Support'
+    channelRows[1].label = 'Telegram - Sales'
+    let root = await mountConversation()
+    await selectConversationOne(root, 'Send intentionally through chat 1')
+
+    sendButton(root).click()
+
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+    let dialog = mocks.dialog.mock.calls.at(-1)[0]
+    expect(dialog.title).toBe('Check sending conversation')
+    expect(dialog.message).toBe(
+      'The latest inbound message arrived in Telegram - Sales, but Telegram - Support is selected.',
+    )
+    expect(dialog.actions.map((action) => action.label)).toEqual([
+      'Send through Telegram - Support',
+      'Switch to Telegram - Sales',
+      'Cancel',
+    ])
+    dialog.actions
+      .find((action) => action.label.startsWith('Send through'))
+      .onClick(vi.fn())
+
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.messages.send_message',
+        expect.objectContaining({
+          conversation: 'CONVERSATION-1',
+          text: 'Send intentionally through chat 1',
+        }),
+      ),
+    )
+  })
+
+  it('does not send when the routing confirmation is cancelled', async () => {
+    prepareRoutingFixture()
+    let root = await mountConversation()
+    await selectConversationOne(root, 'Do not send this')
+
+    sendButton(root).click()
+    let dialog = mocks.dialog.mock.calls.at(-1)[0]
+    dialog.actions.find((action) => action.label === 'Cancel').onClick(vi.fn())
+    await nextTick()
+
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+  })
+
+  it('retargets uploaded composer attachments before switching', async () => {
+    prepareRoutingFixture({ attachments: true })
+    let root = await mountConversation()
+    await selectConversationOne(root, 'Keep the composer draft')
+    root.querySelector('[data-testid="mock-attachment-draft"]').click()
+    await nextTick()
+
+    root.querySelector('[data-testid="conversation-routing-switch"]').click()
+
+    await vi.waitFor(() =>
+      expect(mocks.attachmentRetarget).toHaveBeenCalledWith('CONVERSATION-2'),
+    )
+    await vi.waitFor(() =>
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-2',
+      ),
+    )
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]').value,
+    ).toBe('Keep the composer draft')
+  })
+
+  it('selects and pins the source conversation of an inbound message click', async () => {
+    prepareRoutingFixture()
+    snapshotMessages = [
+      {
+        name: 'MESSAGE-1',
+        conversation: 'CONVERSATION-1',
+        channel: 'CHANNEL-1',
+        direction: 'inbound',
+        status: 'received',
+        message_datetime: '2026-08-28 10:00:00',
+      },
+    ]
+    let root = await mountConversation()
+
+    root.querySelector('[data-message-bubble]').click()
+
+    await vi.waitFor(() =>
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-1',
+      ),
+    )
+    expect(
+      root.querySelector('[data-testid="conversation-routing-warning"]'),
+    ).not.toBeNull()
+  })
+})
 
 describe('messenger permission rendering', () => {
   it('renders read-only history without composer or handoff controls', async () => {

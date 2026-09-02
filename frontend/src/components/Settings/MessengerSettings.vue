@@ -154,7 +154,22 @@
           </div>
 
           <div
-            v-if="!channels.length"
+            v-if="loadError"
+            class="flex flex-col items-center rounded-lg border border-dashed border-outline-gray-2 px-6 py-12 text-center"
+          >
+            <div class="text-base-medium text-ink-red-3">
+              {{ __('Could not load message channel settings.') }}
+            </div>
+            <Button
+              class="mt-4"
+              :label="__('Try Again')"
+              variant="subtle"
+              @click="loadSettings(true, true)"
+            />
+          </div>
+
+          <div
+            v-else-if="!channels.length"
             class="flex flex-col items-center rounded-lg border border-dashed border-outline-gray-2 px-6 py-12 text-center"
           >
             <div
@@ -489,6 +504,7 @@ const settings = reactive(defaultSettings())
 const channels = ref([])
 const loading = ref(true)
 const refreshing = ref(false)
+const loadError = ref(false)
 const savingSettings = ref(false)
 const settingsSnapshot = ref('')
 const showAdvanced = ref(false)
@@ -567,7 +583,9 @@ async function loadSettings(isRefresh = false, channelsOnly = false) {
       settingsSnapshot.value = settingsState()
     }
     channels.value = result.channels || []
+    loadError.value = false
   } catch (error) {
+    loadError.value = true
     toast.error(
       clientProviderMessage(
         error?.messages?.[0] || 'Could not load message channel settings.',

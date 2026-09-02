@@ -1,6 +1,7 @@
 import {
   createComposerAttachmentController,
   isVideoFile,
+  retargetComposerTemporaryFiles,
   validateComposerFileMix,
 } from '@/utils/messengerComposer'
 import { describe, expect, it, vi } from 'vitest'
@@ -168,6 +169,50 @@ describe('messenger composer attachments', () => {
 
     expect(current.controller.getItems()).toEqual([])
     expect(current.discard).not.toHaveBeenCalled()
+  })
+
+  it('retargets attachment ownership used by later cleanup', async () => {
+    let current = harness()
+    current.controller.addFiles([file('retarget.pdf')])
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toEqual([
+        'FILE-retarget.pdf',
+      ]),
+    )
+
+    current.controller.retargetScope('CONVERSATION-2')
+    await current.controller.discard()
+
+    expect(current.discard).toHaveBeenCalledWith(
+      ['FILE-retarget.pdf'],
+      'CONVERSATION-2',
+    )
+  })
+
+  it('uses the backend temporary-file retarget contract', async () => {
+    let call = vi.fn(async () => ({
+      ok: true,
+      retargeted: ['FILE-1', 'FILE-2'],
+    }))
+
+    await expect(
+      retargetComposerTemporaryFiles(call, {
+        sourceConversation: 'CONVERSATION-1',
+        targetConversation: 'CONVERSATION-2',
+        files: ['FILE-1', 'FILE-2', 'FILE-1'],
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      retargeted: ['FILE-1', 'FILE-2'],
+    })
+    expect(call).toHaveBeenCalledWith(
+      'crm_messenger.api.attachments.retarget_temporary_files',
+      {
+        source_conversation: 'CONVERSATION-1',
+        target_conversation: 'CONVERSATION-2',
+        files: ['FILE-1', 'FILE-2'],
+      },
+    )
   })
 
   it('discards an upload that finishes after its composer scope reset', async () => {
