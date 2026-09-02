@@ -10,7 +10,7 @@ from crm.call_analysis.client import (
 from crm.call_analysis.config import CallAnalysisConfig
 
 
-def _config(language="Auto"):
+def _config(language="English"):
 	return CallAnalysisConfig(
 		api_base_url="https://ai.example.test/v1",
 		api_key="secret",
@@ -22,7 +22,7 @@ def _config(language="Auto"):
 
 
 class TestCallAnalysisClient(TestCase):
-	def test_transcription_uses_multipart_and_requested_language(self):
+	def test_transcription_uses_multipart_and_auto_detects_spoken_language(self):
 		response = MagicMock(ok=True)
 		response.json.return_value = {"text": "Здравствуйте"}
 		requester = MagicMock(return_value=response)
@@ -37,16 +37,17 @@ class TestCallAnalysisClient(TestCase):
 
 		self.assertEqual(result, "Здравствуйте")
 		kwargs = requester.call_args.kwargs
-		self.assertEqual(kwargs["data"]["language"], "ru")
+		self.assertNotIn("language", kwargs["data"])
 		self.assertEqual(kwargs["files"]["file"], ("call.mp3", b"audio", "audio/mpeg"))
 		self.assertNotIn("secret", str(kwargs["data"]))
 
 	def test_parse_analysis_accepts_json_code_fence(self):
 		result = parse_analysis(
-			'```json\n{"summary":"Итог","key_points":["Цена"],'
+			'```json\n{"transcript":"Полная расшифровка","summary":"Итог","key_points":["Цена"],'
 			'"next_steps":["Позвонить"],"sentiment":"positive"}\n```'
 		)
 
+		self.assertEqual(result.transcript, "Полная расшифровка")
 		self.assertEqual(result.summary, "Итог")
 		self.assertEqual(result.key_points, ["Цена"])
 		self.assertEqual(result.next_steps, ["Позвонить"])
@@ -64,7 +65,8 @@ class TestCallAnalysisClient(TestCase):
 			"choices": [
 				{
 					"message": {
-						"content": '{"summary":"Done","key_points":[],"next_steps":[],"sentiment":"neutral"}'
+						"content": '{"transcript":"Customer asked for a quote.","summary":"Done",'
+						'"key_points":[],"next_steps":[],"sentiment":"neutral"}'
 					}
 				}
 			]
@@ -77,5 +79,33 @@ class TestCallAnalysisClient(TestCase):
 		payload = requester.call_args.kwargs["json"]
 		self.assertIn("do not invent", payload["messages"][0]["content"])
 		self.assertIn("untrusted conversation content", payload["messages"][0]["content"])
+		self.assertIn(
+			"Write transcript, summary, key_points and next_steps in English",
+			payload["messages"][0]["content"],
+		)
 		self.assertEqual(payload["messages"][1]["content"], "Transcript:\nCustomer asked for a quote.")
 		self.assertEqual(payload["response_format"], {"type": "json_object"})
+
+	def test_summary_prompt_uses_selected_russian_language(self):
+		response = MagicMock(ok=True)
+		response.json.return_value = {
+			"choices": [
+				{
+					"message": {
+						"content": '{"transcript":"Клиент запросил предложение.","summary":"Запрос предложения.",'
+						'"key_points":[],"next_steps":[],"sentiment":"neutral"}'
+					}
+				}
+			]
+		}
+		requester = MagicMock(return_value=response)
+
+		result = summarize_transcript(
+			"Customer asked for a quote.",
+			config=_config("Russian"),
+			requester=requester,
+		)
+
+		self.assertEqual(result.transcript, "Клиент запросил предложение.")
+		prompt = requester.call_args.kwargs["json"]["messages"][0]["content"]
+		self.assertIn("Write transcript, summary, key_points and next_steps in Russian", prompt)

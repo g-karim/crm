@@ -45,22 +45,25 @@ class TestCallAnalysisTasks(IntegrationTestCase):
 			content_type="audio/mpeg",
 		)
 		summarize.return_value = AnalysisResult(
+			transcript="Полная расшифровка на выбранном языке",
 			summary="Краткий итог",
 			key_points=["Обсудили цену"],
 			next_steps=["Отправить предложение"],
 			sentiment="positive",
 		)
 
-		result = run_call_analysis(call_log.name, user="Administrator")
+		result = run_call_analysis(call_log.name, user="Administrator", language="Russian")
 
 		call_log.reload()
 		self.assertEqual(result["status"], "Completed")
 		self.assertEqual(call_log.ai_analysis_status, "Completed")
-		self.assertEqual(call_log.ai_transcript, "Полная расшифровка")
+		self.assertEqual(call_log.ai_transcript, "Полная расшифровка на выбранном языке")
 		self.assertEqual(call_log.ai_summary, "Краткий итог")
 		self.assertEqual(frappe.parse_json(call_log.ai_key_points), ["Обсудили цену"])
 		self.assertEqual(frappe.parse_json(call_log.ai_next_steps), ["Отправить предложение"])
 		self.assertEqual(call_log.ai_sentiment, "positive")
+		self.assertEqual(call_log.ai_analysis_language, "Russian")
+		_get_config.assert_called_once_with(language="Russian")
 
 	@patch("crm.call_analysis.tasks._publish")
 	@patch("crm.call_analysis.tasks.download_recording", side_effect=RuntimeError("temporary failure"))
@@ -69,7 +72,7 @@ class TestCallAnalysisTasks(IntegrationTestCase):
 	def test_worker_records_safe_failure(self, _log_error, _get_config, _download, _publish):
 		call_log = create_test_call_log(recording_url="https://cdn.example.test/call.mp3")
 
-		result = run_call_analysis(call_log.name, user="Administrator")
+		result = run_call_analysis(call_log.name, user="Administrator", language="English")
 
 		call_log.reload()
 		self.assertEqual(result["status"], "Failed")

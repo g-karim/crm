@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import frappe
-from frappe import _
 from frappe.utils import now_datetime
 
 from .client import summarize_transcript, transcribe_recording
-from .config import CallAnalysisConfigurationError, get_config
+from .config import (
+	CallAnalysisConfigurationError,
+	get_config,
+	get_user_analysis_language,
+	normalize_analysis_language,
+)
 from .recording import RecordingDownloadError, download_recording
 
 PROGRESS_EVENT = "crm_call_analysis_update"
 
 
-def enqueue_call_analysis(call_log, user: str) -> dict:
+def enqueue_call_analysis(call_log, user: str, *, language: str) -> dict:
 	requested_on = now_datetime()
 	call_log.db_set(
 		{
@@ -33,11 +37,12 @@ def enqueue_call_analysis(call_log, user: str) -> dict:
 		enqueue_after_commit=True,
 		call_log_name=call_log.name,
 		user=user,
+		language=normalize_analysis_language(language),
 	)
 	return {"queued": True, "status": "Queued", "job_id": job_id}
 
 
-def run_call_analysis(call_log_name: str, user: str | None = None):
+def run_call_analysis(call_log_name: str, user: str | None = None, language: str | None = None):
 	call_log = frappe.get_doc("CRM Call Log", call_log_name)
 	_publish(call_log_name, "Processing", user)
 	call_log.db_set(
@@ -50,17 +55,18 @@ def run_call_analysis(call_log_name: str, user: str | None = None):
 	)
 
 	try:
-		config = get_config()
+		language = normalize_analysis_language(language) if language else get_user_analysis_language(user)
+		config = get_config(language=language)
 		recording = download_recording(call_log, max_bytes=config.max_recording_bytes)
-		transcript = transcribe_recording(
+		raw_transcript = transcribe_recording(
 			recording.data,
 			filename=recording.filename,
 			content_type=recording.content_type,
 			config=config,
 		)
-		call_log.db_set("ai_transcript", transcript, update_modified=False)
+		call_log.db_set("ai_transcript", raw_transcript, update_modified=False)
 
-		analysis = summarize_transcript(transcript, config=config)
+		analysis = summarize_transcript(raw_transcript, config=config)
 		call_log.db_set(
 			{
 				"ai_analysis_status": "Completed",
@@ -68,6 +74,7 @@ def run_call_analysis(call_log_name: str, user: str | None = None):
 				"ai_analysis_language": config.language,
 				"ai_transcription_model": config.transcription_model,
 				"ai_summary_model": config.summary_model,
+				"ai_transcript": analysis.transcript,
 				"ai_summary": analysis.summary,
 				"ai_key_points": frappe.as_json(analysis.key_points),
 				"ai_next_steps": frappe.as_json(analysis.next_steps),
@@ -97,7 +104,7 @@ def _safe_user_error(exc: Exception) -> str:
 		message = str(exc or "").strip()
 		if message:
 			return message
-	return str(_("The AI service could not analyze this recording. Please try again."))
+	return "The AI service could not analyze this recording. Please try again."
 
 
 def _publish(call_log_name: str, status: str, user: str | None):
