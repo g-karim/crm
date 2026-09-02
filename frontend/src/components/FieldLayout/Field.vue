@@ -59,6 +59,7 @@
       :class="field.prefix ? 'prefix' : ''"
       :options="field.options"
       :placeholder="getPlaceholder(field)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       @update:modelValue="(e) => fieldChange(e, field)"
     >
@@ -71,15 +72,15 @@
         v-model="data[field.fieldname]"
         class="form-control"
         type="checkbox"
-        :disabled="Boolean(field.read_only)"
-        :description="getDescription(field)"
+      :disabled="Boolean(field.disabled)"
+      :description="getDescription(field)"
         @change="(e) => fieldChange(e.target.checked, field)"
       />
       <label
         class="text-sm text-ink-gray-5"
         @click="
           () => {
-            if (!Boolean(field.read_only)) {
+            if (!Boolean(field.disabled)) {
               data[field.fieldname] = !data[field.fieldname]
             }
           }
@@ -101,6 +102,7 @@
         "
         :filters="field.filters"
         :placeholder="getPlaceholder(field)"
+        :disabled="Boolean(field.disabled)"
         :onCreate="field.create"
         @change="(v) => fieldChange(v, field)"
       />
@@ -154,7 +156,7 @@
       v-model="data[field.fieldname]"
       :options="getAutocompleteOptions(field)"
       :placeholder="getPlaceholder(field)"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       @update:modelValue="(v) => fieldChange(v, field, data)"
     />
     <TimePicker
@@ -163,6 +165,7 @@
       :format="getFormat('', '', false, true, false)"
       :use12Hour="false"
       :placeholder="getPlaceholder(field)"
+      :disabled="Boolean(field.disabled)"
       input-class="border-none"
       @change="(v) => fieldChange(v, field)"
     />
@@ -171,6 +174,7 @@
       :value="data[field.fieldname]"
       :format="getFormat('', '', true, true, false)"
       :placeholder="getPlaceholder(field)"
+      :disabled="Boolean(field.disabled)"
       input-class="border-none"
       @change="(v) => fieldChange(v, field)"
     />
@@ -179,6 +183,7 @@
       :value="data[field.fieldname]"
       :format="getFormat('', '', true, false, false)"
       :placeholder="getPlaceholder(field)"
+      :disabled="Boolean(field.disabled)"
       input-class="border-none"
       @change="(v) => fieldChange(v, field)"
     />
@@ -189,6 +194,7 @@
       type="textarea"
       :value="data[field.fieldname]"
       :placeholder="getPlaceholder(field)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       @change="fieldChange($event.target.value, field)"
     />
@@ -196,6 +202,7 @@
       v-else-if="field.fieldtype === 'Password'"
       :value="data[field.fieldname]"
       :placeholder="getPlaceholder(field)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       @change="fieldChange($event.target.value, field)"
     />
@@ -204,7 +211,7 @@
       type="text"
       :placeholder="getPlaceholder(field)"
       :value="data[field.fieldname] || '0'"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       @change="fieldChange($event.target.value, field)"
     />
@@ -213,7 +220,7 @@
       type="text"
       :value="getFormattedPercent(field.fieldname, data)"
       :placeholder="getPlaceholder(field)"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       @change="fieldChange(flt($event.target.value), field)"
     />
@@ -222,7 +229,7 @@
       type="text"
       :value="getFormattedFloat(field.fieldname, data)"
       :placeholder="getPlaceholder(field)"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       @change="fieldChange(flt($event.target.value), field)"
     />
@@ -231,7 +238,7 @@
       type="text"
       :value="getFormattedCurrency(field.fieldname, data, parentDoc)"
       :placeholder="getPlaceholder(field)"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       @change="fieldChange(flt($event.target.value), field)"
     />
@@ -239,7 +246,7 @@
       v-else-if="field.fieldtype === 'Duration'"
       :value="data[field.fieldname]"
       :placeholder="getPlaceholder(field)"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       @change="(v) => fieldChange(v, field)"
     />
@@ -247,7 +254,7 @@
       v-else-if="field.fieldtype === 'Rating'"
       :value="data[field.fieldname]"
       :max="field.options || 5"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       @change="(v) => fieldChange(v, field)"
     />
     <ButtonControl
@@ -256,7 +263,7 @@
       :icon="field.icon"
       :theme="getButtonTheme(field.button_color)"
       :variant="getButtonVariant(field.button_color)"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       @click="handleButtonClick(field)"
     />
     <AttachControl
@@ -266,7 +273,7 @@
       :docname="data.name"
       :fieldname="field.fieldname"
       :imageOnly="field.fieldtype === 'Attach Image'"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       @change="(v) => fieldChange(v, field)"
     />
     <HtmlControl v-else-if="field.fieldtype === 'HTML'" :html="resolvedHtml" />
@@ -274,13 +281,13 @@
       v-else-if="field.fieldtype === 'Text Editor'"
       :value="data[field.fieldname]"
       :placeholder="getPlaceholder(field)"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       @change="(v) => fieldChange(v, field)"
     />
     <GeolocationControl
       v-else-if="field.fieldtype === 'Geolocation'"
       :value="data[field.fieldname]"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       @change="(v) => fieldChange(v, field)"
     />
     <FormControl
@@ -288,7 +295,7 @@
       type="text"
       :placeholder="getPlaceholder(field)"
       :value="data[field.fieldname]"
-      :disabled="Boolean(field.read_only)"
+      :disabled="Boolean(field.disabled)"
       :description="getDescription(field)"
       :error="
         Boolean(data[field.fieldname]) && !validatePhone(data[field.fieldname])
@@ -303,7 +310,7 @@
         type="text"
         :placeholder="getPlaceholder(field)"
         :value="data[field.fieldname]"
-        :disabled="Boolean(field.read_only)"
+        :disabled="Boolean(field.disabled)"
         :description="field.description"
         @change="fieldChange($event.target.value, field)"
       />
@@ -350,6 +357,7 @@ import {
   applyStateFieldOptions,
 } from '@/utils/fieldTransforms'
 import { getPlaceholderLabel } from '@/utils/fieldPlaceholders'
+import { isFetchedFromLink } from '@/utils/fetchFrom'
 import { usersStore } from '@/stores/users'
 import { useDocument } from '@/data/document'
 
@@ -565,6 +573,10 @@ const field = computed(() => {
       data.value,
     ),
     read_only: effectiveReadOnly,
+    // separate from read_only because isFieldVisible hides empty read-only fields
+    disabled: Boolean(
+      effectiveReadOnly || isFetchedFromLink(field, data.value),
+    ),
   }
 
   _field.visible = isFieldVisible(_field, scriptHidden)
