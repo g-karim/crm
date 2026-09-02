@@ -152,6 +152,10 @@
             </div>
           </div>
         </div>
+        <CallAnalysisPanel
+          v-if="callLog?.data?.recording_url_path"
+          :call-log="callLog"
+        />
       </div>
       <div
         v-if="!callLog?.data?._lead && !callLog?.data?._deal"
@@ -180,6 +184,7 @@ import NoteIcon from '@/components/Icons/NoteIcon.vue'
 import TaskIcon from '@/components/Icons/TaskIcon.vue'
 import CheckCircleIcon from '@/components/Icons/CheckCircleIcon.vue'
 import FadedScrollableDiv from '@/components/FadedScrollableDiv.vue'
+import CallAnalysisPanel from '@/components/Activities/CallAnalysisPanel.vue'
 import { getCallLogDetail } from '@/utils/callLog'
 import { sanitizeHTML } from '@/utils'
 import { isMobileView } from '@/composables/settings'

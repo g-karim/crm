@@ -8,6 +8,7 @@ class TestCRMTranslations(TestCase):
 		self.assertEqual(get_crm_translations("en"), {})
 		self.assertEqual(get_crm_translations(None), {})
 		self.assertEqual(get_crm_translations("ru_RU")["Messaging"], "Обмен сообщениями")
+		self.assertEqual(get_crm_translations("ru_RU")["Call Analysis"], "Анализ звонков")
 
 	def test_gateway_brand_is_not_exposed_in_customer_translations(self):
 		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS))

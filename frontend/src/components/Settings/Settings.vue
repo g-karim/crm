@@ -52,6 +52,7 @@ import LucideNetwork from '~icons/lucide/network'
 import MonitorCogIcon from '~icons/lucide/monitor-cog'
 import LucideTextCursorInput from '~icons/lucide/text-cursor-input'
 import LucideMessagesSquare from '~icons/lucide/messages-square'
+import LucideAudioLines from '~icons/lucide/audio-lines'
 import SlidersIcon from '@/components/Icons/SlidersIcon.vue'
 import CalendarIcon from '@/components/Icons/CalendarIcon.vue'
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
@@ -67,6 +68,7 @@ import WhatsAppSettings from '@/components/Settings/WhatsAppSettings.vue'
 import ERPNextSettings from '@/components/Settings/ERPNextSettings.vue'
 import LeadSyncSourcePage from '@/components/Settings/LeadSyncing/LeadSyncSourcePage.vue'
 import MessengerSettings from '@/components/Settings/MessengerSettings.vue'
+import CallAnalysisSettings from '@/components/Settings/CallAnalysisSettings.vue'
 import DefaultsSettings from '@/components/Settings/DefaultsSettings.vue'
 import CalendarSettings from '@/components/Settings/CalendarSettings.vue'
 import FormsSettings from '@/components/Settings/Forms/FormsSettings.vue'
@@ -89,7 +91,7 @@ import AssignmentRulePage from './AssignmentRules/AssignmentRulePage.vue'
 import ShieldCheck from '~icons/lucide/shield-check'
 import SlaConfig from './Sla/SlaConfig.vue'
 
-const { isManager, getUser } = usersStore()
+const { isAdmin, isManager, getUser } = usersStore()
 
 const user = computed(() => getUser() || {})
 
@@ -198,6 +200,12 @@ const tabs = computed(() => {
     {
       label: __('Integrations', null, 'FCRM'),
       items: [
+        {
+          label: __('Call Analysis'),
+          icon: LucideAudioLines,
+          component: markRaw(CallAnalysisSettings),
+          condition: () => isAdmin(),
+        },
         {
           label: __('Message Channels'),
           icon: LucideMessagesSquare,
