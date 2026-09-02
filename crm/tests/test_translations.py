@@ -9,6 +9,7 @@ class TestCRMTranslations(TestCase):
 		self.assertEqual(get_crm_translations(None), {})
 		translations = get_crm_translations("ru_RU")
 		self.assertEqual(translations["Messaging"], "Обмен сообщениями")
+		self.assertEqual(translations["Try Again"], "Повторить")
 		self.assertEqual(translations["Play"], "Воспроизвести")
 		self.assertEqual(translations["Pause"], "Пауза")
 		self.assertEqual(translations["Resume"], "Продолжить")

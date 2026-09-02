@@ -48,6 +48,7 @@ RUSSIAN_TRANSLATIONS = {
 	"Register Webhook": "Зарегистрировать вебхук",
 	"Disconnect": "Отключить",
 	"Could not load message channel settings.": "Не удалось загрузить настройки каналов сообщений.",
+	"Try Again": "Повторить",
 	"Message channel settings saved.": "Настройки каналов сообщений сохранены.",
 	"Could not save message channel settings.": "Не удалось сохранить настройки каналов сообщений.",
 	"Channel created.": "Канал создан.",
