@@ -589,6 +589,12 @@ describe('messenger conversation routing guard', () => {
 
   it('shows the mismatch warning only for a different selected conversation', async () => {
     prepareRoutingFixture()
+    channelRows[0].label = 'Telegram - Support'
+    channelRows[1].label = 'Telegram - Sales'
+    conversationRows[0].client_name = 'Иван'
+    conversationRows[0].last_message_at = '2026-08-28 10:00:00'
+    conversationRows[1].client_name = 'Пётр'
+    conversationRows[1].last_message_at = '2026-08-28 10:01:00'
     let root = await mountConversation()
 
     expect(
@@ -597,13 +603,22 @@ describe('messenger conversation routing guard', () => {
 
     await selectConversationOne(root)
 
-    expect(
-      root.querySelector('[data-testid="conversation-routing-warning"]'),
-    ).not.toBeNull()
+    let warning = root.querySelector(
+      '[data-testid="conversation-routing-warning"]',
+    )
+    expect(warning).not.toBeNull()
+    expect(warning.textContent).toContain('Telegram - Sales')
+    expect(warning.textContent).toContain('Telegram - Support')
+    expect(warning.textContent).not.toContain('Иван')
+    expect(warning.textContent).not.toContain('Пётр')
+    expect(warning.textContent).not.toContain('CONVERSATION-')
+    expect(warning.textContent).not.toContain('2026-08-28')
   })
 
   it('confirms and sends through the intentionally selected conversation', async () => {
     prepareRoutingFixture()
+    channelRows[0].label = 'Telegram - Support'
+    channelRows[1].label = 'Telegram - Sales'
     let root = await mountConversation()
     await selectConversationOne(root, 'Send intentionally through chat 1')
 
@@ -614,6 +629,14 @@ describe('messenger conversation routing guard', () => {
     ).toBe(false)
     let dialog = mocks.dialog.mock.calls.at(-1)[0]
     expect(dialog.title).toBe('Check sending conversation')
+    expect(dialog.message).toBe(
+      'The latest inbound message arrived in Telegram - Sales, but Telegram - Support is selected.',
+    )
+    expect(dialog.actions.map((action) => action.label)).toEqual([
+      'Send through Telegram - Support',
+      'Switch to Telegram - Sales',
+      'Cancel',
+    ])
     dialog.actions
       .find((action) => action.label.startsWith('Send through'))
       .onClick(vi.fn())

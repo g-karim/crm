@@ -1424,7 +1424,11 @@ function composerRetargetError(target) {
 }
 
 function conversationRoutingLabel(conversation = {}) {
-  return messengerConversationOption(conversation, __).label
+  let channel =
+    channelByName.value[conversation.channel] ||
+    conversation.channel_info ||
+    conversation
+  return __(getMessengerPlatformLabel(channel))
 }
 
 function channelRoutingLabel(channel = {}) {

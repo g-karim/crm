@@ -17,6 +17,7 @@ class TestCRMTranslations(TestCase):
 			translations["Check sending conversation"],
 			"Проверить переписку отправки",
 		)
+		self.assertEqual(translations["Cancel"], "Отменить")
 		self.assertEqual(
 			translations["Could not move attachments to the selected conversation."],
 			"Не удалось перенести вложения в выбранную переписку.",

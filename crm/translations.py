@@ -99,6 +99,7 @@ RUSSIAN_TRANSLATIONS = {
 	"Check sending conversation": "Проверить переписку отправки",
 	"Send through {0}": "Отправить через {0}",
 	"Switch to {0}": "Переключиться на {0}",
+	"Cancel": "Отменить",
 	"This external conversation is not available for sending.": "Эта внешняя переписка недоступна для отправки.",
 	"Could not switch the external conversation.": "Не удалось переключить внешнюю переписку.",
 	"Cancel the reply before switching conversations.": "Отмените ответ перед переключением переписки.",
