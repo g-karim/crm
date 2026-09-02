@@ -65,6 +65,11 @@ class TestCRMCallLog(IntegrationTestCase):
 
 		self.assertEqual(call.recording_url, recording_url)
 
+	def test_local_recording_uses_direct_authenticated_file_url(self):
+		call = create_test_call_log(recording_url="/private/files/test-call.mp3")
+
+		self.assertEqual(call.as_dict()["recording_url_path"], "/private/files/test-call.mp3")
+
 	def test_replacing_recording_clears_previous_ai_analysis(self):
 		call = create_test_call_log(recording_url="https://example.com/first.mp3")
 		call.db_set(

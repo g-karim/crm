@@ -42,3 +42,21 @@ class TestCallRecordingDownload(TestCase):
 			download_recording(call_log, max_bytes=6)
 
 		fetch.return_value.close.assert_called_once()
+
+	@patch("crm.call_analysis.recording.frappe.get_doc")
+	@patch("crm.call_analysis.recording.frappe.db.get_value", return_value="test-file")
+	def test_reads_private_file_attached_to_call_log(self, _get_value, get_doc):
+		file_doc = get_doc.return_value
+		file_doc.file_size = 5
+		file_doc.get_content.return_value = b"audio"
+		call_log = SimpleNamespace(
+			name="test-call",
+			recording_url="/private/files/test-call.mp3",
+			telephony_medium="Manual",
+		)
+
+		recording = download_recording(call_log, max_bytes=10)
+
+		self.assertEqual(recording.data, b"audio")
+		self.assertEqual(recording.filename, "test-call.mp3")
+		self.assertEqual(recording.content_type, "audio/mpeg")

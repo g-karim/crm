@@ -178,9 +178,13 @@ class CRMCallLog(Document):
 	def as_dict(self, *args, **kwargs):
 		d = super().as_dict(*args, **kwargs)
 		if d.get("recording_url"):
-			d["recording_url_path"] = (
-				f"/api/method/crm.integrations.api.get_recording_url?call_log_name={d.get('name')}"
-			)
+			recording_url = str(d.get("recording_url"))
+			if recording_url.startswith(("/files/", "/private/files/")):
+				d["recording_url_path"] = recording_url
+			else:
+				d["recording_url_path"] = (
+					f"/api/method/crm.integrations.api.get_recording_url?call_log_name={d.get('name')}"
+				)
 		return d
 
 

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
+import frappe
+
 from crm.integrations.api import _fetch_recording, _get_recording_credentials
 
 
@@ -35,6 +37,8 @@ _ALLOWED_EXTENSIONS = {".aac", ".flac", ".m4a", ".mp3", ".ogg", ".wav", ".webm"}
 def download_recording(call_log, *, max_bytes: int) -> Recording:
 	if not call_log.recording_url:
 		raise RecordingDownloadError("Recording URL not found")
+	if _local_file_url(call_log.recording_url):
+		return _download_local_recording(call_log, max_bytes=max_bytes)
 
 	auth = _get_recording_credentials(call_log.telephony_medium)
 	upstream = None
@@ -74,6 +78,42 @@ def download_recording(call_log, *, max_bytes: int) -> Recording:
 	}:
 		raise RecordingDownloadError("The call recording has an unsupported format.")
 	return Recording(data=data, filename=filename, content_type=content_type or "audio/mpeg")
+
+
+def _download_local_recording(call_log, *, max_bytes: int) -> Recording:
+	file_name = frappe.db.get_value(
+		"File",
+		{
+			"file_url": call_log.recording_url,
+			"attached_to_doctype": "CRM Call Log",
+			"attached_to_name": call_log.name,
+		},
+		"name",
+	)
+	if not file_name:
+		raise RecordingDownloadError("The call recording file could not be found.")
+
+	file_doc = frappe.get_doc("File", file_name)
+	if file_doc.file_size and int(file_doc.file_size) > max_bytes:
+		raise RecordingDownloadError("The call recording is too large to analyze.")
+	data = file_doc.get_content()
+	if isinstance(data, str):
+		data = data.encode()
+	if not data:
+		raise RecordingDownloadError("The call recording is empty.")
+	if len(data) > max_bytes:
+		raise RecordingDownloadError("The call recording is too large to analyze.")
+
+	filename = PurePosixPath(urlsplit(call_log.recording_url).path).name or "call-recording.mp3"
+	content_type = mimetypes.guess_type(filename)[0] or "audio/mpeg"
+	if not content_type.startswith("audio/"):
+		raise RecordingDownloadError("The call recording has an unsupported format.")
+	return Recording(data=data, filename=filename, content_type=content_type)
+
+
+def _local_file_url(url: str) -> bool:
+	parsed = urlsplit(str(url or ""))
+	return not parsed.scheme and not parsed.netloc and parsed.path.startswith(("/files/", "/private/files/"))
 
 
 def _content_length(value: object) -> int:

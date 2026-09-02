@@ -307,6 +307,7 @@ RUSSIAN_TRANSLATIONS = {
 	"The call recording is too large to analyze.": "Запись звонка слишком большая для анализа.",
 	"The call recording is empty.": "Запись звонка пуста.",
 	"The call recording has an unsupported format.": "Формат записи звонка не поддерживается.",
+	"The call recording file could not be found.": "Не удалось найти файл записи звонка.",
 	"Set the AI service URL before enabling call analysis.": "Укажите адрес ИИ-сервиса перед включением анализа звонков.",
 	"Enter a valid AI service URL.": "Укажите корректный адрес ИИ-сервиса.",
 	"The AI service URL must use HTTPS.": "Адрес ИИ-сервиса должен использовать HTTPS.",
