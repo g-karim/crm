@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import frappe
@@ -11,11 +12,12 @@ DEFAULTS = {
 	"language": "Auto",
 	"max_recording_mb": 25,
 }
+API_KEY_ENV = "CRM_CALL_ANALYSIS_API_KEY"
+API_KEY_CONFIG = "crm_call_analysis_api_key"
 
 
 @dataclass(frozen=True)
 class CallAnalysisConfig:
-	enabled: bool
 	api_base_url: str
 	api_key: str
 	transcription_model: str
@@ -24,46 +26,27 @@ class CallAnalysisConfig:
 	max_recording_bytes: int
 
 
-def get_settings():
-	return frappe.get_cached_doc("CRM Call Analysis Settings")
-
-
-def _value(settings, fieldname):
-	value = settings.get(fieldname)
-	return DEFAULTS.get(fieldname) if value in (None, "") else value
-
-
-def get_config(*, require_enabled: bool = True) -> CallAnalysisConfig:
-	settings = get_settings()
-	api_key = settings.get_password("api_key", raise_exception=False) or ""
+def get_config(*, require_api_key: bool = True) -> CallAnalysisConfig:
+	api_key = os.getenv(API_KEY_ENV) or frappe.conf.get(API_KEY_CONFIG) or ""
 	config = CallAnalysisConfig(
-		enabled=bool(settings.enabled),
-		api_base_url=str(_value(settings, "api_base_url")).strip().rstrip("/"),
-		api_key=api_key.strip(),
-		transcription_model=str(_value(settings, "transcription_model")).strip(),
-		summary_model=str(_value(settings, "summary_model")).strip(),
-		language=str(_value(settings, "language")).strip() or "Auto",
-		max_recording_bytes=max(1, min(int(_value(settings, "max_recording_mb")), 25)) * 1024 * 1024,
+		api_base_url=DEFAULTS["api_base_url"],
+		api_key=str(api_key).strip(),
+		transcription_model=DEFAULTS["transcription_model"],
+		summary_model=DEFAULTS["summary_model"],
+		language=DEFAULTS["language"],
+		max_recording_bytes=DEFAULTS["max_recording_mb"] * 1024 * 1024,
 	)
 
-	if require_enabled and not config.enabled:
-		raise CallAnalysisConfigurationError("Call analysis is disabled.")
-	if require_enabled and not config.api_key:
+	if require_api_key and not config.api_key:
 		raise CallAnalysisConfigurationError("The AI service API key is not configured.")
 	return config
 
 
 def get_public_status() -> dict:
-	config = get_config(require_enabled=False)
+	config = get_config(require_api_key=False)
 	return {
-		"enabled": config.enabled,
-		"configured": bool(
-			config.enabled
-			and config.api_key
-			and config.api_base_url
-			and config.transcription_model
-			and config.summary_model
-		),
+		"enabled": True,
+		"configured": bool(config.api_key),
 	}
 
 

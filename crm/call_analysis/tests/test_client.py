@@ -12,7 +12,6 @@ from crm.call_analysis.config import CallAnalysisConfig
 
 def _config(language="Auto"):
 	return CallAnalysisConfig(
-		enabled=True,
 		api_base_url="https://ai.example.test/v1",
 		api_key="secret",
 		transcription_model="speech-model",

@@ -12,7 +12,6 @@ from crm.fcrm.doctype.crm_call_log.test_crm_call_log import create_test_call_log
 
 def _config():
 	return CallAnalysisConfig(
-		enabled=True,
 		api_base_url="https://ai.example.test/v1",
 		api_key="secret",
 		transcription_model="speech-model",

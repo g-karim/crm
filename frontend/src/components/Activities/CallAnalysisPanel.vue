@@ -22,9 +22,7 @@
               ? __(
                   'Get a transcript, concise summary, key points, and next steps.',
                 )
-              : __(
-                  'Ask an administrator to configure call analysis in CRM settings.',
-                )
+              : __('Call analysis is temporarily unavailable.')
           }}
         </p>
       </div>
