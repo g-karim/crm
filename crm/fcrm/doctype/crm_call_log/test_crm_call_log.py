@@ -264,6 +264,11 @@ class TestCRMCallLog(IntegrationTestCase):
 			type="Outgoing",
 			status="Completed",
 			duration=60,
+			ai_analysis_status="Completed",
+			ai_transcript="Test transcript",
+			ai_summary="Test summary",
+			ai_key_points=frappe.as_json(["Key point"]),
+			ai_next_steps=frappe.as_json(["Next step"]),
 		)
 
 		# Call the API
@@ -277,6 +282,11 @@ class TestCRMCallLog(IntegrationTestCase):
 		self.assertIn("_tasks", result)
 		self.assertIn("_notes", result)
 		self.assertIn("_call_analysis", result)
+		self.assertEqual(result["ai_analysis_status"], "Completed")
+		self.assertEqual(result["ai_transcript"], "Test transcript")
+		self.assertEqual(result["ai_summary"], "Test summary")
+		self.assertEqual(result["ai_key_points"], frappe.as_json(["Key point"]))
+		self.assertEqual(result["ai_next_steps"], frappe.as_json(["Next step"]))
 
 	def test_get_call_log_with_reference_lead(self):
 		"""Test get_call_log API with reference to CRM Lead"""
