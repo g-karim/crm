@@ -174,7 +174,8 @@ def update_recording_info(**kwargs):
 		frappe.throw(_("Call log not found"), frappe.DoesNotExistError)
 
 	try:
-		frappe.db.set_value("CRM Call Log", call_sid, "recording_url", recording_url)
+		call_log.recording_url = recording_url
+		call_log.save(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception as exc:
 		frappe.log_error(title=_("Failed to capture Twilio recording"))

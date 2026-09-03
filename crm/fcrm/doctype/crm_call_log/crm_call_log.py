@@ -67,9 +67,20 @@ class CRMCallLog(Document):
 		if not self.telephony_medium:
 			self.telephony_medium = "Manual"
 
+	def after_insert(self):
+		self._maybe_enqueue_call_analysis()
+
 	def validate(self):
 		if not self.is_new() and self.has_value_changed("recording_url"):
 			self._clear_call_analysis()
+
+	def on_update(self):
+		self._maybe_enqueue_call_analysis()
+
+	def _maybe_enqueue_call_analysis(self):
+		from crm.call_analysis.automation import maybe_enqueue_call_analysis
+
+		maybe_enqueue_call_analysis(self)
 
 	def _clear_call_analysis(self):
 		for fieldname in (

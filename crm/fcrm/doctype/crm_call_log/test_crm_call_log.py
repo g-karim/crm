@@ -70,7 +70,8 @@ class TestCRMCallLog(IntegrationTestCase):
 
 		self.assertEqual(call.as_dict()["recording_url_path"], "/private/files/test-call.mp3")
 
-	def test_replacing_recording_clears_previous_ai_analysis(self):
+	@patch("crm.call_analysis.automation.maybe_enqueue_call_analysis")
+	def test_replacing_recording_clears_previous_ai_analysis(self, _auto_analysis):
 		call = create_test_call_log(recording_url="https://example.com/first.mp3")
 		call.db_set(
 			{
@@ -87,6 +88,40 @@ class TestCRMCallLog(IntegrationTestCase):
 		self.assertFalse(call.ai_analysis_status)
 		self.assertFalse(call.ai_transcript)
 		self.assertFalse(call.ai_summary)
+
+	@patch("crm.call_analysis.tasks.frappe.enqueue")
+	@patch("crm.call_analysis.automation.get_config")
+	@patch("crm.call_analysis.automation.get_user_analysis_language", return_value="Russian")
+	def test_completed_recording_is_automatically_queued(self, _get_language, _get_config, enqueue):
+		call = create_test_call_log(
+			status="Completed",
+			duration=30,
+			recording_url="https://example.com/recording.mp3",
+			receiver="Administrator",
+		)
+
+		self.assertEqual(call.ai_analysis_status, "Queued")
+		enqueue.assert_called_once()
+		self.assertEqual(enqueue.call_args.kwargs["language"], "Russian")
+
+	@patch("crm.call_analysis.tasks.frappe.enqueue")
+	@patch("crm.call_analysis.automation.get_config")
+	@patch("crm.call_analysis.automation.get_user_analysis_language", return_value="English")
+	def test_recording_received_after_completion_is_automatically_queued(
+		self,
+		_get_language,
+		_get_config,
+		enqueue,
+	):
+		call = create_test_call_log(status="In Progress", duration=30)
+		enqueue.assert_not_called()
+
+		call.status = "Completed"
+		call.recording_url = "https://example.com/recording.mp3"
+		call.save()
+
+		self.assertEqual(call.ai_analysis_status, "Queued")
+		enqueue.assert_called_once()
 
 	def test_has_link_method(self):
 		"""Test has_link method to check if document link exists"""
