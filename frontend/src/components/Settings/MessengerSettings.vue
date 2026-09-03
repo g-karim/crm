@@ -321,16 +321,6 @@
           <FormControl
             v-if="
               channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type !== 'authorization_code'
-            "
-            v-model="channelDraft.external_account_id"
-            type="text"
-            required
-            :label="__('Avito Account ID')"
-          />
-          <FormControl
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
               channelDraft.auth_type === 'client_credentials'
             "
             v-model="channelDraft.client_id"
@@ -387,21 +377,21 @@
           class="flex flex-wrap gap-2 border-t border-outline-gray-1 pt-4"
         >
           <Button
-            v-if="isDirectMessengerProvider(channelDraft.provider)"
+            v-if="usesCommonConnectionActions"
             :label="__('Test')"
             variant="subtle"
             :loading="channelAction === 'test'"
             @click="runChannelAction('test')"
           />
           <Button
-            v-if="isDirectMessengerProvider(channelDraft.provider)"
+            v-if="usesCommonConnectionActions"
             :label="__('Connect / Repair')"
             variant="solid"
             :loading="channelAction === 'connect'"
             @click="runChannelAction('connect')"
           />
           <Button
-            v-if="isDirectMessengerProvider(channelDraft.provider)"
+            v-if="usesCommonConnectionActions"
             :label="__('Refresh Status')"
             variant="subtle"
             :loading="channelAction === 'status'"
@@ -419,17 +409,7 @@
           />
           <Button
             v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type !== 'authorization_code'
-            "
-            :label="__('Register Webhook')"
-            variant="subtle"
-            :loading="channelAction === 'avito-webhook'"
-            @click="runChannelAction('avito-webhook')"
-          />
-          <Button
-            v-if="
-              isDirectMessengerProvider(channelDraft.provider) &&
+              usesCommonConnectionActions &&
               channelDraft.enabled
             "
             :label="__('Disconnect')"
@@ -520,8 +500,8 @@ const wazzupPlatforms = [
   { label: 'Telegram', value: 'telegram' },
 ]
 const avitoAuthTypes = [
-  { label: __('OAuth'), value: 'authorization_code' },
   { label: __('Client ID / Secret'), value: 'client_credentials' },
+  { label: __('OAuth'), value: 'authorization_code' },
   { label: __('API Token'), value: 'api_token' },
 ]
 
@@ -554,6 +534,14 @@ const hasConnectionActions = computed(
   () =>
     isDirectMessengerProvider(channelDraft.value.provider) ||
     channelDraft.value.provider === 'avito_direct',
+)
+const usesCommonConnectionActions = computed(
+  () =>
+    isDirectMessengerProvider(channelDraft.value.provider) &&
+    !(
+      channelDraft.value.provider === 'avito_direct' &&
+      channelDraft.value.auth_type === 'authorization_code'
+    ),
 )
 
 function settingsState() {
@@ -685,7 +673,6 @@ async function runChannelAction(action) {
     connect: 'crm_messenger.api.channels.register_provider_webhook',
     status: 'crm_messenger.api.channels.get_provider_webhook_status',
     disconnect: 'crm_messenger.api.channels.remove_provider_webhook',
-    'avito-webhook': 'crm_messenger.api.channels.register_avito_webhook',
     'avito-oauth': 'crm_messenger.api.avito_oauth.start_connection',
   }
   channelAction.value = action

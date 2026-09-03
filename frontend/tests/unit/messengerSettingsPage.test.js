@@ -87,4 +87,46 @@ describe('MessengerSettings page loading', () => {
     )
     expect(root.textContent).not.toContain('No channels yet')
   })
+
+  it('uses the common connect action for Avito client credentials', async () => {
+    let channel = {
+      name: 'avito-1',
+      provider: 'avito_direct',
+      platform: 'avito',
+      auth_type: 'client_credentials',
+      custom_display_name: 'Avito Sales',
+      client_id: 'client-id',
+      client_secret_configured: true,
+      enabled: 0,
+      state: 'unchecked',
+    }
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels: [channel] })
+      }
+      if (method === 'crm_messenger.api.channels.register_provider_webhook') {
+        return Promise.resolve({ ok: true, message: 'connected' })
+      }
+      return Promise.reject(new Error(`unexpected method: ${method}`))
+    })
+    let root = await mountSettings()
+    let channelButton = [...root.querySelectorAll('button')].find((button) =>
+      button.textContent.includes('Avito Sales'),
+    )
+
+    channelButton.click()
+    await nextTick()
+    let connectButton = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Connect / Repair',
+    )
+    connectButton.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mocks.call).toHaveBeenCalledWith(
+      'crm_messenger.api.channels.register_provider_webhook',
+      { channel: 'avito-1' },
+    )
+    expect(root.textContent).not.toContain('Register Webhook')
+    expect(root.textContent).not.toContain('Avito Account ID')
+  })
 })

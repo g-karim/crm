@@ -2,6 +2,7 @@ export const DIRECT_MESSENGER_PROVIDERS = [
   'telegram_bot',
   'vk_direct',
   'max_direct',
+  'avito_direct',
 ]
 
 export const MESSENGER_PROVIDER_OPTIONS = [
@@ -16,7 +17,7 @@ const PROVIDER_DEFAULTS = {
   telegram_bot: { platform: 'telegram', auth_type: 'api_token' },
   vk_direct: { platform: 'vk', auth_type: 'api_token' },
   max_direct: { platform: 'max', auth_type: 'api_token' },
-  avito_direct: { platform: 'avito', auth_type: 'authorization_code' },
+  avito_direct: { platform: 'avito', auth_type: 'client_credentials' },
   wazzup: { platform: 'whatsapp', auth_type: 'api_token' },
 }
 
@@ -113,12 +114,6 @@ export function validateMessengerChannelDraft(draft) {
     }
   }
   if (draft.provider === 'avito_direct') {
-    if (
-      draft.auth_type !== 'authorization_code' &&
-      !clean(draft.external_account_id)
-    ) {
-      return 'Enter an Avito account ID.'
-    }
     if (draft.auth_type === 'client_credentials') {
       if (!clean(draft.client_id)) return 'Enter the Avito Client ID.'
       if (!draft.client_secret_configured && !clean(draft.client_secret)) {

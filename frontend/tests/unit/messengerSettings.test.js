@@ -83,11 +83,16 @@ describe('messengerSettings', () => {
     expect(validateMessengerChannelDraft(wazzup)).toBe('Enter a channel ID.')
 
     let avito = makeMessengerChannelDraft({ provider: 'avito_direct' })
-    expect(validateMessengerChannelDraft(avito)).toBe('')
-    avito.auth_type = 'client_credentials'
     expect(validateMessengerChannelDraft(avito)).toBe(
-      'Enter an Avito account ID.',
+      'Enter the Avito Client ID.',
     )
+    avito.client_id = 'client-id'
+    expect(validateMessengerChannelDraft(avito)).toBe(
+      'Enter the Avito Client Secret.',
+    )
+    avito.client_secret = 'client-secret'
+    expect(validateMessengerChannelDraft(avito)).toBe('')
+    expect(buildMessengerChannelPayload(avito).external_account_id).toBe('')
   })
 
   it('maps channel connection states for the list', () => {
