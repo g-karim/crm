@@ -14,6 +14,7 @@ def _config():
 	return CallAnalysisConfig(
 		api_base_url="https://ai.example.test/v1",
 		api_key="secret",
+		proxy_url="",
 		transcription_model="speech-model",
 		summary_model="summary-model",
 		language="Russian",

@@ -38,6 +38,7 @@ def transcribe_recording(
 		data=data,
 		files={"file": (filename, audio, content_type)},
 		timeout=(10, 180),
+		**_request_options(config),
 	)
 	payload = _response_json(response, "transcribe the recording")
 	transcript = str(payload.get("text") or "").strip()
@@ -77,6 +78,7 @@ def summarize_transcript(
 			"response_format": {"type": "json_object"},
 		},
 		timeout=(10, 180),
+		**_request_options(config),
 	)
 	payload = _response_json(response, "summarize the transcript")
 	try:
@@ -121,6 +123,17 @@ def _headers(api_key: str) -> dict[str, str]:
 		"Authorization": f"Bearer {api_key}",
 		"HTTP-Referer": "https://exp-verse.com",
 		"X-Title": "EXP CRM",
+	}
+
+
+def _request_options(config: CallAnalysisConfig) -> dict:
+	if not config.proxy_url:
+		return {}
+	return {
+		"proxies": {
+			"http": config.proxy_url,
+			"https": config.proxy_url,
+		}
 	}
 
 

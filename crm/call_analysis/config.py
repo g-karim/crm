@@ -14,12 +14,16 @@ DEFAULTS = {
 }
 API_KEY_ENV = "CRM_CALL_ANALYSIS_API_KEY"
 API_KEY_CONFIG = "crm_call_analysis_api_key"
+PROXY_URL_ENV = "CRM_CALL_ANALYSIS_PROXY_URL"
+PROXY_URL_CONFIG = "crm_call_analysis_proxy_url"
+VOICE_TRANSCRIPTION_PROXY_URL_CONFIG = "voice_transcription_proxy_url"
 
 
 @dataclass(frozen=True)
 class CallAnalysisConfig:
 	api_base_url: str
 	api_key: str
+	proxy_url: str
 	transcription_model: str
 	summary_model: str
 	language: str
@@ -37,9 +41,16 @@ def get_user_analysis_language(user: str | None = None) -> str:
 
 def get_config(*, language: str | None = None, require_api_key: bool = True) -> CallAnalysisConfig:
 	api_key = os.getenv(API_KEY_ENV) or frappe.conf.get(API_KEY_CONFIG) or ""
+	proxy_url = (
+		os.getenv(PROXY_URL_ENV)
+		or frappe.conf.get(PROXY_URL_CONFIG)
+		or frappe.conf.get(VOICE_TRANSCRIPTION_PROXY_URL_CONFIG)
+		or ""
+	)
 	config = CallAnalysisConfig(
 		api_base_url=DEFAULTS["api_base_url"],
 		api_key=str(api_key).strip(),
+		proxy_url=str(proxy_url).strip(),
 		transcription_model=DEFAULTS["transcription_model"],
 		summary_model=DEFAULTS["summary_model"],
 		language=normalize_analysis_language(language),

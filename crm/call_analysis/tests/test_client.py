@@ -10,10 +10,11 @@ from crm.call_analysis.client import (
 from crm.call_analysis.config import CallAnalysisConfig
 
 
-def _config(language="English"):
+def _config(language="English", proxy_url=""):
 	return CallAnalysisConfig(
 		api_base_url="https://ai.example.test/v1",
 		api_key="secret",
+		proxy_url=proxy_url,
 		transcription_model="speech-model",
 		summary_model="summary-model",
 		language=language,
@@ -40,6 +41,28 @@ class TestCallAnalysisClient(TestCase):
 		self.assertNotIn("language", kwargs["data"])
 		self.assertEqual(kwargs["files"]["file"], ("call.mp3", b"audio", "audio/mpeg"))
 		self.assertNotIn("secret", str(kwargs["data"]))
+		self.assertNotIn("proxies", kwargs)
+
+	def test_transcription_uses_configured_outbound_proxy(self):
+		response = MagicMock(ok=True)
+		response.json.return_value = {"text": "Hello"}
+		requester = MagicMock(return_value=response)
+
+		transcribe_recording(
+			b"audio",
+			filename="call.mp3",
+			content_type="audio/mpeg",
+			config=_config(proxy_url="socks5h://127.0.0.1:10808"),
+			requester=requester,
+		)
+
+		self.assertEqual(
+			requester.call_args.kwargs["proxies"],
+			{
+				"http": "socks5h://127.0.0.1:10808",
+				"https": "socks5h://127.0.0.1:10808",
+			},
+		)
 
 	def test_parse_analysis_accepts_json_code_fence(self):
 		result = parse_analysis(
@@ -85,6 +108,35 @@ class TestCallAnalysisClient(TestCase):
 		)
 		self.assertEqual(payload["messages"][1]["content"], "Transcript:\nCustomer asked for a quote.")
 		self.assertEqual(payload["response_format"], {"type": "json_object"})
+		self.assertNotIn("proxies", requester.call_args.kwargs)
+
+	def test_summary_uses_configured_outbound_proxy(self):
+		response = MagicMock(ok=True)
+		response.json.return_value = {
+			"choices": [
+				{
+					"message": {
+						"content": '{"transcript":"Hello","summary":"Done",'
+						'"key_points":[],"next_steps":[],"sentiment":"neutral"}'
+					}
+				}
+			]
+		}
+		requester = MagicMock(return_value=response)
+
+		summarize_transcript(
+			"Hello",
+			config=_config(proxy_url="socks5h://127.0.0.1:10808"),
+			requester=requester,
+		)
+
+		self.assertEqual(
+			requester.call_args.kwargs["proxies"],
+			{
+				"http": "socks5h://127.0.0.1:10808",
+				"https": "socks5h://127.0.0.1:10808",
+			},
+		)
 
 	def test_summary_prompt_uses_selected_russian_language(self):
 		response = MagicMock(ok=True)

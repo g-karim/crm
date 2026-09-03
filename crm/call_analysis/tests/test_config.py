@@ -22,6 +22,41 @@ class TestCallAnalysisConfig(TestCase):
 			result = config.get_config()
 
 		self.assertEqual(result.api_key, "bench-key")
+		self.assertEqual(result.proxy_url, "")
+
+	@patch.dict(
+		os.environ,
+		{
+			config.API_KEY_ENV: "environment-key",
+			config.PROXY_URL_ENV: "socks5h://environment-proxy:1080",
+		},
+		clear=True,
+	)
+	def test_environment_proxy_takes_precedence_over_bench_config(self):
+		with patch.object(
+			config,
+			"frappe",
+			SimpleNamespace(
+				conf={
+					config.PROXY_URL_CONFIG: "http://bench-proxy:8080",
+					config.VOICE_TRANSCRIPTION_PROXY_URL_CONFIG: "socks5h://voice-proxy:1080",
+				}
+			),
+		):
+			result = config.get_config()
+
+		self.assertEqual(result.proxy_url, "socks5h://environment-proxy:1080")
+
+	@patch.dict(os.environ, {config.API_KEY_ENV: "environment-key"}, clear=True)
+	def test_shared_proxy_falls_back_to_existing_voice_transcription_proxy(self):
+		with patch.object(
+			config,
+			"frappe",
+			SimpleNamespace(conf={config.VOICE_TRANSCRIPTION_PROXY_URL_CONFIG: "socks5h://voice-proxy:1080"}),
+		):
+			result = config.get_config()
+
+		self.assertEqual(result.proxy_url, "socks5h://voice-proxy:1080")
 
 	@patch.dict(os.environ, {}, clear=True)
 	def test_feature_is_always_enabled_but_reports_missing_key(self):
