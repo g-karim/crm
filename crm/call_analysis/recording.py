@@ -37,8 +37,12 @@ _ALLOWED_EXTENSIONS = {".aac", ".flac", ".m4a", ".mp3", ".ogg", ".wav", ".webm"}
 def download_recording(call_log, *, max_bytes: int) -> Recording:
 	if not call_log.recording_url:
 		raise RecordingDownloadError("Recording URL not found")
+
+	file_doc = _get_attached_recording_file(call_log)
+	if file_doc:
+		return _download_attached_recording(file_doc, max_bytes=max_bytes)
 	if _local_file_url(call_log.recording_url):
-		return _download_local_recording(call_log, max_bytes=max_bytes)
+		raise RecordingDownloadError("The call recording file could not be found.")
 
 	auth = _get_recording_credentials(call_log.telephony_medium)
 	upstream = None
@@ -80,7 +84,10 @@ def download_recording(call_log, *, max_bytes: int) -> Recording:
 	return Recording(data=data, filename=filename, content_type=content_type or "audio/mpeg")
 
 
-def _download_local_recording(call_log, *, max_bytes: int) -> Recording:
+def _get_attached_recording_file(call_log):
+	if not getattr(call_log, "name", None):
+		return None
+
 	file_name = frappe.db.get_value(
 		"File",
 		{
@@ -90,13 +97,60 @@ def _download_local_recording(call_log, *, max_bytes: int) -> Recording:
 		},
 		"name",
 	)
-	if not file_name:
-		raise RecordingDownloadError("The call recording file could not be found.")
+	return frappe.get_doc("File", file_name) if file_name else None
 
-	file_doc = frappe.get_doc("File", file_name)
+
+def _download_attached_recording(file_doc, *, max_bytes: int) -> Recording:
 	if file_doc.file_size and int(file_doc.file_size) > max_bytes:
 		raise RecordingDownloadError("The call recording is too large to analyze.")
+	if _s3_file_url(file_doc.file_url):
+		return _download_s3_recording(file_doc, max_bytes=max_bytes)
+
 	data = file_doc.get_content()
+	return _recording_from_file_doc(file_doc, data, max_bytes=max_bytes)
+
+
+def _download_s3_recording(file_doc, *, max_bytes: int) -> Recording:
+	try:
+		operations_class = frappe.get_attr("frappe_s3.controller.S3Operations")
+		get_s3_key = frappe.get_attr("frappe_s3.controller.get_s3_key_from_file_doc")
+		key = get_s3_key(file_doc)
+		if not key:
+			raise RecordingDownloadError("The call recording file could not be found.")
+		response = operations_class().read_file_from_s3(key)
+	except RecordingDownloadError:
+		raise
+	except Exception as exc:
+		raise RecordingDownloadError("The call recording could not be read from file storage.") from exc
+
+	body = response.get("Body")
+	if body is None:
+		raise RecordingDownloadError("The call recording is empty.")
+
+	try:
+		content_length = _content_length(response.get("ContentLength"))
+		if content_length and content_length > max_bytes:
+			raise RecordingDownloadError("The call recording is too large to analyze.")
+		data = body.read(max_bytes + 1)
+	finally:
+		body.close()
+
+	content_type = str(response.get("ContentType") or "").split(";", 1)[0].strip().lower()
+	return _recording_from_file_doc(
+		file_doc,
+		data,
+		max_bytes=max_bytes,
+		content_type=content_type,
+	)
+
+
+def _recording_from_file_doc(
+	file_doc,
+	data,
+	*,
+	max_bytes: int,
+	content_type: str | None = None,
+) -> Recording:
 	if isinstance(data, str):
 		data = data.encode()
 	if not data:
@@ -104,8 +158,11 @@ def _download_local_recording(call_log, *, max_bytes: int) -> Recording:
 	if len(data) > max_bytes:
 		raise RecordingDownloadError("The call recording is too large to analyze.")
 
-	filename = PurePosixPath(urlsplit(call_log.recording_url).path).name or "call-recording.mp3"
-	content_type = mimetypes.guess_type(filename)[0] or "audio/mpeg"
+	filename = file_doc.file_name or PurePosixPath(urlsplit(file_doc.file_url).path).name
+	filename = filename or "call-recording.mp3"
+	guessed_content_type = mimetypes.guess_type(filename)[0] or "audio/mpeg"
+	if not content_type or content_type == "application/octet-stream":
+		content_type = guessed_content_type
 	if not content_type.startswith("audio/"):
 		raise RecordingDownloadError("The call recording has an unsupported format.")
 	return Recording(data=data, filename=filename, content_type=content_type)
@@ -114,6 +171,11 @@ def _download_local_recording(call_log, *, max_bytes: int) -> Recording:
 def _local_file_url(url: str) -> bool:
 	parsed = urlsplit(str(url or ""))
 	return not parsed.scheme and not parsed.netloc and parsed.path.startswith(("/files/", "/private/files/"))
+
+
+def _s3_file_url(url: str) -> bool:
+	path = urlsplit(str(url or "")).path
+	return path.startswith("/api/method/frappe_s3.")
 
 
 def _content_length(value: object) -> int:
