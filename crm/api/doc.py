@@ -324,8 +324,11 @@ def get_data(
 	data = []
 	_list = get_controller(doctype)
 	default_rows = []
+	default_column_keys = []
 	if hasattr(_list, "default_list_data"):
-		default_rows = _list.default_list_data().get("rows")
+		default_list_data = _list.default_list_data()
+		default_rows = default_list_data.get("rows")
+		default_column_keys = [column.get("key") for column in default_list_data.get("columns", [])]
 
 	meta = frappe.get_meta(doctype)
 	hidden_fields = set(get_hidden_fields(doctype))
@@ -363,20 +366,21 @@ def get_data(
 			columns = _list.default_list_data().get("columns")
 
 		rows = [row for row in rows or [] if row not in hidden_fields]
-		columns = [column for column in columns or [] if column.get("key") not in hidden_fields]
-
 		visible_columns = []
-		# check if rows has all keys from columns if not add them
-		for column in columns:
-			column_meta = meta.get_field(column.get("key"))
-			if column_meta and column_meta.get("hidden"):
+		for column in columns or []:
+			key = column.get("key")
+			if key in hidden_fields:
+				continue
+			# Schema-hidden fields are allowed when the controller selected them.
+			column_meta = meta.get_field(key)
+			if column_meta and column_meta.get("hidden") and key not in default_column_keys:
 				continue
 
-			if column.get("key") not in rows:
-				rows.append(column.get("key"))
+			if key not in rows:
+				rows.append(key)
 			column["label"] = _(column.get("label"))
 
-			if column.get("key") == "_liked_by" and column.get("width") == "10rem":
+			if key == "_liked_by" and column.get("width") == "10rem":
 				column["width"] = "50px"
 
 			visible_columns.append(column)
