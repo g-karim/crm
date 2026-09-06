@@ -21,7 +21,6 @@ vi.mock('frappe-ui', () => ({
   Dialog: {
     template: '<div><slot name="body-content" /><slot name="actions" /></div>',
   },
-  ErrorMessage: { props: ['message'], template: '<div>{{ message }}</div>' },
   FeatherIcon: { template: '<span />' },
   FormControl: { template: '<input />' },
   LoadingIndicator: { template: '<span>Loading</span>' },
@@ -88,6 +87,50 @@ describe('MessengerSettings page loading', () => {
     expect(root.textContent).not.toContain('No channels yet')
   })
 
+  it.each([
+    ['', false],
+    ['http://crm.example.com', false],
+    ['https://localhost:8000', false],
+    ['https://127.0.0.1', false],
+    ['https://0.0.0.0', false],
+    ['https://[::1]', false],
+    ['https://crm.local', false],
+    ['https://example.ngrok.app', true],
+  ])(
+    'shows the webhook warning only when effective URL %s is unsuitable',
+    async (webhookBaseUrl, isPublicHttps) => {
+      let channel = {
+        name: 'avito-1',
+        provider: 'avito_direct',
+        platform: 'avito',
+        auth_type: 'client_credentials',
+        custom_display_name: 'Avito Sales',
+        state: 'unchecked',
+      }
+      mocks.call.mockResolvedValue({
+        settings: {
+          webhook_base_url: webhookBaseUrl,
+          webhook_base_url_is_public_https: isPublicHttps,
+        },
+        channels: [channel],
+      })
+
+      let root = await mountSettings()
+      let channelButton = [...root.querySelectorAll('button')].find((button) =>
+        button.textContent.includes('Avito Sales'),
+      )
+      channelButton.click()
+      await nextTick()
+
+      let warning = root.querySelector('[data-testid="webhook-url-warning"]')
+      expect(Boolean(warning)).toBe(!isPublicHttps)
+      if (warning) {
+        expect(warning.className).toContain('text-ink-blue-9')
+        expect(warning.className).toContain('bg-surface-blue-2')
+      }
+    },
+  )
+
   it('uses the common connect action for Avito client credentials', async () => {
     let channel = {
       name: 'avito-1',
@@ -139,6 +182,7 @@ describe('MessengerSettings page loading', () => {
       custom_display_name: 'Avito Sales',
       client_id: 'client-id',
       client_secret_configured: true,
+      auth_error: 'Avito account id is not configured.',
       enabled: 0,
       state: 'unchecked',
     }
@@ -172,5 +216,38 @@ describe('MessengerSettings page loading', () => {
       'Для этого аккаунта не подключён доступ к Avito Messenger API. Перейдите на подписку с API мессенджера и повторите проверку.',
     )
     expect(root.textContent).not.toContain('generic provider failure')
+    expect(root.textContent).not.toContain(
+      'Avito account id is not configured.',
+    )
+    expect(root.querySelectorAll('[data-testid="channel-auth-error"]')).toHaveLength(
+      1,
+    )
+  })
+
+  it('renders stored channel errors with high contrast', async () => {
+    let channel = {
+      name: 'avito-1',
+      provider: 'avito_direct',
+      platform: 'avito',
+      auth_type: 'client_credentials',
+      custom_display_name: 'Avito Sales',
+      auth_error: 'Avito account id is not configured.',
+      state: 'error',
+    }
+    mocks.call.mockResolvedValue({ settings: {}, channels: [channel] })
+
+    let root = await mountSettings()
+    let channelButton = [...root.querySelectorAll('button')].find((button) =>
+      button.textContent.includes('Avito Sales'),
+    )
+    channelButton.click()
+    await nextTick()
+
+    let errorAlert = root.querySelector('[data-testid="channel-auth-error"]')
+    expect(errorAlert.textContent).toContain(
+      'Avito account id is not configured.',
+    )
+    expect(errorAlert.className).toContain('text-ink-red-8')
+    expect(errorAlert.className).toContain('bg-surface-red-2')
   })
 })

@@ -355,8 +355,9 @@
         </div>
 
         <div
-          v-if="isDirectMessengerProvider(channelDraft.provider)"
-          class="rounded-lg bg-surface-blue-1 px-3 py-2 text-p-sm text-ink-blue-3"
+          v-if="showWebhookUrlWarning"
+          data-testid="webhook-url-warning"
+          class="rounded-lg border border-outline-blue-4 bg-surface-blue-2 px-3 py-2 text-p-sm font-semibold text-ink-blue-9"
         >
           {{
             __(
@@ -366,10 +367,11 @@
         </div>
 
         <div
-          v-if="channelDraft.auth_error"
-          class="rounded-lg bg-surface-red-1 px-3 py-2 text-p-sm text-ink-red-3"
+          v-if="channelError || channelDraft.auth_error"
+          data-testid="channel-auth-error"
+          class="rounded-lg border border-outline-red-4 bg-surface-red-2 px-3 py-2 text-p-sm font-semibold text-ink-red-8"
         >
-          {{ clientProviderMessage(channelDraft.auth_error) }}
+          {{ channelError || clientProviderMessage(channelDraft.auth_error) }}
         </div>
 
         <div
@@ -419,8 +421,6 @@
             @click="runChannelAction('disconnect')"
           />
         </div>
-
-        <ErrorMessage v-if="channelError" :message="channelError" />
       </div>
     </template>
     <template #actions>
@@ -457,7 +457,6 @@ import {
   Badge,
   Button,
   Dialog,
-  ErrorMessage,
   FeatherIcon,
   FormControl,
   LoadingIndicator,
@@ -478,6 +477,8 @@ const defaultSettings = () => ({
   avito_oauth_broker_secret: '',
   avito_oauth_broker_secret_configured: false,
   oauth_site_url: '',
+  webhook_base_url: '',
+  webhook_base_url_is_public_https: false,
 })
 
 const settings = reactive(defaultSettings())
@@ -542,6 +543,11 @@ const usesCommonConnectionActions = computed(
       channelDraft.value.provider === 'avito_direct' &&
       channelDraft.value.auth_type === 'authorization_code'
     ),
+)
+const showWebhookUrlWarning = computed(
+  () =>
+    isDirectMessengerProvider(channelDraft.value.provider) &&
+    !settings.webhook_base_url_is_public_https,
 )
 
 function settingsState() {
