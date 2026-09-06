@@ -129,4 +129,48 @@ describe('MessengerSettings page loading', () => {
     expect(root.textContent).not.toContain('Register Webhook')
     expect(root.textContent).not.toContain('Avito Account ID')
   })
+
+  it('shows a specific Avito Messenger subscription error after Test', async () => {
+    let channel = {
+      name: 'avito-1',
+      provider: 'avito_direct',
+      platform: 'avito',
+      auth_type: 'client_credentials',
+      custom_display_name: 'Avito Sales',
+      client_id: 'client-id',
+      client_secret_configured: true,
+      enabled: 0,
+      state: 'unchecked',
+    }
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels: [channel] })
+      }
+      if (method === 'crm_messenger.api.channels.test_provider_connection') {
+        return Promise.resolve({
+          ok: false,
+          reason: 'messenger_subscription_required',
+          message: 'generic provider failure',
+        })
+      }
+      return Promise.reject(new Error(`unexpected method: ${method}`))
+    })
+    let root = await mountSettings()
+    let channelButton = [...root.querySelectorAll('button')].find((button) =>
+      button.textContent.includes('Avito Sales'),
+    )
+
+    channelButton.click()
+    await nextTick()
+    let testButton = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Test',
+    )
+    testButton.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(root.textContent).toContain(
+      'Для этого аккаунта не подключён доступ к Avito Messenger API. Перейдите на подписку с API мессенджера и повторите проверку.',
+    )
+    expect(root.textContent).not.toContain('generic provider failure')
+  })
 })

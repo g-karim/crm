@@ -682,7 +682,7 @@ async function runChannelAction(action) {
     if (action === 'avito-oauth') params.return_url = window.location.href
     let result = await call(methods[action], params)
     if (!result?.ok) {
-      throw new Error(result?.message || __('The provider operation failed.'))
+      throw new Error(providerActionFailureMessage(result))
     }
     if (result.authorization_url) {
       window.open(result.authorization_url, '_blank', 'noopener')
@@ -741,6 +741,15 @@ function clientProviderMessage(message) {
   if (!text) return ''
   if (/wazzup(?:24)?/i.test(text)) return __('The provider operation failed.')
   return __(text)
+}
+
+function providerActionFailureMessage(result = {}) {
+  if (result.reason === 'messenger_subscription_required') {
+    return __(
+      'Для этого аккаунта не подключён доступ к Avito Messenger API. Перейдите на подписку с API мессенджера и повторите проверку.',
+    )
+  }
+  return result.message || __('The provider operation failed.')
 }
 
 onMounted(() => loadSettings())
