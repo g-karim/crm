@@ -8,10 +8,10 @@ const mocks = vi.hoisted(() => ({
 
 const components = vi.hoisted(() => ({
   button: {
-    props: ['label', 'loading'],
+    props: ['label', 'loading', 'disabled'],
     emits: ['click'],
     template:
-      '<button :disabled="loading" @click="$emit(\'click\')">{{ label }}</button>',
+      '<button :disabled="loading || disabled" @click="$emit(\'click\')">{{ label }}</button>',
   },
 }))
 
@@ -22,7 +22,12 @@ vi.mock('frappe-ui', () => ({
     template: '<div><slot name="body-content" /><slot name="actions" /></div>',
   },
   FeatherIcon: { template: '<span />' },
-  FormControl: { template: '<input />' },
+  FormControl: {
+    props: ['label', 'modelValue', 'type'],
+    emits: ['update:modelValue'],
+    template:
+      '<input :data-label="label" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+  },
   LoadingIndicator: { template: '<span>Loading</span>' },
   Switch: { template: '<input type="checkbox" />' },
   call: mocks.call,
@@ -63,6 +68,177 @@ async function mountSettings() {
   await nextTick()
   return root
 }
+
+async function clickButton(root, label) {
+  const buttons = [...root.querySelectorAll('button')]
+  const button =
+    buttons.find((button) => button.textContent.trim() === label) ||
+    buttons.find((button) => button.textContent.includes(label))
+  expect(button).toBeTruthy()
+  button.click()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  await nextTick()
+}
+
+async function editField(root, label, value) {
+  const input = root.querySelector(`input[data-label="${label}"]`)
+  input.value = value
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await nextTick()
+}
+
+describe('MessengerSettings unsaved channel changes', () => {
+  function avitoChannel() {
+    return {
+      name: 'avito-1',
+      provider: 'avito_direct',
+      platform: 'avito',
+      auth_type: 'client_credentials',
+      custom_display_name: 'Avito Sales',
+      client_id: 'saved-id',
+      client_secret_configured: true,
+      enabled: 1,
+      state: 'disconnected',
+    }
+  }
+
+  it.each(['Test', 'Connect / Repair', 'Refresh Status', 'Disconnect'])(
+    '%s keeps unsaved credentials and asks to save without calling the provider',
+    async (action) => {
+      mocks.call.mockResolvedValue({ settings: {}, channels: [avitoChannel()] })
+      const root = await mountSettings()
+      await clickButton(root, 'Avito Sales')
+      await editField(root, 'Client ID', 'new-id')
+      await editField(root, 'Client Secret', 'new-secret')
+      await clickButton(root, action)
+
+      expect(mocks.call).toHaveBeenCalledTimes(1)
+      expect(root.querySelector('input[data-label="Client ID"]').value).toBe(
+        'new-id',
+      )
+      expect(
+        root.querySelector('input[data-label="Client Secret"]').value,
+      ).toBe('new-secret')
+      expect(
+        root.querySelector('[data-testid="channel-auth-error"]').textContent,
+      ).toContain('Save channel changes before running connection actions.')
+      expect(mocks.toast.success).not.toHaveBeenCalled()
+    },
+  )
+
+  it('allows testing after the edited credentials have been saved', async () => {
+    let channel = avitoChannel()
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels: [channel] })
+      }
+      if (method === 'crm_messenger.api.settings.save_channel') {
+        expect(params.client_secret).toBe('new-secret')
+        channel = {
+          ...channel,
+          client_id: params.client_id,
+          state: 'unchecked',
+        }
+        return Promise.resolve(channel)
+      }
+      if (method === 'crm_messenger.api.channels.test_provider_connection') {
+        expect(channel.client_id).toBe('new-id')
+        return Promise.resolve({ ok: true })
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Avito Sales')
+    await editField(root, 'Client ID', 'new-id')
+    await editField(root, 'Client Secret', 'new-secret')
+    await clickButton(root, 'Save')
+    await clickButton(root, 'Test')
+
+    expect(mocks.call).toHaveBeenCalledWith(
+      'crm_messenger.api.channels.test_provider_connection',
+      { channel: 'avito-1' },
+    )
+    expect(root.querySelector('input[data-label="Client ID"]').value).toBe(
+      'new-id',
+    )
+    expect(root.querySelector('input[data-label="Client Secret"]').value).toBe(
+      '',
+    )
+    expect(root.querySelector('[data-testid="channel-auth-error"]')).toBeNull()
+  })
+
+  it('preserves the draft when saving replacement credentials fails', async () => {
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels: [avitoChannel()] })
+      }
+      return Promise.reject({
+        messages: ['Avito token belongs to another account.'],
+      })
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Avito Sales')
+    await editField(root, 'Client Secret', 'rejected-secret')
+    await clickButton(root, 'Save')
+    await clickButton(root, 'Test')
+
+    expect(mocks.call).toHaveBeenCalledTimes(2)
+    expect(root.querySelector('input[data-label="Client Secret"]').value).toBe(
+      'rejected-secret',
+    )
+    expect(mocks.toast.success).not.toHaveBeenCalled()
+  })
+
+  it('keeps edits made during a request and prevents overlapping connection actions', async () => {
+    let resolveTest
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels: [avitoChannel()] })
+      }
+      return new Promise((resolve) => {
+        resolveTest = resolve
+      })
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Avito Sales')
+    await clickButton(root, 'Test')
+    await editField(root, 'Client Secret', 'typed-during-request')
+    await clickButton(root, 'Connect / Repair')
+    await clickButton(root, 'Save')
+    expect(mocks.call).toHaveBeenCalledTimes(2)
+    resolveTest({ ok: true })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+
+    expect(root.querySelector('input[data-label="Client Secret"]').value).toBe(
+      'typed-during-request',
+    )
+    await clickButton(root, 'Test')
+    expect(mocks.call).toHaveBeenCalledTimes(3)
+    expect(
+      root.querySelector('[data-testid="channel-auth-error"]').textContent,
+    ).toContain('Save channel changes before running connection actions.')
+  })
+
+  it('does not reopen a channel closed during a request', async () => {
+    let resolveTest
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels: [avitoChannel()] })
+      }
+      return new Promise((resolve) => {
+        resolveTest = resolve
+      })
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Avito Sales')
+    await clickButton(root, 'Test')
+    await clickButton(root, 'Close')
+    resolveTest({ ok: true })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(mounted[0].app._instance.setupState.showChannelDialog).toBe(false)
+  })
+})
 
 describe('MessengerSettings page loading', () => {
   it('shows the empty state only after a successful empty response', async () => {
@@ -219,9 +395,9 @@ describe('MessengerSettings page loading', () => {
     expect(root.textContent).not.toContain(
       'Avito account id is not configured.',
     )
-    expect(root.querySelectorAll('[data-testid="channel-auth-error"]')).toHaveLength(
-      1,
-    )
+    expect(
+      root.querySelectorAll('[data-testid="channel-auth-error"]'),
+    ).toHaveLength(1)
   })
 
   it('renders stored channel errors with high contrast', async () => {

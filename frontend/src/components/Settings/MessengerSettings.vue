@@ -383,6 +383,7 @@
             :label="__('Test')"
             variant="subtle"
             :loading="channelAction === 'test'"
+            :disabled="channelBusy"
             @click="runChannelAction('test')"
           />
           <Button
@@ -390,6 +391,7 @@
             :label="__('Connect / Repair')"
             variant="solid"
             :loading="channelAction === 'connect'"
+            :disabled="channelBusy"
             @click="runChannelAction('connect')"
           />
           <Button
@@ -397,6 +399,7 @@
             :label="__('Refresh Status')"
             variant="subtle"
             :loading="channelAction === 'status'"
+            :disabled="channelBusy"
             @click="runChannelAction('status')"
           />
           <Button
@@ -407,6 +410,7 @@
             :label="__('Connect Avito')"
             variant="solid"
             :loading="channelAction === 'avito-oauth'"
+            :disabled="channelBusy"
             @click="runChannelAction('avito-oauth')"
           />
           <Button
@@ -418,6 +422,7 @@
             variant="subtle"
             theme="red"
             :loading="channelAction === 'disconnect'"
+            :disabled="channelBusy"
             @click="runChannelAction('disconnect')"
           />
         </div>
@@ -434,6 +439,7 @@
           :label="channelDraft.channel ? __('Save') : __('Create Channel')"
           variant="solid"
           :loading="savingChannel"
+          :disabled="Boolean(channelAction)"
           @click="saveChannel"
         />
       </div>
@@ -492,9 +498,12 @@ const showAdvanced = ref(false)
 
 const showChannelDialog = ref(false)
 const channelDraft = ref(makeMessengerChannelDraft())
+const channelSnapshot = ref('')
 const savingChannel = ref(false)
 const channelAction = ref('')
 const channelError = ref('')
+const channelBusy = computed(() => savingChannel.value || Boolean(channelAction.value))
+const channelDirty = computed(() => channelState() !== channelSnapshot.value)
 
 const wazzupPlatforms = [
   { label: 'WhatsApp', value: 'whatsapp' },
@@ -624,6 +633,7 @@ async function saveGlobalSettings() {
 
 function openNewChannel() {
   channelDraft.value = makeMessengerChannelDraft()
+  channelSnapshot.value = channelState()
   channelError.value = ''
   showChannelDialog.value = true
 }
@@ -636,6 +646,7 @@ function openChannel(channel) {
     provider_display_name: channel.provider_display_name,
     label: channel.label,
   }
+  channelSnapshot.value = channelState()
   channelError.value = ''
   showChannelDialog.value = true
 }
@@ -646,6 +657,7 @@ function changeProvider(provider) {
 }
 
 async function saveChannel() {
+  if (channelBusy.value) return
   let error = validateMessengerChannelDraft(channelDraft.value)
   if (error) {
     channelError.value = __(error)
@@ -674,6 +686,13 @@ async function saveChannel() {
 }
 
 async function runChannelAction(action) {
+  if (channelBusy.value) return
+  if (channelDirty.value) {
+    channelError.value = __('Save channel changes before running connection actions.')
+    return
+  }
+  let draft = channelDraft.value
+  let snapshot = channelState()
   let methods = {
     test: 'crm_messenger.api.channels.test_provider_connection',
     connect: 'crm_messenger.api.channels.register_provider_webhook',
@@ -695,21 +714,34 @@ async function runChannelAction(action) {
     }
     await loadSettings(true, true)
     let fresh = channels.value.find(
-      (row) => row.name === channelDraft.value.channel,
+      (row) => row.name === draft.channel,
     )
-    if (fresh) openChannel(fresh)
+    if (
+      fresh &&
+      showChannelDialog.value &&
+      channelDraft.value === draft &&
+      channelState() === snapshot
+    ) {
+      openChannel(fresh)
+    }
     toast.success(
       clientProviderMessage(result.message || 'Operation completed.'),
     )
   } catch (error) {
-    channelError.value = clientProviderMessage(
-      error?.messages?.[0] ||
-        error?.message ||
-        'The provider operation failed.',
-    )
+    if (channelDraft.value === draft) {
+      channelError.value = clientProviderMessage(
+        error?.messages?.[0] ||
+          error?.message ||
+          'The provider operation failed.',
+      )
+    }
   } finally {
     channelAction.value = ''
   }
+}
+
+function channelState() {
+  return JSON.stringify(buildMessengerChannelPayload(channelDraft.value))
 }
 
 function channelTitle(channel) {
