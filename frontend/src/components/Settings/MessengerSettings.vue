@@ -69,12 +69,12 @@
           <div class="flex items-center justify-between gap-6 p-4">
             <div>
               <div class="text-base-medium text-ink-gray-8">
-                {{ __('Store raw webhook events') }}
+                {{ __('Store detailed webhook payloads') }}
               </div>
               <div class="mt-1 text-p-sm text-ink-gray-5">
                 {{
                   __(
-                    'Use this only for diagnostics. Keep it disabled in normal operation.',
+                    'Applies only to future events. Detailed payloads can contain message text and customer personal data; secrets are always redacted. Enable only for diagnostics.',
                   )
                 }}
               </div>
@@ -94,7 +94,7 @@
               class="size-4 transition-transform"
               :class="showAdvanced && 'rotate-90'"
             />
-            {{ __('Webhooks and Avito OAuth') }}
+            {{ __('Webhooks') }}
           </button>
           <div
             v-if="showAdvanced"
@@ -106,27 +106,6 @@
               :label="__('Shared Webhook Secret')"
               :placeholder="
                 secretPlaceholder(settings.webhook_secret_configured)
-              "
-              :description="__('Leave blank to keep the current secret.')"
-            />
-            <FormControl
-              v-model="settings.oauth_site_url"
-              type="text"
-              :label="__('OAuth Site URL')"
-              placeholder="https://crm.example.com"
-            />
-            <FormControl
-              v-model="settings.avito_oauth_broker_url"
-              type="text"
-              :label="__('Avito OAuth Broker URL')"
-              placeholder="https://broker.example.com"
-            />
-            <FormControl
-              v-model="settings.avito_oauth_broker_secret"
-              type="password"
-              :label="__('Avito OAuth Broker Secret')"
-              :placeholder="
-                secretPlaceholder(settings.avito_oauth_broker_secret_configured)
               "
               :description="__('Leave blank to keep the current secret.')"
             />
@@ -313,16 +292,6 @@
 
           <FormControl
             v-if="channelDraft.provider === 'avito_direct'"
-            v-model="channelDraft.auth_type"
-            type="select"
-            :options="avitoAuthTypes"
-            :label="__('Avito Connection Method')"
-          />
-          <FormControl
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type === 'client_credentials'
-            "
             v-model="channelDraft.client_id"
             type="text"
             required
@@ -339,10 +308,7 @@
             :description="__('Leave blank to keep the current token.')"
           />
           <FormControl
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type === 'client_credentials'
-            "
+            v-if="channelDraft.provider === 'avito_direct'"
             v-model="channelDraft.client_secret"
             type="password"
             :required="!channelDraft.client_secret_configured"
@@ -403,21 +369,7 @@
             @click="runChannelAction('status')"
           />
           <Button
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type === 'authorization_code'
-            "
-            :label="__('Connect Avito')"
-            variant="solid"
-            :loading="channelAction === 'avito-oauth'"
-            :disabled="channelBusy"
-            @click="runChannelAction('avito-oauth')"
-          />
-          <Button
-            v-if="
-              usesCommonConnectionActions &&
-              channelDraft.enabled
-            "
+            v-if="usesCommonConnectionActions && channelDraft.enabled"
             :label="__('Disconnect')"
             variant="subtle"
             theme="red"
@@ -479,10 +431,6 @@ const defaultSettings = () => ({
   log_raw_webhooks: false,
   webhook_secret: '',
   webhook_secret_configured: false,
-  avito_oauth_broker_url: '',
-  avito_oauth_broker_secret: '',
-  avito_oauth_broker_secret_configured: false,
-  oauth_site_url: '',
   webhook_base_url: '',
   webhook_base_url_is_public_https: false,
 })
@@ -502,19 +450,15 @@ const channelSnapshot = ref('')
 const savingChannel = ref(false)
 const channelAction = ref('')
 const channelError = ref('')
-const channelBusy = computed(() => savingChannel.value || Boolean(channelAction.value))
+const channelBusy = computed(
+  () => savingChannel.value || Boolean(channelAction.value),
+)
 const channelDirty = computed(() => channelState() !== channelSnapshot.value)
 
 const wazzupPlatforms = [
   { label: 'WhatsApp', value: 'whatsapp' },
   { label: 'Telegram', value: 'telegram' },
 ]
-const avitoAuthTypes = [
-  { label: __('Client ID / Secret'), value: 'client_credentials' },
-  { label: __('OAuth'), value: 'authorization_code' },
-  { label: __('API Token'), value: 'api_token' },
-]
-
 const providerOptions = computed(() =>
   MESSENGER_PROVIDER_OPTIONS.map((option) => ({
     ...option,
@@ -526,9 +470,6 @@ const settingsDirty = computed(
   () => settingsSnapshot.value && settingsSnapshot.value !== settingsState(),
 )
 const showsApiToken = computed(() => {
-  if (channelDraft.value.provider === 'avito_direct') {
-    return channelDraft.value.auth_type === 'api_token'
-  }
   return ['telegram_bot', 'vk_direct', 'max_direct', 'wazzup'].includes(
     channelDraft.value.provider,
   )
@@ -545,13 +486,8 @@ const hasConnectionActions = computed(
     isDirectMessengerProvider(channelDraft.value.provider) ||
     channelDraft.value.provider === 'avito_direct',
 )
-const usesCommonConnectionActions = computed(
-  () =>
-    isDirectMessengerProvider(channelDraft.value.provider) &&
-    !(
-      channelDraft.value.provider === 'avito_direct' &&
-      channelDraft.value.auth_type === 'authorization_code'
-    ),
+const usesCommonConnectionActions = computed(() =>
+  isDirectMessengerProvider(channelDraft.value.provider),
 )
 const showWebhookUrlWarning = computed(
   () =>
@@ -567,10 +503,7 @@ function settingsState() {
       settings.enable_provider_history_tombstones,
     ),
     log_raw_webhooks: Boolean(settings.log_raw_webhooks),
-    avito_oauth_broker_url: settings.avito_oauth_broker_url || '',
-    oauth_site_url: settings.oauth_site_url || '',
     webhook_secret: settings.webhook_secret || '',
-    avito_oauth_broker_secret: settings.avito_oauth_broker_secret || '',
   })
 }
 
@@ -582,7 +515,6 @@ async function loadSettings(isRefresh = false, channelsOnly = false) {
     if (!channelsOnly) {
       Object.assign(settings, defaultSettings(), result.settings || {})
       settings.webhook_secret = ''
-      settings.avito_oauth_broker_secret = ''
       settingsSnapshot.value = settingsState()
     }
     channels.value = result.channels || []
@@ -610,14 +542,10 @@ async function saveGlobalSettings() {
         settings.enable_provider_history_tombstones,
       ),
       log_raw_webhooks: Boolean(settings.log_raw_webhooks),
-      avito_oauth_broker_url: settings.avito_oauth_broker_url || '',
-      oauth_site_url: settings.oauth_site_url || '',
       webhook_secret: settings.webhook_secret || '',
-      avito_oauth_broker_secret: settings.avito_oauth_broker_secret || '',
     })
     Object.assign(settings, result || {})
     settings.webhook_secret = ''
-    settings.avito_oauth_broker_secret = ''
     settingsSnapshot.value = settingsState()
     toast.success(__('Message channel settings saved.'))
   } catch (error) {
@@ -688,7 +616,9 @@ async function saveChannel() {
 async function runChannelAction(action) {
   if (channelBusy.value) return
   if (channelDirty.value) {
-    channelError.value = __('Save channel changes before running connection actions.')
+    channelError.value = __(
+      'Save channel changes before running connection actions.',
+    )
     return
   }
   let draft = channelDraft.value
@@ -698,13 +628,11 @@ async function runChannelAction(action) {
     connect: 'crm_messenger.api.channels.register_provider_webhook',
     status: 'crm_messenger.api.channels.get_provider_webhook_status',
     disconnect: 'crm_messenger.api.channels.remove_provider_webhook',
-    'avito-oauth': 'crm_messenger.api.avito_oauth.start_connection',
   }
   channelAction.value = action
   channelError.value = ''
   try {
     let params = { channel: channelDraft.value.channel }
-    if (action === 'avito-oauth') params.return_url = window.location.href
     let result = await call(methods[action], params)
     if (!result?.ok) {
       throw new Error(providerActionFailureMessage(result))
@@ -713,9 +641,7 @@ async function runChannelAction(action) {
       window.open(result.authorization_url, '_blank', 'noopener')
     }
     await loadSettings(true, true)
-    let fresh = channels.value.find(
-      (row) => row.name === draft.channel,
-    )
+    let fresh = channels.value.find((row) => row.name === draft.channel)
     if (
       fresh &&
       showChannelDialog.value &&

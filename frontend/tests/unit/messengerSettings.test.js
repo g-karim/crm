@@ -93,6 +93,19 @@ describe('messengerSettings', () => {
     avito.client_secret = 'client-secret'
     expect(validateMessengerChannelDraft(avito)).toBe('')
     expect(buildMessengerChannelPayload(avito).external_account_id).toBe('')
+
+    let legacyAvito = makeMessengerChannelDraft({
+      name: 'legacy-avito',
+      provider: 'avito_direct',
+      auth_type: 'authorization_code',
+      client_id: 'client-id',
+      client_secret_configured: true,
+    })
+    expect(legacyAvito.auth_type).toBe('client_credentials')
+    legacyAvito.auth_type = 'api_token'
+    expect(buildMessengerChannelPayload(legacyAvito).auth_type).toBe(
+      'client_credentials',
+    )
   })
 
   it('maps channel connection states for the list', () => {

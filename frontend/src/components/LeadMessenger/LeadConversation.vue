@@ -1704,7 +1704,7 @@ function integrationWarningMessage(result = {}) {
     resultMessage.includes('avito')
   ) {
     return __(
-      'The Avito integration is not configured. Enter the Avito account ID and API token. The message was saved locally with an error status.',
+      'The Avito integration is not configured. Enter the Client ID and Client Secret in the Avito channel settings, then connect the channel. The message was saved locally with an error status.',
     )
   }
 

@@ -347,6 +347,9 @@ describe('MessengerSettings page loading', () => {
     )
     expect(root.textContent).not.toContain('Register Webhook')
     expect(root.textContent).not.toContain('Avito Account ID')
+    expect(root.textContent).not.toContain('Avito Connection Method')
+    expect(root.textContent).not.toContain('OAuth')
+    expect(root.querySelector('input[data-label="API Token"]')).toBeNull()
   })
 
   it('shows a specific Avito Messenger subscription error after Test', async () => {

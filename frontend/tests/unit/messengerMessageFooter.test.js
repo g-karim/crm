@@ -109,6 +109,38 @@ describe('message footer metadata', () => {
     )
   })
 
+  it('shows Avito sent as one gray check and read as two blue checks', () => {
+    let sent = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'avito_direct',
+        direction: 'outbound',
+        status: 'sent',
+        delivery_status: 'sent',
+      }),
+    })
+    let sentDelivery = sent.querySelector('[data-message-delivery]')
+    expect(sentDelivery.className).toContain('text-ink-gray-5')
+    expect(sentDelivery.querySelectorAll('svg')).toHaveLength(1)
+    expect(sentDelivery.closest('[data-test-tooltip]').title).toBe(
+      'Sent to Avito; delivery confirmation is unavailable',
+    )
+
+    let read = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'avito_direct',
+        direction: 'outbound',
+        status: 'read',
+        delivery_status: 'read',
+      }),
+    })
+    let readDelivery = read.querySelector('[data-message-delivery]')
+    expect(readDelivery.className).toContain('text-ink-blue-5')
+    expect(readDelivery.querySelector('svg').getAttribute('class')).toContain(
+      'lucide-check-check',
+    )
+    expect(readDelivery.querySelectorAll('path')).toHaveLength(2)
+  })
+
   it('hides the edited marker for unedited and deleted messages', () => {
     let unedited = mountComponent(MessageFooterMetadata, {
       message: message({ is_edited: 0 }),

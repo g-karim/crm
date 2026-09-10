@@ -22,6 +22,12 @@ class TestCRMTranslations(TestCase):
 			translations["Could not move attachments to the selected conversation."],
 			"Не удалось перенести вложения в выбранную переписку.",
 		)
+		self.assertEqual(
+			translations[
+				"The Avito integration is not configured. Enter the Client ID and Client Secret in the Avito channel settings, then connect the channel. The message was saved locally with an error status."
+			],
+			"Интеграция Avito не настроена. Укажите Client ID и Client Secret в настройках канала Avito, затем подключите канал. Сообщение сохранено локально со статусом ошибки.",
+		)
 
 	def test_gateway_brand_is_not_exposed_in_customer_translations(self):
 		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS))

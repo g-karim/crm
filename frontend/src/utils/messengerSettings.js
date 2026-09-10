@@ -40,7 +40,10 @@ export function makeMessengerChannelDraft(channel = null) {
     provider,
     custom_display_name: channel?.custom_display_name || '',
     platform: channel?.platform || defaults.platform || '',
-    auth_type: channel?.auth_type || defaults.auth_type || '',
+    auth_type:
+      provider === 'avito_direct'
+        ? 'client_credentials'
+        : channel?.auth_type || defaults.auth_type || '',
     provider_channel_id: channel?.provider_channel_id || '',
     external_account_id: channel?.external_account_id || '',
     public_chat_url: channel?.public_chat_url || '',
@@ -73,7 +76,10 @@ export function buildMessengerChannelPayload(draft) {
     provider: draft.provider,
     custom_display_name: clean(draft.custom_display_name),
     platform: clean(draft.platform) || defaults.platform || '',
-    auth_type: clean(draft.auth_type) || defaults.auth_type || '',
+    auth_type:
+      draft.provider === 'avito_direct'
+        ? 'client_credentials'
+        : clean(draft.auth_type) || defaults.auth_type || '',
     provider_channel_id: clean(draft.provider_channel_id),
     external_account_id: clean(draft.external_account_id),
     public_chat_url: clean(draft.public_chat_url),
@@ -114,18 +120,9 @@ export function validateMessengerChannelDraft(draft) {
     }
   }
   if (draft.provider === 'avito_direct') {
-    if (draft.auth_type === 'client_credentials') {
-      if (!clean(draft.client_id)) return 'Enter the Avito Client ID.'
-      if (!draft.client_secret_configured && !clean(draft.client_secret)) {
-        return 'Enter the Avito Client Secret.'
-      }
-    }
-    if (
-      draft.auth_type === 'api_token' &&
-      !draft.api_token_configured &&
-      !clean(draft.api_token)
-    ) {
-      return 'Enter an Avito API token.'
+    if (!clean(draft.client_id)) return 'Enter the Avito Client ID.'
+    if (!draft.client_secret_configured && !clean(draft.client_secret)) {
+      return 'Enter the Avito Client Secret.'
     }
   }
   return ''

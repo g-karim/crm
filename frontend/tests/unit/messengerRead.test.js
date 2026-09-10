@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 afterEach(() => vi.useRealTimers())
 
-function harness({ enabled = true } = {}) {
+function harness({ enabled = true, provider = 'vk_direct' } = {}) {
   let messages = [
     {
       name: 'MSG-10',
@@ -11,6 +11,7 @@ function harness({ enabled = true } = {}) {
       direction: 'inbound',
       status: 'received',
       external_conversation_message_id: '10',
+      external_message_id: 'provider-10',
     },
   ]
   let call = vi.fn(async () => ({
@@ -22,7 +23,7 @@ function harness({ enabled = true } = {}) {
   let controller = createMessengerReadController({
     call,
     isEnabled: () => enabled,
-    getConversation: () => ({ name: 'CONV-1' }),
+    getConversation: () => ({ name: 'CONV-1', provider }),
     getMessages: () => messages,
   })
   return { controller, call, messages }
@@ -51,5 +52,23 @@ describe('messenger provider read controller', () => {
     expect(await active.controller.flush()).toBe(true)
     expect(await active.controller.flush()).toBe(false)
     expect(active.call).toHaveBeenCalledOnce()
+  })
+
+  it('uses an Avito external message ID when CMID is unavailable', async () => {
+    let { controller, call, messages } = harness({ provider: 'avito_direct' })
+    messages[0].external_conversation_message_id = null
+
+    expect(await controller.flush()).toBe(true)
+    expect(await controller.flush()).toBe(false)
+    messages.push({
+      ...messages[0],
+      name: 'MSG-11',
+      external_message_id: 'provider-11',
+    })
+    expect(await controller.flush()).toBe(true)
+    expect(call).toHaveBeenLastCalledWith(
+      'crm_messenger.api.conversations.mark_read',
+      { conversation: 'CONV-1', up_to_message: 'MSG-11' },
+    )
   })
 })

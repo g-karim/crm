@@ -180,6 +180,12 @@ export function shouldShowMessengerText(message = {}) {
 export function getMessengerDeliveryLabel(message = {}) {
   if (isMaxVideoProcessingMessage(message)) return 'MAX is processing the video'
   if (
+    message?.provider === 'avito_direct' &&
+    getMessengerDeliveryState(message) === 'sent'
+  ) {
+    return 'Sent to Avito; delivery confirmation is unavailable'
+  }
+  if (
     message?.provider === 'telegram_bot' &&
     getMessengerDeliveryState(message) === 'sent'
   ) {
