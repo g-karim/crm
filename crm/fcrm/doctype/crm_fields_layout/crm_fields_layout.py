@@ -198,7 +198,7 @@ def get_field_obj(field):
 		field["placeholder"] = field.get("placeholder") or _("Select {0}...").format(_(field.label))
 	elif field.fieldtype == "Select" and field.options:
 		field["placeholder"] = field.get("placeholder") or _("Select {0}...").format(_(field.label))
-		field["options"] = [{"label": option, "value": option} for option in field.options.split("\n")]
+		field["options"] = [{"label": _(option), "value": option} for option in field.options.split("\n")]
 	else:
 		field["placeholder"] = field.get("placeholder") or _("Add {0}...").format(_(field.label))
 
