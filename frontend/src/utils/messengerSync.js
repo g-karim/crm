@@ -20,7 +20,9 @@ export function mergeMessengerMessages(current = [], incoming = []) {
   let updated = []
   incoming.forEach((message) => {
     if (!message?.name) return
-    if (byName.has(message.name)) updated.push(message.name)
+    let existing = byName.get(message.name)
+    if (existing && !shouldReplaceMessengerMessage(existing, message)) return
+    if (existing) updated.push(message.name)
     else inserted.push(message.name)
     byName.set(message.name, message)
   })
@@ -60,9 +62,9 @@ export function createMessengerSyncController(options) {
   let hasMoreHistory = false
   let started = false
   let generation = 0
-  let deltaPromise = null
-  let deltaRequested = false
-  let historyPromise = null
+  let deltaRequest = null
+  let pendingDeltaGeneration = null
+  let historyRequest = null
 
   function api(method, params) {
     return call(`crm_messenger.api.messages.${method}`, params)
@@ -118,25 +120,50 @@ export function createMessengerSyncController(options) {
     }
 
     notifyPermissions(result)
-    if (reset) messages = []
+    if (reset) {
+      let snapshotByName = new Map(
+        (result.messages || []).map((message) => [message?.name, message]),
+      )
+      messages = messages.filter((message) => {
+        let snapshotMessage = snapshotByName.get(message?.name)
+        return (
+          snapshotMessage &&
+          !shouldReplaceMessengerMessage(message, snapshotMessage)
+        )
+      })
+    }
     syncCursor = result.sync_cursor
     beforeCursor = result.page?.before_cursor || ''
     hasMoreHistory = Boolean(result.page?.has_more && beforeCursor)
     merge(result.messages || [], 'snapshot', { reset })
 
-    if (deltaRequested) await syncDelta()
+    if (pendingDeltaGeneration === requestGeneration) {
+      pendingDeltaGeneration = null
+      await syncDelta()
+    }
   }
 
   async function loadOlder() {
     if (!leadName || !hasMoreHistory || !beforeCursor) return
-    if (historyPromise) return historyPromise
     let requestGeneration = generation
     let requestedLead = leadName
     let requestedCursor = beforeCursor
-    historyPromise = api(
-      'get_message_page',
-      scopeParams({ limit: 100, before_cursor: requestedCursor }),
+    if (
+      historyRequest?.generation === requestGeneration &&
+      historyRequest?.lead === requestedLead
     )
+      return historyRequest.promise
+    let request = {
+      generation: requestGeneration,
+      lead: requestedLead,
+      promise: null,
+    }
+    request.promise = api('get_message_page', {
+      reference_doctype: REFERENCE_DOCTYPE,
+      reference_name: requestedLead,
+      limit: 100,
+      before_cursor: requestedCursor,
+    })
       .then((result) => {
         if (
           requestGeneration !== generation ||
@@ -153,21 +180,25 @@ export function createMessengerSyncController(options) {
         merge(result.messages || [], 'history')
       })
       .finally(() => {
-        historyPromise = null
+        if (historyRequest === request) historyRequest = null
       })
-    return historyPromise
+    historyRequest = request
+    return request.promise
   }
 
-  async function drainDelta(requestGeneration, requestedLead) {
+  async function drainDelta(request) {
     do {
-      deltaRequested = false
+      request.requested = false
       let hasMore = true
       while (hasMore) {
-        let result = await api(
-          'get_message_changes',
-          scopeParams({ cursor: syncCursor, limit: 200 }),
-        )
-        if (requestGeneration !== generation || requestedLead !== leadName)
+        let requestedCursor = syncCursor
+        let result = await api('get_message_changes', {
+          reference_doctype: REFERENCE_DOCTYPE,
+          reference_name: request.lead,
+          cursor: requestedCursor,
+          limit: 200,
+        })
+        if (request.generation !== generation || request.lead !== leadName)
           return
         if (result?.contract_version !== 1 || !result?.next_cursor) {
           throw new Error('Unsupported messenger delta response.')
@@ -180,34 +211,56 @@ export function createMessengerSyncController(options) {
           options.onDeltaApplied?.(merged, result.changes || [])
         }
       }
-    } while (deltaRequested)
+    } while (request.requested)
   }
 
   async function syncDelta() {
-    if (!leadName || !syncCursor) {
-      deltaRequested = true
+    if (!leadName) return
+    if (!syncCursor) {
+      pendingDeltaGeneration = generation
       return
-    }
-    if (deltaPromise) {
-      deltaRequested = true
-      return deltaPromise
     }
     let requestGeneration = generation
     let requestedLead = leadName
-    deltaPromise = drainDelta(requestGeneration, requestedLead)
+    if (
+      deltaRequest?.generation === requestGeneration &&
+      deltaRequest?.lead === requestedLead
+    ) {
+      deltaRequest.requested = true
+      return deltaRequest.promise
+    }
+    let request = {
+      generation: requestGeneration,
+      lead: requestedLead,
+      requested: false,
+      promise: null,
+    }
+    request.promise = drainDelta(request)
       .catch(async (error) => {
         if (requestGeneration !== generation) return
         if (isCursorError(error)) {
           await loadSnapshot()
+          if (request.requested) pendingDeltaGeneration = requestGeneration
           return
         }
         options.onError?.(error)
         throw error
       })
       .finally(() => {
-        deltaPromise = null
+        if (deltaRequest !== request) return
+        deltaRequest = null
+        if (
+          pendingDeltaGeneration === requestGeneration &&
+          requestGeneration === generation &&
+          requestedLead === leadName &&
+          syncCursor
+        ) {
+          pendingDeltaGeneration = null
+          syncDelta().catch(() => {})
+        }
       })
-    return deltaPromise
+    deltaRequest = request
+    return request.promise
   }
 
   function onRealtime(payload = {}) {
@@ -255,7 +308,7 @@ export function createMessengerSyncController(options) {
     syncCursor = ''
     beforeCursor = ''
     hasMoreHistory = false
-    deltaRequested = false
+    pendingDeltaGeneration = null
     if (previousLead) unsubscribe(previousLead)
     if (!leadName) {
       notify('reset')
@@ -314,6 +367,14 @@ export function createMessengerSyncController(options) {
 
 function compareValues(left, right) {
   return `${left || ''}`.localeCompare(`${right || ''}`)
+}
+
+function shouldReplaceMessengerMessage(current, incoming) {
+  let currentVersion = current?.modified
+  let incomingVersion = incoming?.modified
+  if (currentVersion && !incomingVersion) return false
+  if (!currentVersion || !incomingVersion) return true
+  return compareValues(incomingVersion, currentVersion) >= 0
 }
 
 function isCursorError(error) {
