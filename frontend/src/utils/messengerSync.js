@@ -65,6 +65,8 @@ export function createMessengerSyncController(options) {
   let deltaRequest = null
   let pendingDeltaGeneration = null
   let historyRequest = null
+  let scopeReloadRequest = null
+  let scopeReloadNeeded = false
 
   function api(method, params) {
     return call(`crm_messenger.api.messages.${method}`, params)
@@ -120,6 +122,7 @@ export function createMessengerSyncController(options) {
     }
 
     notifyPermissions(result)
+    scopeReloadNeeded = false
     if (reset) {
       let snapshotByName = new Map(
         (result.messages || []).map((message) => [message?.name, message]),
@@ -218,6 +221,7 @@ export function createMessengerSyncController(options) {
     if (!leadName) return
     if (!syncCursor) {
       pendingDeltaGeneration = generation
+      if (scopeReloadNeeded && !scopeReloadRequest) return reloadScope()
       return
     }
     let requestGeneration = generation
@@ -263,6 +267,52 @@ export function createMessengerSyncController(options) {
     return request.promise
   }
 
+  function reloadScope() {
+    if (!leadName) return
+    if (
+      scopeReloadRequest?.generation === generation &&
+      scopeReloadRequest?.lead === leadName
+    ) {
+      scopeReloadRequest.requested = true
+      return scopeReloadRequest.promise
+    }
+
+    generation += 1
+    let requestGeneration = generation
+    let requestedLead = leadName
+    scopeReloadNeeded = true
+    syncCursor = ''
+    beforeCursor = ''
+    hasMoreHistory = false
+    pendingDeltaGeneration = null
+    let request = {
+      generation: requestGeneration,
+      lead: requestedLead,
+      requested: false,
+      promise: null,
+    }
+    request.promise = loadSnapshot()
+      .catch((error) => {
+        if (requestGeneration === generation && requestedLead === leadName) {
+          options.onError?.(error)
+        }
+        throw error
+      })
+      .finally(() => {
+        if (scopeReloadRequest !== request) return
+        scopeReloadRequest = null
+        if (
+          request.requested &&
+          requestGeneration === generation &&
+          requestedLead === leadName
+        ) {
+          reloadScope()?.catch(() => {})
+        }
+      })
+    scopeReloadRequest = request
+    return request.promise
+  }
+
   function onRealtime(payload = {}) {
     if (
       payload.version !== 1 ||
@@ -270,8 +320,12 @@ export function createMessengerSyncController(options) {
       payload.reference_name !== leadName
     )
       return
-    if (payload.conversation_state_changed) {
+    if (payload.conversation_state_changed || payload.scope_invalidated) {
       options.onConversationStateChanged?.(payload)
+    }
+    if (payload.scope_invalidated) {
+      reloadScope()?.catch(() => {})
+      return
     }
     syncDelta().catch(() => {})
   }
@@ -289,7 +343,7 @@ export function createMessengerSyncController(options) {
   function onConnect() {
     if (!leadName) return
     subscribe(leadName)
-    if (syncCursor) syncDelta().catch(() => {})
+    syncDelta().catch(() => {})
   }
 
   function onVisibilityChange() {
@@ -309,6 +363,8 @@ export function createMessengerSyncController(options) {
     beforeCursor = ''
     hasMoreHistory = false
     pendingDeltaGeneration = null
+    scopeReloadRequest = null
+    scopeReloadNeeded = false
     if (previousLead) unsubscribe(previousLead)
     if (!leadName) {
       notify('reset')
@@ -334,6 +390,8 @@ export function createMessengerSyncController(options) {
 
   function stop() {
     generation += 1
+    scopeReloadRequest = null
+    scopeReloadNeeded = false
     unsubscribe(leadName)
     leadName = ''
     if (!started) return

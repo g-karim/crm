@@ -37,6 +37,7 @@ function createHarness(responses = {}) {
   visibility.visibilityState = 'visible'
   let changes = []
   let permissions = []
+  let errors = []
   let calls = []
   let call = vi.fn(async (method, params) => {
     calls.push([method, params])
@@ -50,8 +51,17 @@ function createHarness(responses = {}) {
     visibilityTarget: visibility,
     onChange: (change) => changes.push(change),
     onPermissions: (value) => permissions.push(value),
+    onError: (error) => errors.push(error),
   })
-  return { controller, socket, visibility, changes, permissions, calls }
+  return {
+    controller,
+    socket,
+    visibility,
+    changes,
+    permissions,
+    errors,
+    calls,
+  }
 }
 
 const snapshot = (messages = [], overrides = {}) => ({
@@ -621,6 +631,140 @@ describe('messenger sync', () => {
     expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
       'LEAD-2-M',
     ])
+  })
+
+  it('reloads the complete scope and ignores an older pending delta after relink', async () => {
+    let snapshotCalls = 0
+    let resolveScopeSnapshot
+    let resolveOldDelta
+    let harness = createHarness({
+      get_message_page: () => {
+        snapshotCalls += 1
+        if (snapshotCalls === 1)
+          return snapshot(
+            [
+              {
+                name: 'UNLINKED-MESSAGE',
+                modified: '2026-07-16 10:00:00',
+              },
+            ],
+            { sync_cursor: 'old-cursor' },
+          )
+        return new Promise((resolve) => (resolveScopeSnapshot = resolve))
+      },
+      get_message_changes: () =>
+        new Promise((resolve) => (resolveOldDelta = resolve)),
+    })
+    await harness.controller.start('LEAD-1')
+    let oldDelta = harness.controller.syncDelta()
+
+    harness.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONV-1',
+      scope_invalidated: true,
+    })
+    await vi.waitFor(() => expect(snapshotCalls).toBe(2))
+
+    resolveOldDelta(
+      delta([{ name: 'STALE-DELTA', modified: '2026-07-16 10:01:00' }], {
+        next_cursor: 'stale-cursor',
+      }),
+    )
+    await oldDelta
+    resolveScopeSnapshot(
+      snapshot([{ name: 'CURRENT-MESSAGE', modified: '2026-07-16 10:02:00' }], {
+        sync_cursor: 'scope-cursor',
+      }),
+    )
+
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
+        'CURRENT-MESSAGE',
+      ]),
+    )
+    expect(harness.controller.getCursor()).toBe('scope-cursor')
+  })
+
+  it('coalesces repeated scope invalidations into one follow-up snapshot', async () => {
+    let snapshotCalls = 0
+    let resolveFirstReload
+    let resolveFollowUp
+    let harness = createHarness({
+      get_message_page: () => {
+        snapshotCalls += 1
+        if (snapshotCalls === 1) return snapshot()
+        if (snapshotCalls === 2)
+          return new Promise((resolve) => (resolveFirstReload = resolve))
+        return new Promise((resolve) => (resolveFollowUp = resolve))
+      },
+    })
+    await harness.controller.start('LEAD-1')
+    let event = {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONV-1',
+      scope_invalidated: true,
+    }
+
+    harness.socket.emit('crm_messenger:conversation_changed', event)
+    harness.socket.emit('crm_messenger:conversation_changed', event)
+    await vi.waitFor(() => expect(snapshotCalls).toBe(2))
+
+    resolveFirstReload(
+      snapshot([{ name: 'INTERMEDIATE', modified: '2026-07-16 10:01:00' }]),
+    )
+    await vi.waitFor(() => expect(snapshotCalls).toBe(3))
+    resolveFollowUp(
+      snapshot([{ name: 'FINAL', modified: '2026-07-16 10:02:00' }], {
+        sync_cursor: 'final-cursor',
+      }),
+    )
+
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
+        'FINAL',
+      ]),
+    )
+    expect(harness.controller.getCursor()).toBe('final-cursor')
+    expect(snapshotCalls).toBe(3)
+  })
+
+  it('retries a failed scope reload on the next visibility sync', async () => {
+    let snapshotCalls = 0
+    let harness = createHarness({
+      get_message_page: () => {
+        snapshotCalls += 1
+        if (snapshotCalls === 1) return snapshot()
+        if (snapshotCalls === 2)
+          return Promise.reject(new Error('Temporary snapshot failure'))
+        return snapshot(
+          [{ name: 'RECOVERED', modified: '2026-07-16 10:02:00' }],
+          { sync_cursor: 'recovered-cursor' },
+        )
+      },
+    })
+    await harness.controller.start('LEAD-1')
+
+    harness.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      scope_invalidated: true,
+    })
+    await vi.waitFor(() => expect(harness.errors).toHaveLength(1))
+
+    harness.visibility.dispatchEvent(new Event('visibilitychange'))
+
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
+        'RECOVERED',
+      ]),
+    )
+    expect(snapshotCalls).toBe(3)
+    expect(harness.controller.getCursor()).toBe('recovered-cursor')
   })
 
   it('runs a delta requested while the initial snapshot is pending', async () => {
