@@ -600,7 +600,7 @@ describe('Avito messenger UX', () => {
     expect(dialog.message).not.toContain('same request ID')
   })
 
-  it('keeps an existing draft while an Avito image blocks caption sending', async () => {
+  it('lets the user clear an existing draft while an Avito image blocks caption sending', async () => {
     permissions = { ...permissions, can_operate: true }
     channelRows = [avitoChannel()]
     let root = await mountConversation()
@@ -612,7 +612,7 @@ describe('Avito messenger UX', () => {
     root.querySelector('[data-testid="mock-image-draft"]').click()
     await nextTick()
 
-    expect(composer.disabled).toBe(true)
+    expect(composer.disabled).toBe(false)
     expect(composer.value).toBe('Send this separately')
     expect(
       root.querySelector('[data-testid="image-caption-warning"]'),
@@ -630,6 +630,29 @@ describe('Avito messenger UX', () => {
 
     expect(composer.disabled).toBe(false)
     expect(composer.value).toBe('Send this separately')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).toBeNull()
+
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+
+    composer.value = ''
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    expect(composer.disabled).toBe(true)
+    expect(composer.value).toBe('')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).toBeNull()
+    expect(send.disabled).toBe(false)
+
+    root.querySelector('[data-testid="mock-clear-attachments"]').click()
+    await nextTick()
+
+    expect(composer.disabled).toBe(false)
+    expect(composer.value).toBe('')
     expect(
       root.querySelector('[data-testid="image-caption-warning"]'),
     ).toBeNull()

@@ -369,10 +369,10 @@
           :disabled="
             baseSendDisabled ||
             Boolean(pendingLocation) ||
-            imageCaptionState.blocked
+            (imageCaptionState.blocked && !draftText)
           "
           :placeholder="
-            imageCaptionState.blocked
+            imageCaptionState.blocked && !draftText
               ? __('Image captions are unavailable for Avito.')
               : __('Enter a message...')
           "
