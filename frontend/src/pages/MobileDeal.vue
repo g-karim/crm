@@ -669,7 +669,7 @@ function updateField(name, value) {
 
   document.save.submit(null, {
     onSuccess: () => (reload.value = true),
-    onError: (err) => {
+    onError: () => {
       if (Array.isArray(name)) {
         name.forEach((field) => (doc.value[field] = oldValues[field]))
       } else if (name == 'pipeline') {
@@ -678,7 +678,6 @@ function updateField(name, value) {
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }
