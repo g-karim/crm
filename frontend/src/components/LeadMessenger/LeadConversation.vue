@@ -232,7 +232,7 @@
                     class="mt-1 border-t border-outline-gray-1 pt-1 text-xs"
                     :class="messageStatusNoteClass(item.message)"
                   >
-                    {{ messageFailureReason(item.message) }}
+                    {{ __(messageFailureReason(item.message)) }}
                   </div>
                 </div>
               </div>
@@ -366,8 +366,16 @@
           v-model="draftText"
           class="mb-2 min-h-20 w-full"
           :rows="3"
-          :disabled="baseSendDisabled || Boolean(pendingLocation)"
-          :placeholder="__('Enter a message...')"
+          :disabled="
+            baseSendDisabled ||
+            Boolean(pendingLocation) ||
+            imageCaptionState.blocked
+          "
+          :placeholder="
+            imageCaptionState.blocked
+              ? __('Image captions are unavailable for Avito.')
+              : __('Enter a message...')
+          "
           @keydown.enter.stop="sendOnEnter"
           @update:modelValue="handleComposerInput"
           @paste.stop="handleComposerPaste"
@@ -375,15 +383,26 @@
         <ComposerAttachments
           v-if="!preparedHandoff"
           ref="composerAttachments"
-          :supportsAttachments="selectedCapabilities.supports_attachments"
+          :supportsAttachments="attachmentPolicy.supportsAttachments"
           :channelType="selectedChannelType"
-          :maxFiles="selectedCapabilities.max_attachment_count"
+          :maxFiles="attachmentPolicy.maxAttachmentCount"
+          :supportedAttachmentTypes="attachmentPolicy.supportedAttachmentTypes"
+          :acceptedFileTypes="attachmentPolicy.acceptedFileTypes"
+          :unsupportedFileMessage="attachmentPolicy.unsupportedFileMessage"
+          :unsupportedFormatMessage="attachmentPolicy.unsupportedFormatMessage"
           :conversation="selectedConversation?.name || ''"
           :disabled="
             baseSendDisabled || voiceActive || Boolean(pendingLocation)
           "
           @change="handleAttachmentsChange"
         />
+        <div
+          v-if="imageCaptionState.error"
+          data-testid="image-caption-warning"
+          class="mb-2 text-sm text-ink-amber-8"
+        >
+          {{ __(imageCaptionState.error) }}
+        </div>
         <div
           v-if="pendingLocation"
           class="mb-2 flex items-center justify-between rounded-md border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-sm"
@@ -488,8 +507,7 @@
                 baseSendDisabled ||
                 voiceActive ||
                 Boolean(pendingLocation) ||
-                pendingAttachments.length >=
-                  selectedCapabilities.max_attachment_count
+                pendingAttachments.length >= attachmentPolicy.maxAttachmentCount
               "
               @click="composerAttachments?.openFileSelector()"
             />
@@ -550,6 +568,7 @@ import {
 } from '@/utils/messengerChannels'
 import {
   getSingleImageBubbleWidthClass,
+  isSingleAudioAttachmentSet,
   isSingleImageAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
@@ -558,7 +577,12 @@ import {
   countNewMessengerMessages,
   createMessengerSyncController,
 } from '@/utils/messengerSync'
-import { isVideoFile, validateComposerFileMix } from '@/utils/messengerComposer'
+import {
+  getComposerAttachmentPolicy,
+  getComposerImageCaptionState,
+  isVideoFile,
+  validateComposerFileMix,
+} from '@/utils/messengerComposer'
 import {
   getForwardedContentKind,
   isStickerOnlyForwardContext,
@@ -568,6 +592,7 @@ import { createMessengerTypingController } from '@/utils/messengerTyping'
 import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
 import {
   createMessengerMessageActions,
+  getMessengerRetryConfirmation,
   openMessengerMessageEditor,
 } from '@/utils/messengerMessageActions'
 import {
@@ -736,6 +761,19 @@ const selectedCapabilities = computed(() =>
     selectedChannelDoc.value || selectedConversation.value || {},
   ),
 )
+const attachmentPolicy = computed(() =>
+  getComposerAttachmentPolicy(
+    selectedCapabilities.value,
+    selectedChannelType.value,
+  ),
+)
+const imageCaptionState = computed(() =>
+  getComposerImageCaptionState(
+    draftText.value,
+    pendingAttachments.value,
+    attachmentPolicy.value,
+  ),
+)
 const conversationNotice = computed(() =>
   getMessengerConversationNotice(selectedConversation.value || {}),
 )
@@ -769,16 +807,17 @@ const sendDisabled = computed(
   () =>
     baseSendDisabled.value ||
     Boolean(attachmentMixError.value) ||
+    Boolean(imageCaptionState.value.error) ||
     pendingAttachments.value.some((item) => item.status !== 'uploaded'),
 )
 const attachmentMixError = computed(() => {
   if (!pendingAttachments.value.length) return ''
   return (
-    validateComposerFileMix([], pendingAttachments.value, {
-      supportsAttachments: selectedCapabilities.value.supports_attachments,
-      channelType: selectedChannelType.value,
-      maxAttachmentCount: selectedCapabilities.value.max_attachment_count,
-    }).error || ''
+    validateComposerFileMix(
+      [],
+      pendingAttachments.value,
+      attachmentPolicy.value,
+    ).error || ''
   )
 })
 const channelOptions = computed(() =>
@@ -1393,11 +1432,14 @@ function composerRetargetError(target) {
     return 'Wait for attachments to finish uploading before switching.'
   }
   if (pendingAttachments.value.length) {
-    let validation = validateComposerFileMix([], pendingAttachments.value, {
-      supportsAttachments: capabilities.supports_attachments,
-      channelType: getMessengerChannelType(channel),
-      maxAttachmentCount: capabilities.max_attachment_count,
-    })
+    let validation = validateComposerFileMix(
+      [],
+      pendingAttachments.value,
+      getComposerAttachmentPolicy(
+        capabilities,
+        getMessengerChannelType(channel),
+      ),
+    )
     if (validation.error) return validation.error
   }
   if (pendingLocation.value && !capabilities.location.send) {
@@ -1935,11 +1977,10 @@ function retryMessage(message) {
     messageActions.retryMessage(message)
     return
   }
+  let confirmation = getMessengerRetryConfirmation(message)
   $dialog({
-    title: __('Retry sending?'),
-    message: __(
-      'VK may have already accepted the message. Retrying uses the same request ID.',
-    ),
+    title: __(confirmation.title),
+    message: __(confirmation.message),
     actions: [
       {
         label: __('Retry Sending'),
@@ -2139,6 +2180,9 @@ function messageBubbleWidthClass(message) {
   }
   if (isSingleLocationAttachmentSet(message.attachments)) {
     return 'w-[21.5rem] !max-w-[94%] sm:!max-w-[21.5rem]'
+  }
+  if (isSingleAudioAttachmentSet(message.attachments)) {
+    return 'w-[24rem] !max-w-[94%] sm:!max-w-[24rem]'
   }
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
   return getSingleImageBubbleWidthClass(message.attachments[0])

@@ -12,7 +12,9 @@
           ? 'w-fit'
           : singleLocation
             ? 'w-full'
-            : 'w-fit max-w-[20rem]'
+            : singleAudio
+              ? 'w-full min-w-0'
+              : 'w-fit max-w-[20rem]'
     "
   >
     <template v-for="segment in segments" :key="segment.key">
@@ -102,6 +104,7 @@ import {
   buildMessengerAttachmentSegments,
   getAttachmentState,
   getMessengerAttachmentTitle,
+  isSingleAudioAttachmentSet,
   isSingleImageAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
@@ -134,6 +137,9 @@ const singleSticker = computed(() =>
 )
 const singleLocation = computed(() =>
   isSingleLocationAttachmentSet(props.attachments),
+)
+const singleAudio = computed(() =>
+  isSingleAudioAttachmentSet(props.attachments),
 )
 const availableMedia = computed(() =>
   props.attachments.flatMap((attachment) => {

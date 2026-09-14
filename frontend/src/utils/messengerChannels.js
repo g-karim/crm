@@ -1,5 +1,6 @@
 import { dayjsLocal } from 'frappe-ui'
 import { isMaxForwardOnlyMessage } from '@/utils/messengerForwarding'
+import { shouldShowMessengerMessageText } from '@/utils/messengerMessagePresentation'
 
 const PLATFORM_LABELS = {
   avito: 'Avito',
@@ -173,8 +174,7 @@ export function getMessengerDeliveryState(message = {}) {
 }
 
 export function shouldShowMessengerText(message = {}) {
-  if (message?.status === 'deleted') return true
-  return Boolean(String(message?.text || '').trim())
+  return shouldShowMessengerMessageText(message)
 }
 
 export function getMessengerDeliveryLabel(message = {}) {
@@ -268,6 +268,9 @@ export function getMessengerCapabilities(channel = {}) {
     },
     supported_attachment_types:
       channel?.capabilities?.supported_attachment_types || [],
+    supported_attachment_file_types:
+      channel?.capabilities?.supported_attachment_file_types || [],
+    supports_image_caption: channel?.capabilities?.supports_image_caption,
     max_attachment_count: Math.max(
       1,
       Number(channel?.capabilities?.max_attachment_count || 10),

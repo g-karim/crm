@@ -170,6 +170,23 @@ describe('messengerChannels', () => {
     expect(shouldShowMessengerText({ status: 'deleted', text: null })).toBe(
       true,
     )
+    expect(
+      shouldShowMessengerText({
+        message_type: 'image',
+        text: '[image]',
+        attachments: [
+          { type: 'image', status: 'available', url: '/private/image.jpg' },
+        ],
+      }),
+    ).toBe(false)
+    expect(
+      shouldShowMessengerText({
+        provider: 'avito_direct',
+        message_type: 'video',
+        text: '[video]',
+        attachments: [],
+      }),
+    ).toBe(true)
   })
 
   it('returns delivery labels', () => {
@@ -227,6 +244,8 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: false,
       supported_attachment_types: [],
+      supported_attachment_file_types: [],
+      supports_image_caption: undefined,
       max_attachment_count: 10,
       reactions: { receive: false, send: false },
       location: { receive: false, send: false },
@@ -254,6 +273,8 @@ describe('messengerChannels', () => {
           requires_phone: false,
           supports_attachments: true,
           supported_attachment_types: ['image', 'file'],
+          supported_attachment_file_types: ['image/jpeg', '.pdf'],
+          supports_image_caption: false,
           reactions: { receive: true, send: true },
           location: { receive: true, send: true },
           contact: { receive: true, send: false },
@@ -272,6 +293,8 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
+      supported_attachment_file_types: ['image/jpeg', '.pdf'],
+      supports_image_caption: false,
       max_attachment_count: 10,
       reactions: { receive: true, send: true },
       location: { receive: true, send: true },

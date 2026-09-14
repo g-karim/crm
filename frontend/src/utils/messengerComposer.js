@@ -157,7 +157,7 @@ export function createComposerAttachmentController(options) {
     let files = Array.from(event?.clipboardData?.items || [])
       .filter((item) => item.kind === 'file')
       .map((item) => item.getAsFile())
-      .filter((file) => file?.type?.startsWith('image/'))
+      .filter(Boolean)
     if (!files.length) {
       if (event && typeof event === 'object')
         handledPasteEvents.set(event, false)
@@ -250,6 +250,35 @@ export function validateComposerFileMix(files, existing, context = {}) {
       error: translate('You can select at most {0} attachments.', [maxFiles]),
     }
   }
+
+  let supportedTypes = new Set(context.supportedAttachmentTypes || [])
+  if (
+    supportedTypes.size &&
+    combined.some((file) => !supportedTypes.has(composerAttachmentType(file)))
+  ) {
+    return {
+      files: [],
+      error: translate(
+        context.unsupportedFileMessage ||
+          'This file type is not supported by the selected channel.',
+      ),
+    }
+  }
+
+  let acceptedFileTypes = context.acceptedFileTypes || []
+  if (
+    acceptedFileTypes.length &&
+    combined.some((file) => !matchesAcceptedFileType(file, acceptedFileTypes))
+  ) {
+    return {
+      files: [],
+      error: translate(
+        context.unsupportedFormatMessage ||
+          'This file format is not supported by the selected channel.',
+      ),
+    }
+  }
+
   if (context.channelType !== 'max') return { files }
 
   let mediaFlags = combined.map(
@@ -268,10 +297,84 @@ export function validateComposerFileMix(files, existing, context = {}) {
   }
 }
 
+const AVITO_IMAGE_FILE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/bmp',
+  'image/heic',
+  'image/heif',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.bmp',
+  '.heic',
+  '.heif',
+]
+
+export function getComposerAttachmentPolicy(
+  capabilities = {},
+  channelType = '',
+) {
+  let supportedAttachmentTypes = Array.isArray(
+    capabilities.supported_attachment_types,
+  )
+    ? capabilities.supported_attachment_types
+    : []
+  let acceptedFileTypes = Array.isArray(
+    capabilities.supported_attachment_file_types,
+  )
+    ? capabilities.supported_attachment_file_types
+    : []
+  if (!acceptedFileTypes.length && channelType === 'avito') {
+    acceptedFileTypes = AVITO_IMAGE_FILE_TYPES
+  }
+
+  return {
+    supportsAttachments: Boolean(capabilities.supports_attachments),
+    channelType,
+    maxAttachmentCount: Math.max(
+      1,
+      Number(capabilities.max_attachment_count || 10),
+    ),
+    supportedAttachmentTypes,
+    acceptedFileTypes,
+    supportsImageCaption:
+      capabilities.supports_image_caption ?? channelType !== 'avito',
+    unsupportedFileMessage:
+      supportedAttachmentTypes.length === 1 &&
+      supportedAttachmentTypes[0] === 'image'
+        ? 'The selected channel supports only image attachments.'
+        : 'This file type is not supported by the selected channel.',
+    unsupportedFormatMessage:
+      channelType === 'avito'
+        ? 'Avito supports JPEG, PNG, GIF, BMP, and HEIC images.'
+        : 'This file format is not supported by the selected channel.',
+  }
+}
+
+export function getComposerImageCaptionState(
+  text,
+  attachments = [],
+  policy = {},
+) {
+  let hasImage = attachments.some((item) => isImageFile(item?.file || item))
+  let blocked = hasImage && policy.supportsImageCaption === false
+  let message = blocked
+    ? 'Avito API does not support image captions. Send the text as a separate message.'
+    : ''
+  return {
+    blocked,
+    message,
+    error: blocked && String(text || '').trim() ? message : '',
+  }
+}
+
 export function isImageFile(file = {}) {
   return (
     file.type?.startsWith('image/') ||
-    /\.(png|jpe?g|gif|webp|heic)$/i.test(file.name || '')
+    /\.(png|jpe?g|gif|webp|bmp|heic|heif)$/i.test(file.name || '')
   )
 }
 
@@ -280,6 +383,29 @@ export function isVideoFile(file = {}) {
     ['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type) ||
     /\.(mp4|webm|mov)$/i.test(file.name || '')
   )
+}
+
+function composerAttachmentType(file = {}) {
+  if (isImageFile(file)) return 'image'
+  if (isVideoFile(file)) return 'video'
+  if (file.type?.startsWith('audio/')) return 'audio'
+  return 'file'
+}
+
+function matchesAcceptedFileType(file = {}, acceptedFileTypes = []) {
+  let mimeType = String(file.type || '').toLowerCase()
+  let fileName = String(file.name || '').toLowerCase()
+  return acceptedFileTypes.some((accepted) => {
+    accepted = String(accepted || '')
+      .trim()
+      .toLowerCase()
+    if (!accepted) return false
+    if (accepted.startsWith('.')) return fileName.endsWith(accepted)
+    if (accepted.endsWith('/*')) {
+      return mimeType.startsWith(accepted.slice(0, -1))
+    }
+    return mimeType === accepted
+  })
 }
 
 function makeId() {

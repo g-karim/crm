@@ -87,11 +87,19 @@ vi.mock('@/components/LeadMessenger/LocationPickerDialog.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageContent.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageFooterMetadata.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageForwardStack.vue', emptyComponent)
-vi.mock('@/components/LeadMessenger/MessageMetadata.vue', emptyComponent)
+vi.mock('@/components/LeadMessenger/MessageMetadata.vue', () => ({
+  default: {
+    props: ['message'],
+    emits: ['retry'],
+    template:
+      '<button v-if="message.can_retry" data-testid="mock-message-retry" @click="$emit(\'retry\')">retry</button>',
+  },
+}))
 vi.mock('@/components/LeadMessenger/MessageReactions.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageReplyQuote.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
   default: {
+    props: ['acceptedFileTypes', 'maxFiles', 'supportedAttachmentTypes'],
     emits: ['change'],
     methods: {
       discard() {},
@@ -108,8 +116,11 @@ vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
       },
       openFileSelector() {},
     },
-    template:
-      "<button data-testid=\"mock-attachment-draft\" @click=\"$emit('change', [{ status: 'uploaded', file: { name: 'draft.pdf', type: 'application/pdf' } }])\">attachment draft</button>",
+    template: `<span>
+      <button data-testid="mock-attachment-draft" @click="$emit('change', [{ status: 'uploaded', file: { name: 'draft.pdf', type: 'application/pdf' } }])">attachment draft</button>
+      <button data-testid="mock-image-draft" @click="$emit('change', [{ status: 'uploaded', file: { name: 'photo.jpg', type: 'image/jpeg' } }])">image draft</button>
+      <button data-testid="mock-clear-attachments" @click="$emit('change', [])">clear attachments</button>
+    </span>`,
   },
 }))
 vi.mock('@/components/LeadMessenger/ComposerVoiceRecorder.vue', () => ({
@@ -532,6 +543,115 @@ describe('messenger initial selection', () => {
       'CHANNEL-1',
     )
     expect(composer.value).toBe('Keep this draft on conversation 1')
+  })
+})
+
+describe('Avito messenger UX', () => {
+  function avitoChannel() {
+    return {
+      name: 'CHANNEL-1',
+      provider: 'avito_direct',
+      platform: 'avito',
+      channel_type: 'avito',
+      capabilities: {
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        max_attachment_count: 1,
+        requires_inbound: true,
+        requires_phone: false,
+        voice: { send: false },
+        location: { send: false },
+        reactions: { receive: false, send: false },
+        video: {},
+      },
+    }
+  }
+
+  it('opens an Avito unknown retry dialog without VK request ID copy', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [avitoChannel()]
+    snapshotMessages = [
+      {
+        name: 'MESSAGE-UNKNOWN',
+        provider: 'avito_direct',
+        channel: 'CHANNEL-1',
+        conversation: 'CONVERSATION-1',
+        direction: 'outbound',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        message_type: 'text',
+        text: 'проверка',
+        attachments: [],
+        can_retry: true,
+        retry_requires_confirmation: true,
+        message_datetime: '2026-09-14 10:56:00',
+      },
+    ]
+    let root = await mountConversation()
+
+    root.querySelector('[data-testid="mock-message-retry"]').click()
+
+    expect(mocks.dialog).toHaveBeenCalledOnce()
+    let dialog = mocks.dialog.mock.calls[0][0]
+    expect(dialog.title).toBe('Retry sending?')
+    expect(dialog.message).toContain('Avito may have accepted')
+    expect(dialog.message).toContain('may create a duplicate')
+    expect(dialog.message).not.toContain('VK')
+    expect(dialog.message).not.toContain('same request ID')
+  })
+
+  it('keeps an existing draft while an Avito image blocks caption sending', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [avitoChannel()]
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+    composer.value = 'Send this separately'
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+
+    expect(composer.disabled).toBe(true)
+    expect(composer.value).toBe('Send this separately')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).not.toBeNull()
+    expect(root.textContent).toContain(
+      'Avito API does not support image captions. Send the text as a separate message.',
+    )
+    let send = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Send',
+    )
+    expect(send.disabled).toBe(true)
+
+    root.querySelector('[data-testid="mock-clear-attachments"]').click()
+    await nextTick()
+
+    expect(composer.disabled).toBe(false)
+    expect(composer.value).toBe('Send this separately')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).toBeNull()
+  })
+
+  it('disables an empty Avito image caption without showing a warning', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [avitoChannel()]
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+
+    expect(composer.disabled).toBe(true)
+    expect(composer.value).toBe('')
+    expect(composer.placeholder).toBe(
+      'Image captions are unavailable for Avito.',
+    )
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).toBeNull()
   })
 })
 

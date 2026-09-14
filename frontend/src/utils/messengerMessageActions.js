@@ -18,6 +18,21 @@ export function getMessengerMessageDisplay(message = {}) {
   }
 }
 
+export function getMessengerRetryConfirmation(message = {}) {
+  if (message?.provider === 'avito_direct') {
+    return {
+      title: 'Retry sending?',
+      message:
+        'Avito may have accepted the message, but CRM did not receive a definitive result. Retrying may create a duplicate.',
+    }
+  }
+  return {
+    title: 'Retry sending?',
+    message:
+      'VK may have already accepted the message. Retrying uses the same request ID.',
+  }
+}
+
 export function canSaveMessengerMessageEdit(message = {}, draft = '') {
   if (!message.can_edit) return false
   let text = `${draft || ''}`.trim()

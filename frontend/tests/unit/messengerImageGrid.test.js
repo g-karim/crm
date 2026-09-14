@@ -196,6 +196,23 @@ describe('messenger image layout', () => {
     expect(root.querySelector('[data-test-video]')).not.toBeNull()
   })
 
+  it('lets a single voice player use the full message bubble width', () => {
+    let root = mountRenderer([
+      {
+        id: 'VOICE-1',
+        type: 'audio',
+        is_voice: true,
+        status: 'available',
+        url: '/private/voice.ogg',
+      },
+    ])
+    let renderer = root.querySelector('[data-attachment-renderer]')
+
+    expect(renderer.className).toContain('w-full')
+    expect(renderer.className).toContain('min-w-0')
+    expect(renderer.className).not.toContain('max-w-[20rem]')
+  })
+
   it('renders videos and following image runs in provider order', () => {
     let root = mountRenderer([
       { id: 'V-1', type: 'video', status: 'external' },
