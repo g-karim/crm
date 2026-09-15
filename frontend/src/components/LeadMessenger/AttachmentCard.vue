@@ -4,8 +4,14 @@
     :href="action || undefined"
     :target="action ? '_blank' : undefined"
     :rel="action ? 'noopener noreferrer' : undefined"
-    class="flex min-w-0 max-w-sm items-center gap-3 rounded-lg border border-outline-gray-1 bg-surface-base p-3 no-underline"
-    :class="action ? 'hover:bg-surface-gray-1' : ''"
+    data-attachment-card
+    class="flex min-w-0 items-center gap-3 rounded-lg border border-outline-gray-1 bg-surface-base p-3 no-underline"
+    :class="[
+      action ? 'hover:bg-surface-gray-1' : '',
+      isGenericFile
+        ? 'w-fit max-w-[min(20rem,100%)] justify-self-start'
+        : 'max-w-sm',
+    ]"
   >
     <div
       v-if="attachment.type === 'video' && attachment.preview_url"
@@ -21,8 +27,11 @@
       <LoadingIndicator v-if="state.busy" class="size-5" />
       <component :is="cardIcon" v-else class="size-5" />
     </div>
-    <div class="min-w-0 flex-1">
-      <div class="truncate text-sm font-medium text-ink-gray-8">
+    <div class="min-w-0" :class="isGenericFile ? '' : 'flex-1'">
+      <div
+        data-attachment-card-title
+        class="truncate text-sm font-medium text-ink-gray-8"
+      >
         {{ __(title) }}
       </div>
       <div
@@ -62,6 +71,7 @@ const state = computed(() => getAttachmentState(props.attachment))
 const action = computed(() => getAttachmentAction(props.attachment))
 const size = computed(() => formatAttachmentSize(props.attachment.size_bytes))
 const title = computed(() => getMessengerAttachmentTitle(props.attachment))
+const isGenericFile = computed(() => props.attachment.type === 'file')
 const cardIcon = computed(() => {
   if (props.icon === 'sticker') return StickerIcon
   if (props.attachment.type === 'link') return LinkIcon

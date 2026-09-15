@@ -89,10 +89,11 @@ vi.mock('@/components/LeadMessenger/MessageFooterMetadata.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageForwardStack.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageMetadata.vue', () => ({
   default: {
-    props: ['message'],
+    props: ['message', 'constrainIntrinsicWidth'],
     emits: ['retry'],
-    template:
-      '<button v-if="message.can_retry" data-testid="mock-message-retry" @click="$emit(\'retry\')">retry</button>',
+    template: `<div data-message-metadata :class="constrainIntrinsicWidth ? 'w-0 min-w-full' : 'min-w-0'">
+			<button v-if="message.can_retry" data-testid="mock-message-retry" @click="$emit('retry')">retry</button>
+		</div>`,
   },
 }))
 vi.mock('@/components/LeadMessenger/MessageReactions.vue', emptyComponent)
@@ -856,6 +857,88 @@ describe('messenger conversation routing guard', () => {
     expect(
       root.querySelector('[data-testid="conversation-routing-warning"]'),
     ).not.toBeNull()
+  })
+
+  it.each([
+    ['telegram_bot', 'telegram', 'Telegram - Support Bot'],
+    ['max_direct', 'max', 'MAX - Support Bot'],
+    ['vk_direct', 'vk', 'VK - Support Bot'],
+  ])(
+    'constrains metadata intrinsic width for a %s generic file-only message',
+    async (provider, platform, label) => {
+      channelRows = [
+        {
+          ...channel('CHANNEL-1'),
+          provider,
+          platform,
+          channel_type: platform,
+          label,
+        },
+      ]
+      snapshotMessages = [
+        {
+          name: `MESSAGE-${provider}`,
+          provider,
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'outbound',
+          status: 'sent',
+          text: '',
+          attachments: [{ id: 'FILE-1', type: 'file' }],
+          message_datetime: '2026-09-14 10:56:00',
+        },
+      ]
+
+      let root = await mountConversation()
+      let metadata = root.querySelector('[data-message-metadata]')
+
+      expect(metadata.className.split(/\s+/)).toEqual(
+        expect.arrayContaining(['w-0', 'min-w-full']),
+      )
+    },
+  )
+
+  it('hides the technical VK photo upload reason below the message bubble', async () => {
+    channelRows = [
+      {
+        ...channel('CHANNEL-1'),
+        provider: 'vk_direct',
+        platform: 'vk',
+        channel_type: 'vk',
+      },
+    ]
+    snapshotMessages = [
+      {
+        name: 'MESSAGE-VK-FAILED-PHOTO',
+        provider: 'vk_direct',
+        channel: 'CHANNEL-1',
+        conversation: 'CONVERSATION-1',
+        direction: 'outbound',
+        status: 'failed',
+        delivery_status: 'failed',
+        message_type: 'image',
+        text: '',
+        failure_reason: 'VK photo upload did not return photo data.',
+        attachments: [
+          {
+            id: 'IMAGE-1',
+            type: 'image',
+            status: 'failed',
+            url: '/api/method/crm_messenger.api.attachments.stream_file',
+          },
+        ],
+        message_datetime: '2026-09-15 10:00:00',
+      },
+    ]
+
+    let root = await mountConversation()
+
+    expect(root.textContent).toContain(
+      'Could not upload the image to VK. Try sending it again.',
+    )
+    expect(root.textContent).not.toContain(
+      'VK photo upload did not return photo data.',
+    )
   })
 })
 

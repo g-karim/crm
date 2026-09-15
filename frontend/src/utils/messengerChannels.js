@@ -23,6 +23,11 @@ const DELIVERY_LABELS = {
 
 const DELIVERY_STATES = Object.keys(DELIVERY_LABELS)
 
+const VK_PHOTO_UPLOAD_INVALID_REASON =
+  'VK photo upload did not return photo data.'
+const VK_PHOTO_UPLOAD_USER_REASON =
+  'Could not upload the image to VK. Try sending it again.'
+
 const MONTHS = [
   'January',
   'February',
@@ -173,8 +178,33 @@ export function getMessengerDeliveryState(message = {}) {
   return DELIVERY_STATES.includes(status) ? status : ''
 }
 
+export function getMessengerFailureReason(message = {}) {
+  let reason = message?.failure_reason || message?.error || ''
+  if (
+    message?.provider === 'vk_direct' &&
+    reason === VK_PHOTO_UPLOAD_INVALID_REASON
+  ) {
+    return VK_PHOTO_UPLOAD_USER_REASON
+  }
+  return reason
+}
+
 export function shouldShowMessengerText(message = {}) {
   return shouldShowMessengerMessageText(message)
+}
+
+export function isGenericFileOnlyMessage(message = {}) {
+  let attachments = Array.isArray(message?.attachments)
+    ? message.attachments
+    : []
+  return Boolean(
+    message?.status !== 'deleted' &&
+    attachments.length &&
+    attachments.every((attachment) => attachment?.type === 'file') &&
+    !shouldShowMessengerMessageText(message) &&
+    !message?.reply_context &&
+    !message?.forward_context,
+  )
 }
 
 export function getMessengerDeliveryLabel(message = {}) {

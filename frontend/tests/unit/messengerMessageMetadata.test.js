@@ -13,8 +13,7 @@ vi.mock('frappe-ui', () => ({
   Dropdown: {
     inheritAttrs: false,
     props: ['options'],
-    template:
-      '<div data-test-action-menu v-bind="$attrs"><slot /></div>',
+    template: '<div data-test-action-menu v-bind="$attrs"><slot /></div>',
   },
 }))
 
@@ -51,6 +50,23 @@ function mountMetadata(overrides = {}) {
 }
 
 describe('message metadata layout', () => {
+  it('excludes metadata from intrinsic width only when explicitly requested', () => {
+    let regular = mountMetadata()
+    let constrained = mountMetadata({ constrainIntrinsicWidth: true })
+
+    expect(
+      regular.querySelector('[data-message-metadata]').className.split(/\s+/),
+    ).toContain('min-w-0')
+    expect(
+      regular.querySelector('[data-message-metadata]').className.split(/\s+/),
+    ).not.toContain('w-0')
+    expect(
+      constrained
+        .querySelector('[data-message-metadata]')
+        .className.split(/\s+/),
+    ).toEqual(expect.arrayContaining(['w-0', 'min-w-full']))
+  })
+
   it('reserves a separate flex slot for actions on a short message', () => {
     let root = mountMetadata()
     let metadata = root.querySelector('[data-message-metadata]')
@@ -70,30 +86,30 @@ describe('message metadata layout', () => {
     expect(root.textContent).toContain('VK')
   })
 
-	it('keeps long platform badges wrapping without an action overlap', () => {
+  it('keeps long platform badges wrapping without an action overlap', () => {
     let root = mountMetadata({ source: 'WhatsApp Business' })
     expect(root.querySelector('[data-message-labels]').className).toContain(
       'flex-wrap',
     )
     expect(root.querySelector('[data-message-actions]')).not.toBeNull()
-		expect(root.textContent).toContain('WhatsApp Business')
-	})
+    expect(root.textContent).toContain('WhatsApp Business')
+  })
 
-	it('shows the existing edit action for a backend-eligible photo message', () => {
-		let root = mountMetadata({
-			message: {
-				name: 'MSG-PHOTO',
-				text: 'Подпись',
-				message_type: 'image',
-				attachments: [{ id: 'ATT-1', type: 'image' }],
-				can_edit: true,
-				can_delete: true,
-			},
-		})
+  it('shows the existing edit action for a backend-eligible photo message', () => {
+    let root = mountMetadata({
+      message: {
+        name: 'MSG-PHOTO',
+        text: 'Подпись',
+        message_type: 'image',
+        attachments: [{ id: 'ATT-1', type: 'image' }],
+        can_edit: true,
+        can_delete: true,
+      },
+    })
 
-		expect(root.querySelector('[data-test-action-menu]')).not.toBeNull()
-		expect(root.querySelector('[data-message-actions]')).not.toBeNull()
-	})
+    expect(root.querySelector('[data-test-action-menu]')).not.toBeNull()
+    expect(root.querySelector('[data-message-actions]')).not.toBeNull()
+  })
 
   it('does not reserve an empty action slot for inbound messages', () => {
     let root = mountMetadata({

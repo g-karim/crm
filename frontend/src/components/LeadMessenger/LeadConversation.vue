@@ -153,6 +153,9 @@
                     aria-hidden="true"
                   />
                   <MessageMetadata
+                    :constrain-intrinsic-width="
+                      isGenericFileOnlyMessage(item.message)
+                    "
                     :message="item.message"
                     :sender="messageSender(item.message)"
                     :source="messageSource(item.message)"
@@ -211,6 +214,7 @@
                     :attachments="item.message.attachments"
                     :playback-scope="videoPlaybackScope"
                     :provider="item.message.provider"
+                    :outbound="item.message.direction === 'outbound'"
                   />
                   <MessageReactions
                     v-if="
@@ -563,7 +567,9 @@ import {
   getMessengerCapabilities,
   getMessengerConversationNotice,
   getMessengerDeliveryState,
+  getMessengerFailureReason,
   getMessengerPlatformLabel,
+  isGenericFileOnlyMessage,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 import {
@@ -2189,7 +2195,7 @@ function messageBubbleWidthClass(message) {
 }
 
 function messageFailureReason(message) {
-  return message.failure_reason || message.error || ''
+  return getMessengerFailureReason(message)
 }
 
 function messageFailed(message) {

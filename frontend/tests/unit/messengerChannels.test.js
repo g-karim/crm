@@ -9,9 +9,11 @@ import {
   getMessengerChannelType,
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
+  getMessengerFailureReason,
   getMessengerConversationNotice,
   getMessengerCapabilities,
   getMessengerPlatformLabel,
+  isGenericFileOnlyMessage,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 
@@ -163,6 +165,29 @@ describe('messengerChannels', () => {
     },
   )
 
+  it('replaces only the VK invalid-photo upload reason for presentation', () => {
+    let technicalReason = 'VK photo upload did not return photo data.'
+
+    expect(
+      getMessengerFailureReason({
+        provider: 'vk_direct',
+        failure_reason: technicalReason,
+      }),
+    ).toBe('Could not upload the image to VK. Try sending it again.')
+    expect(
+      getMessengerFailureReason({
+        provider: 'telegram_bot',
+        failure_reason: technicalReason,
+      }),
+    ).toBe(technicalReason)
+    expect(
+      getMessengerFailureReason({
+        provider: 'vk_direct',
+        error: 'Another VK failure.',
+      }),
+    ).toBe('Another VK failure.')
+  })
+
   it('shows text only for content or a deleted placeholder', () => {
     expect(shouldShowMessengerText({ text: null })).toBe(false)
     expect(shouldShowMessengerText({ text: '   ' })).toBe(false)
@@ -187,6 +212,36 @@ describe('messengerChannels', () => {
         attachments: [],
       }),
     ).toBe(true)
+  })
+
+  it('classifies only generic file-only messages for compact bubble layout', () => {
+    let fileOnly = {
+      status: 'sent',
+      text: '',
+      attachments: [{ id: 'FILE-1', type: 'file' }],
+    }
+
+    expect(isGenericFileOnlyMessage(fileOnly)).toBe(true)
+    expect(
+      isGenericFileOnlyMessage({
+        ...fileOnly,
+        attachments: [
+          { id: 'FILE-1', type: 'file' },
+          { id: 'FILE-2', type: 'file' },
+        ],
+      }),
+    ).toBe(true)
+    for (let message of [
+      { ...fileOnly, text: 'caption' },
+      { ...fileOnly, reply_context: { message_id: 'REPLY-1' } },
+      { ...fileOnly, forward_context: { messages: [] } },
+      { ...fileOnly, attachments: [{ id: 'IMAGE-1', type: 'image' }] },
+      { ...fileOnly, attachments: [{ id: 'AUDIO-1', type: 'audio' }] },
+      { ...fileOnly, attachments: [{ id: 'VOICE-1', type: 'voice' }] },
+      { ...fileOnly, status: 'deleted' },
+    ]) {
+      expect(isGenericFileOnlyMessage(message)).toBe(false)
+    }
   })
 
   it('returns delivery labels', () => {

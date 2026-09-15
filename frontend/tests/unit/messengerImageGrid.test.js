@@ -89,10 +89,10 @@ function image(id, overrides = {}) {
   }
 }
 
-function mountGrid(images) {
+function mountGrid(images, props = {}) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(ImageGrid, { images })
+  let app = createApp(ImageGrid, { images, ...props })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
   mounted.push({ app, root })
@@ -293,6 +293,31 @@ describe('messenger image layout', () => {
 
     expect(root.querySelector('[data-test-lightbox]')).not.toBeNull()
     expect(root.querySelector('[data-test-lightbox]').dataset.index).toBe('0')
+  })
+
+  it('keeps a failed outbound VK image preview and shows the send failure', () => {
+    let root = mountRenderer([image('VK-FAILED', { status: 'failed' })], {
+      provider: 'vk_direct',
+      outbound: true,
+    })
+    let wrapper = root.querySelector('[data-single-image]')
+    let media = wrapper.querySelector('img:not([data-media-backdrop])')
+    let failure = wrapper.querySelector('[data-vk-image-send-failed]')
+
+    expect(wrapper.disabled).toBe(true)
+    expect(media?.getAttribute('src')).toBe('/media/VK-FAILED.jpg')
+    expect(failure?.textContent.trim()).toBe('Failed to send image to VK')
+    expect(wrapper.textContent).not.toContain('Upload failed')
+
+    let otherProvider = mountGrid([image('MAX-FAILED', { status: 'failed' })], {
+      provider: 'max_direct',
+      outbound: true,
+    })
+    expect(otherProvider.querySelector('img')).toBeNull()
+    expect(otherProvider.textContent).toContain('Upload failed')
+    expect(
+      otherProvider.querySelector('[data-vk-image-send-failed]'),
+    ).toBeNull()
   })
 
   it('opens every image in one lightbox across separated visual groups', async () => {

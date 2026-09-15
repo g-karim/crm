@@ -141,6 +141,28 @@ describe('message footer metadata', () => {
     expect(readDelivery.querySelectorAll('path')).toHaveLength(2)
   })
 
+  it('hides the technical VK photo upload reason in the delivery tooltip', () => {
+    let root = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'vk_direct',
+        direction: 'outbound',
+        status: 'failed',
+        delivery_status: 'failed',
+        failure_reason: 'VK photo upload did not return photo data.',
+      }),
+    })
+
+    let tooltip = root
+      .querySelector('[data-message-delivery]')
+      .closest('[data-test-tooltip]')
+    expect(tooltip.title).toBe(
+      'Delivery failed: Could not upload the image to VK. Try sending it again.',
+    )
+    expect(tooltip.title).not.toContain(
+      'VK photo upload did not return photo data.',
+    )
+  })
+
   it('hides the edited marker for unedited and deleted messages', () => {
     let unedited = mountComponent(MessageFooterMetadata, {
       message: message({ is_edited: 0 }),

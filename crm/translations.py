@@ -166,6 +166,8 @@ RUSSIAN_TRANSLATIONS = {
 	"Uploading": "Отправляется",
 	"Uploaded": "Загружено",
 	"Upload failed": "Ошибка загрузки",
+	"Failed to send image to VK": "Ошибка отправки изображения в VK",
+	"Could not upload the image to VK. Try sending it again.": "Не удалось загрузить изображение в VK. Повторите отправку.",
 	"Unsupported": "Не поддерживается",
 	"Image": "Изображение",
 	"Images": "Изображения",

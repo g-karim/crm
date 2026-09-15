@@ -22,6 +22,8 @@
         v-if="segment.type === 'images'"
         :images="segment.items"
         :compact-preview="compactPreview"
+        :provider="provider"
+        :outbound="outbound"
         @open-image="openImage"
       />
       <AnimatedMediaAttachment
@@ -124,6 +126,7 @@ const props = defineProps({
   attachments: { type: Array, default: () => [] },
   playbackScope: { type: String, default: '' },
   provider: { type: String, default: '' },
+  outbound: { type: Boolean, default: false },
   compactPreview: { type: Boolean, default: false },
 })
 const segments = computed(() =>
