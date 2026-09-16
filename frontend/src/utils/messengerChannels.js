@@ -25,6 +25,7 @@ const DELIVERY_STATES = Object.keys(DELIVERY_LABELS)
 
 const VK_PHOTO_UPLOAD_INVALID_REASON =
   'VK photo upload did not return photo data.'
+const VK_PHOTO_UPLOAD_PROVIDER_REASON = /^VK photo upload failed(?::|\.)/i
 const VK_PHOTO_UPLOAD_USER_REASON =
   'Could not upload the image to VK. Try sending it again.'
 
@@ -182,7 +183,8 @@ export function getMessengerFailureReason(message = {}) {
   let reason = message?.failure_reason || message?.error || ''
   if (
     message?.provider === 'vk_direct' &&
-    reason === VK_PHOTO_UPLOAD_INVALID_REASON
+    (reason === VK_PHOTO_UPLOAD_INVALID_REASON ||
+      VK_PHOTO_UPLOAD_PROVIDER_REASON.test(reason))
   ) {
     return VK_PHOTO_UPLOAD_USER_REASON
   }

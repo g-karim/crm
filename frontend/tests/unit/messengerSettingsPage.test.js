@@ -352,7 +352,14 @@ describe('MessengerSettings page loading', () => {
     expect(root.querySelector('input[data-label="API Token"]')).toBeNull()
   })
 
-  it('shows a specific Avito Messenger subscription error after Test', async () => {
+  it('translates the specific Avito Messenger subscription error after Test', async () => {
+    const source =
+      'This account does not have access to the Avito Messenger API. Switch to a subscription that includes the Messenger API, then try again.'
+    const localized = 'localized Avito subscription message'
+    const originalTranslate = globalThis.__
+    globalThis.__ = vi.fn((message, args) =>
+      message === source ? localized : originalTranslate(message, args),
+    )
     let channel = {
       name: 'avito-1',
       provider: 'avito_direct',
@@ -378,29 +385,32 @@ describe('MessengerSettings page loading', () => {
       }
       return Promise.reject(new Error(`unexpected method: ${method}`))
     })
-    let root = await mountSettings()
-    let channelButton = [...root.querySelectorAll('button')].find((button) =>
-      button.textContent.includes('Avito Sales'),
-    )
+    try {
+      let root = await mountSettings()
+      let channelButton = [...root.querySelectorAll('button')].find((button) =>
+        button.textContent.includes('Avito Sales'),
+      )
 
-    channelButton.click()
-    await nextTick()
-    let testButton = [...root.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Test',
-    )
-    testButton.click()
-    await new Promise((resolve) => setTimeout(resolve, 0))
+      channelButton.click()
+      await nextTick()
+      let testButton = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Test',
+      )
+      testButton.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(root.textContent).toContain(
-      'Для этого аккаунта не подключён доступ к Avito Messenger API. Перейдите на подписку с API мессенджера и повторите проверку.',
-    )
-    expect(root.textContent).not.toContain('generic provider failure')
-    expect(root.textContent).not.toContain(
-      'Avito account id is not configured.',
-    )
-    expect(
-      root.querySelectorAll('[data-testid="channel-auth-error"]'),
-    ).toHaveLength(1)
+      expect(root.textContent).toContain(localized)
+      expect(globalThis.__).toHaveBeenCalledWith(source)
+      expect(root.textContent).not.toContain('generic provider failure')
+      expect(root.textContent).not.toContain(
+        'Avito account id is not configured.',
+      )
+      expect(
+        root.querySelectorAll('[data-testid="channel-auth-error"]'),
+      ).toHaveLength(1)
+    } finally {
+      globalThis.__ = originalTranslate
+    }
   })
 
   it('renders stored channel errors with high contrast', async () => {

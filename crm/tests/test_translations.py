@@ -32,3 +32,24 @@ class TestCRMTranslations(TestCase):
 	def test_gateway_brand_is_not_exposed_in_customer_translations(self):
 		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS))
 		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS.values()))
+
+	def test_user_facing_avito_errors_have_runtime_translations(self):
+		user_facing = {
+			"This account does not have access to the Avito Messenger API. Switch to a subscription that includes the Messenger API, then try again.",
+			"Avito credentials belong to another account. Create a separate channel for it.",
+			"This Avito account is already connected to another channel.",
+			"Avito account identity received.",
+			"Avito V3 webhook registered.",
+			"Avito webhook status received.",
+			"Avito webhook removed.",
+			"Avito request failed.",
+			"Avito image size must be between 1 byte and 24 MiB.",
+			"Avito image format could not be reliably confirmed.",
+			"Avito accepted the image request without a provider message id; delivery is ambiguous.",
+			"Avito message text cannot exceed 1000 characters.",
+			"Avito rejected the delete request.",
+			"Avito delete result is unknown.",
+		}
+		translations = get_crm_translations("ru_RU")
+		self.assertEqual(user_facing - translations.keys(), set())
+		self.assertTrue(all(translations[source] != source for source in user_facing))

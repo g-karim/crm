@@ -163,6 +163,26 @@ describe('message footer metadata', () => {
     )
   })
 
+  it('hides a legacy raw VK photo upload provider error', () => {
+    let root = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'vk_direct',
+        direction: 'outbound',
+        status: 'failed',
+        delivery_status: 'failed',
+        failure_reason: 'VK photo upload failed: unsupported format',
+      }),
+    })
+
+    let tooltip = root
+      .querySelector('[data-message-delivery]')
+      .closest('[data-test-tooltip]')
+    expect(tooltip.title).toBe(
+      'Delivery failed: Could not upload the image to VK. Try sending it again.',
+    )
+    expect(tooltip.title).not.toContain('unsupported format')
+  })
+
   it('hides the edited marker for unedited and deleted messages', () => {
     let unedited = mountComponent(MessageFooterMetadata, {
       message: message({ is_edited: 0 }),

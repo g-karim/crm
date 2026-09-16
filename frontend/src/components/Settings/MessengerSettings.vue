@@ -710,7 +710,7 @@ function clientProviderMessage(message) {
 function providerActionFailureMessage(result = {}) {
   if (result.reason === 'messenger_subscription_required') {
     return __(
-      'Для этого аккаунта не подключён доступ к Avito Messenger API. Перейдите на подписку с API мессенджера и повторите проверку.',
+      'This account does not have access to the Avito Messenger API. Switch to a subscription that includes the Messenger API, then try again.',
     )
   }
   return result.message || __('The provider operation failed.')

@@ -186,6 +186,12 @@ describe('messengerChannels', () => {
         error: 'Another VK failure.',
       }),
     ).toBe('Another VK failure.')
+    expect(
+      getMessengerFailureReason({
+        provider: 'vk_direct',
+        error: 'VK photo upload failed: unsupported format',
+      }),
+    ).toBe('Could not upload the image to VK. Try sending it again.')
   })
 
   it('shows text only for content or a deleted placeholder', () => {
