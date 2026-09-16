@@ -3,6 +3,7 @@ import {
   createMessengerMessageActions,
   getMessengerMessageActions,
   getMessengerMessageDisplay,
+  getMessengerRetryConfirmation,
   openMessengerMessageEditor,
   revealMessengerEditor,
 } from '@/utils/messengerMessageActions'
@@ -81,6 +82,29 @@ describe('messenger message actions', () => {
       { message: 'MSG-1', confirm_unknown: 1 },
     )
     expect(sync).toHaveBeenCalledOnce()
+  })
+
+  it('uses Avito-specific ambiguous retry copy without VK request ID claims', () => {
+    let confirmation = getMessengerRetryConfirmation({
+      provider: 'avito_direct',
+      status: 'unknown',
+    })
+
+    expect(confirmation.title).toBe('Retry sending?')
+    expect(confirmation.message).toContain('Avito may have accepted')
+    expect(confirmation.message).toContain('may create a duplicate')
+    expect(confirmation.message).not.toContain('VK')
+    expect(confirmation.message).not.toContain('same request ID')
+  })
+
+  it('preserves the existing VK retry confirmation', () => {
+    let confirmation = getMessengerRetryConfirmation({
+      provider: 'vk_direct',
+      status: 'unknown',
+    })
+
+    expect(confirmation.message).toContain('VK may have already accepted')
+    expect(confirmation.message).toContain('same request ID')
   })
 
   it('exposes tombstone and edited marker display states', () => {

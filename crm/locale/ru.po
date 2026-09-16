@@ -8925,3 +8925,7 @@ msgstr "⚠️ Данные для родительского поля не на
 #: frontend/src/data/script.js:257
 msgid "⚠️ No row found for idx: {0} in parent field: {1}"
 msgstr "⚠️ Не найдена строка для idx: {0} в родительском поле: {1}"
+
+#: frontend/src/components/Settings/MessengerSettings.vue
+msgid "Save channel changes before running connection actions."
+msgstr "Сначала сохраните изменения канала, затем повторите действие подключения."

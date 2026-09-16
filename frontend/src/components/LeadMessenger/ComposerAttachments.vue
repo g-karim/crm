@@ -4,7 +4,8 @@
       ref="fileInput"
       type="file"
       class="hidden"
-      multiple
+      :accept="acceptedFileTypes.join(',')"
+      :multiple="maxFiles > 1"
       :disabled="disabled"
       @change="onFileInput"
     />
@@ -82,6 +83,10 @@ const props = defineProps({
   supportsAttachments: { type: Boolean, default: false },
   channelType: { type: String, default: '' },
   maxFiles: { type: Number, default: 10 },
+  supportedAttachmentTypes: { type: Array, default: () => [] },
+  acceptedFileTypes: { type: Array, default: () => [] },
+  unsupportedFileMessage: { type: String, default: '' },
+  unsupportedFormatMessage: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
   conversation: { type: String, default: '' },
 })
@@ -103,6 +108,10 @@ const controller = createComposerAttachmentController({
       supportsAttachments: props.supportsAttachments,
       channelType: props.channelType,
       maxAttachmentCount: props.maxFiles,
+      supportedAttachmentTypes: props.supportedAttachmentTypes,
+      acceptedFileTypes: props.acceptedFileTypes,
+      unsupportedFileMessage: props.unsupportedFileMessage,
+      unsupportedFormatMessage: props.unsupportedFormatMessage,
     })
   },
   onError: (message) => toast.error(__(message)),

@@ -12,7 +12,9 @@
           ? 'w-fit'
           : singleLocation
             ? 'w-full'
-            : 'w-fit max-w-[20rem]'
+            : singleAudio
+              ? 'w-full min-w-0'
+              : 'w-fit max-w-[20rem]'
     "
   >
     <template v-for="segment in segments" :key="segment.key">
@@ -20,6 +22,8 @@
         v-if="segment.type === 'images'"
         :images="segment.items"
         :compact-preview="compactPreview"
+        :provider="provider"
+        :outbound="outbound"
         @open-image="openImage"
       />
       <AnimatedMediaAttachment
@@ -102,6 +106,7 @@ import {
   buildMessengerAttachmentSegments,
   getAttachmentState,
   getMessengerAttachmentTitle,
+  isSingleAudioAttachmentSet,
   isSingleImageAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
@@ -121,6 +126,7 @@ const props = defineProps({
   attachments: { type: Array, default: () => [] },
   playbackScope: { type: String, default: '' },
   provider: { type: String, default: '' },
+  outbound: { type: Boolean, default: false },
   compactPreview: { type: Boolean, default: false },
 })
 const segments = computed(() =>
@@ -134,6 +140,9 @@ const singleSticker = computed(() =>
 )
 const singleLocation = computed(() =>
   isSingleLocationAttachmentSet(props.attachments),
+)
+const singleAudio = computed(() =>
+  isSingleAudioAttachmentSet(props.attachments),
 )
 const availableMedia = computed(() =>
   props.attachments.flatMap((attachment) => {

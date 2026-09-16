@@ -17,6 +17,7 @@ export function createMessengerReadController(options) {
     if (!options.isEnabled()) return false
     let conversation = options.getConversation()
     if (!conversation?.name) return false
+    let provider = conversation.provider
     let message = [...(options.getMessages() || [])]
       .reverse()
       .find(
@@ -24,11 +25,22 @@ export function createMessengerReadController(options) {
           item.conversation === conversation.name &&
           item.direction === 'inbound' &&
           item.status !== 'deleted' &&
-          Number(item.external_conversation_message_id) > 0,
+          (provider === 'avito_direct'
+            ? Boolean(String(item.external_message_id || '').trim())
+            : Number(item.external_conversation_message_id) > 0),
       )
     if (!message) return false
-    let cmid = Number(message.external_conversation_message_id)
-    if (cmid <= (lastRequested.get(conversation.name) || 0)) return false
+    let boundary =
+      provider === 'avito_direct'
+        ? `avito:${String(message.external_message_id).trim()}`
+        : Number(message.external_conversation_message_id)
+    let previousBoundary = lastRequested.get(conversation.name)
+    if (
+      provider === 'avito_direct'
+        ? boundary === previousBoundary
+        : boundary <= (previousBoundary || 0)
+    )
+      return false
     let result = await options.call(
       'crm_messenger.api.conversations.mark_read',
       { conversation: conversation.name, up_to_message: message.name },
@@ -37,7 +49,9 @@ export function createMessengerReadController(options) {
       throw new Error(result?.message || 'Could not mark messages as read.')
     lastRequested.set(
       conversation.name,
-      Math.max(cmid, Number(result.up_to_cmid) || 0),
+      provider === 'avito_direct'
+        ? boundary
+        : Math.max(boundary, Number(result.up_to_cmid) || 0),
     )
     options.onConfirmed?.(result)
     return true

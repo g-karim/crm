@@ -109,6 +109,80 @@ describe('message footer metadata', () => {
     )
   })
 
+  it('shows Avito sent as one gray check and read as two blue checks', () => {
+    let sent = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'avito_direct',
+        direction: 'outbound',
+        status: 'sent',
+        delivery_status: 'sent',
+      }),
+    })
+    let sentDelivery = sent.querySelector('[data-message-delivery]')
+    expect(sentDelivery.className).toContain('text-ink-gray-5')
+    expect(sentDelivery.querySelectorAll('svg')).toHaveLength(1)
+    expect(sentDelivery.closest('[data-test-tooltip]').title).toBe(
+      'Sent to Avito; delivery confirmation is unavailable',
+    )
+
+    let read = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'avito_direct',
+        direction: 'outbound',
+        status: 'read',
+        delivery_status: 'read',
+      }),
+    })
+    let readDelivery = read.querySelector('[data-message-delivery]')
+    expect(readDelivery.className).toContain('text-ink-blue-5')
+    expect(readDelivery.querySelector('svg').getAttribute('class')).toContain(
+      'lucide-check-check',
+    )
+    expect(readDelivery.querySelectorAll('path')).toHaveLength(2)
+  })
+
+  it('hides the technical VK photo upload reason in the delivery tooltip', () => {
+    let root = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'vk_direct',
+        direction: 'outbound',
+        status: 'failed',
+        delivery_status: 'failed',
+        failure_reason: 'VK photo upload did not return photo data.',
+      }),
+    })
+
+    let tooltip = root
+      .querySelector('[data-message-delivery]')
+      .closest('[data-test-tooltip]')
+    expect(tooltip.title).toBe(
+      'Delivery failed: Could not upload the image to VK. Try sending it again.',
+    )
+    expect(tooltip.title).not.toContain(
+      'VK photo upload did not return photo data.',
+    )
+  })
+
+  it('hides a legacy raw VK photo upload provider error', () => {
+    let root = mountComponent(MessageFooterMetadata, {
+      message: message({
+        provider: 'vk_direct',
+        direction: 'outbound',
+        status: 'failed',
+        delivery_status: 'failed',
+        failure_reason: 'VK photo upload failed: unsupported format',
+      }),
+    })
+
+    let tooltip = root
+      .querySelector('[data-message-delivery]')
+      .closest('[data-test-tooltip]')
+    expect(tooltip.title).toBe(
+      'Delivery failed: Could not upload the image to VK. Try sending it again.',
+    )
+    expect(tooltip.title).not.toContain('unsupported format')
+  })
+
   it('hides the edited marker for unedited and deleted messages', () => {
     let unedited = mountComponent(MessageFooterMetadata, {
       message: message({ is_edited: 0 }),

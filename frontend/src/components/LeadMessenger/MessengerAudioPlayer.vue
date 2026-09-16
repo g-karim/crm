@@ -1,11 +1,5 @@
 <template>
-  <div
-    data-messenger-audio
-    class="max-w-full rounded-lg border border-outline-gray-1 bg-surface-base p-3"
-    :class="
-      compactPreview ? 'w-full min-w-0' : 'w-[min(22rem,calc(100vw-3rem))]'
-    "
-  >
+  <div data-messenger-audio class="w-full min-w-0 max-w-full">
     <div
       class="mb-2 flex min-w-0 items-center gap-2 text-sm font-medium text-ink-gray-8"
     >

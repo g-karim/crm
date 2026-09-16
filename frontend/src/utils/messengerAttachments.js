@@ -210,6 +210,14 @@ export function isSingleLocationAttachmentSet(attachments = []) {
   return attachments.length === 1 && attachments[0]?.type === 'location'
 }
 
+export function isSingleAudioAttachmentSet(attachments = []) {
+  return (
+    attachments.length === 1 &&
+    (attachments[0]?.is_voice ||
+      ['audio', 'voice'].includes(attachments[0]?.type))
+  )
+}
+
 export function getSingleImageBubbleWidthClass(image = {}) {
   return 'w-fit max-w-full'
 }

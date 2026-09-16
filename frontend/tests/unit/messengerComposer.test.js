@@ -1,5 +1,7 @@
 import {
   createComposerAttachmentController,
+  getComposerAttachmentPolicy,
+  getComposerImageCaptionState,
   isVideoFile,
   retargetComposerTemporaryFiles,
   validateComposerFileMix,
@@ -335,5 +337,173 @@ describe('messenger composer attachments', () => {
 
     expect(result.files).toEqual([])
     expect(result.error).toContain('2')
+  })
+
+  it('blocks unsupported Avito attachments before upload', () => {
+    let onError = vi.fn()
+    let upload = vi.fn()
+    let policy = getComposerAttachmentPolicy(
+      {
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        max_attachment_count: 1,
+      },
+      'avito',
+    )
+    let controller = createComposerAttachmentController({
+      upload,
+      maxFiles: 1,
+      validateFiles: (files, existing) =>
+        validateComposerFileMix(files, existing, policy),
+      onError,
+    })
+
+    expect(
+      controller.addFiles([file('document.pdf', 'application/pdf')]),
+    ).toEqual([])
+    expect(upload).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledWith(
+      'The selected channel supports only image attachments.',
+    )
+  })
+
+  it('blocks unsupported pasted Avito media before upload', () => {
+    let onError = vi.fn()
+    let upload = vi.fn()
+    let policy = getComposerAttachmentPolicy(
+      {
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        max_attachment_count: 1,
+      },
+      'avito',
+    )
+    let controller = createComposerAttachmentController({
+      upload,
+      maxFiles: 1,
+      validateFiles: (files, existing) =>
+        validateComposerFileMix(files, existing, policy),
+      onError,
+    })
+    let event = {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            getAsFile: () => file('clip.mp4', 'video/mp4'),
+          },
+        ],
+      },
+      preventDefault: vi.fn(),
+    }
+
+    expect(controller.handlePaste(event)).toBe(true)
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(upload).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledOnce()
+  })
+
+  it('allows one supported Avito image but rejects its second image and WebP', () => {
+    let policy = getComposerAttachmentPolicy(
+      {
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        max_attachment_count: 1,
+      },
+      'avito',
+    )
+    let jpeg = file('photo.jpg', 'image/jpeg')
+
+    expect(validateComposerFileMix([jpeg], [], policy).error).toBeUndefined()
+    expect(
+      validateComposerFileMix([file('photo.BMP')], [], policy).error,
+    ).toBeUndefined()
+    expect(
+      validateComposerFileMix([file('photo.HEIF')], [], policy).error,
+    ).toBeUndefined()
+    expect(
+      validateComposerFileMix(
+        [file('second.png', 'image/png')],
+        [{ file: jpeg }],
+        policy,
+      ).error,
+    ).toContain('at most 1')
+    expect(
+      validateComposerFileMix([file('photo.webp', 'image/webp')], [], policy)
+        .error,
+    ).toContain('JPEG, PNG, GIF, BMP, and HEIC')
+  })
+
+  it('blocks Avito image captions without discarding the existing draft', () => {
+    let draft = 'Send this after the image'
+    let policy = getComposerAttachmentPolicy(
+      {
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        max_attachment_count: 1,
+      },
+      'avito',
+    )
+    let attachment = { file: file('photo.jpg', 'image/jpeg') }
+
+    expect(getComposerImageCaptionState(draft, [attachment], policy)).toEqual({
+      blocked: true,
+      message:
+        'Avito API does not support image captions. Send the text as a separate message.',
+      error:
+        'Avito API does not support image captions. Send the text as a separate message.',
+    })
+    expect(draft).toBe('Send this after the image')
+    expect(getComposerImageCaptionState(draft, [], policy).blocked).toBe(false)
+  })
+
+  it('disables Avito caption input without warning for an empty draft', () => {
+    let policy = getComposerAttachmentPolicy(
+      {
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        max_attachment_count: 1,
+      },
+      'avito',
+    )
+
+    expect(
+      getComposerImageCaptionState(
+        '',
+        [{ file: file('photo.jpg', 'image/jpeg') }],
+        policy,
+      ),
+    ).toEqual({
+      blocked: true,
+      message:
+        'Avito API does not support image captions. Send the text as a separate message.',
+      error: '',
+    })
+  })
+
+  it('preserves attachment and caption behavior for other providers', () => {
+    let policy = getComposerAttachmentPolicy(
+      {
+        supports_attachments: true,
+        supported_attachment_types: ['image', 'file'],
+        max_attachment_count: 10,
+      },
+      'telegram',
+    )
+
+    expect(
+      validateComposerFileMix(
+        [file('document.pdf', 'application/pdf')],
+        [],
+        policy,
+      ).error,
+    ).toBeUndefined()
+    expect(
+      getComposerImageCaptionState(
+        'caption',
+        [{ file: file('photo.webp', 'image/webp') }],
+        policy,
+      ).blocked,
+    ).toBe(false)
   })
 })

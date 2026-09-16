@@ -37,6 +37,7 @@ function createHarness(responses = {}) {
   visibility.visibilityState = 'visible'
   let changes = []
   let permissions = []
+  let errors = []
   let calls = []
   let call = vi.fn(async (method, params) => {
     calls.push([method, params])
@@ -50,8 +51,17 @@ function createHarness(responses = {}) {
     visibilityTarget: visibility,
     onChange: (change) => changes.push(change),
     onPermissions: (value) => permissions.push(value),
+    onError: (error) => errors.push(error),
   })
-  return { controller, socket, visibility, changes, permissions, calls }
+  return {
+    controller,
+    socket,
+    visibility,
+    changes,
+    permissions,
+    errors,
+    calls,
+  }
 }
 
 const snapshot = (messages = [], overrides = {}) => ({
@@ -437,5 +447,353 @@ describe('messenger sync', () => {
     expect(result.messages).toHaveLength(1)
     expect(result.messages[0].attachments).toEqual(attachments)
     expect(result.updated).toEqual(['M-PHOTOS'])
+  })
+
+  it('accepts an equal server version but keeps versioned data over unversioned data', () => {
+    let current = {
+      name: 'M-1',
+      text: 'Current',
+      modified: '2026-07-16 10:00:00',
+    }
+    let equal = mergeMessengerMessages(
+      [current],
+      [{ ...current, text: 'Complete server row' }],
+    )
+    let unversioned = mergeMessengerMessages(equal.messages, [
+      { name: 'M-1', text: 'Stale unversioned row' },
+    ])
+
+    expect(equal.messages[0].text).toBe('Complete server row')
+    expect(equal.updated).toEqual(['M-1'])
+    expect(unversioned.messages[0].text).toBe('Complete server row')
+    expect(unversioned.updated).toEqual([])
+  })
+
+  it('keeps a newer version when delayed history returns an older message', async () => {
+    let resolveHistory
+    let message = (text, modified, status = 'received') => ({
+      name: 'M-1',
+      text,
+      status,
+      modified,
+      message_datetime: '2026-07-16 10:00:00',
+      creation: '2026-07-16 10:00:01',
+    })
+    let harness = createHarness({
+      get_message_page: (params) =>
+        params.before_cursor
+          ? new Promise((resolve) => (resolveHistory = resolve))
+          : snapshot([], {
+              page: { has_more: true, before_cursor: 'history-1' },
+            }),
+      get_message_changes: delta([
+        message('Message deleted', '2026-07-16 10:02:00', 'deleted'),
+      ]),
+    })
+    await harness.controller.start('LEAD-1')
+
+    let history = harness.controller.loadOlder()
+    await harness.controller.syncDelta()
+    resolveHistory({
+      contract_version: 1,
+      messages: [message('Old text', '2026-07-16 10:01:00')],
+      page: { has_more: false, before_cursor: null },
+    })
+    await history
+
+    expect(harness.controller.getMessages()[0]).toMatchObject({
+      status: 'deleted',
+      modified: '2026-07-16 10:02:00',
+    })
+    expect(harness.controller.getCursor()).toBe('cursor-2')
+    expect(harness.changes.at(-1).updated).toEqual([])
+  })
+
+  it('keeps a newer delta tombstone when a delayed snapshot resets the page', async () => {
+    let snapshotCalls = 0
+    let resolveRefresh
+    let message = (text, modified, status = 'received') => ({
+      name: 'M-1',
+      text,
+      status,
+      modified,
+      message_datetime: '2026-07-16 10:00:00',
+      creation: '2026-07-16 10:00:01',
+    })
+    let harness = createHarness({
+      get_message_page: () => {
+        snapshotCalls += 1
+        if (snapshotCalls === 1)
+          return snapshot([message('Initial', '2026-07-16 10:00:00')])
+        return new Promise((resolve) => (resolveRefresh = resolve))
+      },
+      get_message_changes: delta([
+        message('Message deleted', '2026-07-16 10:02:00', 'deleted'),
+      ]),
+    })
+    await harness.controller.start('LEAD-1')
+
+    let refresh = harness.controller.loadSnapshot()
+    await harness.controller.syncDelta()
+    resolveRefresh(
+      snapshot([message('Old snapshot', '2026-07-16 10:01:00')], {
+        sync_cursor: 'snapshot-cursor',
+      }),
+    )
+    await refresh
+
+    expect(harness.controller.getMessages()[0]).toMatchObject({
+      status: 'deleted',
+      modified: '2026-07-16 10:02:00',
+    })
+    expect(harness.changes.at(-1).updated).toEqual([])
+  })
+
+  it('starts the new Lead delta while the old Lead delta is still pending', async () => {
+    let resolveOldDelta
+    let harness = createHarness({
+      get_message_page: ({ reference_name }) =>
+        snapshot([], { sync_cursor: `${reference_name}-cursor` }),
+      get_message_changes: ({ reference_name }) =>
+        reference_name === 'LEAD-1'
+          ? new Promise((resolve) => (resolveOldDelta = resolve))
+          : delta([], { next_cursor: 'LEAD-2-next' }),
+    })
+    await harness.controller.start('LEAD-1')
+    let oldDelta = harness.controller.syncDelta()
+
+    await harness.controller.setLead('LEAD-2')
+    let newDelta = harness.controller.syncDelta()
+    await newDelta
+
+    expect(
+      harness.calls.filter(
+        ([method, params]) =>
+          method.endsWith('get_message_changes') &&
+          params.reference_name === 'LEAD-2',
+      ),
+    ).toHaveLength(1)
+    expect(harness.controller.getCursor()).toBe('LEAD-2-next')
+
+    resolveOldDelta(delta([], { next_cursor: 'LEAD-1-next' }))
+    await oldDelta
+    expect(harness.controller.getCursor()).toBe('LEAD-2-next')
+  })
+
+  it('starts the new Lead history while the old Lead history is pending', async () => {
+    let resolveOldHistory
+    let harness = createHarness({
+      get_message_page: ({ reference_name, before_cursor }) => {
+        if (!before_cursor)
+          return snapshot([], {
+            sync_cursor: `${reference_name}-cursor`,
+            page: {
+              has_more: true,
+              before_cursor: `${reference_name}-history`,
+            },
+          })
+        if (reference_name === 'LEAD-1')
+          return new Promise((resolve) => (resolveOldHistory = resolve))
+        return {
+          contract_version: 1,
+          messages: [
+            {
+              name: 'LEAD-2-M',
+              modified: '2026-07-16 10:00:00',
+              message_datetime: '2026-07-16 09:00:00',
+            },
+          ],
+          page: { has_more: false, before_cursor: null },
+        }
+      },
+    })
+    await harness.controller.start('LEAD-1')
+    let oldHistory = harness.controller.loadOlder()
+
+    await harness.controller.setLead('LEAD-2')
+    await harness.controller.loadOlder()
+    expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
+      'LEAD-2-M',
+    ])
+
+    resolveOldHistory({
+      contract_version: 1,
+      messages: [
+        {
+          name: 'LEAD-1-M',
+          modified: '2026-07-16 09:00:00',
+          message_datetime: '2026-07-16 08:00:00',
+        },
+      ],
+      page: { has_more: false, before_cursor: null },
+    })
+    await oldHistory
+    expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
+      'LEAD-2-M',
+    ])
+  })
+
+  it('reloads the complete scope and ignores an older pending delta after relink', async () => {
+    let snapshotCalls = 0
+    let resolveScopeSnapshot
+    let resolveOldDelta
+    let harness = createHarness({
+      get_message_page: () => {
+        snapshotCalls += 1
+        if (snapshotCalls === 1)
+          return snapshot(
+            [
+              {
+                name: 'UNLINKED-MESSAGE',
+                modified: '2026-07-16 10:00:00',
+              },
+            ],
+            { sync_cursor: 'old-cursor' },
+          )
+        return new Promise((resolve) => (resolveScopeSnapshot = resolve))
+      },
+      get_message_changes: () =>
+        new Promise((resolve) => (resolveOldDelta = resolve)),
+    })
+    await harness.controller.start('LEAD-1')
+    let oldDelta = harness.controller.syncDelta()
+
+    harness.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONV-1',
+      scope_invalidated: true,
+    })
+    await vi.waitFor(() => expect(snapshotCalls).toBe(2))
+
+    resolveOldDelta(
+      delta([{ name: 'STALE-DELTA', modified: '2026-07-16 10:01:00' }], {
+        next_cursor: 'stale-cursor',
+      }),
+    )
+    await oldDelta
+    resolveScopeSnapshot(
+      snapshot([{ name: 'CURRENT-MESSAGE', modified: '2026-07-16 10:02:00' }], {
+        sync_cursor: 'scope-cursor',
+      }),
+    )
+
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
+        'CURRENT-MESSAGE',
+      ]),
+    )
+    expect(harness.controller.getCursor()).toBe('scope-cursor')
+  })
+
+  it('coalesces repeated scope invalidations into one follow-up snapshot', async () => {
+    let snapshotCalls = 0
+    let resolveFirstReload
+    let resolveFollowUp
+    let harness = createHarness({
+      get_message_page: () => {
+        snapshotCalls += 1
+        if (snapshotCalls === 1) return snapshot()
+        if (snapshotCalls === 2)
+          return new Promise((resolve) => (resolveFirstReload = resolve))
+        return new Promise((resolve) => (resolveFollowUp = resolve))
+      },
+    })
+    await harness.controller.start('LEAD-1')
+    let event = {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONV-1',
+      scope_invalidated: true,
+    }
+
+    harness.socket.emit('crm_messenger:conversation_changed', event)
+    harness.socket.emit('crm_messenger:conversation_changed', event)
+    await vi.waitFor(() => expect(snapshotCalls).toBe(2))
+
+    resolveFirstReload(
+      snapshot([{ name: 'INTERMEDIATE', modified: '2026-07-16 10:01:00' }]),
+    )
+    await vi.waitFor(() => expect(snapshotCalls).toBe(3))
+    resolveFollowUp(
+      snapshot([{ name: 'FINAL', modified: '2026-07-16 10:02:00' }], {
+        sync_cursor: 'final-cursor',
+      }),
+    )
+
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
+        'FINAL',
+      ]),
+    )
+    expect(harness.controller.getCursor()).toBe('final-cursor')
+    expect(snapshotCalls).toBe(3)
+  })
+
+  it('retries a failed scope reload on the next visibility sync', async () => {
+    let snapshotCalls = 0
+    let harness = createHarness({
+      get_message_page: () => {
+        snapshotCalls += 1
+        if (snapshotCalls === 1) return snapshot()
+        if (snapshotCalls === 2)
+          return Promise.reject(new Error('Temporary snapshot failure'))
+        return snapshot(
+          [{ name: 'RECOVERED', modified: '2026-07-16 10:02:00' }],
+          { sync_cursor: 'recovered-cursor' },
+        )
+      },
+    })
+    await harness.controller.start('LEAD-1')
+
+    harness.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      scope_invalidated: true,
+    })
+    await vi.waitFor(() => expect(harness.errors).toHaveLength(1))
+
+    harness.visibility.dispatchEvent(new Event('visibilitychange'))
+
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages().map(({ name }) => name)).toEqual([
+        'RECOVERED',
+      ]),
+    )
+    expect(snapshotCalls).toBe(3)
+    expect(harness.controller.getCursor()).toBe('recovered-cursor')
+  })
+
+  it('runs a delta requested while the initial snapshot is pending', async () => {
+    let resolveSnapshot
+    let harness = createHarness({
+      get_message_page: () =>
+        new Promise((resolve) => (resolveSnapshot = resolve)),
+      get_message_changes: delta([
+        {
+          name: 'M-1',
+          modified: '2026-07-16 10:01:00',
+          message_datetime: '2026-07-16 10:00:00',
+        },
+      ]),
+    })
+    let started = harness.controller.start('LEAD-1')
+    harness.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+    })
+    resolveSnapshot(snapshot())
+    await started
+
+    expect(harness.controller.getMessages()).toHaveLength(1)
+    expect(
+      harness.calls.filter(([method]) =>
+        method.endsWith('get_message_changes'),
+      ),
+    ).toHaveLength(1)
   })
 })
