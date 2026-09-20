@@ -17,30 +17,28 @@ export function createMessengerReadController(options) {
     if (!options.isEnabled()) return false
     let conversation = options.getConversation()
     if (!conversation?.name) return false
-    let provider = conversation.provider
-    let message = [...(options.getMessages() || [])]
-      .reverse()
-      .find(
+    // Arrival order in CRM is independent of provider IDs and display order.
+    let message = (options.getMessages() || [])
+      .filter(
         (item) =>
           item.conversation === conversation.name &&
           item.direction === 'inbound' &&
           item.status !== 'deleted' &&
-          (provider === 'avito_direct'
-            ? Boolean(String(item.external_message_id || '').trim())
-            : Number(item.external_conversation_message_id) > 0),
+          !item.deleted_at &&
+          Number(item.local_inbound_sequence) > 0,
+      )
+      .reduce(
+        (latest, item) =>
+          !latest ||
+          Number(item.local_inbound_sequence) >
+            Number(latest.local_inbound_sequence)
+            ? item
+            : latest,
+        null,
       )
     if (!message) return false
-    let boundary =
-      provider === 'avito_direct'
-        ? `avito:${String(message.external_message_id).trim()}`
-        : Number(message.external_conversation_message_id)
-    let previousBoundary = lastRequested.get(conversation.name)
-    if (
-      provider === 'avito_direct'
-        ? boundary === previousBoundary
-        : boundary <= (previousBoundary || 0)
-    )
-      return false
+    let boundary = Number(message.local_inbound_sequence)
+    if (boundary <= (lastRequested.get(conversation.name) || 0)) return false
     let result = await options.call(
       'crm_messenger.api.conversations.mark_read',
       { conversation: conversation.name, up_to_message: message.name },
@@ -49,9 +47,11 @@ export function createMessengerReadController(options) {
       throw new Error(result?.message || 'Could not mark messages as read.')
     lastRequested.set(
       conversation.name,
-      provider === 'avito_direct'
-        ? boundary
-        : Math.max(boundary, Number(result.up_to_cmid) || 0),
+      Math.max(
+        lastRequested.get(conversation.name) || 0,
+        boundary,
+        Number(result.local_read_sequence) || 0,
+      ),
     )
     options.onConfirmed?.(result)
     return true
