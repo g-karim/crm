@@ -1,4 +1,4 @@
-import { createApp, nextTick } from 'vue'
+import { createApp, h, nextTick, reactive } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
@@ -246,10 +246,12 @@ beforeEach(() => {
 
 function deferred() {
   let resolve
-  let promise = new Promise((resolvePromise) => {
+  let reject
+  let promise = new Promise((resolvePromise, rejectPromise) => {
     resolve = resolvePromise
+    reject = rejectPromise
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 afterEach(() => {
@@ -263,10 +265,11 @@ afterEach(() => {
 async function mountConversation(props = {}) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(LeadConversation, { leadName: 'LEAD-1', ...props })
+  let liveProps = reactive({ leadName: 'LEAD-1', ...props })
+  let app = createApp({ render: () => h(LeadConversation, liveProps) })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
-  mounted.push({ app, root })
+  mounted.push({ app, root, props: liveProps })
   await nextTick()
   await new Promise((resolve) => setTimeout(resolve, 0))
   await nextTick()
@@ -323,6 +326,81 @@ async function resolveSelectionRequests(requests, first) {
 }
 
 describe('messenger initial selection', () => {
+  it.each(['success', 'failure', 'return-to-same-lead'])(
+    'ignores obsolete Lead context responses: %s',
+    async (outcome) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [channel('CHANNEL-2')]
+      conversationRows = [
+        { name: 'CURRENT-CHAT', channel: 'CHANNEL-2', status: 'Open' },
+      ]
+      latestInbound = { conversation: 'CURRENT-CHAT', channel: 'CHANNEL-2' }
+      let oldChannels = deferred()
+      let oldConversations = deferred()
+      let deferredMethods = new Set()
+      let defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((method, args) => {
+        if (args?.reference_name === 'LEAD-1' && !deferredMethods.has(method)) {
+          if (
+            method.endsWith('get_channels') ||
+            method.endsWith('get_conversations')
+          ) {
+            deferredMethods.add(method)
+            return method.endsWith('get_channels')
+              ? oldChannels.promise
+              : oldConversations.promise
+          }
+        }
+        return defaultCall(method, args)
+      })
+      let mounting = mountConversation()
+      await vi.waitFor(() => expect(deferredMethods.size).toBe(2))
+      mounted.at(-1).props.leadName = 'LEAD-2'
+      let root = await mounting
+      if (outcome === 'return-to-same-lead') {
+        mounted.at(-1).props.leadName = 'LEAD-1'
+        await nextTick()
+        await vi.waitFor(() =>
+          expect(
+            root.querySelector('input[placeholder="Platform"]')?.value,
+          ).toBe('CHANNEL-2'),
+        )
+      }
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Current Lead draft'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      if (outcome === 'failure') {
+        oldChannels.reject(new Error('Obsolete channel failure'))
+        oldConversations.reject(new Error('Obsolete conversation failure'))
+      } else {
+        oldChannels.resolve({
+          ok: true,
+          channels: [channel('OLD-CHANNEL')],
+          permissions: { can_read: true, can_operate: false },
+        })
+        oldConversations.resolve({
+          ok: true,
+          conversations: [{ name: 'OLD-CHAT', channel: 'OLD-CHANNEL' }],
+          latest_inbound: { conversation: 'OLD-CHAT' },
+          permissions: { can_read: true, can_operate: false },
+        })
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await nextTick()
+      expect(root.querySelector('input[placeholder="Platform"]')?.value).toBe(
+        'CHANNEL-2',
+      )
+      expect(
+        root.querySelector('input[placeholder="Enter a message..."]')?.value,
+      ).toBe('Current Lead draft')
+      expect(root.textContent).not.toContain('Obsolete')
+      expect(root.textContent).not.toContain('Read Only')
+    },
+  )
+
   it('selects the conversation containing the latest inbound message', async () => {
     permissions = { ...permissions, can_operate: true }
     conversationRows = [

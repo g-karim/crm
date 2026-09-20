@@ -678,6 +678,20 @@ let highlightTimer = null
 let preserveComposerScope = false
 let notificationReadPending = false
 let appliedRouteConversation = ''
+let contextGeneration = 0
+let channelRequest = 0
+let conversationRequest = 0
+let disposed = false
+
+function captureLeadContext() {
+  let generation = contextGeneration
+  let lead = props.leadName
+  return {
+    lead,
+    isCurrent: () =>
+      !disposed && generation === contextGeneration && lead === props.leadName,
+  }
+}
 
 const composerTyping = createMessengerTypingController({
   send(conversation) {
@@ -1035,6 +1049,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
   resetComposer()
   messageSync.stop()
   readController.stop()
@@ -1047,6 +1063,7 @@ onBeforeUnmount(() => {
 watch(
   () => props.leadName,
   () => initialize(true),
+  { flush: 'sync' },
 )
 
 watch(
@@ -1059,16 +1076,20 @@ watch(
 )
 
 async function initialize(leadChanged = false) {
+  contextGeneration += 1
+  let context = captureLeadContext()
   genericError.value = ''
   routingError.value = ''
   sendWarning.value = ''
   newMessageCount.value = 0
   loadingMessages.value = true
   if (leadChanged) {
-    await resetComposer()
+    let cleanup = resetComposer()
+    messageSync.setLead('')
     applyPermissions()
     messages.value = []
     conversations.value = []
+    channels.value = []
     latestInbound.value = null
     selectedChannel.value = ''
     selectedConversationName.value = ''
@@ -1076,19 +1097,21 @@ async function initialize(leadChanged = false) {
     appliedRouteConversation = ''
     handoffTargetChannel.value = ''
     messageEditorElements.clear()
+    await cleanup
+    if (!context.isCurrent()) return
   }
   try {
     await Promise.all([
       loadSelectionContext(),
       leadChanged
-        ? messageSync.setLead(props.leadName)
-        : messageSync.start(props.leadName),
+        ? messageSync.setLead(context.lead)
+        : messageSync.start(context.lead),
     ])
-    scheduleMessengerNotificationRead()
+    if (context.isCurrent()) scheduleMessengerNotificationRead()
   } catch (error) {
-    handleError(error, __('Could not load messages.'))
+    if (context.isCurrent()) handleError(error, __('Could not load messages.'))
   } finally {
-    loadingMessages.value = false
+    if (context.isCurrent()) loadingMessages.value = false
   }
 }
 
@@ -1118,68 +1141,85 @@ function confirmDeleteMessage(message) {
 }
 
 async function loadAll() {
+  let context = captureLeadContext()
   genericError.value = ''
   sendWarning.value = ''
   loadingMessages.value = true
   try {
     await Promise.all([loadSelectionContext(), messageSync.loadSnapshot()])
   } catch (error) {
-    handleError(error, __('Could not refresh messages.'))
+    if (context.isCurrent())
+      handleError(error, __('Could not refresh messages.'))
   } finally {
-    loadingMessages.value = false
+    if (context.isCurrent()) loadingMessages.value = false
   }
 }
 
 async function loadSelectionContext() {
-  await Promise.all([loadChannels(), loadConversations()])
-  reconcileSelection()
+  let context = captureLeadContext()
+  let results = await Promise.all([loadChannels(), loadConversations()])
+  if (context.isCurrent() && results.every(Boolean)) reconcileSelection()
 }
 
 async function loadChannels() {
+  let context = captureLeadContext()
+  let request = ++channelRequest
+  let isCurrent = () => context.isCurrent() && request === channelRequest
   loadingChannels.value = true
   try {
     let result = await call('crm_messenger.api.channels.get_channels', {
       active_only: 1,
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
     })
+    if (!isCurrent()) return false
     if (!result?.ok)
       throw new Error(result?.message || __('Could not load channels.'))
     channels.value = result.channels || []
     applyPermissions(result.permissions)
+    return true
   } catch (error) {
-    handleError(error, __('Could not load channels.'))
+    if (isCurrent()) handleError(error, __('Could not load channels.'))
+    return isCurrent()
   } finally {
-    loadingChannels.value = false
+    if (isCurrent()) loadingChannels.value = false
   }
 }
 
 async function loadConversations() {
+  let context = captureLeadContext()
+  let request = ++conversationRequest
+  let isCurrent = () => context.isCurrent() && request === conversationRequest
   loadingConversation.value = true
   try {
     let result = await call(
       'crm_messenger.api.conversations.get_conversations',
       {
         reference_doctype: 'CRM Lead',
-        reference_name: props.leadName,
+        reference_name: context.lead,
         limit: 50,
       },
     )
+    if (!isCurrent()) return false
     if (!result?.ok)
       throw new Error(result?.message || __('Could not load the conversation.'))
     conversations.value = result.conversations || []
     latestInbound.value = result.latest_inbound || null
     applyPermissions(result.permissions)
+    return true
   } catch (error) {
-    handleError(error, __('Could not load the conversation.'))
+    if (isCurrent()) handleError(error, __('Could not load the conversation.'))
+    return isCurrent()
   } finally {
-    loadingConversation.value = false
+    if (isCurrent()) loadingConversation.value = false
   }
 }
 
 async function refreshConversations() {
-  await loadConversations()
-  reconcileSelection()
+  let context = captureLeadContext()
+  if (await loadConversations()) {
+    if (context.isCurrent()) reconcileSelection()
+  }
 }
 
 function reconcileSelection() {

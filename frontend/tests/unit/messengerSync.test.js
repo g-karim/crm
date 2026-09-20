@@ -767,6 +767,88 @@ describe('messenger sync', () => {
     expect(harness.controller.getCursor()).toBe('recovered-cursor')
   })
 
+  it.each(['timer', 'connect', 'visibility', 'realtime'])(
+    'recovers an initial snapshot failure through %s',
+    async (trigger) => {
+      vi.useFakeTimers()
+      let attempts = 0
+      let harness = createHarness({
+        get_message_page: () => {
+          if (++attempts === 1) throw new Error('Temporary network failure')
+          return snapshot([{ name: 'RECOVERED' }])
+        },
+        get_message_changes: delta(),
+      })
+      try {
+        await expect(harness.controller.start('LEAD-1')).rejects.toThrow(
+          'Temporary',
+        )
+        if (trigger === 'timer') await vi.advanceTimersByTimeAsync(2000)
+        if (trigger === 'connect') harness.socket.emit('connect')
+        if (trigger === 'visibility')
+          harness.visibility.dispatchEvent(new Event('visibilitychange'))
+        if (trigger === 'realtime')
+          harness.socket.emit('crm_messenger:conversation_changed', {
+            version: 1,
+            reference_doctype: 'CRM Lead',
+            reference_name: 'LEAD-1',
+          })
+        await vi.advanceTimersByTimeAsync(0)
+        expect(harness.controller.getMessages().map((row) => row.name)).toEqual(
+          ['RECOVERED'],
+        )
+        await vi.advanceTimersByTimeAsync(30000)
+        expect(attempts).toBe(2)
+      } finally {
+        harness.controller.stop()
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  it.each(['stop', 'switch'])(
+    'cancels the initial snapshot retry on %s',
+    async (action) => {
+      vi.useFakeTimers()
+      let harness = createHarness({
+        get_message_page: ({ reference_name }) => {
+          if (reference_name === 'LEAD-1') throw new Error('Temporary failure')
+          return snapshot([{ name: 'LEAD-2-MESSAGE' }])
+        },
+      })
+      try {
+        await expect(harness.controller.start('LEAD-1')).rejects.toThrow()
+        if (action === 'stop') harness.controller.stop()
+        else await harness.controller.setLead('LEAD-2')
+        let calls = harness.calls.length
+        await vi.advanceTimersByTimeAsync(30000)
+        expect(harness.calls).toHaveLength(calls)
+      } finally {
+        harness.controller.stop()
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  it('does not schedule automatic retries after a permission denial', async () => {
+    vi.useFakeTimers()
+    let harness = createHarness({
+      get_message_page: () => {
+        throw Object.assign(new Error('Denied'), {
+          exc_type: 'PermissionError',
+        })
+      },
+    })
+    try {
+      await expect(harness.controller.start('LEAD-1')).rejects.toThrow('Denied')
+      await vi.advanceTimersByTimeAsync(30000)
+      expect(harness.calls).toHaveLength(1)
+    } finally {
+      harness.controller.stop()
+      vi.useRealTimers()
+    }
+  })
+
   it('runs a delta requested while the initial snapshot is pending', async () => {
     let resolveSnapshot
     let harness = createHarness({
