@@ -74,6 +74,8 @@
         }}
       </div>
 
+      <AvitoItemCard :conversation="selectedConversation" />
+
       <div class="relative min-h-0 flex-1">
         <div
           ref="messagesEl"
@@ -546,6 +548,8 @@
 </template>
 
 <script setup>
+import AvitoItemCard from './AvitoItemCard.vue'
+import { avitoConversationLabel } from '@/utils/messengerAvitoContext'
 import CommentIcon from '@/components/Icons/CommentIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
@@ -1516,7 +1520,9 @@ function conversationRoutingLabel(conversation = {}) {
     channelByName.value[conversation.channel] ||
     conversation.channel_info ||
     conversation
-  return __(getMessengerPlatformLabel(channel))
+  let platform = __(getMessengerPlatformLabel(channel))
+  let listing = avitoConversationLabel(conversation, __)
+  return listing ? `${platform} · ${listing}` : platform
 }
 
 function channelRoutingLabel(channel = {}) {

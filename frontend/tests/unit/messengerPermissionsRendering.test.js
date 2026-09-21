@@ -809,6 +809,56 @@ describe('messenger conversation routing guard', () => {
     )
   }
 
+  it('names both Avito listings when routing between conversations of one account', async () => {
+    prepareRoutingFixture()
+    channelRows = [
+      {
+        ...channel('CHANNEL-1'),
+        provider: 'avito_direct',
+        platform: 'avito',
+        channel_type: 'avito',
+        label: 'Avito shop',
+      },
+    ]
+    conversationRows = [1, 2].map((id) => ({
+      name: `CONVERSATION-${id}`,
+      channel: 'CHANNEL-1',
+      status: 'Open',
+      provider: 'avito_direct',
+      external_chat_id: `chat-${id}`,
+      avito_item: { id: `${id}`, title: id === 1 ? 'Bicycle' : 'Scooter' },
+    }))
+    latestInbound.channel = 'CHANNEL-1'
+    let root = await mountConversation()
+    expect(
+      root.querySelector('[data-testid="avito-item-card"]').textContent,
+    ).toContain('Scooter')
+    let selector = root.querySelector('input[placeholder="External Chat"]')
+    selector.value = 'CONVERSATION-1'
+    selector.dispatchEvent(new Event('input'))
+    await nextTick()
+    let warning = root.querySelector(
+      '[data-testid="conversation-routing-warning"]',
+    )
+    expect(warning.textContent).toContain('Scooter · #2 · CONVERSATION-2')
+    expect(warning.textContent).toContain('Bicycle · #1 · CONVERSATION-1')
+    expect(
+      root.querySelector('[data-testid="avito-item-card"]').textContent,
+    ).toContain('Bicycle')
+    root.querySelector('[data-testid="conversation-routing-switch"]').click()
+    await nextTick()
+    await nextTick()
+    expect(
+      root.querySelector('[data-testid="conversation-routing-warning"]'),
+    ).toBeNull()
+    expect(
+      root.querySelector('[data-testid="avito-item-card"]').textContent,
+    ).toContain('Scooter')
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+  })
+
   it('shows the mismatch warning only for a different selected conversation', async () => {
     prepareRoutingFixture()
     channelRows[0].label = 'Telegram - Support'
