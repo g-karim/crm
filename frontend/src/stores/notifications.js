@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { createResource } from 'frappe-ui'
+import { createResource, frappeRequest } from 'frappe-ui'
 import { computed, ref } from 'vue'
 import { formatCompactNumber } from '@/utils/numberFormat.js'
 
@@ -7,6 +7,8 @@ export const visible = ref(false)
 
 export const notifications = createResource({
   url: 'crm.api.notifications.get_notifications',
+  // This resource loads before main.js configures the global fetcher.
+  resourceFetcher: frappeRequest,
   initialData: { notifications: [], unread_count: 0, has_more: false },
   auto: true,
 })

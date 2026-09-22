@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const resources = vi.hoisted(() => new Map())
 
 vi.mock('frappe-ui', () => ({
+  frappeRequest: vi.fn(),
   createResource(options) {
     let resource = {
       data: options.initialData,
