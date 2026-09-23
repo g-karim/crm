@@ -8,6 +8,7 @@
     <template #body>
       <div class="flex h-[calc(100vh_-_8rem)] min-h-0 bg-surface-gray-1">
         <div
+          ref="sidebarContainer"
           class="m-1 flex min-h-0 w-56 shrink-0 flex-col overflow-y-auto rounded-l-lg bg-surface-gray-1"
         >
           <template v-for="(tab, i) in tabs" :key="tab.label">
@@ -23,6 +24,7 @@
                 v-for="item in tab.items"
                 :key="item.label"
                 :label="__(item.label)"
+                :data-page="item.label"
                 :active="activeTab?.label == item.label"
                 class="w-full"
                 :class="
@@ -85,7 +87,7 @@ import {
 import { isWhatsappInstalled } from '@/composables/whatsapp'
 import { isMessengerInstalled } from '@/composables/messenger'
 import { Dialog, Avatar, SidebarItem } from 'frappe-ui'
-import { ref, markRaw, computed, watch, h } from 'vue'
+import { ref, markRaw, computed, watch, h, nextTick } from 'vue'
 import AssignmentRulePage from './AssignmentRules/AssignmentRulePage.vue'
 import ShieldCheck from '~icons/lucide/shield-check'
 import LucideZap from '~icons/lucide/zap'
@@ -246,6 +248,7 @@ const tabs = computed(() => {
 })
 
 const activeTab = ref()
+const sidebarContainer = ref(null)
 
 const settingItems = computed(() => tabs.value.map((tab) => tab.items).flat())
 
@@ -259,9 +262,20 @@ function setActiveTab(tabName) {
     getFallbackTab()
 }
 
-watch(activeSettingsPage, (activePage) => setActiveTab(activePage), {
-  immediate: true,
-})
+// Keep a deep-linked settings page visible in the sidebar.
+function scrollActiveIntoView() {
+  nextTick(() => {
+    const el = sidebarContainer.value?.querySelector(
+      `[data-page="${activeTab.value?.label}"]`,
+    )
+    el?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+watch(activeSettingsPage, (activePage) => {
+  setActiveTab(activePage)
+  scrollActiveIntoView()
+}, { immediate: true })
 
 watch(tabs, () => setActiveTab(activeSettingsPage.value))
 </script>
