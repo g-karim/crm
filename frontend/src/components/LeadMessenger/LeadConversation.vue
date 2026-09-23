@@ -680,7 +680,6 @@ const reactionComponents = new Map()
 let typingTimer = null
 let highlightTimer = null
 let preserveComposerScope = false
-let notificationReadPending = false
 let appliedRouteConversation = ''
 let contextGeneration = 0
 let channelRequest = 0
@@ -964,7 +963,7 @@ const messageSync = createMessengerSyncController({
           previousLastMessage: change.changeSnapshot?.previousLastMessage,
         })
     }
-    scheduleMessengerNotificationRead()
+    readController.schedule()
   },
   onDeltaApplied(_merge, incoming) {
     let hasInbound = incoming.some((message) => message.direction === 'inbound')
@@ -1111,7 +1110,7 @@ async function initialize(leadChanged = false) {
         ? messageSync.setLead(context.lead)
         : messageSync.start(context.lead),
     ])
-    if (context.isCurrent()) scheduleMessengerNotificationRead()
+    if (context.isCurrent()) readController.schedule()
   } catch (error) {
     if (context.isCurrent()) handleError(error, __('Could not load messages.'))
   } finally {
@@ -1946,7 +1945,6 @@ function scrollToBottom() {
   messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   newMessageCount.value = 0
   readController.schedule()
-  scheduleMessengerNotificationRead()
 }
 
 function isNearBottom() {
@@ -1957,7 +1955,6 @@ async function handleMessagesScroll() {
   if (isNearBottom()) {
     newMessageCount.value = 0
     readController.schedule()
-    scheduleMessengerNotificationRead()
   }
   if (
     !messagesEl.value ||
@@ -2109,44 +2106,7 @@ function handleVisibilityChange() {
     composerTyping.reset()
   } else {
     readController.schedule()
-    scheduleMessengerNotificationRead()
   }
-}
-
-async function markMessengerNotificationsRead() {
-  if (
-    notificationReadPending ||
-    !props.active ||
-    document.visibilityState !== 'visible' ||
-    !selectedConversation.value?.name ||
-    !isNearBottom()
-  )
-    return
-  let lastInbound = messages.value
-    .filter(
-      (message) =>
-        message.conversation === selectedConversation.value.name &&
-        message.direction === 'inbound' &&
-        message.status !== 'deleted' &&
-        message.ingest_source !== 'provider_history',
-    )
-    .at(-1)
-  if (!lastInbound?.name) return
-  notificationReadPending = true
-  try {
-    await call('crm.api.notifications.mark_messenger_as_read', {
-      conversation: selectedConversation.value.name,
-      last_event_id: lastInbound.name,
-    })
-  } catch {
-    // Notifications are auxiliary and must not interrupt the conversation UI.
-  } finally {
-    notificationReadPending = false
-  }
-}
-
-function scheduleMessengerNotificationRead() {
-  nextTick(() => markMessengerNotificationsRead())
 }
 
 watch(
@@ -2157,7 +2117,6 @@ watch(
       composerTyping.reset()
     } else {
       readController.schedule()
-      scheduleMessengerNotificationRead()
     }
   },
 )

@@ -148,8 +148,7 @@ onClickOutside(
 
 function markAsRead(notification) {
   capture('notification_mark_as_read')
-  if (notification.type !== 'Messenger')
-    markNotificationAsRead(notification.name)
+  markNotificationAsRead(notification.name)
   toggle()
 }
 

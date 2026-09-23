@@ -1219,7 +1219,8 @@ describe('messenger permission rendering', () => {
     ).toBe(false)
   })
 
-  it('marks a Messenger notification at the loaded event boundary', async () => {
+  it('reads the current user’s Messenger notification through the chat read boundary', async () => {
+    permissions = { ...permissions, can_operate: true }
     snapshotMessages = [
       {
         name: 'MESSAGE-INBOUND-1',
@@ -1228,6 +1229,7 @@ describe('messenger permission rendering', () => {
         status: 'received',
         ingest_source: 'provider_webhook',
         message_datetime: '2026-08-23 12:00:00',
+        local_inbound_sequence: 1,
       },
     ]
 
@@ -1235,16 +1237,17 @@ describe('messenger permission rendering', () => {
 
     await vi.waitFor(() =>
       expect(mocks.call).toHaveBeenCalledWith(
-        'crm.api.notifications.mark_messenger_as_read',
+        'crm_messenger.api.conversations.mark_read',
         {
           conversation: 'CONVERSATION-1',
-          last_event_id: 'MESSAGE-INBOUND-1',
+          up_to_message: 'MESSAGE-INBOUND-1',
         },
       ),
     )
   })
 
-  it('does not mark Messenger notifications while the tab is inactive', async () => {
+  it('does not read Messenger notifications while the tab is inactive', async () => {
+    permissions = { ...permissions, can_operate: true }
     snapshotMessages = [
       {
         name: 'MESSAGE-INBOUND-1',
@@ -1253,6 +1256,7 @@ describe('messenger permission rendering', () => {
         status: 'received',
         ingest_source: 'provider_webhook',
         message_datetime: '2026-08-23 12:00:00',
+        local_inbound_sequence: 1,
       },
     ]
 
@@ -1260,7 +1264,7 @@ describe('messenger permission rendering', () => {
 
     expect(
       mocks.call.mock.calls.some(([method]) =>
-        method.endsWith('mark_messenger_as_read'),
+        method.endsWith('mark_read'),
       ),
     ).toBe(false)
   })

@@ -138,7 +138,7 @@ export const usersStore = defineStore('crm-users', () => {
   }
 
   function isManager(email) {
-    return getUser(email).role === 'Sales Manager' || isAdmin(email)
+    return ['Sales Manager', 'CRM Manager'].includes(getUser(email).role) || isAdmin(email)
   }
 
   function isWebsiteUser(email) {
@@ -146,7 +146,7 @@ export const usersStore = defineStore('crm-users', () => {
   }
 
   function isSalesUser(email) {
-    return getUser(email).role === 'Sales User'
+    return ['Sales User', 'CRM User'].includes(getUser(email).role)
   }
 
   function isTelephonyAgent(email) {

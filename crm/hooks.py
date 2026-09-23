@@ -212,7 +212,10 @@ doc_events = {
 		"on_trash": ["crm.integrations.erpnext.user_permission.on_trash"],
 	},
 	"DocShare": {
-		"before_validate": ["crm.integrations.erpnext.doc_share.before_validate"],
+		"before_validate": [
+			"crm.permissions.lead_shares.reject_lead_share",
+			"crm.integrations.erpnext.doc_share.before_validate",
+		],
 		"after_insert": ["crm.integrations.erpnext.doc_share.after_insert"],
 		"on_update": ["crm.integrations.erpnext.doc_share.on_update"],
 		"on_trash": ["crm.integrations.erpnext.doc_share.on_trash"],

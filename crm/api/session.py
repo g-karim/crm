@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 
-CRM_ALLOWED_ROLES = ["System Manager", "Sales Manager", "Sales User"]
+CRM_ALLOWED_ROLES = ["System Manager", "Sales Manager", "CRM Manager", "Sales User", "CRM User"]
 
 
 def get_session_role_flags():
@@ -10,12 +10,14 @@ def get_session_role_flags():
 	if not roles.intersection(set(CRM_ALLOWED_ROLES)):
 		frappe.throw(_("You are not permitted to access CRM resources."), frappe.PermissionError)
 
+	is_system_manager = "System Manager" in roles
+	is_sales_manager = bool(roles & {"Sales Manager", "CRM Manager"}) and not is_system_manager
 	return {
-		"is_system_manager": "System Manager" in roles,
-		"is_sales_manager": "Sales Manager" in roles and "System Manager" not in roles,
-		"is_sales_user": "Sales User" in roles
-		and "Sales Manager" not in roles
-		and "System Manager" not in roles,
+		"is_system_manager": is_system_manager,
+		"is_sales_manager": is_sales_manager,
+		"is_sales_user": bool(roles & {"Sales User", "CRM User"})
+		and not is_sales_manager
+		and not is_system_manager,
 	}
 
 
@@ -99,7 +101,7 @@ def get_users(include_all: bool = False):
 	# than serializing an IN list and gives identical results.
 	telephony_agents = set(frappe.get_all("CRM Telephony Agent", pluck="user"))
 
-	role_priority = ("System Manager", "Sales Manager", "Sales User", "Guest")
+	role_priority = ("System Manager", "Sales Manager", "CRM Manager", "Sales User", "CRM User", "Guest")
 	crm_users = []
 
 	for user in users:
