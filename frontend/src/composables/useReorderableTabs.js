@@ -18,12 +18,19 @@ export function useReorderableTabs(doctype, defaultTabs, selectTab) {
   let saving = false
 
   onMounted(async () => {
-    try {
-      const settings = await get(doctype)
-      savedOrder.value = settings[ORDER_KEY] || []
-      loaded.value = true
-    } catch {
-      toast.error(__('Could not load tab order'))
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const settings = await get(doctype)
+        savedOrder.value = settings[ORDER_KEY] || []
+        loaded.value = true
+        return
+      } catch {
+        if (attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        } else {
+          toast.error(__('Could not load tab order'))
+        }
+      }
     }
   })
 
