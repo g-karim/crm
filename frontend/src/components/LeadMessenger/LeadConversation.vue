@@ -1548,6 +1548,7 @@ function requestVoiceSend(metadata) {
 
 async function sendMessage() {
   if (!permissions.value.can_operate) return
+  let context = captureLeadContext()
   let handoff = preparedHandoff.value
   let text = handoff?.message || draftText.value.trim()
   if (
@@ -1574,8 +1575,8 @@ async function sendMessage() {
   let accepted = false
 
   try {
-    let conversation = await resolveConversationForSend()
-    if (!conversation?.name) return
+    let conversation = await resolveConversationForSend(context)
+    if (!context.isCurrent() || !conversation?.name) return
 
     let fingerprint = JSON.stringify({
       conversation: conversation.name,
@@ -1602,8 +1603,9 @@ async function sendMessage() {
       location: pendingLocation.value || undefined,
       reply_to_message: replyTarget.value?.name || undefined,
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
     })
+    if (!context.isCurrent()) return
     accepted = Boolean(result?.name)
     if (accepted) {
       composerTyping.reset()
@@ -1637,15 +1639,18 @@ async function sendMessage() {
       composerTyping.reset()
     }
   } catch (error) {
-    handleError(error, __('Could not send the message.'))
+    if (context.isCurrent())
+      handleError(error, __('Could not send the message.'))
   } finally {
-    if (!accepted) composerAttachments.value?.unfreeze()
+    if (context.isCurrent() && !accepted) composerAttachments.value?.unfreeze()
     sendingMessage.value = false
-    await Promise.all([refreshConversations(), messageSync.syncDelta()])
+    if (context.isCurrent())
+      await Promise.all([refreshConversations(), messageSync.syncDelta()])
   }
 }
 
-async function resolveConversationForSend() {
+async function resolveConversationForSend(context) {
+  if (!context.isCurrent()) return null
   if (selectedConversation.value && !replyTarget.value)
     return selectedConversation.value
 
@@ -1653,11 +1658,12 @@ async function resolveConversationForSend() {
     'crm_messenger.api.conversations.resolve_send_target',
     {
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
       channel: selectedChannel.value,
       reply_to_message: replyTarget.value?.name || undefined,
     },
   )
+  if (!context.isCurrent()) return null
   if (result?.ok && result.conversation?.name) {
     preserveComposerDuringScopeChange(() => {
       selectedChannel.value =
@@ -1673,7 +1679,7 @@ async function resolveConversationForSend() {
     )
   }
   if (result?.reason === 'missing_channel_conversation' && result.can_create)
-    return createConversation()
+    return createConversation(context)
 
   genericError.value =
     result?.reason === 'ambiguous_conversation'
@@ -1813,7 +1819,8 @@ function integrationWarningMessage(result = {}) {
   )
 }
 
-async function createConversation() {
+async function createConversation(context) {
+  if (!context.isCurrent()) return null
   if (selectedCapabilities.value.requires_inbound) {
     genericError.value = __(
       'An incoming message must arrive in the selected channel first.',
@@ -1824,10 +1831,11 @@ async function createConversation() {
   let result = await call(
     'crm_messenger.api.conversations.get_or_create_lead_conversation',
     {
-      reference_name: props.leadName,
+      reference_name: context.lead,
       channel: selectedChannel.value,
     },
   )
+  if (!context.isCurrent()) return null
 
   if (result?.reason === 'missing_phone') {
     genericError.value = __('This lead has no phone number.')

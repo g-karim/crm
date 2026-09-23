@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
     attachmentRetarget: vi.fn(async () => {}),
     call: vi.fn(),
     dialog: vi.fn(),
+    toastError: vi.fn(),
     route: { query: {} },
     voiceRetarget: vi.fn(),
     voiceSend: vi.fn(),
@@ -62,7 +63,7 @@ vi.mock('frappe-ui', () => ({
     format: () => '2026-08-23',
     fromNow: () => 'now',
   }),
-  toast: { error: vi.fn() },
+  toast: { error: mocks.toastError },
 }))
 
 vi.mock('@/stores/global', () => ({
@@ -1067,6 +1068,110 @@ describe('messenger conversation routing guard', () => {
     expect(root.textContent).not.toContain(
       'VK photo upload did not return photo data.',
     )
+  })
+
+  it.each(['error', 'not_configured'])(
+    'ignores a late %s from a send started on another Lead',
+    async (outcome) => {
+      prepareRoutingFixture()
+      let oldSend = deferred()
+      let defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((method, args) => {
+        if (method.endsWith('send_message') && args.reference_name === 'LEAD-1')
+          return oldSend.promise
+        return defaultCall(method, args)
+      })
+      let root = await mountConversation()
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Message from A'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      sendButton(root).click()
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            reference_name: 'LEAD-1',
+            text: 'Message from A',
+          }),
+        ),
+      )
+
+      mounted.at(-1).props.leadName = 'LEAD-2'
+      await vi.waitFor(() => expect(sendButton(root)?.disabled).toBe(true))
+      if (outcome === 'error') oldSend.reject(new Error('Old Lead send error'))
+      else oldSend.resolve({ ok: false, reason: 'not_configured' })
+      await vi.waitFor(() =>
+        expect(
+          root.querySelector('input[placeholder="Enter a message..."]')
+            ?.disabled,
+        ).toBe(false),
+      )
+      expect(root.textContent).not.toContain('Old Lead send error')
+      expect(root.textContent).not.toContain('not configured')
+      expect(mocks.toastError).not.toHaveBeenCalled()
+
+      composer = root.querySelector('input[placeholder="Enter a message..."]')
+      composer.value = 'Message from B'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      sendButton(root).click()
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            reference_name: 'LEAD-2',
+            text: 'Message from B',
+          }),
+        ),
+      )
+    },
+  )
+
+  it('does not send after a stale Lead target resolution', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = []
+    let oldTarget = deferred()
+    let defaultCall = mocks.call.getMockImplementation()
+    mocks.call.mockImplementation((method, args) => {
+      if (
+        method.endsWith('resolve_send_target') &&
+        args.reference_name === 'LEAD-1'
+      )
+        return oldTarget.promise
+      return defaultCall(method, args)
+    })
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+    composer.value = 'Old Lead draft'
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    sendButton(root).click()
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.conversations.resolve_send_target',
+        expect.objectContaining({ reference_name: 'LEAD-1' }),
+      ),
+    )
+
+    mounted.at(-1).props.leadName = 'LEAD-2'
+    await nextTick()
+    oldTarget.resolve({
+      ok: true,
+      conversation: { name: 'OLD-CONVERSATION', channel: 'CHANNEL-1' },
+    })
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('input[placeholder="Enter a message..."]')?.disabled,
+      ).toBe(false),
+    )
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+    expect(root.textContent).not.toContain('OLD-CONVERSATION')
+    expect(mocks.toastError).not.toHaveBeenCalled()
   })
 })
 
