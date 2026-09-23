@@ -44,10 +44,11 @@
   </LayoutHeader>
   <div v-if="doc.name" class="flex h-full overflow-hidden">
     <Tabs
+      ref="tabRoot"
       v-model="tabIndex"
       as="div"
       :tabs="tabs"
-      class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
+      class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:cursor-grab [&_[role='tab']:active]:cursor-grabbing [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
     >
       <template #tab-panel>
         <Activities
@@ -407,6 +408,7 @@ import {
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useActiveTabManager } from '@/composables/useActiveTabManager'
+import { useReorderableTabs } from '@/composables/useReorderableTabs'
 import { useUnsavedChangesWarning } from '@/composables/useUnsavedChangesWarning'
 
 const { on } = useBroadcast()
@@ -569,8 +571,8 @@ usePageMeta(() => {
   }
 })
 
-const tabs = computed(() => {
-  let tabOptions = [
+const defaultTabs = computed(() => {
+  return [
     {
       name: 'Activity',
       label: __('Activity'),
@@ -623,9 +625,13 @@ const tabs = computed(() => {
       condition: () => whatsappEnabled.value,
     },
   ]
-  return tabOptions.filter((tab) => (tab.condition ? tab.condition() : true))
 })
 
+const { tabs, tabRoot } = useReorderableTabs(
+  'CRM Deal',
+  defaultTabs,
+  (index) => (tabIndex.value = index),
+)
 const { tabIndex } = useActiveTabManager(tabs, 'lastDealTab')
 
 const sections = createResource({

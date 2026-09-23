@@ -54,9 +54,10 @@
   </LayoutHeader>
   <div v-if="doc.name" class="flex h-full overflow-hidden">
     <Tabs
+      ref="tabRoot"
       v-model="tabIndex"
       :tabs="tabs"
-      class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
+      class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:cursor-grab [&_[role='tab']:active]:cursor-grabbing [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
     >
       <template #tab-panel="{ tab }">
         <LeadConversation
@@ -311,6 +312,7 @@ import {
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useActiveTabManager } from '@/composables/useActiveTabManager'
+import { useReorderableTabs } from '@/composables/useReorderableTabs'
 import { useUnsavedChangesWarning } from '@/composables/useUnsavedChangesWarning'
 
 const { brand } = getSettings()
@@ -435,8 +437,8 @@ usePageMeta(() => {
   return { title: title.value, icon: brand.favicon }
 })
 
-const tabs = computed(() => {
-  let tabOptions = [
+const defaultTabs = computed(() => {
+  return [
     {
       name: 'Activity',
       label: __('Activity'),
@@ -494,9 +496,13 @@ const tabs = computed(() => {
       condition: () => whatsappEnabled.value,
     },
   ]
-  return tabOptions.filter((tab) => (tab.condition ? tab.condition() : true))
 })
 
+const { tabs, tabRoot } = useReorderableTabs(
+  'CRM Lead',
+  defaultTabs,
+  (index) => (tabIndex.value = index),
+)
 const { tabIndex, changeTabTo } = useActiveTabManager(tabs, 'lastLeadTab')
 
 const sections = createResource({
