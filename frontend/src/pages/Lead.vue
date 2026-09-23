@@ -458,6 +458,7 @@ const defaultTabs = computed(() => {
       name: 'Messenger',
       label: __('Messages'),
       icon: CommentIcon,
+      condition: () => globalThis.crm_messenger_enabled === true,
     },
     {
       name: 'Data',
