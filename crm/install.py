@@ -16,10 +16,11 @@ from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 	get_default_deal_stage_templates,
 	get_or_create_default_pipeline,
 )
+from crm.patches.v1_0.ensure_crm_access_roles import execute as ensure_crm_access_roles
 
 
 def before_install():
-	pass
+	ensure_crm_access_roles()
 
 
 def after_install(force=False):

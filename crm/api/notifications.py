@@ -125,6 +125,55 @@ def mark_messenger_as_read(conversation: str, last_event_id: str):
 	return {"ok": True, "marked": len(rows), "stale": False}
 
 
+def mark_messenger_notifications_through(conversation: str, up_to_message: str | None = None):
+	"""Read only this user's notifications covered by a successful chat read."""
+	conversation_row = frappe.db.get_value(
+		"Messenger Conversation",
+		conversation,
+		["reference_doctype", "reference_name", "local_inbound_sequence"],
+		as_dict=True,
+	)
+	if not conversation_row or conversation_row.reference_doctype != "CRM Lead":
+		return 0
+
+	boundary = (
+		frappe.db.get_value("Messenger Message", up_to_message, "local_inbound_sequence")
+		if up_to_message
+		else conversation_row.local_inbound_sequence
+	)
+	if not cint(boundary):
+		return 0
+
+	rows = frappe.db.sql(
+		"""
+		select notification.name
+		from `tabCRM Notification` notification
+		join `tabMessenger Message` message
+			on message.name = notification.last_event_id
+			and message.conversation = %(conversation)s
+		where notification.to_user = %(user)s
+			and notification.type = 'Messenger' and notification.`read` = 0
+			and notification.notification_type_doctype = 'Messenger Conversation'
+			and notification.notification_type_doc = %(conversation)s
+			and notification.reference_doctype = 'CRM Lead'
+			and notification.reference_name = %(lead)s
+			and message.local_inbound_sequence > 0
+			and message.local_inbound_sequence <= %(boundary)s
+		for update
+		""",
+		{
+			"conversation": conversation,
+			"user": frappe.session.user,
+			"lead": conversation_row.reference_name,
+			"boundary": cint(boundary),
+		},
+		as_dict=True,
+	)
+	for row in rows:
+		_mark_locked_notification_read(row.name)
+	return len(rows)
+
+
 @frappe.whitelist(methods=["POST"])
 def mark_as_read(notification: str):
 	row = _lock_notification(notification)
@@ -163,7 +212,9 @@ def mark_all_as_read(limit: int = 500):
 
 
 def _visible_notifications_query(Notification):
-	visibility = Notification.type != "Messenger"
+	visibility = (Notification.type != "Messenger") & (
+		Coalesce(Notification.reference_doctype, "") != "CRM Lead"
+	)
 	for doctype in ("CRM Lead", "CRM Deal"):
 		if not frappe.has_permission(doctype, "read"):
 			continue
@@ -175,11 +226,12 @@ def _visible_notifications_query(Notification):
 			order_by=None,
 			run=False,
 		)
-		visibility |= (
-			(Notification.type == "Messenger")
-			& (Notification.reference_doctype == doctype)
-			& Notification.reference_name.isin(readable_references)
+		condition = (Notification.reference_doctype == doctype) & Notification.reference_name.isin(
+			readable_references
 		)
+		if doctype == "CRM Deal":
+			condition &= Notification.type == "Messenger"
+		visibility |= condition
 
 	return frappe.qb.from_(Notification).where(Notification.to_user == frappe.session.user).where(visibility)
 

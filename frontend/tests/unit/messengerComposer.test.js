@@ -140,6 +140,32 @@ describe('messenger composer attachments', () => {
     )
   })
 
+  it('removes only the selected image from a multi-image draft', async () => {
+    let current = harness()
+    let [first] = current.controller.addFiles([
+      file('first.png', 'image/png'),
+      file('second.png', 'image/png'),
+    ])
+    await vi.waitFor(() =>
+      expect(current.controller.readyFileNames()).toEqual([
+        'FILE-first.png',
+        'FILE-second.png',
+      ]),
+    )
+
+    await current.controller.remove(first.id)
+
+    expect(current.controller.readyFileNames()).toEqual(['FILE-second.png'])
+    expect(current.controller.getItems().map((item) => item.fileName)).toEqual([
+      'second.png',
+    ])
+    expect(current.revoked).toEqual(['blob:first.png'])
+    expect(current.discard).toHaveBeenCalledWith(
+      ['FILE-first.png'],
+      'CONVERSATION-1',
+    )
+  })
+
   it('freezes an immutable uploaded snapshot until send completes', async () => {
     let current = harness()
     let [item] = current.controller.addFiles([file('send.pdf')])

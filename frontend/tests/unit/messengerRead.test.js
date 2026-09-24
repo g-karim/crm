@@ -7,6 +7,7 @@ function harness({ enabled = true, provider = 'vk_direct' } = {}) {
   let messages = [
     {
       name: 'MSG-10',
+      local_inbound_sequence: 10,
       conversation: 'CONV-1',
       direction: 'inbound',
       status: 'received',
@@ -17,7 +18,7 @@ function harness({ enabled = true, provider = 'vk_direct' } = {}) {
   let call = vi.fn(async () => ({
     ok: true,
     conversation: 'CONV-1',
-    up_to_cmid: 10,
+    local_read_sequence: 10,
     unread_count: 0,
   }))
   let controller = createMessengerReadController({
@@ -29,7 +30,7 @@ function harness({ enabled = true, provider = 'vk_direct' } = {}) {
   return { controller, call, messages }
 }
 
-describe('messenger provider read controller', () => {
+describe('messenger local read controller', () => {
   it('debounces and sends the local message name, not a raw CMID', async () => {
     vi.useFakeTimers()
     let { controller, call } = harness()
@@ -54,21 +55,54 @@ describe('messenger provider read controller', () => {
     expect(active.call).toHaveBeenCalledOnce()
   })
 
-  it('uses an Avito external message ID when CMID is unavailable', async () => {
-    let { controller, call, messages } = harness({ provider: 'avito_direct' })
-    messages[0].external_conversation_message_id = null
+  it.each(['avito_direct', 'telegram_bot', 'max_direct', 'vk_direct'])(
+    'uses local sequence without external IDs for %s',
+    async (provider) => {
+      let { controller, call, messages } = harness({ provider })
+      messages[0].external_conversation_message_id = null
+      messages[0].external_message_id = null
 
-    expect(await controller.flush()).toBe(true)
-    expect(await controller.flush()).toBe(false)
-    messages.push({
-      ...messages[0],
-      name: 'MSG-11',
-      external_message_id: 'provider-11',
-    })
-    expect(await controller.flush()).toBe(true)
-    expect(call).toHaveBeenLastCalledWith(
-      'crm_messenger.api.conversations.mark_read',
-      { conversation: 'CONV-1', up_to_message: 'MSG-11' },
-    )
+      expect(await controller.flush()).toBe(true)
+      expect(await controller.flush()).toBe(false)
+      messages.push({
+        ...messages[0],
+        name: 'MSG-11',
+        local_inbound_sequence: 11,
+        external_message_id: 'provider-11',
+      })
+      expect(await controller.flush()).toBe(true)
+      expect(call).toHaveBeenLastCalledWith(
+        'crm_messenger.api.conversations.mark_read',
+        { conversation: 'CONV-1', up_to_message: 'MSG-11' },
+      )
+    },
+  )
+})
+
+it('reads late arrivals by local sequence even with smaller provider ID and earlier display position', async () => {
+  let { controller, call, messages } = harness()
+  await controller.flush()
+  messages.unshift({
+    ...messages[0],
+    name: 'LATE',
+    local_inbound_sequence: 11,
+    external_conversation_message_id: '2',
   })
+  await controller.flush()
+  expect(call).toHaveBeenLastCalledWith(
+    'crm_messenger.api.conversations.mark_read',
+    { conversation: 'CONV-1', up_to_message: 'LATE' },
+  )
+})
+it('excludes deleted messages and quiet history imports', async () => {
+  let { controller, call, messages } = harness()
+  messages[0].deleted_at = '2026-09-20 10:00:00'
+  messages.push({
+    ...messages[0],
+    name: 'HISTORY',
+    deleted_at: null,
+    local_inbound_sequence: 0,
+  })
+  expect(await controller.flush()).toBe(false)
+  expect(call).not.toHaveBeenCalled()
 })

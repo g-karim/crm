@@ -1,3 +1,4 @@
+import { avitoConversationLabel } from '@/utils/messengerAvitoContext'
 import { getMessengerMessagePreview } from '@/utils/messengerAttachments'
 
 export function messengerConversationsForChannel(
@@ -48,11 +49,12 @@ export function messengerConversationOption(
   let label = [
     platform,
     channel,
+    avitoConversationLabel(conversation, translate),
     conversation.client_name,
     externalId,
     lastMessage,
     conversation.last_message_at,
-    conversation.name,
+    conversation.provider === 'avito_direct' ? '' : conversation.name,
   ]
     .filter(Boolean)
     .join(' · ')

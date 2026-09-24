@@ -9,6 +9,9 @@ _OWNER_FIELD = {
 	"CRM Deal": "deal_owner",
 }
 
+CRM_MANAGER_ROLES = {"Sales Manager", "CRM Manager"}
+CRM_SPECIALIST_ROLES = {"Sales User", "CRM User"}
+
 
 def hierarchy_enabled() -> bool:
 	return bool(frappe.db.get_single_value("FCRM Settings", "enable_sales_hierarchy"))
@@ -21,9 +24,25 @@ def _permission_query_conditions(user: str | None, doctype: str):
 	if user == "Administrator":
 		return ""
 
-	roles = frappe.get_roles(user)
+	roles = set(frappe.get_roles(user))
 	if "System Manager" in roles:
 		return ""
+
+	if doctype == "CRM Lead":
+		if roles & CRM_MANAGER_ROLES:
+			return ""
+		if not roles & CRM_SPECIALIST_ROLES:
+			return "false"
+		DT = frappe.qb.DocType("CRM Lead")
+		Todo = frappe.qb.DocType("ToDo").as_("_todo")
+		conditions = (DT.lead_owner == user) | DT.name.isin(
+			frappe.qb.from_(Todo)
+			.select(Todo.reference_name)
+			.where(
+				(Todo.reference_type == "CRM Lead") & (Todo.status == "Open") & (Todo.allocated_to == user)
+			)
+		)
+		return conditions
 
 	in_tree = hierarchy_enabled() and _in_hierarchy(user)
 
@@ -62,6 +81,8 @@ def _permission_query_conditions(user: str | None, doctype: str):
 
 def get_lead_permission_query_conditions(user=None):
 	cond = _permission_query_conditions(user, "CRM Lead")
+	if isinstance(cond, str):
+		return cond
 	return cond.get_sql(with_namespace=True, quote_char="`", secondary_quote_char="'") if cond else ""
 
 
@@ -77,9 +98,15 @@ def _has_permission(doc, ptype, user, doctype: str) -> bool | None:
 	if user == "Administrator":
 		return True
 
-	roles = frappe.get_roles(user)
+	roles = set(frappe.get_roles(user))
 	if "System Manager" in roles:
 		return True
+
+	if doctype == "CRM Lead":
+		if roles & CRM_MANAGER_ROLES:
+			return True
+		if not roles & CRM_SPECIALIST_ROLES:
+			return False
 
 	if ptype == "create" or not doc.name:
 		return True

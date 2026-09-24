@@ -9,61 +9,63 @@
       :disabled="disabled"
       @change="onFileInput"
     />
-    <div v-if="items.length" class="mb-2 flex gap-2 overflow-x-auto pb-1">
-      <div
-        v-for="item in items"
-        :key="item.id"
-        class="relative flex w-40 shrink-0 items-center gap-2 rounded-lg border border-outline-gray-1 bg-surface-base p-2"
-      >
-        <img
-          v-if="item.previewUrl"
-          :src="item.previewUrl"
-          :alt="item.fileName"
-          class="size-12 shrink-0 rounded object-cover"
-        />
+    <div v-if="items.length" class="mb-2 overflow-x-auto">
+      <div class="flex w-max min-w-full gap-2 px-3 pb-1 pt-3">
         <div
-          v-else
-          class="flex size-12 shrink-0 items-center justify-center rounded bg-surface-gray-2"
+          v-for="item in items"
+          :key="item.id"
+          class="relative flex w-40 shrink-0 items-center gap-2 rounded-lg border border-outline-gray-1 bg-surface-base p-2"
         >
-          <FileIcon class="size-5 text-ink-gray-6" />
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="truncate text-xs font-medium text-ink-gray-8">
-            {{ item.fileName }}
-          </div>
+          <img
+            v-if="item.previewUrl"
+            :src="item.previewUrl"
+            :alt="item.fileName"
+            class="size-12 shrink-0 rounded object-cover"
+          />
           <div
-            class="mt-1 truncate text-xs"
-            :class="
-              item.status === 'failed' ? 'text-ink-red-8' : 'text-ink-gray-5'
-            "
+            v-else
+            class="flex size-12 shrink-0 items-center justify-center rounded bg-surface-gray-2"
           >
-            {{ itemStatus(item) }}
+            <FileIcon class="size-5 text-ink-gray-6" />
           </div>
-          <div
-            v-if="item.status === 'uploading'"
-            class="mt-1 h-1 overflow-hidden rounded bg-surface-gray-3"
-          >
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-xs font-medium text-ink-gray-8">
+              {{ item.fileName }}
+            </div>
             <div
-              class="h-full bg-surface-blue-7 transition-all"
-              :style="{ width: `${item.progress}%` }"
+              class="mt-1 truncate text-xs"
+              :class="
+                item.status === 'failed' ? 'text-ink-red-8' : 'text-ink-gray-5'
+              "
+            >
+              {{ itemStatus(item) }}
+            </div>
+            <div
+              v-if="item.status === 'uploading'"
+              class="mt-1 h-1 overflow-hidden rounded bg-surface-gray-3"
+            >
+              <div
+                class="h-full bg-surface-blue-7 transition-all"
+                :style="{ width: `${item.progress}%` }"
+              />
+            </div>
+            <Button
+              v-if="item.status === 'failed'"
+              class="mt-1 !h-5 !px-1 text-xs"
+              variant="ghost"
+              :disabled="disabled || frozen"
+              :label="__('Retry')"
+              @click="controller.retry(item.id)"
             />
           </div>
           <Button
-            v-if="item.status === 'failed'"
-            class="mt-1 !h-5 !px-1 text-xs"
-            variant="ghost"
+            class="absolute right-0 top-0 !size-7 translate-x-1/4 -translate-y-1/4 rounded-full shadow-sm"
+            icon="x"
             :disabled="disabled || frozen"
-            :label="__('Retry')"
-            @click="controller.retry(item.id)"
+            :aria-label="__('Remove Attachment')"
+            @click="controller.remove(item.id)"
           />
         </div>
-        <Button
-          class="absolute right-0 top-0 !size-6 translate-x-1/3 -translate-y-1/3 rounded-full shadow-sm"
-          icon="x"
-          :disabled="disabled || frozen"
-          :aria-label="__('Remove Attachment')"
-          @click="controller.remove(item.id)"
-        />
       </div>
     </div>
   </div>

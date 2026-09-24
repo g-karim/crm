@@ -107,7 +107,7 @@ describe('messenger responsive markup', () => {
       ':can-send="Boolean(item.message.can_react)"',
     )
     expect(conversationSource).toContain(
-      "reference_doctype: 'CRM Lead',\n      reference_name: props.leadName",
+      "reference_doctype: 'CRM Lead',\n      reference_name: context.lead",
     )
     expect(conversationSource).toContain('voiceRecorder.value?.reset?.()')
     expect(conversationSource).toContain('locationPickerOpen.value = false')

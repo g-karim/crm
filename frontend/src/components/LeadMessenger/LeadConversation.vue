@@ -74,6 +74,8 @@
         }}
       </div>
 
+      <AvitoItemCard :conversation="selectedConversation" />
+
       <div class="relative min-h-0 flex-1">
         <div
           ref="messagesEl"
@@ -546,6 +548,8 @@
 </template>
 
 <script setup>
+import AvitoItemCard from './AvitoItemCard.vue'
+import { avitoConversationLabel } from '@/utils/messengerAvitoContext'
 import CommentIcon from '@/components/Icons/CommentIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
@@ -676,8 +680,21 @@ const reactionComponents = new Map()
 let typingTimer = null
 let highlightTimer = null
 let preserveComposerScope = false
-let notificationReadPending = false
 let appliedRouteConversation = ''
+let contextGeneration = 0
+let channelRequest = 0
+let conversationRequest = 0
+let disposed = false
+
+function captureLeadContext() {
+  let generation = contextGeneration
+  let lead = props.leadName
+  return {
+    lead,
+    isCurrent: () =>
+      !disposed && generation === contextGeneration && lead === props.leadName,
+  }
+}
 
 const composerTyping = createMessengerTypingController({
   send(conversation) {
@@ -946,7 +963,7 @@ const messageSync = createMessengerSyncController({
           previousLastMessage: change.changeSnapshot?.previousLastMessage,
         })
     }
-    scheduleMessengerNotificationRead()
+    readController.schedule()
   },
   onDeltaApplied(_merge, incoming) {
     let hasInbound = incoming.some((message) => message.direction === 'inbound')
@@ -1035,6 +1052,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
   resetComposer()
   messageSync.stop()
   readController.stop()
@@ -1047,6 +1066,7 @@ onBeforeUnmount(() => {
 watch(
   () => props.leadName,
   () => initialize(true),
+  { flush: 'sync' },
 )
 
 watch(
@@ -1059,16 +1079,20 @@ watch(
 )
 
 async function initialize(leadChanged = false) {
+  contextGeneration += 1
+  let context = captureLeadContext()
   genericError.value = ''
   routingError.value = ''
   sendWarning.value = ''
   newMessageCount.value = 0
   loadingMessages.value = true
   if (leadChanged) {
-    await resetComposer()
+    let cleanup = resetComposer()
+    messageSync.setLead('')
     applyPermissions()
     messages.value = []
     conversations.value = []
+    channels.value = []
     latestInbound.value = null
     selectedChannel.value = ''
     selectedConversationName.value = ''
@@ -1076,19 +1100,21 @@ async function initialize(leadChanged = false) {
     appliedRouteConversation = ''
     handoffTargetChannel.value = ''
     messageEditorElements.clear()
+    await cleanup
+    if (!context.isCurrent()) return
   }
   try {
     await Promise.all([
       loadSelectionContext(),
       leadChanged
-        ? messageSync.setLead(props.leadName)
-        : messageSync.start(props.leadName),
+        ? messageSync.setLead(context.lead)
+        : messageSync.start(context.lead),
     ])
-    scheduleMessengerNotificationRead()
+    if (context.isCurrent()) readController.schedule()
   } catch (error) {
-    handleError(error, __('Could not load messages.'))
+    if (context.isCurrent()) handleError(error, __('Could not load messages.'))
   } finally {
-    loadingMessages.value = false
+    if (context.isCurrent()) loadingMessages.value = false
   }
 }
 
@@ -1118,68 +1144,85 @@ function confirmDeleteMessage(message) {
 }
 
 async function loadAll() {
+  let context = captureLeadContext()
   genericError.value = ''
   sendWarning.value = ''
   loadingMessages.value = true
   try {
     await Promise.all([loadSelectionContext(), messageSync.loadSnapshot()])
   } catch (error) {
-    handleError(error, __('Could not refresh messages.'))
+    if (context.isCurrent())
+      handleError(error, __('Could not refresh messages.'))
   } finally {
-    loadingMessages.value = false
+    if (context.isCurrent()) loadingMessages.value = false
   }
 }
 
 async function loadSelectionContext() {
-  await Promise.all([loadChannels(), loadConversations()])
-  reconcileSelection()
+  let context = captureLeadContext()
+  let results = await Promise.all([loadChannels(), loadConversations()])
+  if (context.isCurrent() && results.every(Boolean)) reconcileSelection()
 }
 
 async function loadChannels() {
+  let context = captureLeadContext()
+  let request = ++channelRequest
+  let isCurrent = () => context.isCurrent() && request === channelRequest
   loadingChannels.value = true
   try {
     let result = await call('crm_messenger.api.channels.get_channels', {
       active_only: 1,
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
     })
+    if (!isCurrent()) return false
     if (!result?.ok)
       throw new Error(result?.message || __('Could not load channels.'))
     channels.value = result.channels || []
     applyPermissions(result.permissions)
+    return true
   } catch (error) {
-    handleError(error, __('Could not load channels.'))
+    if (isCurrent()) handleError(error, __('Could not load channels.'))
+    return isCurrent()
   } finally {
-    loadingChannels.value = false
+    if (isCurrent()) loadingChannels.value = false
   }
 }
 
 async function loadConversations() {
+  let context = captureLeadContext()
+  let request = ++conversationRequest
+  let isCurrent = () => context.isCurrent() && request === conversationRequest
   loadingConversation.value = true
   try {
     let result = await call(
       'crm_messenger.api.conversations.get_conversations',
       {
         reference_doctype: 'CRM Lead',
-        reference_name: props.leadName,
+        reference_name: context.lead,
         limit: 50,
       },
     )
+    if (!isCurrent()) return false
     if (!result?.ok)
       throw new Error(result?.message || __('Could not load the conversation.'))
     conversations.value = result.conversations || []
     latestInbound.value = result.latest_inbound || null
     applyPermissions(result.permissions)
+    return true
   } catch (error) {
-    handleError(error, __('Could not load the conversation.'))
+    if (isCurrent()) handleError(error, __('Could not load the conversation.'))
+    return isCurrent()
   } finally {
-    loadingConversation.value = false
+    if (isCurrent()) loadingConversation.value = false
   }
 }
 
 async function refreshConversations() {
-  await loadConversations()
-  reconcileSelection()
+  let context = captureLeadContext()
+  if (await loadConversations()) {
+    if (context.isCurrent()) reconcileSelection()
+  }
 }
 
 function reconcileSelection() {
@@ -1476,7 +1519,9 @@ function conversationRoutingLabel(conversation = {}) {
     channelByName.value[conversation.channel] ||
     conversation.channel_info ||
     conversation
-  return __(getMessengerPlatformLabel(channel))
+  let platform = __(getMessengerPlatformLabel(channel))
+  let listing = avitoConversationLabel(conversation, __)
+  return listing ? `${platform} · ${listing}` : platform
 }
 
 function channelRoutingLabel(channel = {}) {
@@ -1502,6 +1547,7 @@ function requestVoiceSend(metadata) {
 
 async function sendMessage() {
   if (!permissions.value.can_operate) return
+  let context = captureLeadContext()
   let handoff = preparedHandoff.value
   let text = handoff?.message || draftText.value.trim()
   if (
@@ -1528,8 +1574,8 @@ async function sendMessage() {
   let accepted = false
 
   try {
-    let conversation = await resolveConversationForSend()
-    if (!conversation?.name) return
+    let conversation = await resolveConversationForSend(context)
+    if (!context.isCurrent() || !conversation?.name) return
 
     let fingerprint = JSON.stringify({
       conversation: conversation.name,
@@ -1556,8 +1602,9 @@ async function sendMessage() {
       location: pendingLocation.value || undefined,
       reply_to_message: replyTarget.value?.name || undefined,
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
     })
+    if (!context.isCurrent()) return
     accepted = Boolean(result?.name)
     if (accepted) {
       composerTyping.reset()
@@ -1591,15 +1638,18 @@ async function sendMessage() {
       composerTyping.reset()
     }
   } catch (error) {
-    handleError(error, __('Could not send the message.'))
+    if (context.isCurrent())
+      handleError(error, __('Could not send the message.'))
   } finally {
-    if (!accepted) composerAttachments.value?.unfreeze()
+    if (context.isCurrent() && !accepted) composerAttachments.value?.unfreeze()
     sendingMessage.value = false
-    await Promise.all([refreshConversations(), messageSync.syncDelta()])
+    if (context.isCurrent())
+      await Promise.all([refreshConversations(), messageSync.syncDelta()])
   }
 }
 
-async function resolveConversationForSend() {
+async function resolveConversationForSend(context) {
+  if (!context.isCurrent()) return null
   if (selectedConversation.value && !replyTarget.value)
     return selectedConversation.value
 
@@ -1607,11 +1657,12 @@ async function resolveConversationForSend() {
     'crm_messenger.api.conversations.resolve_send_target',
     {
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
       channel: selectedChannel.value,
       reply_to_message: replyTarget.value?.name || undefined,
     },
   )
+  if (!context.isCurrent()) return null
   if (result?.ok && result.conversation?.name) {
     preserveComposerDuringScopeChange(() => {
       selectedChannel.value =
@@ -1627,7 +1678,7 @@ async function resolveConversationForSend() {
     )
   }
   if (result?.reason === 'missing_channel_conversation' && result.can_create)
-    return createConversation()
+    return createConversation(context)
 
   genericError.value =
     result?.reason === 'ambiguous_conversation'
@@ -1767,7 +1818,8 @@ function integrationWarningMessage(result = {}) {
   )
 }
 
-async function createConversation() {
+async function createConversation(context) {
+  if (!context.isCurrent()) return null
   if (selectedCapabilities.value.requires_inbound) {
     genericError.value = __(
       'An incoming message must arrive in the selected channel first.',
@@ -1778,10 +1830,11 @@ async function createConversation() {
   let result = await call(
     'crm_messenger.api.conversations.get_or_create_lead_conversation',
     {
-      reference_name: props.leadName,
+      reference_name: context.lead,
       channel: selectedChannel.value,
     },
   )
+  if (!context.isCurrent()) return null
 
   if (result?.reason === 'missing_phone') {
     genericError.value = __('This lead has no phone number.')
@@ -1892,7 +1945,6 @@ function scrollToBottom() {
   messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   newMessageCount.value = 0
   readController.schedule()
-  scheduleMessengerNotificationRead()
 }
 
 function isNearBottom() {
@@ -1903,7 +1955,6 @@ async function handleMessagesScroll() {
   if (isNearBottom()) {
     newMessageCount.value = 0
     readController.schedule()
-    scheduleMessengerNotificationRead()
   }
   if (
     !messagesEl.value ||
@@ -2055,44 +2106,7 @@ function handleVisibilityChange() {
     composerTyping.reset()
   } else {
     readController.schedule()
-    scheduleMessengerNotificationRead()
   }
-}
-
-async function markMessengerNotificationsRead() {
-  if (
-    notificationReadPending ||
-    !props.active ||
-    document.visibilityState !== 'visible' ||
-    !selectedConversation.value?.name ||
-    !isNearBottom()
-  )
-    return
-  let lastInbound = messages.value
-    .filter(
-      (message) =>
-        message.conversation === selectedConversation.value.name &&
-        message.direction === 'inbound' &&
-        message.status !== 'deleted' &&
-        message.ingest_source !== 'provider_history',
-    )
-    .at(-1)
-  if (!lastInbound?.name) return
-  notificationReadPending = true
-  try {
-    await call('crm.api.notifications.mark_messenger_as_read', {
-      conversation: selectedConversation.value.name,
-      last_event_id: lastInbound.name,
-    })
-  } catch {
-    // Notifications are auxiliary and must not interrupt the conversation UI.
-  } finally {
-    notificationReadPending = false
-  }
-}
-
-function scheduleMessengerNotificationRead() {
-  nextTick(() => markMessengerNotificationsRead())
 }
 
 watch(
@@ -2103,7 +2117,6 @@ watch(
       composerTyping.reset()
     } else {
       readController.schedule()
-      scheduleMessengerNotificationRead()
     }
   },
 )

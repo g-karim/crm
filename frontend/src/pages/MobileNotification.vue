@@ -95,8 +95,7 @@ const notificationItems = computed(
 )
 
 function markAsRead(notification) {
-  if (notification.type !== 'Messenger')
-    markNotificationAsRead(notification.name)
+  markNotificationAsRead(notification.name)
 }
 
 function getRoute(notification) {

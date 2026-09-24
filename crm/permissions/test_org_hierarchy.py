@@ -6,6 +6,8 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils.nestedset import rebuild_tree
 
 from crm.api.activities import get_activities
+from crm.api.dashboard import get_chart
+from crm.api.session import get_session_role_flags, get_users
 from crm.permissions.org_hierarchy import (
 	get_lead_permission_query_conditions,
 	has_deal_permission,
@@ -31,6 +33,9 @@ class TestOrgHierarchy(IntegrationTestCase):
 		make_user("rep1@hier.test", roles=["Sales User"])
 		make_user("rep2@hier.test", roles=["Sales User"])
 		make_user("outsider@hier.test", roles=["Sales User"])
+		make_user("crm-manager@hier.test", roles=["CRM Manager", "CRM User"])
+		make_user("crm-user@hier.test", roles=["CRM User"])
+		make_user("no-crm-role@hier.test")
 
 		# Build hierarchy
 		mgr = make_hierarchy_node("manager@hier.test", is_group=1)
@@ -75,6 +80,57 @@ class TestOrgHierarchy(IntegrationTestCase):
 		lead = make_lead("rep2@hier.test")
 		self.assertTrue(has_lead_permission(lead, "read", "manager@hier.test"))
 
+	def test_manager_can_read_lead_outside_hierarchy(self):
+		lead = make_lead("outsider@hier.test")
+		self.assertTrue(has_lead_permission(lead, "read", "manager@hier.test"))
+		frappe.set_user("manager@hier.test")
+		try:
+			self.assertIn(lead.name, frappe.get_list("CRM Lead", pluck="name"))
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_crm_manager_role_can_read_all_leads_even_with_hierarchy(self):
+		lead = make_lead("outsider@hier.test")
+		self.assertTrue(has_lead_permission(lead, "read", "crm-manager@hier.test"))
+		frappe.set_user("crm-manager@hier.test")
+		try:
+			self.assertTrue(frappe.has_permission("CRM Lead", "write", doc=lead))
+			self.assertIn(lead.name, frappe.get_list("CRM Lead", pluck="name"))
+			self.assertTrue(get_session_role_flags()["is_sales_manager"])
+			_, crm_users = get_users()
+			self.assertEqual(
+				next(row.role for row in crm_users if row.name == frappe.session.user), "CRM Manager"
+			)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_crm_user_role_requires_assignment_and_manager_role_takes_priority(self):
+		lead = make_lead("rep1@hier.test")
+		self.assertFalse(has_lead_permission(lead, "read", "crm-user@hier.test"))
+		frappe.set_user("crm-user@hier.test")
+		try:
+			self.assertNotIn(lead.name, frappe.get_list("CRM Lead", pluck="name"))
+			self.assertTrue(get_session_role_flags()["is_sales_user"])
+			_, crm_users = get_users()
+			self.assertEqual(
+				next(row.role for row in crm_users if row.name == frappe.session.user), "CRM User"
+			)
+			chart = get_chart("total_leads", "2026-01-01", "2027-01-01", user="rep1@hier.test")
+			self.assertEqual(chart["value"], 0)
+		finally:
+			frappe.set_user("Administrator")
+		assignment = assign_todo("CRM Lead", lead.name, "crm-user@hier.test")
+		self.assertTrue(has_lead_permission(lead, "write", "crm-user@hier.test"))
+		frappe.db.set_value("ToDo", assignment.name, "status", "Cancelled")
+		frappe.db.set_value("CRM Lead", lead.name, "lead_owner", None)
+		self.assertFalse(has_lead_permission(lead, "read", "crm-user@hier.test"))
+
+	def test_user_without_crm_role_cannot_access_assigned_lead(self):
+		lead = make_lead("rep1@hier.test")
+		frappe.db.set_value("CRM Lead", lead.name, "lead_owner", "no-crm-role@hier.test")
+		self.assertFalse(has_lead_permission(lead, "read", "no-crm-role@hier.test"))
+		self.assertEqual(get_lead_permission_query_conditions("no-crm-role@hier.test"), "false")
+
 	def test_sibling_cannot_read_peer_lead(self):
 		lead = make_lead("rep1@hier.test")
 		self.assertFalse(has_lead_permission(lead, "read", "rep2@hier.test"))
@@ -104,6 +160,20 @@ class TestOrgHierarchy(IntegrationTestCase):
 		lead = make_lead("rep1@hier.test")
 		assign_todo("CRM Lead", lead.name, "outsider@hier.test", status="Cancelled")
 		self.assertFalse(has_lead_permission(lead, "read", "outsider@hier.test"))
+
+	def test_closed_todo_and_read_share_do_not_grant_specialist_access(self):
+		lead = make_lead("rep1@hier.test")
+		assignment = assign_todo("CRM Lead", lead.name, "outsider@hier.test")
+		frappe.db.set_value("ToDo", assignment.name, "status", "Closed")
+		frappe.db.set_value("CRM Lead", lead.name, "lead_owner", None)
+		with self.assertRaises(frappe.PermissionError):
+			frappe.share.add("CRM Lead", lead.name, "outsider@hier.test", read=1, write=0)
+		self.assertFalse(has_lead_permission(lead, "read", "outsider@hier.test"))
+		frappe.set_user("outsider@hier.test")
+		try:
+			self.assertNotIn(lead.name, frappe.get_list("CRM Lead", pluck="name"))
+		finally:
+			frappe.set_user("Administrator")
 
 	def test_manager_can_read_lead_assigned_to_report(self):
 		lead = make_lead("outsider@hier.test")

@@ -67,6 +67,8 @@ export function createMessengerSyncController(options) {
   let historyRequest = null
   let scopeReloadRequest = null
   let scopeReloadNeeded = false
+  let snapshotRetryTimer = null
+  let snapshotRetryDelay = 2000
 
   function api(method, params) {
     return call(`crm_messenger.api.messages.${method}`, params)
@@ -111,16 +113,50 @@ export function createMessengerSyncController(options) {
     if (name) socket?.emit('doc_unsubscribe', REFERENCE_DOCTYPE, name)
   }
 
+  function clearSnapshotRetry() {
+    clearTimeout(snapshotRetryTimer)
+    snapshotRetryTimer = null
+  }
+
+  function scheduleSnapshotRetry(error) {
+    if (
+      ['PermissionError', 'AuthenticationError', 'DoesNotExistError'].includes(
+        error?.exc_type,
+      )
+    )
+      return
+    clearSnapshotRetry()
+    let requestGeneration = generation
+    snapshotRetryTimer = setTimeout(() => {
+      snapshotRetryTimer = null
+      if (requestGeneration === generation && leadName)
+        syncDelta().catch(() => {})
+    }, snapshotRetryDelay)
+    snapshotRetryDelay = Math.min(snapshotRetryDelay * 2, 30000)
+  }
+
   async function loadSnapshot({ reset = true } = {}) {
     if (!leadName) return
     let requestGeneration = generation
     let requestedLead = leadName
-    let result = await api('get_message_page', scopeParams({ limit: 100 }))
+    let result
+    try {
+      result = await api('get_message_page', scopeParams({ limit: 100 }))
+    } catch (error) {
+      if (requestGeneration !== generation || requestedLead !== leadName) return
+      if (!syncCursor) {
+        scopeReloadNeeded = true
+        scheduleSnapshotRetry(error)
+      }
+      throw error
+    }
     if (requestGeneration !== generation || requestedLead !== leadName) return
     if (result?.contract_version !== 1 || !result?.sync_cursor) {
       throw new Error('Unsupported messenger snapshot response.')
     }
 
+    clearSnapshotRetry()
+    snapshotRetryDelay = 2000
     notifyPermissions(result)
     scopeReloadNeeded = false
     if (reset) {
@@ -277,6 +313,7 @@ export function createMessengerSyncController(options) {
       return scopeReloadRequest.promise
     }
 
+    clearSnapshotRetry()
     generation += 1
     let requestGeneration = generation
     let requestedLead = leadName
@@ -356,6 +393,8 @@ export function createMessengerSyncController(options) {
     nextLead = nextLead || ''
     if (nextLead === leadName && syncCursor) return
     let previousLead = leadName
+    clearSnapshotRetry()
+    snapshotRetryDelay = 2000
     generation += 1
     leadName = nextLead
     messages = []
@@ -389,6 +428,7 @@ export function createMessengerSyncController(options) {
   }
 
   function stop() {
+    clearSnapshotRetry()
     generation += 1
     scopeReloadRequest = null
     scopeReloadNeeded = false

@@ -683,6 +683,8 @@ def remove_assignments(doctype: str, name: str, assignees: str | list, ignore_pe
 
 @frappe.whitelist()
 def get_assigned_users(doctype: str, name: str | int, default_assigned_to: str | None = None):
+	if not frappe.has_permission(doctype, "read", name):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
 	assigned_users = frappe.get_all(
 		"ToDo",
 		fields=["allocated_to"],
@@ -758,6 +760,8 @@ def get_linked_docs_of_document(doctype: str, docname: str):
 		doc = frappe.get_doc(doctype, docname)
 	except frappe.DoesNotExistError:
 		return []
+	if not doc.has_permission("read"):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
 	linked_docs = get_linked_docs(doc)
 	dynamic_linked_docs = get_dynamic_linked_docs(doc)
@@ -773,6 +777,8 @@ def get_linked_docs_of_document(doctype: str, docname: str):
 		try:
 			data = frappe.get_doc(doc["reference_doctype"], doc["reference_docname"])
 		except (frappe.DoesNotExistError, frappe.ValidationError):
+			continue
+		if not data.has_permission("read"):
 			continue
 
 		title = data.get("title")

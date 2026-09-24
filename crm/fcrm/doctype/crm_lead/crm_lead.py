@@ -102,15 +102,12 @@ class CRMLead(Document):
 		self.validate_email()
 		self.validate_lost_reason()
 		if not self.is_new() and self.has_value_changed("lead_owner") and self.lead_owner:
-			self.share_with_agent(self.lead_owner)
 			self.assign_agent(self.lead_owner)
 		if self.has_value_changed("status"):
 			add_status_change_log(self)
 
 	def after_insert(self):
 		if self.lead_owner:
-			if self.lead_owner != frappe.session.user:
-				self.share_with_agent(self.lead_owner)
 			self.assign_agent(self.lead_owner)
 
 		# Auto-enrich a new Lead from its website (best-effort, background job).
@@ -120,6 +117,12 @@ class CRMLead(Document):
 
 	def before_save(self):
 		self.apply_sla()
+
+	def on_update(self):
+		if self.has_value_changed("lead_owner"):
+			previous = self.get_doc_before_save()
+			if previous and previous.lead_owner and previous.lead_owner != self.lead_owner:
+				frappe.publish_realtime("crm_notification", {}, user=previous.lead_owner, after_commit=True)
 
 	def validate_status(self):
 		if self.is_new() and not self.status:
@@ -192,38 +195,6 @@ class CRMLead(Document):
 				{"assign_to": [agent], "doctype": "CRM Lead", "name": self.name},
 				ignore_permissions=True,
 			)
-
-	def share_with_agent(self, agent):
-		if not agent:
-			return
-
-		docshares = frappe.get_all(
-			"DocShare",
-			filters={"share_name": self.name, "share_doctype": self.doctype},
-			fields=["name", "user"],
-		)
-
-		shared_with = [d.user for d in docshares] + [agent]
-
-		for user in shared_with:
-			if user == agent and not frappe.db.exists(
-				"DocShare",
-				{"user": agent, "share_name": self.name, "share_doctype": self.doctype},
-			):
-				frappe.share.add_docshare(
-					self.doctype,
-					self.name,
-					agent,
-					write=1,
-					flags={"ignore_share_permission": True},
-				)
-			elif user != agent:
-				frappe.share.remove(
-					self.doctype,
-					self.name,
-					user,
-					flags={"ignore_share_permission": True, "ignore_permissions": True},
-				)
 
 	def create_contact(self, existing_contact=None, throw=True):
 		if not self.lead_name:

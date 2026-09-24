@@ -33,9 +33,11 @@ def get_dashboard(from_date: str | None = None, to_date: str | None = None, user
 		from_date = frappe.utils.get_first_day(from_date or frappe.utils.nowdate())
 		to_date = frappe.utils.get_last_day(to_date or frappe.utils.nowdate())
 
-	roles = frappe.get_roles(frappe.session.user)
-	is_sales_manager = "Sales Manager" in roles or "System Manager" in roles
-	is_sales_user = "Sales User" in roles and not is_sales_manager
+	roles = set(frappe.get_roles(frappe.session.user))
+	is_sales_manager = frappe.session.user == "Administrator" or bool(
+		roles & {"System Manager", "Sales Manager", "CRM Manager"}
+	)
+	is_sales_user = bool(roles & {"Sales User", "CRM User"}) and not is_sales_manager
 
 	if is_sales_user:
 		user = frappe.session.user
@@ -73,9 +75,11 @@ def get_chart(
 		from_date = frappe.utils.get_first_day(from_date or frappe.utils.nowdate())
 		to_date = frappe.utils.get_last_day(to_date or frappe.utils.nowdate())
 
-	roles = frappe.get_roles(frappe.session.user)
-	is_sales_manager = "Sales Manager" in roles or "System Manager" in roles
-	is_sales_user = "Sales User" in roles and not is_sales_manager
+	roles = set(frappe.get_roles(frappe.session.user))
+	is_sales_manager = frappe.session.user == "Administrator" or bool(
+		roles & {"System Manager", "Sales Manager", "CRM Manager"}
+	)
+	is_sales_user = bool(roles & {"Sales User", "CRM User"}) and not is_sales_manager
 
 	if is_sales_user:
 		user = frappe.session.user

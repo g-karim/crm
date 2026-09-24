@@ -56,12 +56,13 @@
       </div>
       <input
         v-else
-        class="h-8 w-full accent-blue-500"
+        class="audio-seek-range h-8 w-full rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
         type="range"
         min="0"
         max="1"
         step="0.001"
         :value="progress"
+        :style="{ '--seek-progress': `${progress * 100}%` }"
         :aria-label="__('Playback Position')"
         @input="seekToFraction($event.target.value)"
       />
@@ -257,3 +258,50 @@ onBeforeUnmount(() => {
   audio.value?.pause()
 })
 </script>
+
+<style scoped>
+.audio-seek-range {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.audio-seek-range::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--surface-blue-7) 0 var(--seek-progress),
+    var(--surface-gray-5) var(--seek-progress) 100%
+  );
+}
+
+.audio-seek-range::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--surface-gray-5);
+}
+
+.audio-seek-range::-moz-range-progress {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--surface-blue-7);
+}
+
+.audio-seek-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.25rem;
+  border-radius: 50%;
+  background: var(--surface-blue-7);
+}
+
+.audio-seek-range::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-blue-7);
+}
+</style>

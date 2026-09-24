@@ -2,8 +2,10 @@
 # For license information, please see license.txt
 
 import frappe
-import frappe.share
-from frappe.desk.form.assign_to import _add, _remove, add, remove
+from frappe.desk.form.assign_to import add, remove
+
+_add = add
+_remove = remove
 from frappe.tests import IntegrationTestCase
 
 from crm.api.todo import allow_internal_lead_assignment
@@ -25,13 +27,6 @@ class TestLeadAssignmentPermissions(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.savepoint("test_lead_assignment_permissions")
 		self.lead = make_lead("assignment-writer@example.com")
-		frappe.share.add(
-			"CRM Lead",
-			self.lead.name,
-			"assignment-reader@example.com",
-			read=1,
-			write=0,
-		)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")

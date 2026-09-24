@@ -39,13 +39,13 @@ class CRMNotification(Document):
 			return
 
 		message = {"name": self.name, "type": self.type, "reference_name": self.reference_name}
-		if self.type != "Messenger":
+		if self.type != "Messenger" and self.reference_doctype != "CRM Lead":
 			frappe.publish_realtime("crm_notification", message, user=self.to_user, after_commit=True)
 			return
 
 		frappe.db.after_commit.add(
 			partial(
-				_publish_messenger_realtime,
+				_publish_scoped_realtime,
 				self.to_user,
 				self.reference_doctype,
 				self.reference_name,
@@ -69,7 +69,7 @@ def has_permission(doc, ptype, user):
 	if not user:
 		user = frappe.session.user
 
-	if doc.type == "Messenger" and not can_access_notification(doc, user=user):
+	if not can_access_notification(doc, user=user):
 		return False
 
 	if user == "Administrator" or "System Manager" in frappe.get_roles(user):
@@ -85,7 +85,7 @@ def has_permission(doc, ptype, user):
 
 
 def get_notification_visibility_condition(user=None):
-	"""Keep ordinary notifications and Messenger rows with a readable CRM reference."""
+	"""Only expose Lead notifications while the recipient can read the Lead."""
 	if not user:
 		user = frappe.session.user
 
@@ -93,12 +93,15 @@ def get_notification_visibility_condition(user=None):
 		"("
 		+ " or ".join(
 			[
-				"`tabCRM Notification`.`type` != 'Messenger'",
-				_messenger_reference_visibility_condition(
+				"(`tabCRM Notification`.`type` != 'Messenger' and coalesce(`tabCRM Notification`.`reference_doctype`, '') != 'CRM Lead')",
+				_reference_visibility_condition(
 					"CRM Lead", "`tabCRM Lead`", _get_read_permission_condition("CRM Lead", user)
 				),
-				_messenger_reference_visibility_condition(
-					"CRM Deal", "`tabCRM Deal`", _get_read_permission_condition("CRM Deal", user)
+				_reference_visibility_condition(
+					"CRM Deal",
+					"`tabCRM Deal`",
+					_get_read_permission_condition("CRM Deal", user),
+					messenger_only=True,
 				),
 			]
 		)
@@ -112,10 +115,11 @@ def _get_read_permission_condition(doctype, user):
 	return build_match_conditions(doctype, user=user) or "true"
 
 
-def _messenger_reference_visibility_condition(doctype, table, permission_condition):
+def _reference_visibility_condition(doctype, table, permission_condition, messenger_only=False):
+	message_type_condition = "and `tabCRM Notification`.`type` = 'Messenger'" if messenger_only else ""
 	return f"""(
 		`tabCRM Notification`.`reference_doctype` = '{doctype}'
-		and `tabCRM Notification`.`type` = 'Messenger'
+		{message_type_condition}
 		and exists (
 			select 1 from {table}
 			where {table}.`name` = `tabCRM Notification`.`reference_name`
@@ -125,7 +129,7 @@ def _messenger_reference_visibility_condition(doctype, table, permission_conditi
 
 
 def can_access_notification(notification, user=None):
-	if notification.type != "Messenger":
+	if notification.type != "Messenger" and notification.reference_doctype != "CRM Lead":
 		return True
 	if (
 		notification.reference_doctype not in MESSENGER_REFERENCE_DOCTYPES
@@ -137,14 +141,17 @@ def can_access_notification(notification, user=None):
 	return frappe.has_permission(notification.reference_doctype, "read", doc=doc, user=user)
 
 
-def _publish_messenger_realtime(user, reference_doctype, reference_name, message):
+def _publish_scoped_realtime(user, reference_doctype, reference_name, message):
 	notification = frappe._dict(
-		type="Messenger",
+		type=message["type"],
 		reference_doctype=reference_doctype,
 		reference_name=reference_name,
 	)
 	if can_access_notification(notification, user=user):
 		frappe.publish_realtime("crm_notification", message, user=user)
+	else:
+		# Refresh cached notifications without sending the revoked Lead reference.
+		frappe.publish_realtime("crm_notification", {}, user=user)
 
 
 def notify_user(notification):

@@ -55,6 +55,10 @@ def _assignment_references(doc):
 def after_insert(doc, method):
 	if doc.reference_type in ["CRM Lead", "CRM Deal"] and doc.reference_name and doc.allocated_to:
 		fieldname = "lead_owner" if doc.reference_type == "CRM Lead" else "deal_owner"
+		if doc.reference_type == "CRM Lead":
+			previous_owner = frappe.db.get_value("CRM Lead", doc.reference_name, "lead_owner")
+			if previous_owner and previous_owner != doc.allocated_to:
+				frappe.publish_realtime("crm_notification", {}, user=previous_owner, after_commit=True)
 		# Mirror assign_to: the latest assignment owns the record, overriding any prior owner.
 		frappe.db.set_value(
 			doc.reference_type, doc.reference_name, fieldname, doc.allocated_to, update_modified=False
@@ -74,6 +78,13 @@ def on_update(doc, method):
 	):
 		notify_assigned_user(doc, is_cancelled=True)
 		clear_owner_on_unassign(doc)
+	if (
+		doc.has_value_changed("status")
+		and doc.status in ("Cancelled", "Closed")
+		and doc.reference_type == "CRM Lead"
+		and doc.allocated_to
+	):
+		frappe.publish_realtime("crm_notification", {}, user=doc.allocated_to, after_commit=True)
 
 
 def clear_owner_on_unassign(doc):

@@ -1,6 +1,11 @@
 """CRM-owned runtime translations for fork-specific user interface strings."""
 
 RUSSIAN_TRANSLATIONS = {
+	"Avito listing": "Объявление Avito",
+	"Listing for the selected conversation": "Объявление выбранного диалога",
+	"Listing details are not available yet.": "Данные объявления пока недоступны.",
+	"Listing ID: {0}": "ID объявления: {0}",
+	"Open on Avito": "Открыть на Avito",
 	# Message channel settings
 	"Message Channels": "Каналы сообщений",
 	"Connect Telegram, VK, MAX, Avito, WhatsApp, and other channels, and reply to customers from lead records.": "Подключайте Telegram, VK, MAX, Avito, WhatsApp и другие каналы и отвечайте клиентам из карточки лида.",
