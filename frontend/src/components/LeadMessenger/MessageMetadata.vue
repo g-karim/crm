@@ -51,6 +51,10 @@ const props = defineProps({
 
 const emit = defineEmits(['start-edit', 'delete', 'retry', 'reply'])
 
+function capitalizeFirstLetter(label) {
+  return label.replace(/^./u, (letter) => letter.toUpperCase())
+}
+
 const menuOptions = computed(() =>
   getMessengerMessageActions(props.message).map((action) => {
     if (action === 'reply') {
@@ -69,7 +73,7 @@ const menuOptions = computed(() =>
     }
     if (action === 'edit') {
       return {
-        label: __('Edit'),
+        label: capitalizeFirstLetter(__('Edit')),
         icon: 'edit-3',
         onClick: () => emit('start-edit'),
       }
