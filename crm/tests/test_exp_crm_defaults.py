@@ -70,6 +70,33 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 		self.assertEqual(frappe.db.get_value("Desktop Icon", "CRM", "hidden"), 1)
 		self.assertEqual(frappe.db.get_value("Desktop Icon", APP_NAME, "hidden"), 0)
 
+	def test_branding_repairs_migrated_crm_desktop_icon(self):
+		ensure_crm_branding_defaults()
+		icon_name = frappe.get_all("Desktop Icon", filters={"app": "crm"}, pluck="name")[0]
+		frappe.db.set_value(
+			"Desktop Icon",
+			icon_name,
+			{
+				"parent_icon": APP_NAME,
+				"link_type": "Workspace Sidebar",
+				"link_to": "Frappe CRM",
+				"link": None,
+			},
+			update_modified=False,
+		)
+
+		ensure_crm_branding_defaults()
+		icon = frappe.db.get_value(
+			"Desktop Icon",
+			icon_name,
+			["parent_icon", "link_type", "link", "link_to"],
+			as_dict=True,
+		)
+		self.assertIsNone(icon.parent_icon)
+		self.assertEqual(icon.link_type, "External")
+		self.assertEqual(icon.link, "/crm")
+		self.assertIsNone(icon.link_to)
+
 	def test_hide_legacy_erpnext_crm_workspace(self):
 		if not frappe.db.table_exists("Workspace"):
 			return
