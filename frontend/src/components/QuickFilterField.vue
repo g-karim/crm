@@ -13,6 +13,7 @@
     type="select"
     :options="translatedOptions"
     :placeholder="__(filter.label)"
+    side="bottom"
     @update:modelValue="updateFilter(filter, $event)"
   />
   <Link
