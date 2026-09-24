@@ -145,7 +145,7 @@ const tabs = createResource({
             if (field.fieldname == 'status') {
               field.fieldtype = 'Select'
               field.options = leadStatuses.value
-              field.prefix = getLeadStatus(lead.doc.status).color
+              field.prefix = getLeadStatus(lead.doc.status)?.color
             }
 
             if (field.fieldtype === 'Table') {

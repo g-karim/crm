@@ -40,7 +40,7 @@
             :iconRight="open ? 'chevron-up' : 'chevron-down'"
           >
             <template #prefix>
-              <IndicatorIcon :class="getLeadStatus(doc.status).color" />
+              <IndicatorIcon :class="getLeadStatus(doc.status)?.color" />
             </template>
           </Button>
         </template>

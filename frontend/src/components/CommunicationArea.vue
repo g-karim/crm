@@ -301,6 +301,8 @@ async function submitComment() {
   try {
     await sending
   } catch {
+    showCommentBox.value = true
+    reload.value = true
     return
   }
   newComment.value = ''

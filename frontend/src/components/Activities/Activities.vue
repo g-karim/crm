@@ -18,6 +18,13 @@
       <LoadingIndicator class="h-6 w-6" />
       <span>{{ __('Loading...') }}</span>
     </div>
+    <div
+      v-else-if="all_activities.error || activityLoadTimedOut"
+      class="flex flex-1 flex-col items-center justify-center gap-3 text-ink-gray-5"
+    >
+      <span>{{ __('Failed to load activities') }}</span>
+      <Button :label="__('Retry')" @click="all_activities.reload()" />
+    </div>
     <div v-else-if="title == 'Events'" class="h-full activity">
       <EventArea :doctype="doctype" :docname="docname" />
     </div>
@@ -554,6 +561,23 @@ const all_activities = createResource({
   },
 })
 
+const activityLoadTimedOut = ref(false)
+let activityLoadTimer
+watch(
+  () => all_activities.loading,
+  (loading) => {
+    clearTimeout(activityLoadTimer)
+    if (loading) {
+      activityLoadTimedOut.value = false
+      activityLoadTimer = setTimeout(() => {
+        activityLoadTimedOut.value = true
+        all_activities.abort()
+      }, 20000)
+    }
+  },
+  { immediate: true },
+)
+
 const showWhatsappTemplates = ref(false)
 
 const whatsappMessages = createResource({
@@ -577,6 +601,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  clearTimeout(activityLoadTimer)
   $socket.off('whatsapp_message')
   $socket.off('docinfo_update', handleDocinfoUpdate)
   $socket.emit('doc_unsubscribe', props.doctype, props.docname)
