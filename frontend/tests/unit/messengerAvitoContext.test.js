@@ -59,9 +59,10 @@ describe('Avito listing context', () => {
 
   it('handles missing data, legacy ID-only context, and other providers', async () => {
     let { root, props } = mount({ provider: 'avito_direct' })
-    expect(root.textContent).toContain('Listing details are not available yet.')
-    expect(root.querySelector('img')).toBeNull()
-    expect(root.querySelector('a')).toBeNull()
+    expect(root.querySelector('section')).toBeNull()
+    props.conversation = { provider: 'avito_direct', avito_item: {} }
+    await nextTick()
+    expect(root.querySelector('section')).toBeNull()
     props.conversation = { provider: 'avito_direct', avito_item: { id: '300' } }
     await nextTick()
     expect(root.textContent).toContain('Listing ID: 300')
@@ -102,7 +103,8 @@ describe('Avito listing context', () => {
     expect(avitoConversationLabel(a)).not.toBe(avitoConversationLabel(b))
     delete a.avito_item
     delete b.avito_item
-    expect(avitoConversationLabel(a)).not.toBe(avitoConversationLabel(b))
+    expect(avitoConversationLabel(a)).toBe('')
+    expect(avitoConversationLabel(b)).toBe('')
     expect(avitoConversationLabel({ provider: 'telegram_bot' })).toBe('')
   })
 })

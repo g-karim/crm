@@ -21,6 +21,11 @@ function safeUrl(value, listing = false) {
 export function getAvitoItem(conversation) {
   if (conversation?.provider !== 'avito_direct') return null
   let item = conversation.avito_item || {}
+  if (
+    !item ||
+    !Object.values(item).some((value) => value != null && value !== '')
+  )
+    return null
   let images = item.images_main
   let image =
     images && typeof images === 'object'
