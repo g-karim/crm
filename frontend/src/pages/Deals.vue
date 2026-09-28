@@ -292,6 +292,7 @@ import { callEnabled } from '@/composables/telephony'
 import { formatDate, timeAgo, website, formatTime } from '@/utils'
 import { timestampCell } from '@/composables/useTimelinePreferences'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
+import { useBroadcast } from '@/composables/useBroadcast'
 import { Tooltip, Avatar, Dropdown, createListResource } from 'frappe-ui'
 import { useRoute } from 'vue-router'
 import { ref, reactive, computed, h, watch } from 'vue'
@@ -306,6 +307,7 @@ const { getView, views } = viewsStore()
 const { updateOnboardingStep } = useOnboarding('frappecrm')
 const { capture } = useTelemetry()
 const { showModal } = useDoctypeModal()
+const { on } = useBroadcast()
 
 const route = useRoute()
 
@@ -315,6 +317,10 @@ const selectedPipeline = ref(
   localStorage.getItem('crm:selectedDealPipeline') || '',
 )
 const pipelinesLoaded = ref(false)
+
+on('trigger_deal_create', (data) => {
+  showDealModal.value = Boolean(data)
+})
 
 const defaults = reactive({})
 
