@@ -709,6 +709,11 @@ function clientProviderMessage(message) {
 
 function providerActionFailureMessage(result = {}) {
   if (result.reason === 'messenger_subscription_required') {
+    if (result.response?.chat_discovery_available) {
+      return __(
+        'Chat discovery is available. Connect this channel to create Avito leads automatically; read and reply on Avito.',
+      )
+    }
     return __(
       'This account does not have access to the Avito Messenger API. Switch to a subscription that includes the Messenger API, then try again.',
     )

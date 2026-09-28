@@ -339,6 +339,7 @@ class CRMLead(Document):
 			"idx",
 			"docstatus",
 			"status",
+			"source",
 			"email",
 			"mobile_no",
 			"phone",
@@ -461,6 +462,13 @@ class CRMLead(Document):
 				"type": "Data",
 				"key": "mobile_no",
 				"width": "11rem",
+			},
+			{
+				"label": "Source",
+				"type": "Link",
+				"key": "source",
+				"options": "CRM Lead Source",
+				"width": "9rem",
 			},
 			{
 				"label": "Assigned To",

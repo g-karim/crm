@@ -1,6 +1,12 @@
 """CRM-owned runtime translations for fork-specific user interface strings."""
 
 RUSSIAN_TRANSLATIONS = {
+	"Avito chat is unavailable because this account has no subscription with Messenger API access.": "Переписка недоступна: у аккаунта нет подписки с доступом к API мессенджера Авито.",
+	"The lead is synchronized automatically. Read and reply on Avito.": "Лид синхронизируется автоматически. Читайте сообщения и отвечайте на Авито.",
+	"Continue the conversation on Avito": "Продолжите общение на Авито",
+	"This Avito account does not have a subscription for messaging in CRM.": "У аккаунта Авито нет подписки для переписки в CRM.",
+	"Avito chats are synchronized as leads. Reading and sending messages requires a subscription with Messenger API access.": "Чаты Авито синхронизируются как лиды. Для чтения и отправки сообщений нужна подписка с доступом к API мессенджера.",
+	"Chat discovery is available. Connect this channel to create Avito leads automatically; read and reply on Avito.": "Список чатов доступен. Подключите канал для автоматического создания лидов Авито; читайте сообщения и отвечайте на Авито.",
 	"Avito listing": "Объявление Avito",
 	"Listing for the selected conversation": "Объявление выбранного диалога",
 	"Listing details are not available yet.": "Данные объявления пока недоступны.",

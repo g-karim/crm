@@ -326,6 +326,68 @@ async function resolveSelectionRequests(requests, first) {
   }
 }
 
+describe('Avito subscription restriction', () => {
+  function restrictedChannel() {
+    return {
+      ...channel('AVITO'), provider: 'avito_direct', platform: 'avito',
+      capabilities: { ...channel('AVITO').capabilities, messenger_access: 'subscription_required', supports_text: false, supports_attachments: false },
+      can_send: false, disabled_reason: 'messenger_subscription_required',
+    }
+  }
+
+  it('shows the real chat link, hides old messages and removes the composer', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [restrictedChannel()]
+    conversationRows = [{ name: 'AVITO-CHAT', provider: 'avito_direct', channel: 'AVITO', external_chat_id: 'A'.repeat(26), status: 'Open' }]
+    conversationRows[0].avito_item = {
+      id: '123', title: 'Balancing machine', price_string: '1 615 680 ₽',
+      url: 'https://www.avito.ru/item_123',
+    }
+    snapshotMessages = [{ name: 'OLD-AVITO-MESSAGE', conversation: 'AVITO-CHAT', channel: 'AVITO', provider: 'avito_direct', direction: 'inbound', text: 'old content', message_datetime: '2026-08-23 10:00:00' }]
+    let root = await mountConversation()
+    let notice = root.querySelector('[data-testid="avito-subscription-notice"]')
+    expect(notice?.textContent).toContain('The lead is synchronized automatically')
+    expect(notice?.querySelector('[data-testid="avito-open-chat"]').href).toBe(`https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`)
+    expect(root.querySelector('[data-message-id="OLD-AVITO-MESSAGE"]')).toBeNull()
+    expect(root.querySelector('input[placeholder="Enter a message..."]')).toBeNull()
+    expect(root.querySelector('[data-testid="avito-item-card"]')).toBeNull()
+    expect(root.querySelectorAll('[data-testid="avito-subscription-notice"]')).toHaveLength(1)
+    expect(root.textContent.match(/Balancing machine/g)).toHaveLength(1)
+    expect(notice.textContent).toContain('1 615 680 ₽')
+    expect(root.textContent).not.toContain('No messages yet')
+  })
+
+  it('reloads channel access when an open conversation is invalidated', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [restrictedChannel()]
+    conversationRows = [{ name: 'AVITO-CHAT', provider: 'avito_direct', channel: 'AVITO', external_chat_id: 'A'.repeat(26), status: 'Open' }]
+    conversationRows[0].avito_item = { id: '123', title: 'Balancing machine' }
+    let root = await mountConversation({ active: true })
+    expect(root.querySelector('[data-testid="avito-subscription-notice"]')).not.toBeNull()
+    channelRows = [{ ...channel('AVITO'), provider: 'avito_direct', platform: 'avito' }]
+    mocks.socket.emit('crm_messenger:conversation_changed', {
+      version: 1, reference_doctype: 'CRM Lead', reference_name: 'LEAD-1',
+      conversation_state_changed: true, scope_invalidated: true,
+    })
+    await vi.waitFor(() => expect(root.querySelector('[data-testid="avito-subscription-notice"]')).toBeNull())
+    expect(root.querySelector('[data-testid="avito-item-card"]')).not.toBeNull()
+    expect(root.querySelector('input[placeholder="Enter a message..."]')).not.toBeNull()
+  })
+
+  it('keeps another messenger available in the same lead', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [channel('TELEGRAM'), restrictedChannel()]
+    conversationRows = [
+      { name: 'TELEGRAM-CHAT', channel: 'TELEGRAM', provider: 'telegram_bot', external_chat_id: 'chat-1', status: 'Open' },
+      { name: 'AVITO-CHAT', channel: 'AVITO', provider: 'avito_direct', external_chat_id: 'A'.repeat(26), status: 'Open' },
+    ]
+    latestInbound = { conversation: 'TELEGRAM-CHAT', channel: 'TELEGRAM' }
+    let root = await mountConversation()
+    expect(root.querySelector('[data-testid="avito-subscription-notice"]')).toBeNull()
+    expect(root.querySelector('input[placeholder="Enter a message..."]')?.disabled).toBe(false)
+  })
+})
+
 describe('messenger initial selection', () => {
   it.each(['success', 'failure', 'return-to-same-lead'])(
     'ignores obsolete Lead context responses: %s',
