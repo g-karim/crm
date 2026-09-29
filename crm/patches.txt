@@ -49,3 +49,4 @@ crm.patches.v1_0.cleanup_resolved_deal_import_labels #06-07-2026
 crm.patches.v1_0.backfill_crm_external_references #06-07-2026
 crm.patches.v1_0.remove_lead_docshares #23-09-2026
 crm.patches.v1_0.add_avito_lead_source
+crm.patches.v1_0.add_messenger_lead_sources
