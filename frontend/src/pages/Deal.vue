@@ -363,6 +363,7 @@ import LinkIcon from '@/components/Icons/LinkIcon.vue'
 import ArrowUpRightIcon from '@/components/Icons/ArrowUpRightIcon.vue'
 import SuccessIcon from '@/components/Icons/SuccessIcon.vue'
 import AttachmentIcon from '@/components/Icons/AttachmentIcon.vue'
+import FileTextIcon from '@/components/Icons/FileTextIcon.vue'
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import Activities from '@/components/Activities/Activities.vue'
 import OrganizationModal from '@/components/Modals/OrganizationModal.vue'
@@ -384,6 +385,7 @@ import { statusesStore } from '@/stores/statuses'
 import { getMeta } from '@/stores/meta'
 import { useDocument } from '@/data/document'
 import { whatsappEnabled } from '@/composables/whatsapp'
+import { canViewQuotations } from '@/composables/erpnext'
 import { callEnabled } from '@/composables/telephony'
 import { useCommandPaletteContext } from '@/composables/useCommandPalette'
 import { flattenCommandActions } from '@/utils/commandPalette'
@@ -803,6 +805,12 @@ const defaultTabs = computed(() => {
       icon: WhatsAppIcon,
       condition: () => whatsappEnabled.value,
     },
+    {
+      name: 'Quotations',
+      label: __('Quotations'),
+      icon: FileTextIcon,
+      condition: () => canViewQuotations.value,
+    },
   ]
 })
 
@@ -812,6 +820,19 @@ const { tabs, tabRoot } = useReorderableTabs(
   (index) => (tabIndex.value = index),
 )
 const { tabIndex, changeTabTo } = useActiveTabManager(tabs, 'lastDealTab')
+
+// keep the active tab visible — later tabs (e.g. Quotations) otherwise stay
+// scrolled out of view behind the right panel
+const dealTabsRef = ref(null)
+function scrollActiveTabIntoView() {
+  nextTick(() => {
+    dealTabsRef.value?.$el
+      ?.querySelector('[role="tab"][aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+}
+watch(tabIndex, scrollActiveTabIntoView)
+onMounted(scrollActiveTabIntoView)
 
 const sections = createResource({
   url: 'crm.fcrm.doctype.crm_fields_layout.crm_fields_layout.get_sidepanel_sections',
