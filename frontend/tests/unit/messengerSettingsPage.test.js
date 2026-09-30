@@ -126,6 +126,44 @@ describe('MessengerSettings unsaved channel changes', () => {
     },
   )
 
+  it('shows one editable Avito end date and saves a changed date', async () => {
+    let channel = {
+      ...avitoChannel(),
+      avito_import_mode: 'period',
+      avito_import_from_date: '2026-09-01',
+      avito_import_started_at: '2026-09-04 12:00:00',
+    }
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels: [channel] })
+      }
+      if (method === 'crm_messenger.api.settings.save_channel') {
+        expect(params.avito_import_to_date).toBe('2026-09-10')
+        channel = {
+          ...channel,
+          avito_import_to_date: params.avito_import_to_date,
+        }
+        return Promise.resolve(channel)
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Avito Sales')
+    expect(root.querySelector('input[data-label="Through"]')).toBeNull()
+    expect(
+      root.querySelectorAll('input[data-label="Through date"]'),
+    ).toHaveLength(1)
+    expect(root.querySelector('input[data-label="Through date"]').value).toBe(
+      '2026-09-04',
+    )
+    await editField(root, 'Through date', '2026-09-10')
+    await clickButton(root, 'Save')
+    expect(mocks.call).toHaveBeenCalledWith(
+      'crm_messenger.api.settings.save_channel',
+      expect.objectContaining({ avito_import_to_date: '2026-09-10' }),
+    )
+  })
+
   it('allows testing after the edited credentials have been saved', async () => {
     let channel = avitoChannel()
     mocks.call.mockImplementation((method, params) => {

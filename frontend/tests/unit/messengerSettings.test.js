@@ -91,6 +91,10 @@ describe('messengerSettings', () => {
       'Enter the Avito Client Secret.',
     )
     avito.client_secret = 'client-secret'
+    expect(validateMessengerChannelDraft(avito)).toBe(
+      'Enter the Avito import start date.',
+    )
+    avito.avito_import_from_date = '2025-01-01'
     expect(validateMessengerChannelDraft(avito)).toBe('')
     expect(buildMessengerChannelPayload(avito).external_account_id).toBe('')
 
@@ -106,6 +110,117 @@ describe('messengerSettings', () => {
     expect(buildMessengerChannelPayload(legacyAvito).auth_type).toBe(
       'client_credentials',
     )
+  })
+
+  it('defaults new Avito channels to a date range and preserves existing channels', () => {
+    expect(
+      makeMessengerChannelDraft({ provider: 'avito_direct' }).avito_import_mode,
+    ).toBe('period')
+    expect(
+      makeMessengerChannelDraft({
+        name: 'existing-avito',
+        provider: 'avito_direct',
+      }).avito_import_mode,
+    ).toBe('all')
+    let draft = makeMessengerChannelDraft()
+    draft.provider = 'avito_direct'
+    applyMessengerProviderDefaults(draft)
+    expect(draft.avito_import_mode).toBe('period')
+  })
+
+  it('shows today as the default end date and sends the selected date', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-29T09:00:00Z'))
+    try {
+      let draft = makeMessengerChannelDraft({
+        provider: 'avito_direct',
+        client_id: 'client-id',
+        client_secret_configured: true,
+      })
+      expect(draft.avito_import_to_date).toBe('2026-09-29')
+      draft.avito_import_from_date = '2025-01-01'
+      expect(validateMessengerChannelDraft(draft)).toBe('')
+      expect(buildMessengerChannelPayload(draft)).toMatchObject({
+        avito_import_mode: 'period',
+        avito_import_from_date: '2025-01-01',
+        avito_import_to_date: '2026-09-29',
+      })
+      draft.avito_import_to_date = '2025-02-01'
+      expect(buildMessengerChannelPayload(draft).avito_import_to_date).toBe(
+        '2025-02-01',
+      )
+      draft.avito_import_to_date = ''
+      expect(validateMessengerChannelDraft(draft)).toBe(
+        'Enter the Avito import end date.',
+      )
+      draft.avito_import_to_date = '2024-12-31'
+      expect(validateMessengerChannelDraft(draft)).toBe(
+        'The end date must be on or after the start date.',
+      )
+      draft.avito_import_to_date = '2026-09-30'
+      expect(validateMessengerChannelDraft(draft)).toBe(
+        'Avito import dates cannot be later than today.',
+      )
+      draft.avito_import_from_date = '2026-09-30'
+      draft.avito_import_to_date = '2026-09-30'
+      expect(validateMessengerChannelDraft(draft)).toBe(
+        'Avito import dates cannot be later than today.',
+      )
+      draft.avito_import_mode = 'new_activity'
+      expect(buildMessengerChannelPayload(draft)).toMatchObject({
+        avito_import_mode: 'new_activity',
+        avito_import_from_date: '',
+        avito_import_to_date: '',
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('uses the CRM system time zone for the default end date', () => {
+    let previousTimezone = window.timezone
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-29T12:00:00Z'))
+    window.timezone = { system: 'Pacific/Kiritimati' }
+    try {
+      expect(
+        makeMessengerChannelDraft({ provider: 'avito_direct' })
+          .avito_import_to_date,
+      ).toBe('2026-09-30')
+    } finally {
+      window.timezone = previousTimezone
+      vi.useRealTimers()
+    }
+  })
+
+  it('shows the effective legacy end date without changing an untouched import policy', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-29T09:00:00Z'))
+    try {
+      let legacy = makeMessengerChannelDraft({
+        name: 'legacy-period',
+        provider: 'avito_direct',
+        avito_import_mode: 'period',
+        avito_import_from_date: '2026-09-01',
+        avito_import_to_date: '',
+        avito_import_started_at: '2026-09-04 12:00:00',
+      })
+      expect(legacy.avito_import_to_date).toBe('2026-09-04')
+      expect(buildMessengerChannelPayload(legacy).avito_import_to_date).toBe('')
+      legacy.avito_import_to_date = '2026-09-10'
+      expect(buildMessengerChannelPayload(legacy).avito_import_to_date).toBe(
+        '2026-09-10',
+      )
+      let all = makeMessengerChannelDraft({
+        name: 'existing-all',
+        provider: 'avito_direct',
+        avito_import_mode: 'all',
+        avito_import_started_at: '2026-09-04 12:00:00',
+      })
+      expect(all.avito_import_to_date).toBe('2026-09-29')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('maps channel connection states for the list', () => {
