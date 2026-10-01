@@ -330,7 +330,7 @@
           <p class="mt-1 text-p-sm text-ink-gray-5">
             {{
               __(
-                'Choose which past chats create leads when the channel connects or this setting is saved. New customer messages are always processed.',
+                'Choose which past chats create leads when the channel connects or this setting is saved. Chats created after connection are processed automatically.',
               )
             }}
           </p>
@@ -394,7 +394,7 @@
           <p class="mt-3 text-p-sm text-ink-gray-5">
             {{
               __(
-                'Dates use the CRM time zone and the chat’s last activity. Available messages from selected chats are loaded. An old chat that receives a new customer message later creates a lead and loads its available history.',
+                'Dates use the CRM time zone and the chat’s last activity. Available messages from selected chats are loaded. If Avito hides message details, later activity in old chats may remain unverified.',
               )
             }}
           </p>
@@ -621,7 +621,7 @@ const avitoImportOptions = [
   {
     value: 'new_activity',
     label: 'Only new customer activity',
-    description: 'Skip past chats until a customer writes again.',
+    description: 'Skip past chats until new customer activity can be verified.',
   },
 ]
 const channelBusy = computed(
