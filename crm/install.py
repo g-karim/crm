@@ -705,6 +705,10 @@ def add_default_lead_sources():
 		"Campaign",
 		"Walk In",
 		"Facebook",
+		"Avito",
+		"VK",
+		"Telegram bot",
+		"MAX",
 		"Website",
 		"Web Form",
 	]

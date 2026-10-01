@@ -74,10 +74,24 @@
         }}
       </div>
 
-      <AvitoItemCard :conversation="selectedConversation" />
+      <AvitoItemCard
+        v-if="!selectedAvitoRestricted"
+        :conversation="selectedConversation"
+      />
 
       <div class="relative min-h-0 flex-1">
         <div
+          v-if="selectedAvitoRestricted"
+          class="flex h-full flex-col items-center overflow-y-auto px-4 py-6 sm:px-10"
+          data-testid="avito-restricted-panel"
+        >
+          <AvitoRestrictedChat
+            :conversation="selectedConversation"
+            class="my-auto shrink-0"
+          />
+        </div>
+        <div
+          v-else
           ref="messagesEl"
           class="h-full overflow-y-auto px-4 py-5 sm:px-10"
           @scroll.passive="handleMessagesScroll"
@@ -89,7 +103,7 @@
             <LoadingIndicator class="size-5" />
           </div>
           <div
-            v-if="!messages.length"
+            v-if="!visibleMessages.length"
             class="flex h-full min-h-[260px] flex-col items-center justify-center gap-2 text-center"
           >
             <CommentIcon class="size-8 text-ink-gray-4" />
@@ -367,7 +381,7 @@
           </div>
         </div>
         <Textarea
-          v-else
+          v-else-if="!selectedAvitoRestricted"
           ref="textareaRef"
           v-model="draftText"
           class="mb-2 min-h-20 w-full"
@@ -387,7 +401,7 @@
           @paste.stop="handleComposerPaste"
         />
         <ComposerAttachments
-          v-if="!preparedHandoff"
+          v-if="!preparedHandoff && !selectedAvitoRestricted"
           ref="composerAttachments"
           :supportsAttachments="attachmentPolicy.supportsAttachments"
           :channelType="selectedChannelType"
@@ -449,7 +463,7 @@
           @send-requested="requestVoiceSend"
         />
         <div
-          v-if="!preparedHandoff && handoffChannelOptions.length"
+          v-if="!preparedHandoff && handoffChannelOptions.length && !selectedAvitoRestricted"
           class="mb-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
         >
           <FormControl
@@ -471,7 +485,7 @@
             @click="prepareHandoff"
           />
         </div>
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div v-if="!selectedAvitoRestricted" class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0 flex-1 basis-40 text-sm text-ink-gray-5">
             <div class="truncate">{{ composerHint }}</div>
           </div>
@@ -549,6 +563,11 @@
 
 <script setup>
 import AvitoItemCard from './AvitoItemCard.vue'
+import AvitoRestrictedChat from './AvitoRestrictedChat.vue'
+import {
+  isAvitoChatRestricted,
+  restrictedAvitoChats,
+} from '@/utils/messengerAvitoAccess'
 import { avitoConversationLabel } from '@/utils/messengerAvitoContext'
 import CommentIcon from '@/components/Icons/CommentIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
@@ -752,6 +771,26 @@ const latestInboundConversation = computed(() => {
 const selectedChannelDoc = computed(
   () => channelByName.value[selectedChannel.value] || null,
 )
+const restrictedAvitoConversations = computed(() =>
+  restrictedAvitoChats(conversations.value, channels.value),
+)
+const selectedAvitoRestricted = computed(() =>
+  isAvitoChatRestricted(
+    selectedChannelDoc.value || selectedConversation.value?.channel_info,
+  ),
+)
+const visibleMessages = computed(() => {
+  const restricted = new Set(
+    restrictedAvitoConversations.value.map((conversation) => conversation.name),
+  )
+  return messages.value.filter(
+    (message) =>
+      !restricted.has(message.conversation) &&
+      !isAvitoChatRestricted(
+        channelByName.value[message.channel] || message.channel_info,
+      ),
+  )
+})
 const routingMismatch = computed(() => {
   if (
     !permissions.value.can_operate ||
@@ -819,6 +858,7 @@ const baseSendDisabled = computed(
   () =>
     !permissions.value.can_operate ||
     sendingMessage.value ||
+    selectedAvitoRestricted.value ||
     missingPhone.value ||
     selectedRequiresInbound.value ||
     needsConversationChoice.value ||
@@ -856,7 +896,7 @@ const handoffChannelOptions = computed(() =>
     channels.value.filter((channel) => channel.name !== selectedChannel.value),
   ),
 )
-const messageItems = computed(() => buildMessengerMessageItems(messages.value))
+const messageItems = computed(() => buildMessengerMessageItems(visibleMessages.value))
 const videoPlaybackScope = computed(
   () =>
     `${props.leadName}:${selectedConversation.value?.name || ''}:${props.active}`,
@@ -995,7 +1035,7 @@ const messageSync = createMessengerSyncController({
     else showTyping(payload.expires_in_ms)
   },
   onConversationStateChanged() {
-    refreshConversations()
+    loadSelectionContext()
   },
 })
 
@@ -1003,11 +1043,12 @@ const readController = createMessengerReadController({
   call,
   isEnabled: () =>
     permissions.value.can_operate &&
+    !selectedAvitoRestricted.value &&
     props.active &&
     document.visibilityState === 'visible' &&
     isNearBottom(),
   getConversation: () => selectedConversation.value,
-  getMessages: () => messages.value,
+  getMessages: () => visibleMessages.value,
   onConfirmed(result) {
     let conversation = conversations.value.find(
       (item) => item.name === result.conversation,

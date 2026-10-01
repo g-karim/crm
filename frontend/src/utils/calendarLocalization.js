@@ -75,10 +75,11 @@ export function formatCalendarMonthYear(value, fallback = '') {
   const date = value ? new Date(value) : new Date()
   const safeDate = Number.isNaN(date.getTime()) ? new Date() : date
 
-  return new Intl.DateTimeFormat(RU_LOCALE, {
+  const label = new Intl.DateTimeFormat(RU_LOCALE, {
     month: 'long',
     year: 'numeric',
   }).format(safeDate)
+  return label.charAt(0).toLocaleUpperCase(RU_LOCALE) + label.slice(1)
 }
 
 export function setupCalendarLocalization() {

@@ -35,6 +35,18 @@ export function messengerProviderLabel(provider) {
 export function makeMessengerChannelDraft(channel = null) {
   let provider = channel?.provider || 'telegram_bot'
   let defaults = PROVIDER_DEFAULTS[provider] || {}
+  let implicitAvitoEnd = Boolean(
+    channel?.name &&
+    channel?.avito_import_mode === 'period' &&
+    !channel?.avito_import_to_date,
+  )
+  let avitoEnd =
+    channel?.avito_import_to_date ||
+    (provider === 'avito_direct'
+      ? implicitAvitoEnd && channel?.avito_import_started_at
+        ? String(channel.avito_import_started_at).slice(0, 10)
+        : todayInCrmTimezone()
+      : '')
   return {
     channel: channel?.name || '',
     provider,
@@ -49,6 +61,14 @@ export function makeMessengerChannelDraft(channel = null) {
     public_chat_url: channel?.public_chat_url || '',
     api_base_url: channel?.api_base_url || '',
     client_id: channel?.client_id || '',
+    avito_import_mode: channel?.name
+      ? channel.avito_import_mode || 'all'
+      : provider === 'avito_direct'
+        ? 'period'
+        : 'all',
+    avito_import_from_date: channel?.avito_import_from_date || '',
+    avito_import_to_date: avitoEnd,
+    avito_import_to_date_implicit: implicitAvitoEnd ? avitoEnd : '',
     enabled: Boolean(channel?.enabled),
     api_token: '',
     client_secret: '',
@@ -64,6 +84,11 @@ export function applyMessengerProviderDefaults(draft) {
   draft.external_account_id = ''
   draft.provider_channel_id = ''
   draft.client_id = ''
+  draft.avito_import_mode = draft.provider === 'avito_direct' ? 'period' : 'all'
+  draft.avito_import_from_date = ''
+  draft.avito_import_to_date =
+    draft.provider === 'avito_direct' ? todayInCrmTimezone() : ''
+  draft.avito_import_to_date_implicit = ''
   draft.api_token = ''
   draft.client_secret = ''
   draft.enabled = false
@@ -88,6 +113,19 @@ export function buildMessengerChannelPayload(draft) {
     enabled: isDirectMessengerProvider(draft.provider)
       ? Boolean(draft.enabled && draft.channel)
       : Boolean(draft.enabled),
+  }
+  if (draft.provider === 'avito_direct') {
+    payload.avito_import_mode = draft.avito_import_mode
+    payload.avito_import_from_date =
+      draft.avito_import_mode === 'period'
+        ? clean(draft.avito_import_from_date)
+        : ''
+    let end = clean(draft.avito_import_to_date)
+    payload.avito_import_to_date =
+      draft.avito_import_mode === 'period' &&
+      end !== draft.avito_import_to_date_implicit
+        ? end
+        : ''
   }
   if (draft.channel) payload.channel = draft.channel
   if (clean(draft.api_token)) payload.api_token = clean(draft.api_token)
@@ -124,6 +162,21 @@ export function validateMessengerChannelDraft(draft) {
     if (!draft.client_secret_configured && !clean(draft.client_secret)) {
       return 'Enter the Avito Client Secret.'
     }
+    if (!['all', 'period', 'new_activity'].includes(draft.avito_import_mode)) {
+      return 'Select how to import Avito chats.'
+    }
+    if (draft.avito_import_mode === 'period') {
+      let start = clean(draft.avito_import_from_date)
+      let end = clean(draft.avito_import_to_date)
+      if (!isValidDate(start)) return 'Enter the Avito import start date.'
+      if (!isValidDate(end)) {
+        return 'Enter the Avito import end date.'
+      }
+      if (end < start) return 'The end date must be on or after the start date.'
+      let today = todayInCrmTimezone()
+      if (start > today || end > today)
+        return 'Avito import dates cannot be later than today.'
+    }
   }
   return ''
 }
@@ -146,4 +199,24 @@ export function messengerChannelState(channel = {}) {
 
 function clean(value) {
   return String(value || '').trim()
+}
+
+function isValidDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  let date = new Date(`${value}T00:00:00Z`)
+  return (
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+  )
+}
+
+function todayInCrmTimezone() {
+  let timezone = globalThis.window?.timezone?.system
+  let parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone || undefined,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  let date = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+  return `${date.year}-${date.month}-${date.day}`
 }

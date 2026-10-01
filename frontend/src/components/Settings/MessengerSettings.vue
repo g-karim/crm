@@ -320,6 +320,159 @@
           />
         </div>
 
+        <section
+          v-if="channelDraft.provider === 'avito_direct'"
+          class="rounded-lg border border-outline-gray-1 bg-surface-gray-1 p-4"
+        >
+          <div class="text-base-medium text-ink-gray-8">
+            {{ __('Avito chat import') }}
+          </div>
+          <p class="mt-1 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Choose which past chats create leads when the channel connects or this setting is saved. Chats created after connection are processed automatically.',
+              )
+            }}
+          </p>
+          <p
+            v-if="!settings.auto_create_lead"
+            class="mt-2 text-p-sm text-ink-orange-7"
+          >
+            {{
+              __(
+                'Turn on Create leads from new conversations above to create Avito leads.',
+              )
+            }}
+          </p>
+          <div class="mt-3 grid gap-2">
+            <label
+              v-for="option in avitoImportOptions"
+              :key="option.value"
+              class="flex cursor-pointer items-start gap-3 rounded-lg border bg-surface-cards p-3"
+              :class="
+                channelDraft.avito_import_mode === option.value
+                  ? 'border-outline-blue-3'
+                  : 'border-outline-gray-2'
+              "
+            >
+              <input
+                v-model="channelDraft.avito_import_mode"
+                type="radio"
+                name="avito-import-mode"
+                :value="option.value"
+                class="mt-1 accent-blue-600"
+              />
+              <span>
+                <span class="block text-p-medium text-ink-gray-8">{{
+                  __(option.label)
+                }}</span>
+                <span class="mt-0.5 block text-p-sm text-ink-gray-5">{{
+                  __(option.description)
+                }}</span>
+              </span>
+            </label>
+          </div>
+          <div
+            v-if="channelDraft.avito_import_mode === 'period'"
+            class="mt-4 grid gap-3 md:grid-cols-2"
+          >
+            <FormControl
+              v-model="channelDraft.avito_import_from_date"
+              type="date"
+              :label="__('From date')"
+              data-avito-import-date
+              required
+            />
+            <FormControl
+              v-model="channelDraft.avito_import_to_date"
+              type="date"
+              :label="__('Through date')"
+              data-avito-import-date
+              required
+            />
+          </div>
+          <p class="mt-3 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Dates use the CRM time zone and the chat’s last activity. Available messages from selected chats are loaded. If Avito hides message details, later activity in old chats may remain unverified.',
+              )
+            }}
+          </p>
+          <p v-if="channelDraft.channel" class="mt-2 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Changing this selection does not remove leads already created from Avito chats.',
+              )
+            }}
+          </p>
+          <div
+            v-if="
+              channelDraft.channel &&
+              channelDraft.enabled &&
+              ['connected', 'degraded'].includes(channelDraft.state)
+            "
+            class="mt-4 border-t border-outline-gray-2 pt-3"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="text-p-medium text-ink-gray-8">
+                {{ __('Import status') }}
+              </div>
+              <div class="flex gap-2">
+                <Button
+                  :label="__('Refresh import status')"
+                  variant="subtle"
+                  :loading="loadingAvitoImport"
+                  @click="loadAvitoImportStatus"
+                />
+                <Button
+                  :label="__('Scan chats now')"
+                  variant="subtle"
+                  :disabled="channelBusy || channelDirty"
+                  :loading="scanningAvitoImport"
+                  @click="scanAvitoChats"
+                />
+              </div>
+            </div>
+            <p v-if="avitoImportStatus" class="mt-2 text-p-sm text-ink-gray-6">
+              {{ __(avitoImportStatusLabel(avitoImportStatus.status)) }}
+              <span v-if="avitoImportStatus.counts?.chat_created">
+                ·
+                {{
+                  __('New chats in last scan: {0}', [
+                    avitoImportStatus.counts.chat_created,
+                  ])
+                }}</span
+              >
+              <span v-if="avitoImportStatus.counts?.chat_skipped">
+                ·
+                {{
+                  __('Skipped chats: {0}', [
+                    avitoImportStatus.counts.chat_skipped,
+                  ])
+                }}</span
+              >
+              <span v-if="avitoImportStatus.counts?.chat_unverified">
+                ·
+                {{
+                  __('Chats awaiting verification: {0}', [
+                    avitoImportStatus.counts.chat_unverified,
+                  ])
+                }}</span
+              >
+            </p>
+            <p
+              v-if="avitoImportStatus?.incomplete"
+              class="mt-2 text-p-sm text-ink-orange-7"
+            >
+              {{
+                __(
+                  'The scan is incomplete. Some chats could not be verified or are unavailable through the Avito API.',
+                )
+              }}
+            </p>
+          </div>
+        </section>
+
         <div
           v-if="showWebhookUrlWarning"
           data-testid="webhook-url-warning"
@@ -450,6 +603,27 @@ const channelSnapshot = ref('')
 const savingChannel = ref(false)
 const channelAction = ref('')
 const channelError = ref('')
+const avitoImportStatus = ref(null)
+const loadingAvitoImport = ref(false)
+const scanningAvitoImport = ref(false)
+const avitoImportOptions = [
+  {
+    value: 'all',
+    label: 'All available chats',
+    description: 'Create leads from all past chats available through Avito.',
+  },
+  {
+    value: 'period',
+    label: 'Chats in a date range',
+    description:
+      'Create leads from chats last active between the selected dates.',
+  },
+  {
+    value: 'new_activity',
+    label: 'Only new customer activity',
+    description: 'Skip past chats until new customer activity can be verified.',
+  },
+]
 const channelBusy = computed(
   () => savingChannel.value || Boolean(channelAction.value),
 )
@@ -560,6 +734,7 @@ async function saveGlobalSettings() {
 }
 
 function openNewChannel() {
+  avitoImportStatus.value = null
   channelDraft.value = makeMessengerChannelDraft()
   channelSnapshot.value = channelState()
   channelError.value = ''
@@ -567,6 +742,7 @@ function openNewChannel() {
 }
 
 function openChannel(channel) {
+  avitoImportStatus.value = null
   channelDraft.value = {
     ...makeMessengerChannelDraft(channel),
     state: channel.state,
@@ -577,6 +753,13 @@ function openChannel(channel) {
   channelSnapshot.value = channelState()
   channelError.value = ''
   showChannelDialog.value = true
+  if (
+    channel.provider === 'avito_direct' &&
+    channel.enabled &&
+    ['connected', 'degraded'].includes(channel.state)
+  ) {
+    loadAvitoImportStatus()
+  }
 }
 
 function changeProvider(provider) {
@@ -666,6 +849,63 @@ async function runChannelAction(action) {
   }
 }
 
+async function loadAvitoImportStatus() {
+  if (!channelDraft.value.channel) return
+  const channel = channelDraft.value.channel
+  loadingAvitoImport.value = true
+  try {
+    const result = await call(
+      'crm_messenger.api.provider_sync.get_channel_sync_status',
+      { channel },
+    )
+    if (channelDraft.value.channel === channel && result?.ok)
+      avitoImportStatus.value = result
+  } catch {
+    if (channelDraft.value.channel === channel) avitoImportStatus.value = null
+  } finally {
+    loadingAvitoImport.value = false
+  }
+}
+
+async function scanAvitoChats() {
+  if (channelBusy.value || channelDirty.value || !channelDraft.value.channel)
+    return
+  scanningAvitoImport.value = true
+  try {
+    const result = await call(
+      'crm_messenger.api.provider_sync.enqueue_channel_sync',
+      {
+        channel: channelDraft.value.channel,
+      },
+    )
+    if (!result?.ok)
+      throw new Error(result?.message || 'Could not start the Avito chat scan.')
+    toast.success(__('Avito chat scan started.'))
+    await loadAvitoImportStatus()
+  } catch (error) {
+    toast.error(
+      clientProviderMessage(
+        error?.message || 'Could not start the Avito chat scan.',
+      ),
+    )
+  } finally {
+    scanningAvitoImport.value = false
+  }
+}
+
+function avitoImportStatusLabel(status) {
+  return (
+    {
+      never: 'No chat scan yet',
+      queued: 'Chat scan queued',
+      running: 'Scanning chats',
+      succeeded: 'Chat scan completed',
+      incomplete: 'Chat scan incomplete',
+      failed: 'Chat scan failed',
+    }[status] || 'No chat scan yet'
+  )
+}
+
 function channelState() {
   return JSON.stringify(buildMessengerChannelPayload(channelDraft.value))
 }
@@ -709,6 +949,11 @@ function clientProviderMessage(message) {
 
 function providerActionFailureMessage(result = {}) {
   if (result.reason === 'messenger_subscription_required') {
+    if (result.response?.chat_discovery_available) {
+      return __(
+        'Chat discovery is available. Connect this channel to create Avito leads automatically; read and reply on Avito.',
+      )
+    }
     return __(
       'This account does not have access to the Avito Messenger API. Switch to a subscription that includes the Messenger API, then try again.',
     )
