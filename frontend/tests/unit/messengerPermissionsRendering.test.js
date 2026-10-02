@@ -763,6 +763,93 @@ describe('messenger initial selection', () => {
   })
 })
 
+describe('Wazzup native text replies', () => {
+  function wazzupChannel(platform) {
+    return {
+      ...channel('CHANNEL-1', { requires_phone: true }),
+      provider: 'wazzup',
+      platform,
+      channel_type: platform,
+    }
+  }
+
+  it.each(['whatsapp', 'telegram'])(
+    'sends to an existing Wazzup %s chat without a phone on the lead',
+    async (platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [wazzupChannel(platform)]
+      conversationRows[0].provider = 'wazzup'
+      let root = await mountConversation()
+      let composer = root.querySelector('input[placeholder="Enter a message..."]')
+
+      expect(composer.disabled).toBe(false)
+      composer.value = 'Ответ в существующий чат'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      let send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      expect(send.disabled).toBe(false)
+      send.click()
+
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            conversation: 'CONVERSATION-1',
+            channel: 'CHANNEL-1',
+            text: 'Ответ в существующий чат',
+          }),
+        ),
+      )
+    },
+  )
+
+  it('keeps first contact blocked without a phone or an existing Wazzup chat', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [wazzupChannel('telegram')]
+    conversationRows = []
+    let root = await mountConversation()
+
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]').disabled,
+    ).toBe(true)
+    expect(root.textContent).toContain('Add a phone number to the lead record.')
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+  })
+
+  it.each([
+    ['wazzup', false],
+    ['telegram_bot', true],
+  ])(
+    'shows the file drop invitation only for an attachment-capable %s channel',
+    async (provider, supportsAttachments) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        {
+          ...channel('CHANNEL-1', { supports_attachments: supportsAttachments }),
+          provider,
+        },
+      ]
+      let root = await mountConversation()
+      let event = new Event('dragover', { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'] } })
+
+      root
+        .querySelector('input[placeholder="Enter a message..."]')
+        .dispatchEvent(event)
+      await nextTick()
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(root.textContent.includes('Drop files here')).toBe(
+        supportsAttachments,
+      )
+    },
+  )
+})
+
 describe('Avito messenger UX', () => {
   function avitoChannel() {
     return {

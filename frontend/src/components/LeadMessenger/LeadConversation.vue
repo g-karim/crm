@@ -850,7 +850,12 @@ const missingPhone = computed(
   () =>
     Boolean(selectedChannelType.value) &&
     selectedCapabilities.value.requires_phone &&
-    !leadPhone.value,
+    !leadPhone.value &&
+    !(
+      (selectedChannelDoc.value?.provider ||
+        selectedConversation.value?.provider) === 'wazzup' &&
+      selectedConversation.value?.external_chat_id
+    ),
 )
 const needsConversationChoice = computed(
   () => conversationCandidates.value.length > 1 && !selectedConversation.value,
@@ -1932,7 +1937,7 @@ function handleComposerDragOver(event) {
     return
   if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return
   event.preventDefault()
-  draggingFiles.value = true
+  draggingFiles.value = attachmentPolicy.value.supportsAttachments
 }
 
 function handleComposerDrop(event) {

@@ -36,6 +36,22 @@ function mountMessage(message) {
 }
 
 describe('messenger message presentation', () => {
+  it('renders normalized Wazzup incoming text literally in the native chat', () => {
+    let message = {
+      provider: 'wazzup',
+      direction: 'inbound',
+      message_type: 'text',
+      text: 'Здравствуйте\n<b>Уточню заказ</b> [image]',
+      attachments: [],
+    }
+
+    let root = mountMessage(message)
+
+    expect(root.textContent.trim()).toBe(message.text)
+    expect(root.querySelector('b')).toBeNull()
+    expect(root.querySelector('[data-provider-chat-action]')).toBeNull()
+  })
+
   it('hides an image placeholder while its attachment is still loading', () => {
     let message = {
       message_type: 'image',

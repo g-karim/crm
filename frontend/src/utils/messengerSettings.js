@@ -10,7 +10,7 @@ export const MESSENGER_PROVIDER_OPTIONS = [
   { label: 'VK', value: 'vk_direct' },
   { label: 'MAX', value: 'max_direct' },
   { label: 'Avito', value: 'avito_direct' },
-  { label: 'WhatsApp & Telegram', value: 'wazzup' },
+  { label: 'Wazzup', value: 'wazzup' },
 ]
 
 const PROVIDER_DEFAULTS = {
@@ -184,6 +184,18 @@ export function validateMessengerChannelDraft(draft) {
 export function messengerChannelState(channel = {}) {
   if (!channel.enabled) {
     return { label: 'Channel Disabled', theme: 'gray' }
+  }
+  if (channel.provider === 'wazzup') {
+    if (channel.state === 'connected') {
+      return { label: 'Channel Connected', theme: 'green' }
+    }
+    if (channel.state === 'degraded' || channel.state === 'error') {
+      return { label: 'Needs Attention', theme: 'orange' }
+    }
+    if (channel.state === 'disconnected') {
+      return { label: 'Channel Not Connected', theme: 'red' }
+    }
+    return { label: 'Connection Not Checked', theme: 'gray' }
   }
   if (isDirectMessengerProvider(channel.provider)) {
     if (channel.state === 'connected') {

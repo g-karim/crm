@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from crm.translations import RUSSIAN_TRANSLATIONS, get_crm_translations
+from crm.translations import get_crm_translations
 
 
 class TestCRMTranslations(TestCase):
@@ -35,9 +35,35 @@ class TestCRMTranslations(TestCase):
 			"Интеграция Avito не настроена. Укажите Client ID и Client Secret в настройках канала Avito, затем подключите канал. Сообщение сохранено локально со статусом ошибки.",
 		)
 
-	def test_gateway_brand_is_not_exposed_in_customer_translations(self):
-		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS))
-		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS.values()))
+	def test_wazzup_administration_and_unknown_delivery_are_translated(self):
+		translations = get_crm_translations("ru")
+		self.assertEqual(translations["Wazzup"], "Wazzup")
+		self.assertEqual(translations["Connection Not Checked"], "Подключение не проверено")
+		self.assertEqual(
+			translations[
+				"The provider may have accepted the message, but CRM did not receive a definitive result. Retrying may create a duplicate."
+			],
+			"Провайдер мог уже принять сообщение, но CRM не получила однозначный результат. Повторная отправка может создать дубликат.",
+		)
+		user_facing = {
+			"Provider message delivery result is unknown.",
+			"Provider rejected the message.",
+			"Provider authentication failed.",
+			"The messenger channel is unavailable.",
+			"The message text is too long.",
+			"The recipient is not configured.",
+			"This channel supports text messages only.",
+			"This channel supports individual chats only.",
+			"The message text is required.",
+			"Provider rate limit reached.",
+			"Message accepted by provider.",
+			"Channel can send messages.",
+			"The provider reported a message delivery failure.",
+		}
+		for source in user_facing:
+			with self.subTest(source=source):
+				self.assertIn(source, translations)
+				self.assertNotEqual(translations[source], source)
 
 	def test_user_facing_avito_errors_have_runtime_translations(self):
 		user_facing = {

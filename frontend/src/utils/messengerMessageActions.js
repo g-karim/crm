@@ -26,10 +26,17 @@ export function getMessengerRetryConfirmation(message = {}) {
         'Avito may have accepted the message, but CRM did not receive a definitive result. Retrying may create a duplicate.',
     }
   }
+  if (message?.provider === 'vk_direct') {
+    return {
+      title: 'Retry sending?',
+      message:
+        'VK may have already accepted the message. Retrying uses the same request ID.',
+    }
+  }
   return {
     title: 'Retry sending?',
     message:
-      'VK may have already accepted the message. Retrying uses the same request ID.',
+      'The provider may have accepted the message, but CRM did not receive a definitive result. Retrying may create a duplicate.',
   }
 }
 

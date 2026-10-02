@@ -265,6 +265,95 @@ describe('messenger sync', () => {
     expect(harness.controller.getMessages()).toHaveLength(1)
   })
 
+  it.each(['whatsapp', 'telegram'])(
+    'merges normalized Wazzup %s text and delivery updates without duplicate messages',
+    async (platform) => {
+      let outgoing = {
+        name: 'WAZZUP-OUTBOUND',
+        provider: 'wazzup',
+        platform,
+        channel: 'WAZZUP-CHANNEL',
+        conversation: 'WAZZUP-CONVERSATION',
+        direction: 'outbound',
+        message_type: 'text',
+        text: 'Здравствуйте',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        can_retry: false,
+        message_datetime: '2026-10-02 10:00:00',
+      }
+      let incoming = {
+        ...outgoing,
+        name: 'WAZZUP-INBOUND',
+        direction: 'inbound',
+        ingest_source: 'provider_webhook',
+        text: 'Хочу уточнить заказ',
+        status: 'received',
+        delivery_status: '',
+        message_datetime: '2026-10-02 10:01:00',
+      }
+      let harness = createHarness({
+        get_message_page: snapshot([outgoing]),
+        get_message_changes: vi
+          .fn()
+          .mockReturnValueOnce(delta([incoming]))
+          .mockReturnValueOnce(
+            delta(
+              [
+                incoming,
+                { ...outgoing, status: 'read', delivery_status: 'read' },
+              ],
+              { next_cursor: 'cursor-3' },
+            ),
+          ),
+      })
+      await harness.controller.start('LEAD-1')
+
+      let event = {
+        version: 1,
+        reference_doctype: 'CRM Lead',
+        reference_name: 'LEAD-1',
+        conversation: incoming.conversation,
+      }
+      harness.socket.emit('crm_messenger:conversation_changed', event)
+      await vi.waitFor(() =>
+        expect(harness.controller.getMessages()).toHaveLength(2),
+      )
+      let firstDelta = harness.changes.find((change) => change.kind === 'delta')
+      expect(firstDelta.inserted).toEqual([incoming.name])
+      expect(
+        countNewMessengerMessages({
+          ...firstDelta,
+          previousLastMessage: outgoing,
+        }),
+      ).toBe(1)
+
+      harness.socket.emit('crm_messenger:conversation_changed', event)
+      await vi.waitFor(() =>
+        expect(harness.controller.getMessages()[0].delivery_status).toBe(
+          'read',
+        ),
+      )
+
+      expect(harness.controller.getMessages()).toEqual([
+        { ...outgoing, status: 'read', delivery_status: 'read' },
+        incoming,
+      ])
+      let lastDelta = harness.changes.at(-1)
+      expect(lastDelta.inserted).toEqual([])
+      expect(
+        countNewMessengerMessages({
+          ...lastDelta,
+          previousLastMessage: incoming,
+        }),
+      ).toBe(0)
+      expect(harness.calls.every(([method]) => !method.includes('retry'))).toBe(
+        true,
+      )
+      harness.controller.stop()
+    },
+  )
+
   it('notifies the conversation layer about lifecycle realtime changes', async () => {
     let stateChanges = []
     let harness = createHarness({

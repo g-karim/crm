@@ -8,15 +8,20 @@ import {
 } from '@/utils/messengerSettings'
 
 describe('messengerSettings', () => {
-  it('keeps the gateway brand out of customer-facing provider labels', () => {
+  it('names Wazzup separately from the direct messenger providers', () => {
     const gateway = MESSENGER_PROVIDER_OPTIONS.find(
       (option) => option.value === 'wazzup',
     )
 
-    expect(gateway.label).toBe('WhatsApp & Telegram')
+    expect(gateway.label).toBe('Wazzup')
     expect(
-      MESSENGER_PROVIDER_OPTIONS.map((option) => option.label).join(' '),
-    ).not.toContain('Wazzup')
+      MESSENGER_PROVIDER_OPTIONS.filter((option) => option.value !== 'wazzup'),
+    ).toEqual([
+      { label: 'Telegram Bot', value: 'telegram_bot' },
+      { label: 'VK', value: 'vk_direct' },
+      { label: 'MAX', value: 'max_direct' },
+      { label: 'Avito', value: 'avito_direct' },
+    ])
   })
 
   it('creates provider-aware drafts without exposing saved secrets', () => {
@@ -235,5 +240,28 @@ describe('messengerSettings', () => {
         state: 'connected',
       }),
     ).toEqual({ label: 'Channel Connected', theme: 'green' })
+  })
+
+  it.each([undefined, '', 'new', 'unknown'])(
+    'does not claim an enabled Wazzup channel is connected with state %s',
+    (state) => {
+      expect(
+        messengerChannelState({ enabled: 1, provider: 'wazzup', state }),
+      ).toEqual({ label: 'Connection Not Checked', theme: 'gray' })
+    },
+  )
+
+  it.each([
+    ['connected', 'Channel Connected', 'green'],
+    ['degraded', 'Needs Attention', 'orange'],
+    ['error', 'Needs Attention', 'orange'],
+    ['disconnected', 'Channel Not Connected', 'red'],
+  ])('uses the validated Wazzup state %s', (state, label, theme) => {
+    expect(
+      messengerChannelState({ enabled: 1, provider: 'wazzup', state }),
+    ).toEqual({ label, theme })
+    expect(
+      messengerChannelState({ enabled: 0, provider: 'wazzup', state }),
+    ).toEqual({ label: 'Channel Disabled', theme: 'gray' })
   })
 })

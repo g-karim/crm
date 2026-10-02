@@ -107,6 +107,26 @@ describe('messenger message actions', () => {
     expect(confirmation.message).toContain('same request ID')
   })
 
+  it('does not promise VK idempotency or retry a blocked Wazzup unknown result', async () => {
+    let message = {
+      name: 'WAZZUP-UNKNOWN',
+      provider: 'wazzup',
+      direction: 'outbound',
+      status: 'unknown',
+      delivery_status: 'unknown',
+      can_retry: false,
+    }
+    let confirmation = getMessengerRetryConfirmation(message)
+
+    expect(confirmation.message).toContain('may create a duplicate')
+    expect(confirmation.message).not.toContain('VK')
+    expect(confirmation.message).not.toContain('same request ID')
+    expect(getMessengerMessageActions(message)).toEqual([])
+    let { controller, call } = harness()
+    expect(await controller.retryMessage(message, true)).toBe(false)
+    expect(call).not.toHaveBeenCalled()
+  })
+
   it('exposes tombstone and edited marker display states', () => {
     expect(getMessengerMessageDisplay(editable({ is_edited: 1 }))).toEqual({
       tombstone: false,

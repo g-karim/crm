@@ -109,6 +109,32 @@ describe('message footer metadata', () => {
     )
   })
 
+  it.each([
+    ['sent', 'Sent', 'text-ink-gray-5'],
+    ['delivered', 'Delivered', 'text-ink-gray-5'],
+    ['read', 'Read by recipient', 'text-ink-blue-5'],
+    ['failed', 'Delivery failed', 'text-ink-red-8'],
+    ['unknown', 'Result unknown', 'text-ink-red-8'],
+  ])(
+    'renders the canonical Wazzup %s delivery state',
+    (state, label, color) => {
+      let root = mountComponent(MessageFooterMetadata, {
+        message: message({
+          provider: 'wazzup',
+          direction: 'outbound',
+          status: 'sent',
+          delivery_status: state,
+          is_edited: 0,
+        }),
+      })
+
+      let delivery = root.querySelector('[data-message-delivery]')
+      expect(delivery.className).toContain(color)
+      expect(delivery.closest('[data-test-tooltip]').title).toBe(label)
+      expect(footerOrder(root)).toEqual(['time', 'delivery'])
+    },
+  )
+
   it('shows Avito sent as one gray check and read as two blue checks', () => {
     let sent = mountComponent(MessageFooterMetadata, {
       message: message({
