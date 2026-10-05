@@ -304,7 +304,16 @@ export function getMessengerCapabilities(channel = {}) {
       channel?.capabilities?.supported_attachment_types || [],
     supported_attachment_file_types:
       channel?.capabilities?.supported_attachment_file_types || [],
+    supported_attachment_file_types_by_type:
+      channel?.capabilities?.supported_attachment_file_types_by_type || {},
     supports_image_caption: channel?.capabilities?.supports_image_caption,
+    supports_attachment_captions:
+      channel?.capabilities?.supports_attachment_captions,
+    max_attachment_size_bytes: Number(
+      channel?.capabilities?.max_attachment_size_bytes || 0,
+    ),
+    max_attachment_size_bytes_by_type:
+      channel?.capabilities?.max_attachment_size_bytes_by_type || {},
     max_attachment_count: Math.max(
       1,
       Number(channel?.capabilities?.max_attachment_count || 10),

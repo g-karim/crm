@@ -85,3 +85,26 @@ class TestCRMTranslations(TestCase):
 		translations = get_crm_translations("ru_RU")
 		self.assertEqual(user_facing - translations.keys(), set())
 		self.assertTrue(all(translations[source] != source for source in user_facing))
+
+	def test_attachment_caption_and_size_limits_have_runtime_translations(self):
+		user_facing = {
+			"This channel cannot send text and an attachment together. Send them as separate messages.",
+			"Text and attachments must be sent separately.",
+			"The attachment exceeds the selected channel size limit of {0} MB.",
+			"Send the text and attachment as separate messages.",
+			"Send one Wazzup attachment without text.",
+			"The attachment is unavailable for Wazzup.",
+			"This attachment type cannot be sent.",
+			"This channel cannot send voice messages.",
+			"Wazzup supports MP4 video files only.",
+			"The selected channel supports MP4 video files only.",
+			"The attachment exceeds the Wazzup size limit.",
+			"A public HTTPS site URL is required to send Wazzup attachments.",
+			"Site encryption key is not configured.",
+			"Reply target is unavailable for this conversation.",
+			"Attachment content was rejected.",
+			"Attachment could not be stored.",
+		}
+		translations = get_crm_translations("ru")
+		self.assertEqual(user_facing - translations.keys(), set())
+		self.assertTrue(all(translations[source] != source for source in user_facing))

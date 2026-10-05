@@ -354,6 +354,79 @@ describe('messenger sync', () => {
     },
   )
 
+  it.each(['whatsapp', 'telegram'])(
+    'updates downloaded Wazzup %s media and its quote without inserting another message',
+    async (platform) => {
+      let pending = {
+        name: 'WAZZUP-MEDIA',
+        provider: 'wazzup',
+        platform,
+        conversation: 'WAZZUP-CONVERSATION',
+        direction: 'inbound',
+        ingest_source: 'provider_webhook',
+        message_type: 'image',
+        text: '',
+        status: 'received',
+        attachments: [{ id: 'WAZZUP-IMAGE', type: 'image', status: 'pending' }],
+        reply_context: {
+          state: 'unavailable',
+          message: null,
+          snapshot: { text: 'Original' },
+        },
+        message_datetime: '2026-10-02 10:00:00',
+      }
+      let downloaded = {
+        ...pending,
+        attachments: [
+          {
+            ...pending.attachments[0],
+            status: 'available',
+            url: '/api/private-wazzup-image',
+            download_url: '/api/private-wazzup-image-download',
+          },
+        ],
+        reply_context: {
+          state: 'available',
+          message: 'WAZZUP-ORIGINAL',
+          snapshot: { text: 'Original' },
+        },
+      }
+      let harness = createHarness({
+        get_message_page: snapshot([pending]),
+        get_message_changes: delta([downloaded]),
+      })
+      await harness.controller.start('LEAD-1')
+      let event = {
+        version: 1,
+        reference_doctype: 'CRM Lead',
+        reference_name: 'LEAD-1',
+        conversation: pending.conversation,
+      }
+      harness.socket.emit('crm_messenger:conversation_changed', event)
+      await vi.waitFor(() =>
+        expect(harness.controller.getMessages()).toEqual([downloaded]),
+      )
+
+      let update = harness.changes.at(-1)
+      expect(update.inserted).toEqual([])
+      expect(update.updated).toEqual([pending.name])
+      expect(
+        countNewMessengerMessages({ ...update, previousLastMessage: pending }),
+      ).toBe(0)
+      harness.socket.emit('crm_messenger:conversation_changed', event)
+      await vi.waitFor(() =>
+        expect(
+          harness.calls.filter(([method]) =>
+            method.endsWith('get_message_changes'),
+          ),
+        ).toHaveLength(2),
+      )
+      expect(harness.controller.getMessages()).toEqual([downloaded])
+      expect(harness.changes.at(-1).inserted).toEqual([])
+      harness.controller.stop()
+    },
+  )
+
   it('notifies the conversation layer about lifecycle realtime changes', async () => {
     let stateChanges = []
     let harness = createHarness({

@@ -91,9 +91,10 @@ vi.mock('@/components/LeadMessenger/MessageForwardStack.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageMetadata.vue', () => ({
   default: {
     props: ['message', 'constrainIntrinsicWidth'],
-    emits: ['retry'],
+    emits: ['retry', 'reply'],
     template: `<div data-message-metadata :class="constrainIntrinsicWidth ? 'w-0 min-w-full' : 'min-w-0'">
-			<button v-if="message.can_retry" data-testid="mock-message-retry" @click="$emit('retry')">retry</button>
+				<button v-if="message.can_retry" data-testid="mock-message-retry" @click="$emit('retry')">retry</button>
+				<button v-if="message.can_reply" data-testid="mock-message-reply" @click="$emit('reply')">reply</button>
 		</div>`,
   },
 }))
@@ -101,12 +102,20 @@ vi.mock('@/components/LeadMessenger/MessageReactions.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageReplyQuote.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
   default: {
-    props: ['acceptedFileTypes', 'maxFiles', 'supportedAttachmentTypes'],
+    props: [
+      'acceptedFileTypes',
+      'acceptedFileTypesByType',
+      'maxFiles',
+      'supportedAttachmentTypes',
+      'maxAttachmentSizeBytes',
+      'maxAttachmentSizeBytesByType',
+    ],
     emits: ['change'],
+    data: () => ({ files: [] }),
     methods: {
       discard() {},
       freeze() {
-        return []
+        return this.files
       },
       unfreeze() {},
       release() {},
@@ -117,11 +126,25 @@ vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
         mocks.attachmentPreserve()
       },
       openFileSelector() {},
+      setDraft(name, type) {
+        this.files = [`FILE-${name}`]
+        this.$emit('change', [
+          {
+            status: 'uploaded',
+            file: { name, type },
+            uploadedFile: { name: this.files[0] },
+          },
+        ])
+      },
+      clearDraft() {
+        this.files = []
+        this.$emit('change', [])
+      },
     },
-    template: `<span>
-      <button data-testid="mock-attachment-draft" @click="$emit('change', [{ status: 'uploaded', file: { name: 'draft.pdf', type: 'application/pdf' } }])">attachment draft</button>
-      <button data-testid="mock-image-draft" @click="$emit('change', [{ status: 'uploaded', file: { name: 'photo.jpg', type: 'image/jpeg' } }])">image draft</button>
-      <button data-testid="mock-clear-attachments" @click="$emit('change', [])">clear attachments</button>
+    template: `<span data-attachment-policy :data-max-size="maxAttachmentSizeBytes" :data-image-max-size="maxAttachmentSizeBytesByType?.image" :data-max-files="maxFiles" :data-video-formats="acceptedFileTypesByType?.video?.join(',')">
+      <button data-testid="mock-attachment-draft" @click="setDraft('draft.pdf', 'application/pdf')">attachment draft</button>
+      <button data-testid="mock-image-draft" @click="setDraft('photo.jpg', 'image/jpeg')">image draft</button>
+      <button data-testid="mock-clear-attachments" @click="clearDraft">clear attachments</button>
     </span>`,
   },
 }))
@@ -845,6 +868,149 @@ describe('Wazzup native text replies', () => {
       expect(event.defaultPrevented).toBe(true)
       expect(root.textContent.includes('Drop files here')).toBe(
         supportsAttachments,
+      )
+    },
+  )
+
+  function mediaChannel(platform) {
+    return {
+      ...wazzupChannel(platform),
+      capabilities: {
+        ...wazzupChannel(platform).capabilities,
+        supports_attachments: true,
+        supported_attachment_types: ['image', 'file', 'audio', 'video'],
+        supported_attachment_file_types_by_type: { video: ['.mp4'] },
+        max_attachment_count: 1,
+        max_attachment_size_bytes: 10_000_000,
+        max_attachment_size_bytes_by_type:
+          platform === 'telegram' ? { image: 5_000_000 } : {},
+        supports_attachment_captions: false,
+        supports_image_caption: false,
+      },
+    }
+  }
+
+  it.each(['whatsapp', 'telegram'])(
+    'keeps Wazzup %s text and file drafts separate without discarding either',
+    async (platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [mediaChannel(platform)]
+      let root = await mountConversation()
+      expect(root.querySelector('[aria-label="Record a Voice Message"]')).toBeNull()
+      let policy = root.querySelector('[data-attachment-policy]')
+      expect(policy.dataset.maxSize).toBe('10000000')
+      expect(policy.dataset.maxFiles).toBe('1')
+      expect(policy.dataset.videoFormats).toBe('.mp4')
+      expect(policy.dataset.imageMaxSize).toBe(
+        platform === 'telegram' ? '5000000' : undefined,
+      )
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Keep this text'
+      composer.dispatchEvent(new Event('input'))
+      root.querySelector('[data-testid="mock-attachment-draft"]').click()
+      await nextTick()
+      let send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+
+      expect(composer.disabled).toBe(false)
+      expect(composer.value).toBe('Keep this text')
+      expect(send.disabled).toBe(true)
+      expect(root.textContent).toContain(
+        'This channel cannot send text and an attachment together. Send them as separate messages.',
+      )
+      expect(root.textContent).not.toContain('Avito API')
+      composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+      await nextTick()
+      expect(
+        mocks.call.mock.calls.some(([method]) =>
+          method.endsWith('send_message'),
+        ),
+      ).toBe(false)
+
+      root.querySelector('[data-testid="mock-clear-attachments"]').click()
+      await nextTick()
+      expect(composer.value).toBe('Keep this text')
+      expect(send.disabled).toBe(false)
+      root.querySelector('[data-testid="mock-attachment-draft"]').click()
+      await nextTick()
+      composer.value = ''
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      expect(composer.disabled).toBe(true)
+      expect(composer.placeholder).toBe(
+        'Text and attachments must be sent separately.',
+      )
+      expect(send.disabled).toBe(false)
+      send.click()
+
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            text: '',
+            attachments: ['FILE-draft.pdf'],
+          }),
+        ),
+      )
+    },
+  )
+
+  it.each(['whatsapp', 'telegram'])(
+    'sends a Wazzup %s quoted reply using the local original message id',
+    async (platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [mediaChannel(platform)]
+      snapshotMessages = [
+        {
+          name: 'WAZZUP-ORIGINAL',
+          external_message_id: 'provider-original-id',
+          provider: 'wazzup',
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'inbound',
+          status: 'received',
+          message_type: 'image',
+          text: '',
+          attachments: [{ id: 'IMAGE-1', type: 'image', status: 'available' }],
+          can_reply: true,
+          message_datetime: '2026-10-02 10:00:00',
+        },
+      ]
+      let defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((method, args) => {
+        if (method.endsWith('resolve_send_target'))
+          return { ok: true, conversation: conversationRows[0] }
+        return defaultCall(method, args)
+      })
+      let root = await mountConversation()
+      root.querySelector('[data-testid="mock-message-reply"]').click()
+      await nextTick()
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Reply to the photo'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      ;[...root.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Send')
+        .click()
+
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            conversation: 'CONVERSATION-1',
+            text: 'Reply to the photo',
+            reply_to_message: 'WAZZUP-ORIGINAL',
+          }),
+        ),
+      )
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.conversations.resolve_send_target',
+        expect.objectContaining({ reply_to_message: 'WAZZUP-ORIGINAL' }),
       )
     },
   )

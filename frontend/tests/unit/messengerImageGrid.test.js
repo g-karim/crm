@@ -110,6 +110,58 @@ function mountRenderer(attachments, props = {}) {
 }
 
 describe('messenger image layout', () => {
+  it.each(['pending', 'available'])(
+    'renders a canonical Wazzup image with %s download status',
+    async (status) => {
+      let ready = status === 'available'
+      let root = mountRenderer(
+        [
+          image('WAZZUP-IMAGE', {
+            status,
+            url: ready ? '/api/private-wazzup-image' : null,
+            download_url: ready ? '/api/private-wazzup-download' : null,
+          }),
+        ],
+        { provider: 'wazzup' },
+      )
+      let imageButton = root.querySelector('[data-single-image]')
+
+      expect(imageButton.disabled).toBe(!ready)
+      expect(root.querySelector('img')?.getAttribute('src') ?? null).toBe(
+        ready ? '/api/private-wazzup-image' : null,
+      )
+      expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+      imageButton.click()
+      await nextTick()
+      expect(Boolean(root.querySelector('[data-test-lightbox]'))).toBe(ready)
+    },
+  )
+
+  it.each([
+    ['audio', 'data-test-audio'],
+    ['video', 'data-test-video'],
+    ['file', 'data-test-attachment-card'],
+  ])(
+    'routes a canonical Wazzup %s attachment to the shared component',
+    (type, selector) => {
+      let root = mountRenderer(
+        [
+          {
+            id: 'WAZZUP-MEDIA',
+            type,
+            status: 'available',
+            file_name: 'document.pdf',
+          },
+        ],
+        { provider: 'wazzup' },
+      )
+      expect(root.querySelector(`[${selector}]`)).not.toBeNull()
+      if (type !== 'file')
+        expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+      else expect(root.textContent).toContain('document.pdf')
+    },
+  )
+
   it('scales a small single-image preview inside the compact media bounds', () => {
     let root = mountGrid([image('I-1')])
     let wrapper = root.querySelector('[data-single-image]')

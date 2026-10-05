@@ -389,11 +389,13 @@
           :disabled="
             baseSendDisabled ||
             Boolean(pendingLocation) ||
-            (imageCaptionState.blocked && !draftText)
+            (attachmentCaptionState.blocked && !draftText)
           "
           :placeholder="
-            imageCaptionState.blocked && !draftText
-              ? __('Image captions are unavailable for Avito.')
+            attachmentCaptionState.blocked && !draftText
+              ? selectedChannelType === 'avito'
+                ? __('Image captions are unavailable for Avito.')
+                : __('Text and attachments must be sent separately.')
               : __('Enter a message...')
           "
           @keydown.enter.stop="sendOnEnter"
@@ -407,7 +409,10 @@
           :channelType="selectedChannelType"
           :maxFiles="attachmentPolicy.maxAttachmentCount"
           :supportedAttachmentTypes="attachmentPolicy.supportedAttachmentTypes"
+          :maxAttachmentSizeBytes="attachmentPolicy.maxAttachmentSizeBytes"
+          :maxAttachmentSizeBytesByType="attachmentPolicy.maxAttachmentSizeBytesByType"
           :acceptedFileTypes="attachmentPolicy.acceptedFileTypes"
+          :acceptedFileTypesByType="attachmentPolicy.acceptedFileTypesByType"
           :unsupportedFileMessage="attachmentPolicy.unsupportedFileMessage"
           :unsupportedFormatMessage="attachmentPolicy.unsupportedFormatMessage"
           :conversation="selectedConversation?.name || ''"
@@ -417,11 +422,11 @@
           @change="handleAttachmentsChange"
         />
         <div
-          v-if="imageCaptionState.error"
+          v-if="attachmentCaptionState.error"
           data-testid="image-caption-warning"
           class="mb-2 text-sm text-ink-amber-8"
         >
-          {{ __(imageCaptionState.error) }}
+          {{ __(attachmentCaptionState.error) }}
         </div>
         <div
           v-if="pendingLocation"
@@ -615,7 +620,7 @@ import {
 } from '@/utils/messengerSync'
 import {
   getComposerAttachmentPolicy,
-  getComposerImageCaptionState,
+  getComposerCaptionState,
   isVideoFile,
   validateComposerFileMix,
 } from '@/utils/messengerComposer'
@@ -836,8 +841,8 @@ const attachmentPolicy = computed(() =>
     selectedChannelType.value,
   ),
 )
-const imageCaptionState = computed(() =>
-  getComposerImageCaptionState(
+const attachmentCaptionState = computed(() =>
+  getComposerCaptionState(
     draftText.value,
     pendingAttachments.value,
     attachmentPolicy.value,
@@ -882,7 +887,7 @@ const sendDisabled = computed(
   () =>
     baseSendDisabled.value ||
     Boolean(attachmentMixError.value) ||
-    Boolean(imageCaptionState.value.error) ||
+    Boolean(attachmentCaptionState.value.error) ||
     pendingAttachments.value.some((item) => item.status !== 'uploaded'),
 )
 const attachmentMixError = computed(() => {

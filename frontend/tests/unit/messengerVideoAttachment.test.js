@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
@@ -43,6 +43,28 @@ function mountVideo(attachment, provider = '', props = {}) {
 }
 
 describe('external messenger video', () => {
+  it('plays a downloaded Wazzup video through the protected projection', async () => {
+    let root = mountVideo(
+      {
+        id: 'WAZZUP-VIDEO',
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        file_name: 'clip.mp4',
+        url: '/api/private-wazzup-video',
+      },
+      'wazzup',
+    )
+
+    root.querySelector('button[aria-label="Play Video"]').click()
+    await nextTick()
+    expect(root.querySelector('video[controls]')?.getAttribute('src')).toBe(
+      '/api/private-wazzup-video',
+    )
+    expect(root.querySelector('a')).toBeNull()
+    expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+  })
+
   it('translates attachment processing status at the display boundary', () => {
     let originalTranslate = globalThis.__
     globalThis.__ = (message) =>
