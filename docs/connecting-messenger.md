@@ -212,3 +212,10 @@ https://<адрес-CRM>/api/method/crm_messenger.webhooks.wazzup.receive
 - [Avito Messenger API](https://developers.avito.ru/api-catalog/messenger/documentation)
 - [Wazzup: вебхуки и crmKey](https://wazzup24.ru/help/webhooks-2/)
 - [Wazzup: отправка сообщений](https://wazzup24.ru/help/api-ru/otpravka-soobshhenij/)
+
+Для разработчиков: [локальный сквозной сценарий Wazzup](../../crm_messenger/docs/wazzup_local_e2e.md)
+запускается из соседнего репозитория `crm_messenger` командой
+`../../env/bin/python scripts/run_wazzup_local_e2e.py --artifacts /tmp/wazzup-local-e2e-artifacts`.
+Он проверяет WhatsApp и личный Telegram через настоящий CRM UI, HTTP Frappe,
+отдельную БД/очередь и HTTP-имитатор, включая приватный файл и `unknown` без resend.
+Текущие БД не сбрасываются. Проверка не подтверждает доставку на реальном аккаунте.
