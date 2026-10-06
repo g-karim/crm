@@ -823,10 +823,9 @@ const { tabIndex, changeTabTo } = useActiveTabManager(tabs, 'lastDealTab')
 
 // keep the active tab visible — later tabs (e.g. Quotations) otherwise stay
 // scrolled out of view behind the right panel
-const dealTabsRef = ref(null)
 function scrollActiveTabIntoView() {
   nextTick(() => {
-    dealTabsRef.value?.$el
+    tabRoot.value?.$el
       ?.querySelector('[role="tab"][aria-selected="true"]')
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   })
