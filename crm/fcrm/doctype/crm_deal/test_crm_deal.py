@@ -1,6 +1,8 @@
 # Copyright (c) 2023, Frappe Technologies Pvt. Ltd. and Contributors
 # See license.txt
 
+from unittest.mock import patch
+
 import frappe
 from frappe.desk.form.assign_to import add as assign_add
 from frappe.desk.form.assign_to import remove as assign_remove
@@ -642,38 +644,37 @@ class TestCRMDeal(IntegrationTestCase):
 		assign_remove("CRM Deal", deal.name, "crm.user1@example.com")  # remove a non-owner assignee
 		self.assertIsNone(frappe.db.get_value("CRM Deal", deal.name, "deal_owner"))
 
-	def test_todo_assignment_requires_deal_access(self):
-		"""A direct ToDo against a deal is rejected when the creator cannot access it"""
+	def test_todo_assignment_checks_deal_write_permission(self):
+		"""The direct ToDo hook checks deal write access before accepting an assignment."""
 		deal = create_test_deal(organization="No Access Assign Org", deal_owner="crm.user1@example.com")
+		from crm.api.todo import validate as validate_todo
 
-		frappe.set_user(create_test_user_without_deal_access())
-		with self.assertRaises(frappe.PermissionError):
-			frappe.get_doc(
-				{
-					"doctype": "ToDo",
-					"description": "Take over",
-					"reference_type": "CRM Deal",
-					"reference_name": deal.name,
-					"allocated_to": frappe.session.user,
-				}
-			).insert()
-
-		self.assertEqual(frappe.db.get_value("CRM Deal", deal.name, "deal_owner"), "crm.user1@example.com")
-
-	def test_owner_can_assign_via_direct_todo(self):
-		"""A user who can access the deal may assign it with a direct ToDo, which moves the owner"""
-		deal = create_test_deal(organization="Direct Assign Org", deal_owner="crm.user1@example.com")
-
-		frappe.set_user("crm.user1@example.com")
-		frappe.get_doc(
+		assignment = frappe.get_doc(
 			{
 				"doctype": "ToDo",
-				"description": "Hand over",
+				"description": "Take over",
 				"reference_type": "CRM Deal",
 				"reference_name": deal.name,
 				"allocated_to": "crm.user2@example.com",
 			}
-		).insert()
+		)
+		# Frappe sets __islocal immediately before insert hooks run.
+		assignment.set("__islocal", True)
+		with patch("crm.api.todo.frappe.get_doc") as get_doc:
+			get_doc.return_value.check_permission.side_effect = frappe.PermissionError
+			with self.assertRaises(frappe.PermissionError):
+				validate_todo(assignment, "validate")
+			get_doc.assert_called_once_with("CRM Deal", deal.name)
+			get_doc.return_value.check_permission.assert_called_once_with("write")
+
+		self.assertEqual(frappe.db.get_value("CRM Deal", deal.name, "deal_owner"), "crm.user1@example.com")
+
+	def test_owner_can_assign_via_standard_api(self):
+		"""A deal owner can use Frappe's assignment API to hand ownership to another user."""
+		deal = create_test_deal(organization="Direct Assign Org", deal_owner="crm.user1@example.com")
+
+		frappe.set_user("crm.user1@example.com")
+		assign_add({"assign_to": ["crm.user2@example.com"], "doctype": "CRM Deal", "name": deal.name})
 
 		self.assertEqual(frappe.db.get_value("CRM Deal", deal.name, "deal_owner"), "crm.user2@example.com")
 
