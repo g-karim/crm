@@ -108,3 +108,37 @@ class TestCRMTranslations(TestCase):
 		translations = get_crm_translations("ru")
 		self.assertEqual(user_facing - translations.keys(), set())
 		self.assertTrue(all(translations[source] != source for source in user_facing))
+
+	def test_wazzup_connection_and_diagnostic_labels_are_translated(self):
+		user_facing = {
+			"Telegram personal chats", "Wazzup API key", "Wazzup channel UUID",
+			"API key source", "Load Wazzup channels", "Available Wazzup channels",
+			"Active in CRM", "Check saved configuration", "Saved configuration diagnostics", "Configuration Checked", "Wazzup diagnostics refreshed.",
+			"API access", "Selected Wazzup channel", "Webhook subscription",
+			"CRM webhook configuration", "Actual incoming event", "No event observed",
+			"Event received", "Not checked", "Could not verify", "Verified",
+			"The Wazzup API key is invalid.", "The Wazzup API request is not permitted.",
+			"The Wazzup API is temporarily unavailable. Try checking again.",
+			"The Wazzup API rate limit was reached. Try checking again.",
+			"The Wazzup API returned an unexpected response.",
+			"The Wazzup API endpoint is not supported.",
+			"Enter the Wazzup channel UUID, not its phone number or username.",
+			"The selected channel is not available for this Wazzup API key.",
+			"The selected Wazzup channel uses a different messenger.",
+			"The selected Wazzup channel is not active.",
+			"The Wazzup channel state could not be verified.",
+			"The Wazzup webhook address or message subscription does not match this CRM.",
+			"Configure a public HTTPS site URL and webhook secret before receiving Wazzup events.",
+			"Channel settings changed during verification. Check the channel again.",
+			"Configuration verified. Webhook delivery has not been verified.",
+			"Select a Wazzup channel.", "Select a Wazzup channel for the API key.",
+			"Enter a Wazzup channel UUID.", "Wazzup channels support API keys only.",
+			"The messenger identity of a Wazzup channel with conversations cannot be changed. Create a separate channel.",
+			"Wazzup configuration is invalid. Check the saved channel settings.",
+			"Webhook events: {0} pending, {1} failed.",
+			"Attachments: {0} pending, {1} failed.",
+			"The Shared Webhook Secret must match the crmKey configured for the Wazzup integration; it is different from the Wazzup API key.",
+		}
+		translations = get_crm_translations("ru")
+		self.assertEqual(user_facing - translations.keys(), set())
+		self.assertTrue(all(translations[source] != source for source in user_facing))

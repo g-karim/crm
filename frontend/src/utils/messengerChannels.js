@@ -182,6 +182,12 @@ export function getMessengerDeliveryState(message = {}) {
 export function getMessengerFailureReason(message = {}) {
   let reason = message?.failure_reason || message?.error || ''
   if (
+    message?.provider === 'wazzup' &&
+    reason === 'wazzup_configuration_invalid'
+  ) {
+    return 'Wazzup configuration is invalid. Check the saved channel settings.'
+  }
+  if (
     message?.provider === 'vk_direct' &&
     (reason === VK_PHOTO_UPLOAD_INVALID_REASON ||
       VK_PHOTO_UPLOAD_PROVIDER_REASON.test(reason))

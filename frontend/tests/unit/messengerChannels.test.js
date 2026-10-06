@@ -28,6 +28,20 @@ vi.mock('frappe-ui', () => ({
 }))
 
 describe('messengerChannels', () => {
+  it('explains proven Wazzup configuration failure without changing other provider reasons', () => {
+    expect(
+      getMessengerFailureReason({
+        provider: 'wazzup',
+        failure_reason: 'wazzup_configuration_invalid',
+      }),
+    ).toBe('Wazzup configuration is invalid. Check the saved channel settings.')
+    expect(
+      getMessengerFailureReason({
+        provider: 'telegram_bot',
+        failure_reason: 'wazzup_configuration_invalid',
+      }),
+    ).toBe('wazzup_configuration_invalid')
+  })
   it('normalizes known platform labels', () => {
     expect(
       getMessengerPlatformLabel({

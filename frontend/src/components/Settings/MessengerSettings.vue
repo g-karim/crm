@@ -241,8 +241,8 @@
             </div>
           </div>
           <Badge
-            :label="__(messengerChannelState(channelDraft).label)"
-            :theme="messengerChannelState(channelDraft).theme"
+            :label="__(draftChannelState.label)"
+            :theme="draftChannelState.theme"
             variant="outline"
           />
         </div>
@@ -278,7 +278,27 @@
             type="text"
             required
             :label="__('Channel ID')"
-            placeholder="channelId / plainId"
+            :placeholder="__('Wazzup channel UUID')"
+            :description="
+              __('Use channelId from Wazzup, not a phone number or username.')
+            "
+          />
+
+          <FormControl
+            v-if="
+              channelDraft.provider === 'wazzup' &&
+              !channelDraft.channel &&
+              wazzupKeySources.length > 1
+            "
+            v-model="channelDraft.api_token_source_channel"
+            type="select"
+            :options="wazzupKeySources"
+            :label="__('API key source')"
+            :description="
+              __(
+                'The saved key is reused securely without displaying it. An entered API key takes priority.',
+              )
+            "
           />
 
           <FormControl
@@ -302,10 +322,17 @@
             v-if="showsApiToken"
             v-model="channelDraft.api_token"
             type="password"
-            :required="!channelDraft.api_token_configured"
+            :required="
+              !channelDraft.api_token_configured &&
+              !channelDraft.api_token_source_channel
+            "
             :label="__(apiTokenLabel)"
             :placeholder="secretPlaceholder(channelDraft.api_token_configured)"
-            :description="__('Leave blank to keep the current token.')"
+            :description="
+              channelDraft.api_token_source_channel
+                ? __('Leave blank to use the saved API key.')
+                : __('Leave blank to keep the current token.')
+            "
           />
           <FormControl
             v-if="channelDraft.provider === 'avito_direct'"
@@ -319,6 +346,195 @@
             :description="__('Leave blank to keep the current secret.')"
           />
         </div>
+
+        <section
+          v-if="channelDraft.provider === 'wazzup'"
+          data-testid="wazzup-settings"
+          class="rounded-lg border border-outline-gray-1 bg-surface-gray-1 p-4"
+        >
+          <div class="text-base-medium text-ink-gray-8">
+            {{ __('Wazzup connection') }}
+          </div>
+          <p class="mt-1 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Connect the messenger in Wazzup first, then select its channel here. Telegram uses personal chats; Telegram bots have a separate direct integration.',
+              )
+            }}
+          </p>
+          <Button
+            class="mt-3"
+            :label="__('Load Wazzup channels')"
+            variant="subtle"
+            :loading="loadingWazzupChannels"
+            :disabled="channelBusy || !hasWazzupKey"
+            @click="loadWazzupChannels"
+          />
+          <FormControl
+            v-if="wazzupRemoteChannels.length"
+            class="mt-3"
+            :model-value="channelDraft.provider_channel_id"
+            type="select"
+            :options="wazzupRemoteChannelOptions"
+            :label="__('Available Wazzup channels')"
+            @update:modelValue="selectWazzupChannel"
+          />
+          <p
+            v-else-if="wazzupChannelsLoaded"
+            class="mt-2 text-p-sm text-ink-gray-5"
+          >
+            {{
+              __(
+                'No WhatsApp or personal Telegram channels are available for this API key.',
+              )
+            }}
+          </p>
+          <p class="mt-2 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Loading channels uses the entered or saved API key without saving changes.',
+              )
+            }}
+          </p>
+          <Switch
+            v-model="channelDraft.enabled"
+            class="mt-4"
+            :label="__('Active in CRM')"
+            :description="
+              __(
+                'Allows this channel to send and receive messages in CRM. This switch does not verify the connection.',
+              )
+            "
+          />
+
+          <div
+            v-if="channelDraft.channel"
+            class="mt-4 border-t border-outline-gray-1 pt-4"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="text-base-medium text-ink-gray-8">
+                {{ __('Saved configuration diagnostics') }}
+              </div>
+              <Button
+                :label="__('Check saved configuration')"
+                variant="subtle"
+                :loading="channelAction === 'wazzup_check'"
+                :disabled="channelBusy || channelDirty || settingsDirty"
+                @click="checkWazzupChannel"
+              />
+            </div>
+            <p
+              v-if="channelDirty || settingsDirty"
+              class="mt-2 text-p-sm text-ink-orange-7"
+            >
+              {{
+                __(
+                  'Save channel and messaging settings before checking the connection.',
+                )
+              }}
+            </p>
+            <p
+              v-if="wazzupConnection?.last_checked_at"
+              class="mt-2 text-p-sm text-ink-gray-5"
+            >
+              {{ __('Last checked') }}: {{ wazzupConnection.last_checked_at }}
+            </p>
+            <dl
+              class="mt-3 flex flex-col gap-2"
+              data-testid="wazzup-diagnostics"
+            >
+              <div
+                v-for="row in wazzupDiagnosticRows"
+                :key="row.key"
+                :data-diagnostic="row.key"
+                class="flex flex-wrap items-center justify-between gap-2"
+              >
+                <dt class="text-p-sm text-ink-gray-7">{{ __(row.title) }}</dt>
+                <dd
+                  class="flex flex-wrap items-center gap-2 text-p-sm text-ink-gray-5"
+                >
+                  <span v-if="row.received_at"
+                    >{{ row.received_at
+                    }}<template v-if="row.event_label">
+                      · {{ __(row.event_label) }}</template
+                    ></span
+                  >
+                  <Badge
+                    :label="__(row.label)"
+                    :theme="row.theme"
+                    variant="outline"
+                  />
+                </dd>
+              </div>
+            </dl>
+            <p
+              v-if="
+                wazzupConnection?.local_config?.integration_enabled === false
+              "
+              class="mt-2 text-p-sm text-ink-orange-7"
+            >
+              {{ __('Messaging is disabled in CRM.') }}
+            </p>
+            <p
+              v-if="wazzupConnection?.local_config?.channel_enabled === false"
+              class="mt-2 text-p-sm text-ink-gray-5"
+            >
+              {{ __('This channel is inactive in CRM.') }}
+            </p>
+            <p
+              v-if="wazzupConnection?.remote_event?.received_at"
+              class="mt-2 text-p-sm text-ink-gray-5"
+            >
+              {{ __('Last channel update') }}:
+              {{ wazzupConnection.remote_event.received_at }}
+            </p>
+            <div
+              class="mt-3 text-p-sm text-ink-gray-5"
+              data-testid="wazzup-queue-diagnostics"
+            >
+              <template v-if="wazzupOperations">
+                <p>
+                  {{
+                    __('Webhook events: {0} pending, {1} failed.', [
+                      wazzupOperations.events_pending,
+                      wazzupOperations.events_failed,
+                    ])
+                  }}
+                </p>
+                <p>
+                  {{
+                    __('Attachments: {0} pending, {1} failed.', [
+                      wazzupOperations.media_pending,
+                      wazzupOperations.media_failed,
+                    ])
+                  }}
+                </p>
+              </template>
+              <p v-else>{{ __('Operational diagnostics are unavailable.') }}</p>
+            </div>
+            <p class="mt-3 text-p-sm text-ink-gray-5">
+              {{
+                __(
+                  'API and webhook configuration checks do not prove message delivery. A real incoming message, status, or channel update confirms that CRM received an authenticated event.',
+                )
+              }}
+            </p>
+          </div>
+          <p class="mt-3 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Receiving events requires a public HTTPS CRM address, a saved Shared Webhook Secret, and a Wazzup webhook subscription configured for this CRM. Checking does not change the Wazzup subscription.',
+              )
+            }}
+          </p>
+          <p class="mt-2 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'The Shared Webhook Secret must match the crmKey configured for the Wazzup integration; it is different from the Wazzup API key.',
+              )
+            }}
+          </p>
+        </section>
 
         <section
           v-if="channelDraft.provider === 'avito_direct'"
@@ -490,7 +706,7 @@
           data-testid="channel-auth-error"
           class="rounded-lg border border-outline-red-4 bg-surface-red-2 px-3 py-2 text-p-sm font-semibold text-ink-red-8"
         >
-          {{ channelError || clientProviderMessage(channelDraft.auth_error) }}
+          {{ channelError || channelProviderMessage(channelDraft.auth_error) }}
         </div>
 
         <div
@@ -558,11 +774,15 @@ import {
   MESSENGER_PROVIDER_OPTIONS,
   applyMessengerProviderDefaults,
   buildMessengerChannelPayload,
+  callWazzupSettings,
   isDirectMessengerProvider,
   makeMessengerChannelDraft,
   messengerChannelState,
   messengerProviderLabel,
   validateMessengerChannelDraft,
+  wazzupConnectionMessage,
+  wazzupConnectionRows,
+  wazzupOperationalCounts,
 } from '@/utils/messengerSettings'
 import {
   Badge,
@@ -575,7 +795,7 @@ import {
   call,
   toast,
 } from 'frappe-ui'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 const defaultSettings = () => ({
   enabled: false,
@@ -603,6 +823,11 @@ const channelSnapshot = ref('')
 const savingChannel = ref(false)
 const channelAction = ref('')
 const channelError = ref('')
+const wazzupConnection = ref(null)
+const wazzupOperations = ref(null)
+const wazzupRemoteChannels = ref([])
+const wazzupChannelsLoaded = ref(false)
+const loadingWazzupChannels = ref(false)
 const avitoImportStatus = ref(null)
 const loadingAvitoImport = ref(false)
 const scanningAvitoImport = ref(false)
@@ -625,14 +850,55 @@ const avitoImportOptions = [
   },
 ]
 const channelBusy = computed(
-  () => savingChannel.value || Boolean(channelAction.value),
+  () =>
+    savingChannel.value ||
+    Boolean(channelAction.value) ||
+    loadingWazzupChannels.value,
 )
 const channelDirty = computed(() => channelState() !== channelSnapshot.value)
+const draftChannelState = computed(() =>
+  messengerChannelState(
+    channelDraft.value.provider === 'wazzup' && channelDirty.value
+      ? { ...channelDraft.value, state: 'unchecked' }
+      : channelDraft.value.provider === 'wazzup'
+        ? {
+            ...channelDraft.value,
+            integration: { wazzup_connection: wazzupConnection.value },
+          }
+        : channelDraft.value,
+  ),
+)
+const wazzupDiagnosticRows = computed(() =>
+  wazzupConnectionRows(wazzupConnection.value || {}),
+)
+const wazzupKeySources = computed(() => [
+  { label: __('Enter a new API key'), value: '' },
+  ...channels.value
+    .filter(
+      (channel) =>
+        channel.provider === 'wazzup' && channel.api_token_configured,
+    )
+    .map((channel) => ({ label: channelTitle(channel), value: channel.name })),
+])
+const hasWazzupKey = computed(() =>
+  Boolean(
+    channelDraft.value.api_token.trim() ||
+    channelDraft.value.api_token_configured ||
+    channelDraft.value.api_token_source_channel,
+  ),
+)
+const wazzupRemoteChannelOptions = computed(() => [
+  { label: __('Select a Wazzup channel'), value: '' },
+  ...wazzupRemoteChannels.value.map((channel) => ({
+    label: channel.display_name,
+    value: channel.provider_channel_id,
+  })),
+])
 
-const wazzupPlatforms = [
-  { label: 'WhatsApp', value: 'whatsapp' },
-  { label: 'Telegram', value: 'telegram' },
-]
+const wazzupPlatforms = computed(() => [
+  { label: __('WhatsApp'), value: 'whatsapp' },
+  { label: __('Telegram personal chats'), value: 'telegram' },
+])
 const providerOptions = computed(() =>
   MESSENGER_PROVIDER_OPTIONS.map((option) => ({
     ...option,
@@ -653,6 +919,7 @@ const apiTokenLabel = computed(() => {
   if (channelDraft.value.provider === 'vk_direct')
     return 'Community Access Token'
   if (channelDraft.value.provider === 'max_direct') return 'Bot Token'
+  if (channelDraft.value.provider === 'wazzup') return 'Wazzup API key'
   return 'API Token'
 })
 const hasConnectionActions = computed(
@@ -693,6 +960,7 @@ async function loadSettings(isRefresh = false, channelsOnly = false) {
     }
     channels.value = result.channels || []
     loadError.value = false
+    return true
   } catch (error) {
     loadError.value = true
     toast.error(
@@ -700,6 +968,7 @@ async function loadSettings(isRefresh = false, channelsOnly = false) {
         error?.messages?.[0] || 'Could not load message channel settings.',
       ),
     )
+    return false
   } finally {
     loading.value = false
     refreshing.value = false
@@ -709,7 +978,8 @@ async function loadSettings(isRefresh = false, channelsOnly = false) {
 async function saveGlobalSettings() {
   savingSettings.value = true
   try {
-    let result = await call('crm_messenger.api.settings.save_settings', {
+    const save = settings.webhook_secret.trim() ? callWazzupSettings : call
+    let result = await save('crm_messenger.api.settings.save_settings', {
       enabled: Boolean(settings.enabled),
       auto_create_lead: Boolean(settings.auto_create_lead),
       enable_provider_history_tombstones: Boolean(
@@ -721,6 +991,38 @@ async function saveGlobalSettings() {
     Object.assign(settings, result || {})
     settings.webhook_secret = ''
     settingsSnapshot.value = settingsState()
+    if (channels.value.some((channel) => channel.provider === 'wazzup')) {
+      const draft = channelDraft.value
+      const reloaded = await loadSettings(true, true)
+      if (!reloaded) {
+        channels.value = channels.value.map((channel) =>
+          channel.provider === 'wazzup'
+            ? {
+                ...channel,
+                state: 'unchecked',
+                auth_error: null,
+                integration: {
+                  ...channel.integration,
+                  wazzup_connection: null,
+                },
+              }
+            : channel,
+        )
+      }
+      if (
+        channelDraft.value === draft &&
+        draft.provider === 'wazzup' &&
+        draft.channel
+      ) {
+        const fresh = reloaded
+          ? channels.value.find((channel) => channel.name === draft.channel)
+          : null
+        wazzupConnection.value = fresh?.integration?.wazzup_connection || null
+        draft.state = fresh?.state || 'unchecked'
+        draft.auth_error = fresh?.auth_error || null
+        loadWazzupOperations()
+      }
+    }
     toast.success(__('Message channel settings saved.'))
   } catch (error) {
     toast.error(
@@ -735,6 +1037,9 @@ async function saveGlobalSettings() {
 
 function openNewChannel() {
   avitoImportStatus.value = null
+  wazzupConnection.value = null
+  wazzupOperations.value = null
+  resetWazzupChannels()
   channelDraft.value = makeMessengerChannelDraft()
   channelSnapshot.value = channelState()
   channelError.value = ''
@@ -743,6 +1048,9 @@ function openNewChannel() {
 
 function openChannel(channel) {
   avitoImportStatus.value = null
+  wazzupConnection.value = channel.integration?.wazzup_connection || null
+  wazzupOperations.value = null
+  resetWazzupChannels()
   channelDraft.value = {
     ...makeMessengerChannelDraft(channel),
     state: channel.state,
@@ -753,6 +1061,7 @@ function openChannel(channel) {
   channelSnapshot.value = channelState()
   channelError.value = ''
   showChannelDialog.value = true
+  if (channel.provider === 'wazzup') loadWazzupOperations()
   if (
     channel.provider === 'avito_direct' &&
     channel.enabled &&
@@ -767,6 +1076,141 @@ function changeProvider(provider) {
   applyMessengerProviderDefaults(channelDraft.value)
 }
 
+function wazzupCredentialIdentity() {
+  const draft = channelDraft.value
+  return JSON.stringify([
+    draft.provider,
+    draft.channel,
+    draft.api_token,
+    draft.api_token_source_channel,
+  ])
+}
+
+function resetWazzupChannels() {
+  wazzupRemoteChannels.value = []
+  wazzupChannelsLoaded.value = false
+}
+watch(wazzupCredentialIdentity, resetWazzupChannels)
+
+async function loadWazzupChannels() {
+  if (channelBusy.value || !hasWazzupKey.value) return
+  const draft = channelDraft.value
+  const identity = wazzupCredentialIdentity()
+  const params = draft.api_token.trim()
+    ? { api_token: draft.api_token.trim() }
+    : { channel: draft.api_token_source_channel || draft.channel }
+  loadingWazzupChannels.value = true
+  channelError.value = ''
+  try {
+    const result = await callWazzupSettings(
+      'crm_messenger.api.wazzup_connection.list_channels',
+      params,
+    )
+    if (
+      channelDraft.value !== draft ||
+      identity !== wazzupCredentialIdentity() ||
+      !showChannelDialog.value
+    )
+      return
+    if (!result.ok) {
+      channelError.value = __(wazzupConnectionMessage(result.message))
+      wazzupRemoteChannels.value = []
+      wazzupChannelsLoaded.value = false
+      return
+    }
+    wazzupRemoteChannels.value = (result.channels || []).filter((channel) =>
+      ['whatsapp', 'telegram'].includes(channel.platform),
+    )
+    wazzupChannelsLoaded.value = true
+  } catch (error) {
+    if (
+      channelDraft.value === draft &&
+      identity === wazzupCredentialIdentity() &&
+      showChannelDialog.value
+    ) {
+      channelError.value = __(wazzupConnectionMessage(error?.messages?.[0]))
+    }
+  } finally {
+    loadingWazzupChannels.value = false
+  }
+}
+
+function selectWazzupChannel(id) {
+  const selected = wazzupRemoteChannels.value.find(
+    (channel) => channel.provider_channel_id === id,
+  )
+  if (!selected) return
+  channelDraft.value.provider_channel_id = selected.provider_channel_id
+  channelDraft.value.platform = selected.platform
+}
+
+async function loadWazzupOperations() {
+  const draft = channelDraft.value
+  try {
+    const result = await call(
+      'crm_messenger.api.diagnostics.get_health_summary',
+    )
+    if (channelDraft.value !== draft || !showChannelDialog.value) return
+    wazzupOperations.value = wazzupOperationalCounts(
+      (result.channels || []).find(
+        (channel) =>
+          channel.name === draft.channel && channel.provider === 'wazzup',
+      ),
+    )
+  } catch {
+    if (channelDraft.value === draft) wazzupOperations.value = null
+  }
+}
+
+async function checkWazzupChannel() {
+  if (
+    channelBusy.value ||
+    !channelDraft.value.channel ||
+    channelDirty.value ||
+    settingsDirty.value
+  )
+    return
+  const draft = channelDraft.value
+  const snapshot = channelState()
+  channelAction.value = 'wazzup_check'
+  channelError.value = ''
+  try {
+    const result = await callWazzupSettings(
+      'crm_messenger.api.wazzup_connection.check_channel',
+      { channel: draft.channel },
+    )
+    const reloaded = await loadSettings(true, true)
+    if (
+      channelDraft.value !== draft ||
+      channelState() !== snapshot ||
+      !showChannelDialog.value
+    )
+      return
+    const fresh = reloaded
+      ? channels.value.find((channel) => channel.name === draft.channel)
+      : null
+    if (fresh) openChannel(fresh)
+    wazzupConnection.value =
+      fresh?.integration?.wazzup_connection || result.connection || null
+    channelDraft.value.state = fresh?.state || result.state || 'unchecked'
+    channelDraft.value.auth_error = fresh?.auth_error || null
+    if (!result.ok)
+      channelError.value = __(wazzupConnectionMessage(result.message))
+    else toast.success(__('Wazzup diagnostics refreshed.'))
+    if (!fresh) loadWazzupOperations()
+  } catch (error) {
+    if (
+      channelDraft.value === draft &&
+      channelState() === snapshot &&
+      showChannelDialog.value
+    ) {
+      channelError.value = __(wazzupConnectionMessage(error?.messages?.[0]))
+    }
+  } finally {
+    channelAction.value = ''
+  }
+}
+
 async function saveChannel() {
   if (channelBusy.value) return
   let error = validateMessengerChannelDraft(channelDraft.value)
@@ -779,16 +1223,21 @@ async function saveChannel() {
   channelError.value = ''
   let wasNew = !channelDraft.value.channel
   try {
-    let result = await call(
+    const isWazzup = channelDraft.value.provider === 'wazzup'
+    const save = isWazzup ? callWazzupSettings : call
+    let result = await save(
       'crm_messenger.api.settings.save_channel',
       buildMessengerChannelPayload(channelDraft.value),
     )
-    await loadSettings(true, true)
-    let fresh = channels.value.find((row) => row.name === result.name) || result
+    const reloaded = await loadSettings(true, true)
+    let fresh =
+      isWazzup && !reloaded
+        ? result
+        : channels.value.find((row) => row.name === result.name) || result
     openChannel(fresh)
     toast.success(wasNew ? __('Channel created.') : __('Channel saved.'))
   } catch (saveError) {
-    channelError.value = clientProviderMessage(
+    channelError.value = channelProviderMessage(
       saveError?.messages?.[0] || 'Could not save the channel.',
     )
   } finally {
@@ -945,6 +1394,12 @@ function clientProviderMessage(message) {
   if (!text) return ''
   if (/wazzup(?:24)?/i.test(text)) return __('The provider operation failed.')
   return __(text)
+}
+
+function channelProviderMessage(message) {
+  return channelDraft.value.provider === 'wazzup'
+    ? __(wazzupConnectionMessage(message))
+    : clientProviderMessage(message)
 }
 
 function providerActionFailureMessage(result = {}) {

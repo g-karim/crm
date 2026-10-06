@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   call: vi.fn(),
+  safeCall: vi.fn(),
   toast: { error: vi.fn(), success: vi.fn() },
 }))
 
@@ -19,17 +20,30 @@ vi.mock('frappe-ui', () => ({
   Badge: { props: ['label'], template: '<span>{{ label }}</span>' },
   Button: components.button,
   Dialog: {
-    template: '<div><slot name="body-content" /><slot name="actions" /></div>',
+    props: ['open'],
+    template:
+      '<div v-if="open"><slot name="body-content" /><slot name="actions" /></div>',
   },
   FeatherIcon: { template: '<span />' },
   FormControl: {
-    props: ['label', 'modelValue', 'type'],
+    props: [
+      'label',
+      'modelValue',
+      'type',
+      'options',
+      'disabled',
+      'description',
+    ],
     emits: ['update:modelValue'],
-    template:
-      '<input :data-label="label" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+    template: `<label>{{ label }}<select v-if="type === 'select'" :data-label="label" :value="modelValue" :disabled="disabled" @change="$emit('update:modelValue', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select><input v-else :data-label="label" :value="modelValue" :disabled="disabled" @input="$emit('update:modelValue', $event.target.value)" /><span>{{ description }}</span></label>`,
   },
   LoadingIndicator: { template: '<span>Loading</span>' },
-  Switch: { template: '<input type="checkbox" />' },
+  Switch: {
+    props: ['modelValue', 'label'],
+    emits: ['update:modelValue'],
+    template:
+      '<input type="checkbox" :data-label="label" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+  },
   call: mocks.call,
   toast: mocks.toast,
 }))
@@ -38,6 +52,14 @@ vi.mock('@/components/Layouts/SettingsLayoutBase.vue', () => ({
   default: {
     template:
       '<div><slot name="header-actions" /><slot name="content" /></div>',
+  },
+}))
+
+vi.mock('@/utils/messengerSettings', async (importOriginal) => ({
+  ...(await importOriginal()),
+  callWazzupSettings: (...args) => {
+    mocks.safeCall(...args)
+    return mocks.call(...args)
   },
 }))
 
@@ -52,6 +74,7 @@ afterEach(() => {
   }
   mounted = []
   mocks.call.mockReset()
+  mocks.safeCall.mockReset()
   mocks.toast.error.mockReset()
   mocks.toast.success.mockReset()
 })
@@ -81,11 +104,682 @@ async function clickButton(root, label) {
 }
 
 async function editField(root, label, value) {
-  const input = root.querySelector(`input[data-label="${label}"]`)
+  const input = root.querySelector(`[data-label="${label}"]`)
   input.value = value
-  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(
+    new Event(input.tagName === 'SELECT' ? 'change' : 'input', {
+      bubbles: true,
+    }),
+  )
   await nextTick()
 }
+
+describe('MessengerSettings Wazzup connection', () => {
+  const whatsappId = 'b5436cae-2434-4b55-a477-99386aeeecb4'
+  const telegramId = '970899f7-82ca-4fd8-9404-565ce53c8d0a'
+  function channel(overrides = {}) {
+    return {
+      name: 'wazzup-1',
+      provider: 'wazzup',
+      platform: 'whatsapp',
+      custom_display_name: 'Wazzup Sales',
+      provider_channel_id: whatsappId,
+      api_token_configured: true,
+      enabled: true,
+      state: 'unchecked',
+      ...overrides,
+    }
+  }
+  function connection(overrides = {}) {
+    return {
+      last_checked_at: '2026-10-05 12:00:00',
+      api: { status: 'verified' },
+      remote_channel: { status: 'verified', state: 'active' },
+      subscription: {
+        status: 'verified',
+        url_matches: true,
+        messages_and_statuses: true,
+      },
+      local_config: {
+        status: 'verified',
+        integration_enabled: true,
+        channel_enabled: true,
+      },
+      delivery: { status: 'unverified', last_received_at: null },
+      ...overrides,
+    }
+  }
+  function button(root, label) {
+    return [...root.querySelectorAll('button')].find(
+      (button) => button.textContent.trim() === label,
+    )
+  }
+  function setup({
+    stored = [channel()],
+    diagnostics = null,
+    extra = () => {},
+  } = {}) {
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings')
+        return Promise.resolve({
+          settings: { enabled: true },
+          channels: stored,
+        })
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: diagnostics || [] })
+      return extra(method, params)
+    })
+  }
+
+  it('loads channels using a draft key without saving it and selects the UUID plus personal Telegram platform', async () => {
+    setup({
+      stored: [],
+      extra: (method, params) => {
+        expect(method).toBe('crm_messenger.api.wazzup_connection.list_channels')
+        expect(params).toEqual({ api_token: 'draft-key' })
+        return Promise.resolve({
+          ok: true,
+          channels: [
+            {
+              provider_channel_id: telegramId,
+              platform: 'telegram',
+              display_name: 'Telegram · @su***rt',
+              remote_state: 'active',
+            },
+          ],
+        })
+      },
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'New Channel')
+    await editField(root, 'Provider', 'wazzup')
+    expect(button(root, 'Load Wazzup channels').disabled).toBe(true)
+    expect(
+      root.querySelector('input[data-label="Active in CRM"]').checked,
+    ).toBe(false)
+    expect(button(root, 'Check saved configuration')).toBeUndefined()
+    await editField(root, 'Wazzup API key', 'draft-key')
+    await clickButton(root, 'Load Wazzup channels')
+    await editField(root, 'Available Wazzup channels', telegramId)
+    expect(root.querySelector('[data-label="Channel ID"]').value).toBe(
+      telegramId,
+    )
+    expect(root.querySelector('[data-label="Platform"]').value).toBe('telegram')
+    expect(root.textContent).toContain('Telegram personal chats')
+    expect(
+      root.querySelector('input[data-label="Active in CRM"]').checked,
+    ).toBe(false)
+    expect(mocks.call.mock.calls.map(([method]) => method)).not.toContain(
+      'crm_messenger.api.settings.save_channel',
+    )
+    expect(root.textContent).not.toContain('Channel Connected')
+  })
+
+  it('reuses a saved key server-side only on creation and never exposes it in the form', async () => {
+    let created = false
+    setup({
+      extra: (method, params) => {
+        if (method === 'crm_messenger.api.wazzup_connection.list_channels') {
+          expect(params).toEqual({ channel: 'wazzup-1' })
+          return Promise.resolve({
+            ok: true,
+            channels: [
+              {
+                provider_channel_id: telegramId,
+                platform: 'telegram',
+                display_name: 'Telegram · @su***rt',
+              },
+            ],
+          })
+        }
+        if (method === 'crm_messenger.api.settings.save_channel') {
+          expect(params).toMatchObject({
+            provider: 'wazzup',
+            platform: 'telegram',
+            provider_channel_id: telegramId,
+            api_token_source_channel: 'wazzup-1',
+            enabled: false,
+          })
+          expect(params).not.toHaveProperty('api_token')
+          created = true
+          return Promise.resolve(
+            channel({
+              name: 'wazzup-new',
+              platform: 'telegram',
+              provider_channel_id: telegramId,
+              enabled: false,
+            }),
+          )
+        }
+        throw new Error(`Unexpected method ${method}`)
+      },
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'New Channel')
+    await editField(root, 'Provider', 'wazzup')
+    await editField(root, 'API key source', 'wazzup-1')
+    await clickButton(root, 'Load Wazzup channels')
+    await editField(root, 'Available Wazzup channels', telegramId)
+    await clickButton(root, 'Create Channel')
+    expect(created).toBe(true)
+    expect(root.querySelector('[data-label="Wazzup API key"]').value).toBe('')
+    expect(root.querySelector('[data-label="API key source"]')).toBeNull()
+  })
+
+  it('discards a late channel list when its credential draft changes', async () => {
+    let resolveList
+    setup({
+      stored: [],
+      extra: () =>
+        new Promise((resolve) => {
+          resolveList = resolve
+        }),
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'New Channel')
+    await editField(root, 'Provider', 'wazzup')
+    await editField(root, 'Wazzup API key', 'first-key')
+    await clickButton(root, 'Load Wazzup channels')
+    await editField(root, 'Wazzup API key', 'second-key')
+    resolveList({
+      ok: true,
+      channels: [
+        {
+          provider_channel_id: whatsappId,
+          platform: 'whatsapp',
+          display_name: 'Old account',
+        },
+      ],
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+    expect(
+      root.querySelector('[data-label="Available Wazzup channels"]'),
+    ).toBeNull()
+    expect(root.querySelector('[data-label="Wazzup API key"]').value).toBe(
+      'second-key',
+    )
+    expect(root.textContent).not.toContain('Old account')
+  })
+
+  it('can rename and disable a saved legacy Wazzup channel while rejecting an invalid replacement ID', async () => {
+    let stored = channel({ provider_channel_id: 'legacy-channel-id' })
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings')
+        return Promise.resolve({ settings: {}, channels: [stored] })
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: [] })
+      if (method === 'crm_messenger.api.settings.save_channel') {
+        expect(params).toMatchObject({
+          provider_channel_id: 'legacy-channel-id',
+          enabled: false,
+          custom_display_name: 'Legacy disabled',
+        })
+        expect(params).not.toHaveProperty('original_wazzup_identity')
+        stored = {
+          ...stored,
+          enabled: false,
+          custom_display_name: params.custom_display_name,
+        }
+        return Promise.resolve(stored)
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    await editField(root, 'Channel Name', 'Legacy disabled')
+    const active = root.querySelector('input[data-label="Active in CRM"]')
+    active.checked = false
+    active.dispatchEvent(new Event('change', { bubbles: true }))
+    await nextTick()
+    await clickButton(root, 'Save')
+    expect(root.querySelector('[data-label="Channel ID"]').value).toBe(
+      'legacy-channel-id',
+    )
+    expect(
+      root.querySelector('input[data-label="Active in CRM"]').checked,
+    ).toBe(false)
+    await editField(root, 'Channel ID', 'another-invalid-id')
+    await clickButton(root, 'Save')
+    expect(
+      root.querySelector('[data-testid="channel-auth-error"]').textContent,
+    ).toContain('Enter a Wazzup channel UUID.')
+    expect(
+      mocks.call.mock.calls.filter(
+        ([method]) => method === 'crm_messenger.api.settings.save_channel',
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('saves local activation explicitly without claiming a confirmed connection', async () => {
+    let stored = channel({ enabled: false })
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings')
+        return Promise.resolve({ settings: {}, channels: [stored] })
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: [] })
+      if (method === 'crm_messenger.api.settings.save_channel') {
+        expect(params.enabled).toBe(true)
+        expect(params).not.toHaveProperty('state')
+        stored = { ...stored, enabled: true }
+        return Promise.resolve(stored)
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    const active = root.querySelector('input[data-label="Active in CRM"]')
+    active.checked = true
+    active.dispatchEvent(new Event('change', { bubbles: true }))
+    await nextTick()
+    await clickButton(root, 'Save')
+    expect(root.textContent).toContain('Connection Not Checked')
+    expect(root.textContent).not.toContain('Channel Connected')
+  })
+
+  it('checks saved configuration without turning verified reads into delivery confirmation', async () => {
+    const checked = connection()
+    setup({
+      diagnostics: [
+        {
+          name: 'wazzup-1',
+          provider: 'wazzup',
+          webhook_queue: { queued: 2, retrying: 1, failed: 4 },
+          media: { pending: 1, failed: 2 },
+          error: 'private-provider-error',
+        },
+      ],
+      extra: (method, params) => {
+        expect(method).toBe('crm_messenger.api.wazzup_connection.check_channel')
+        expect(params).toEqual({ channel: 'wazzup-1' })
+        return Promise.resolve({
+          ok: true,
+          state: 'unchecked',
+          message:
+            'Configuration verified. Webhook delivery has not been verified.',
+          connection: checked,
+        })
+      },
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    await clickButton(root, 'Check saved configuration')
+    expect(root.querySelector('[data-diagnostic="api"]').textContent).toContain(
+      'Verified',
+    )
+    expect(
+      root.querySelector('[data-diagnostic="subscription"]').textContent,
+    ).toContain('Verified')
+    expect(
+      root.querySelector('[data-diagnostic="delivery"]').textContent,
+    ).toContain('No event observed')
+    expect(root.textContent).toContain('Connection Not Checked')
+    expect(root.textContent).not.toContain('Channel Connected')
+    expect(button(root, 'Connect / Repair')).toBeUndefined()
+    expect(
+      root.querySelector('[data-testid="wazzup-queue-diagnostics"]')
+        .textContent,
+    ).toContain('Webhook events: 3 pending, 4 failed.')
+    expect(root.textContent).toContain('Attachments: 1 pending, 2 failed.')
+    expect(root.textContent).not.toContain('private-provider-error')
+  })
+
+  it('blocks checks of dirty channel or global settings while preserving the edited key', async () => {
+    setup()
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    await editField(root, 'Wazzup API key', 'changed-key')
+    expect(button(root, 'Check saved configuration').disabled).toBe(true)
+    await clickButton(root, 'Check saved configuration')
+    expect(root.querySelector('[data-label="Wazzup API key"]').value).toBe(
+      'changed-key',
+    )
+    expect(mocks.call).not.toHaveBeenCalledWith(
+      'crm_messenger.api.wazzup_connection.check_channel',
+      expect.anything(),
+    )
+    await editField(root, 'Wazzup API key', '')
+    const globalSwitch = root.querySelector('input[type="checkbox"]')
+    globalSwitch.checked = false
+    globalSwitch.dispatchEvent(new Event('change', { bubbles: true }))
+    await nextTick()
+    expect(button(root, 'Check saved configuration').disabled).toBe(true)
+    expect(root.textContent).toContain(
+      'Save channel and messaging settings before checking the connection.',
+    )
+  })
+
+  it('uses a newer channel event from refreshed settings over the earlier check response', async () => {
+    let stored = channel()
+    const latest = connection({
+      remote_channel: { status: 'invalid', state: 'blocked' },
+      delivery: {
+        status: 'received',
+        last_received_at: '2026-10-05 13:01:00',
+        event_type: 'channel_update',
+      },
+    })
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings')
+        return Promise.resolve({
+          settings: { enabled: true },
+          channels: [stored],
+        })
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: [] })
+      if (method === 'crm_messenger.api.wazzup_connection.check_channel') {
+        stored = channel({
+          state: 'degraded',
+          integration: { wazzup_connection: latest },
+        })
+        return Promise.resolve({
+          ok: true,
+          state: 'unchecked',
+          message:
+            'Configuration verified. Webhook delivery has not been verified.',
+          connection: connection(),
+        })
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    await clickButton(root, 'Check saved configuration')
+    expect(
+      root.querySelector('[data-diagnostic="remote_channel"]').textContent,
+    ).toContain('Needs Attention')
+    expect(
+      root.querySelector('[data-diagnostic="delivery"]').textContent,
+    ).toContain('Event received')
+    expect(
+      root.querySelector('[data-diagnostic="delivery"]').textContent,
+    ).toContain('2026-10-05 13:01:00')
+    expect(root.textContent).not.toContain('Configuration Checked')
+  })
+
+  it('falls back to the completed check when settings reload fails instead of using cached diagnostics', async () => {
+    let loads = 0
+    const cached = connection({ api: { status: 'invalid' } })
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        if (++loads > 1) return Promise.reject(new Error('reload failed'))
+        return Promise.resolve({
+          settings: { enabled: true },
+          channels: [channel({ integration: { wazzup_connection: cached } })],
+        })
+      }
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: [] })
+      if (method === 'crm_messenger.api.wazzup_connection.check_channel')
+        return Promise.resolve({
+          ok: true,
+          state: 'unchecked',
+          message:
+            'Configuration verified. Webhook delivery has not been verified.',
+          connection: connection(),
+        })
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    await clickButton(root, 'Check saved configuration')
+    expect(root.querySelector('[data-diagnostic="api"]').textContent).toContain(
+      'Verified',
+    )
+    expect(
+      root.querySelector('[data-diagnostic="api"]').textContent,
+    ).not.toContain('Needs Attention')
+    expect(mocks.toast.success).toHaveBeenCalledWith(
+      'Wazzup diagnostics refreshed.',
+    )
+  })
+
+  it('syncs changed server channel identity after a check without leaving an apparently clean stale form', async () => {
+    let stored = channel()
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings')
+        return Promise.resolve({
+          settings: { enabled: true },
+          channels: [stored],
+        })
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: [] })
+      if (method === 'crm_messenger.api.wazzup_connection.check_channel') {
+        stored = channel({
+          platform: 'telegram',
+          provider_channel_id: telegramId,
+          enabled: false,
+          integration: { wazzup_connection: {} },
+        })
+        return Promise.resolve({
+          ok: false,
+          reason: 'settings_changed',
+          message:
+            'Channel settings changed during verification. Check the channel again.',
+        })
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    await clickButton(root, 'Check saved configuration')
+    expect(root.querySelector('[data-label="Channel ID"]').value).toBe(
+      telegramId,
+    )
+    expect(root.querySelector('[data-label="Platform"]').value).toBe('telegram')
+    expect(
+      root.querySelector('input[data-label="Active in CRM"]').checked,
+    ).toBe(false)
+    expect(button(root, 'Check saved configuration').disabled).toBe(false)
+    expect(root.querySelector('[data-diagnostic="api"]').textContent).toContain(
+      'Not checked',
+    )
+    expect(
+      root.querySelector('[data-testid="channel-auth-error"]').textContent,
+    ).toContain('Channel settings changed during verification.')
+  })
+
+  it('renders actual receipt independently from a failed subscription check and keeps errors sanitized', async () => {
+    setup({
+      extra: () =>
+        Promise.resolve({
+          ok: false,
+          state: 'degraded',
+          message:
+            'The Wazzup webhook address or message subscription does not match this CRM.',
+          connection: connection({
+            subscription: { status: 'invalid' },
+            delivery: {
+              status: 'received',
+              last_received_at: '2026-10-05 13:00:00',
+              event_type: 'channel_update',
+            },
+            remote_event: {
+              state: 'active',
+              received_at: '2026-10-05 13:00:00',
+            },
+          }),
+        }),
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    await clickButton(root, 'Check saved configuration')
+    expect(root.querySelector('[data-diagnostic="api"]').textContent).toContain(
+      'Verified',
+    )
+    expect(
+      root.querySelector('[data-diagnostic="subscription"]').textContent,
+    ).toContain('Needs Attention')
+    expect(
+      root.querySelector('[data-diagnostic="delivery"]').textContent,
+    ).toContain('Event received')
+    expect(
+      root.querySelector('[data-diagnostic="delivery"]').textContent,
+    ).toContain('Channel update')
+    expect(root.textContent).toContain('2026-10-05 13:00:00')
+    expect(
+      root.querySelector('[data-testid="channel-auth-error"]').textContent,
+    ).toContain(
+      'The Wazzup webhook address or message subscription does not match this CRM.',
+    )
+    mocks.call.mockImplementation((method) =>
+      method === 'crm_messenger.api.settings.get_settings'
+        ? Promise.resolve({ settings: {}, channels: [channel()] })
+        : Promise.reject({
+            messages: ['Authorization: Bearer private-key; private payload'],
+          }),
+    )
+    await clickButton(root, 'Check saved configuration')
+    expect(
+      root.querySelector('[data-testid="channel-auth-error"]').textContent,
+    ).toContain('The provider operation failed.')
+    expect(root.textContent).not.toContain('private-key')
+    expect(root.textContent).not.toContain('private payload')
+  })
+
+  it('uses the silent settings boundary when saving a Shared Webhook Secret', async () => {
+    setup({
+      stored: [],
+      extra: (method, params) => {
+        expect(method).toBe('crm_messenger.api.settings.save_settings')
+        expect(params.webhook_secret).toBe('test-webhook-secret')
+        return Promise.resolve({
+          enabled: true,
+          webhook_secret_configured: true,
+        })
+      },
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Webhooks')
+    await editField(root, 'Shared Webhook Secret', 'test-webhook-secret')
+    await clickButton(root, 'Save Settings')
+    expect(mocks.safeCall).toHaveBeenCalledWith(
+      'crm_messenger.api.settings.save_settings',
+      expect.objectContaining({ webhook_secret: 'test-webhook-secret' }),
+    )
+    expect(
+      root.querySelector('[data-label="Shared Webhook Secret"]').value,
+    ).toBe('')
+    expect(root.textContent).not.toContain('test-webhook-secret')
+  })
+
+  it('refreshes public channels and clears old diagnostics after saving global changes', async () => {
+    let stored = channel({ integration: { wazzup_connection: connection() } })
+    let globalEnabled = true
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings')
+        return Promise.resolve({
+          settings: { enabled: globalEnabled },
+          channels: [stored],
+        })
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: [] })
+      if (method === 'crm_messenger.api.settings.save_settings') {
+        globalEnabled = params.enabled
+        stored = channel({ integration: {}, state: 'unchecked' })
+        return Promise.resolve({ enabled: globalEnabled })
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    expect(root.querySelector('[data-diagnostic="api"]').textContent).toContain(
+      'Verified',
+    )
+    const globalSwitch = root.querySelector('input[type="checkbox"]')
+    globalSwitch.checked = false
+    globalSwitch.dispatchEvent(new Event('change', { bubbles: true }))
+    await nextTick()
+    await clickButton(root, 'Save Settings')
+    expect(root.querySelector('[data-diagnostic="api"]').textContent).toContain(
+      'Not checked',
+    )
+    expect(root.textContent).not.toContain('Last checked: 2026-10-05 12:00:00')
+    expect(
+      mocks.call.mock.calls.filter(
+        ([method]) => method === 'crm_messenger.api.settings.get_settings',
+      ),
+    ).toHaveLength(2)
+  })
+
+  it('hides old Wazzup proof after a successful global save even if the subsequent settings reload fails', async () => {
+    let loads = 0
+    mocks.call.mockImplementation((method) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        if (++loads > 1) return Promise.reject(new Error('reload failed'))
+        return Promise.resolve({
+          settings: { enabled: true },
+          channels: [
+            channel({ integration: { wazzup_connection: connection() } }),
+          ],
+        })
+      }
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: [] })
+      if (method === 'crm_messenger.api.settings.save_settings')
+        return Promise.resolve({ enabled: false })
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    const globalSwitch = root.querySelector('input[type="checkbox"]')
+    globalSwitch.checked = false
+    globalSwitch.dispatchEvent(new Event('change', { bubbles: true }))
+    await nextTick()
+    await clickButton(root, 'Save Settings')
+    expect(root.querySelector('[data-diagnostic="api"]').textContent).toContain(
+      'Not checked',
+    )
+    await clickButton(root, 'Close')
+    expect(root.textContent).toContain(
+      'Could not load message channel settings.',
+    )
+    expect(root.textContent).not.toContain('Wazzup Sales')
+    expect(root.textContent).not.toContain('Configuration Checked')
+  })
+
+  it('uses the saved Wazzup result after a replacement key save when the settings reload fails', async () => {
+    let loads = 0
+    const previous = channel({
+      state: 'connected',
+      integration: { wazzup_connection: connection() },
+    })
+    const saved = channel({
+      integration: {
+        wazzup_connection: {
+          api: { status: 'unverified' },
+          delivery: { status: 'unverified', last_received_at: null },
+        },
+      },
+    })
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        if (++loads > 1) return Promise.reject(new Error('reload failed'))
+        return Promise.resolve({
+          settings: { enabled: true },
+          channels: [previous],
+        })
+      }
+      if (method === 'crm_messenger.api.diagnostics.get_health_summary')
+        return Promise.resolve({ channels: [] })
+      if (method === 'crm_messenger.api.settings.save_channel') {
+        expect(params.api_token).toBe('replacement-key')
+        return Promise.resolve(saved)
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    await editField(root, 'Wazzup API key', 'replacement-key')
+    await clickButton(root, 'Save')
+    expect(root.querySelector('[data-diagnostic="api"]').textContent).toContain(
+      'Not checked',
+    )
+    expect(root.querySelector('[data-label="Wazzup API key"]').value).toBe('')
+    expect(root.textContent).not.toContain('Channel Connected')
+    expect(root.textContent).not.toContain('Configuration Checked')
+  })
+})
 
 describe('MessengerSettings unsaved channel changes', () => {
   function avitoChannel() {
