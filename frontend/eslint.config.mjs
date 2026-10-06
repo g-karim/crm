@@ -40,7 +40,9 @@ export default [
         it: 'readonly',
         vi: 'readonly',
         beforeEach: 'readonly',
+        beforeAll: 'readonly',
         afterEach: 'readonly',
+        afterAll: 'readonly',
       },
     },
     rules: {

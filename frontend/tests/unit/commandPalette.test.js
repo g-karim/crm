@@ -7,6 +7,8 @@ import {
   scoreCommand,
 } from '@/utils/commandPalette'
 
+vi.mock('frappe-ui', () => ({ call: vi.fn() }))
+
 describe('fuzzyScore', () => {
   it('ranks prefix, word, substring, and subsequence matches in order', () => {
     const prefix = fuzzyScore('Change status', 'change')

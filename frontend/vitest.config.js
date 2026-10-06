@@ -74,6 +74,10 @@ export default defineConfig({
         import.meta.dirname,
         'tests/stubs/IconStub.vue',
       ),
+      '~icons/lucide/layout-dashboard': path.resolve(
+        import.meta.dirname,
+        'tests/stubs/IconStub.vue',
+      ),
     },
   },
 })

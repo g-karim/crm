@@ -78,8 +78,6 @@ const props = defineProps({
   filters: { type: [Array, Object, String], default: () => [] },
   modelValue: { type: String, default: '' },
   hideMe: { type: Boolean, default: false },
-  variant: { type: String, default: 'subtle' },
-  required: { type: Boolean, default: false },
   /**
    * Split the dropdown into two labelled groups instead of filtering options
    * out: the ones matching `grouping.filters` first, everything else below.
@@ -94,6 +92,7 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const attrs = useAttrs()
 
 const valuePropPassed = computed(() => 'value' in attrs)
+const selectedOption = ref(null)
 
 const value = computed({
   get: () => {
@@ -103,10 +102,9 @@ const value = computed({
     return v
   },
   set: (val) => {
-    return (
-      val?.value &&
-      emit(valuePropPassed.value ? 'change' : 'update:modelValue', val?.value)
-    )
+    if (!val?.value) return
+    selectedOption.value = val
+    emit(valuePropPassed.value ? 'change' : 'update:modelValue', val.value)
   },
 })
 
@@ -152,9 +150,9 @@ function objectFilters() {
 const isGrouped = computed(() =>
   Boolean(
     props.grouping?.filters &&
-      props.grouping?.label &&
-      props.grouping?.otherLabel &&
-      objectFilters(),
+    props.grouping?.label &&
+    props.grouping?.otherLabel &&
+    objectFilters(),
   ),
 )
 
@@ -241,6 +239,13 @@ function stripHtml(html) {
     .trim()
 }
 
+function retainSelectedOption(options) {
+  const selected = selectedOption.value
+  if (!selected || options.some((option) => option.value === selected.value))
+    return
+  options.unshift(selected)
+}
+
 function reload(val, force = false) {
   if (!props.doctype) return
   if (
@@ -297,6 +302,7 @@ function negateFilters(filters) {
 }
 
 function clearValue(close) {
+  selectedOption.value = null
   emit(valuePropPassed.value ? 'change' : 'update:modelValue', '')
   close()
 }

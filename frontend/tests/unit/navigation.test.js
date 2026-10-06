@@ -1,5 +1,7 @@
 import { getNavigationItems, navigationItems } from '@/utils/navigation'
 
+vi.mock('@/router', () => ({ default: { hasRoute: () => true } }))
+
 describe('navigationItems', () => {
   it('uses unique route names', () => {
     const routes = navigationItems.map((item) => item.route)
