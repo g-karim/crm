@@ -101,6 +101,7 @@
           field.fieldtype == 'Link' ? field.options : data[field.options]
         "
         :filters="field.filters"
+        :grouping="field.grouping"
         :placeholder="getPlaceholder(field)"
         :disabled="Boolean(field.disabled)"
         :onCreate="field.create"
@@ -355,6 +356,7 @@ import { getMeta } from '@/stores/meta'
 import {
   parseLinkFilters,
   applyStateFieldOptions,
+  applyContactOrganizationGrouping,
 } from '@/utils/fieldTransforms'
 import { getPlaceholderLabel } from '@/utils/fieldPlaceholders'
 import { isFetchedFromLink } from '@/utils/fetchFrom'
@@ -542,6 +544,8 @@ const field = computed(() => {
       }
     }
   }
+
+  field = applyContactOrganizationGrouping(field, data.value, doctype)
 
   const read_only_via_depends_on = evaluateDependsOnValue(
     field.read_only_depends_on,
