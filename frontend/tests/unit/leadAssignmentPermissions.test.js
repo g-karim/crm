@@ -13,9 +13,7 @@ describe('lead assignment permissions', () => {
   it('shows assignment controls only with record-level write permission', () => {
     for (let source of [leadSource, mobileLeadSource]) {
       expect(source).toContain('v-if="canWrite"')
-      expect(source).toContain(
-        'permissions.data?.permissions?.write || false',
-      )
+      expect(source).toContain('permissions.data?.permissions?.write || false')
     }
   })
 

@@ -375,7 +375,7 @@ const dealFilters = computed(() => {
 const pipelineFilterReady = computed(() => {
   return Boolean(
     selectedPipeline.value ||
-    (pipelinesLoaded.value && salesPipelines.data?.length === 0),
+      (pipelinesLoaded.value && salesPipelines.data?.length === 0),
   )
 })
 

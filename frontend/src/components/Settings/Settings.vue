@@ -272,10 +272,14 @@ function scrollActiveIntoView() {
   })
 }
 
-watch(activeSettingsPage, (activePage) => {
-  setActiveTab(activePage)
-  scrollActiveIntoView()
-}, { immediate: true })
+watch(
+  activeSettingsPage,
+  (activePage) => {
+    setActiveTab(activePage)
+    scrollActiveIntoView()
+  },
+  { immediate: true },
+)
 
 watch(tabs, () => setActiveTab(activeSettingsPage.value))
 </script>

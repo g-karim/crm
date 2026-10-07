@@ -4,12 +4,12 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from crm.patches.v1_0.backfill_crm_external_references import execute as backfill_external_references
 from crm.fcrm.doctype.crm_external_reference.crm_external_reference import (
 	find_external_reference,
 	get_external_reference,
 	set_external_reference,
 )
+from crm.patches.v1_0.backfill_crm_external_references import execute as backfill_external_references
 
 
 class TestCRMExternalReference(IntegrationTestCase):

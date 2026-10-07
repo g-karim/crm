@@ -66,7 +66,11 @@ def get_fields_layout(doctype: str, type: str, parent_doctype: str | None = None
 
 	hidden_fields = set(get_hidden_fields(doctype))
 	fields = frappe.get_meta(doctype).fields
-	fields = [field for field in fields if field.fieldname in allowed_fields and field.fieldname not in hidden_fields]
+	fields = [
+		field
+		for field in fields
+		if field.fieldname in allowed_fields and field.fieldname not in hidden_fields
+	]
 
 	required_fields = []
 

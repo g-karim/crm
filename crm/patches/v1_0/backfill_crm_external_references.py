@@ -165,10 +165,7 @@ def ensure_external_reference(
 		return
 	if existing_for_external:
 		existing = existing_for_external[0]
-		if (
-			existing.reference_doctype == reference_doctype
-			and existing.reference_name == reference_name
-		):
+		if existing.reference_doctype == reference_doctype and existing.reference_name == reference_name:
 			stats["existing"] += 1
 		else:
 			record_skip(
@@ -237,7 +234,9 @@ def same_external_key(reference, external_id, external_parent_id):
 
 
 def has_columns(doctype, columns):
-	return frappe.db.table_exists(doctype) and all(frappe.db.has_column(doctype, column) for column in columns)
+	return frappe.db.table_exists(doctype) and all(
+		frappe.db.has_column(doctype, column) for column in columns
+	)
 
 
 def record_skip(stats, reference_doctype, reference_name, reason):

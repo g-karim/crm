@@ -150,9 +150,9 @@ function objectFilters() {
 const isGrouped = computed(() =>
   Boolean(
     props.grouping?.filters &&
-    props.grouping?.label &&
-    props.grouping?.otherLabel &&
-    objectFilters(),
+      props.grouping?.label &&
+      props.grouping?.otherLabel &&
+      objectFilters(),
   ),
 )
 

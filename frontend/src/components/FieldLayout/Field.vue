@@ -72,8 +72,8 @@
         v-model="data[field.fieldname]"
         class="form-control"
         type="checkbox"
-      :disabled="Boolean(field.disabled)"
-      :description="getDescription(field)"
+        :disabled="Boolean(field.disabled)"
+        :description="getDescription(field)"
         @change="(e) => fieldChange(e.target.checked, field)"
       />
       <label

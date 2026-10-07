@@ -219,7 +219,12 @@ class CRMDeal(Document):
 		self.status_label = None
 
 	def validate_status(self):
-		if self.status and self.pipeline and self.has_value_changed("pipeline") and not self.has_value_changed("status"):
+		if (
+			self.status
+			and self.pipeline
+			and self.has_value_changed("pipeline")
+			and not self.has_value_changed("status")
+		):
 			status_pipeline = frappe.db.get_value("CRM Deal Status", self.status, "pipeline")
 			if status_pipeline and status_pipeline != self.pipeline:
 				self.status = None
@@ -305,12 +310,9 @@ class CRMDeal(Document):
 			self.external_record_id,
 			DEAL_EXTERNAL_DOCTYPE,
 		)
-		if (
-			external_reference
-			and (
-				external_reference.reference_doctype != "CRM Deal"
-				or external_reference.reference_name != self.name
-			)
+		if external_reference and (
+			external_reference.reference_doctype != "CRM Deal"
+			or external_reference.reference_name != self.name
 		):
 			frappe.throw(
 				_("External record ID {0} is already linked to deal {1}.").format(

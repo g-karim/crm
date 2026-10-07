@@ -16,13 +16,13 @@ from crm.api.doc import (
 	sort_options,
 )
 from crm.fcrm.doctype.crm_deal.api import get_deal_contacts
-from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
 from crm.fcrm.doctype.crm_deal.crm_deal import (
 	add_contact,
 	create_deal,
 	remove_contact,
 	set_primary_contact,
 )
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_pipeline
 
 
@@ -245,7 +245,7 @@ class TestCRMDeal(IntegrationTestCase):
 				organization="External Duplicate Org",
 				external_source="bitrix24",
 				external_record_id=external_record_id,
-				)
+			)
 
 	def test_external_record_id_requires_external_source(self):
 		"""Test that external IDs require source context to avoid ambiguous imports"""
@@ -430,7 +430,9 @@ class TestCRMDeal(IntegrationTestCase):
 		deal.save()
 
 		self.assertEqual(deal.status, won_stage.name)
-		self.assertTrue(any("closed without these fields" in warning for warning in deal._pipeline_rule_warnings))
+		self.assertTrue(
+			any("closed without these fields" in warning for warning in deal._pipeline_rule_warnings)
+		)
 		self.assertTrue(any("Contact" in warning for warning in deal._pipeline_rule_warnings))
 
 	def test_stage_skip_block_prevents_save(self):

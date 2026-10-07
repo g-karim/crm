@@ -29,11 +29,11 @@ export function getForwardedContentKind(context) {
 export function isMaxForwardOnlyMessage(message = {}) {
   return Boolean(
     message.provider === 'max_direct' &&
-    message.status !== 'deleted' &&
-    message.forward_context &&
-    !String(message.text || '').trim() &&
-    !(message.attachments || []).length &&
-    !message.reply_context,
+      message.status !== 'deleted' &&
+      message.forward_context &&
+      !String(message.text || '').trim() &&
+      !(message.attachments || []).length &&
+      !message.reply_context,
   )
 }
 
@@ -42,9 +42,9 @@ export function isStickerOnlyForwardItem(item = {}) {
   let children = Array.isArray(item?.items) ? item.items : []
   return Boolean(
     !String(item?.text || '').trim() &&
-    attachments.length === 1 &&
-    attachments[0]?.type === 'sticker' &&
-    !children.length,
+      attachments.length === 1 &&
+      attachments[0]?.type === 'sticker' &&
+      !children.length,
   )
 }
 

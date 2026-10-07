@@ -11,13 +11,13 @@ from crm.api.sales_pipeline import (
 	get_pipeline_settings,
 	save_pipeline,
 )
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import (
 	get_default_deal_stage_label,
 	get_default_deal_stage_templates,
 	get_default_pipeline_label,
 	resolve_sales_pipeline,
 )
-from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
 
 
 class TestCRMSalesPipeline(IntegrationTestCase):
@@ -73,7 +73,7 @@ class TestCRMSalesPipeline(IntegrationTestCase):
 					"enabled": 1,
 					"position": 99,
 				}
-				).insert()
+			).insert()
 
 	def test_external_pipeline_id_requires_external_source(self):
 		with self.assertRaises(frappe.exceptions.ValidationError):

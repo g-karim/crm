@@ -96,8 +96,8 @@ class TestCRMDealStatus(IntegrationTestCase):
 					"external_status_id": external_status_id,
 					"type": "Open",
 					"position": 100,
-					}
-				).insert()
+				}
+			).insert()
 
 	def test_external_status_id_requires_external_source(self):
 		pipeline = get_default_pipeline()
