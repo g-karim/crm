@@ -21,6 +21,14 @@ def validate_twilio_request(args, require_application_sid: bool = False):
 	signature = request.headers.get("X-Twilio-Signature", "") if request else ""
 	if not signature:
 		frappe.throw(_("Invalid Twilio signature"), frappe.PermissionError)
+	# Voice callbacks use form-encoded POST or query-only GET. Never accept an
+	# unsigned JSON body through Frappe's automatic kwargs parsing.
+	if (
+		request.method not in {"GET", "POST"}
+		or (request.method == "POST" and request.mimetype != "application/x-www-form-urlencoded")
+		or (request.method == "GET" and request.get_data())
+	):
+		frappe.throw(_("Invalid Twilio request body"), frappe.PermissionError)
 
 	auth_token = twilio.settings.get_password("auth_token")
 	if not auth_token:

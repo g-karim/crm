@@ -21,13 +21,16 @@ class TestTwilioWebhookSecurity(UnitTestCase):
 	}
 
 	@contextmanager
-	def webhook(self, params=None, *, signature=None, request_url=None, public_url=None, method="POST"):
+	def webhook(
+		self, params=None, *, signature=None, request_url=None, public_url=None, method="POST", json_body=None
+	):
 		params = dict(self.PARAMS if params is None else params)
 		url = request_url or self.URL
 		builder = EnvironBuilder(
 			path=url,
 			method=method,
-			data=params if method == "POST" else None,
+			data=params if method == "POST" and json_body is None else None,
+			json=json_body,
 			headers={"X-Twilio-Signature": signature} if signature else {},
 		)
 		request = Request(builder.get_environ())
@@ -78,6 +81,35 @@ class TestTwilioWebhookSecurity(UnitTestCase):
 			self.assertRaises(frappe.PermissionError),
 		):
 			api.validate_twilio_request(params)
+
+	def test_rejects_unsigned_json_body_even_with_a_valid_url_signature(self):
+		with (
+			self.webhook(signature=self.sign({}), json_body=self.PARAMS) as (params, _twilio),
+			self.assertRaises(frappe.PermissionError),
+		):
+			api.validate_twilio_request(params)
+
+	def test_rejects_unsigned_get_body_even_with_a_valid_query_signature(self):
+		url = self.URL + "?AccountSid=AC-test&CallSid=CA-test"
+		with (
+			self.webhook(
+				signature=self.sign({}, url=url), request_url=url, method="GET", json_body=self.PARAMS
+			) as (params, _twilio),
+			self.assertRaises(frappe.PermissionError),
+		):
+			api.validate_twilio_request(params)
+
+	def test_rejects_methods_other_than_get_or_post(self):
+		for method in ("PUT", "DELETE"):
+			with (
+				self.subTest(method=method),
+				self.webhook(signature=self.sign({}), method=method, json_body=self.PARAMS) as (
+					params,
+					_twilio,
+				),
+				self.assertRaises(frappe.PermissionError),
+			):
+				api.validate_twilio_request(params)
 
 	def test_accepts_public_https_url_behind_a_proxy(self):
 		with self.webhook(
