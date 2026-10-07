@@ -3953,7 +3953,7 @@ msgstr "Отрасли"
 #: crm/fcrm/doctype/crm_lead/crm_lead.json
 #: crm/fcrm/doctype/crm_organization/crm_organization.json
 msgid "Industry"
-msgstr "Промышленность"
+msgstr "Отрасль"
 
 #. Option for the 'Status' (Select) field in DocType 'CRM Call Log'
 #: crm/fcrm/doctype/crm_call_log/crm_call_log.json
@@ -6953,11 +6953,11 @@ msgstr ""
 
 #: frontend/src/components/Settings/GeneralSettings.vue:153
 msgid "Setting disabled successfully"
-msgstr ""
+msgstr "Настройка выключена"
 
 #: frontend/src/components/Settings/GeneralSettings.vue:152
 msgid "Setting enabled successfully"
-msgstr ""
+msgstr "Настройка включена"
 
 #: frontend/src/components/Settings/emailConfig.js:158
 msgid "Setting up Frappe Mail requires you to have an API key and API Secret of your email account. Read more"
@@ -8929,3 +8929,650 @@ msgstr "⚠️ Не найдена строка для idx: {0} в родите�
 #: frontend/src/components/Settings/MessengerSettings.vue
 msgid "Save channel changes before running connection actions."
 msgstr "Сначала сохраните изменения канала, затем повторите действие подключения."
+
+#. CRM website enrichment
+msgid "Enrich"
+msgstr "Заполнить с сайта"
+
+#. CRM website enrichment
+msgid "Enrichment"
+msgstr "Заполнение с сайта"
+
+#. CRM website enrichment
+msgid "Enriching"
+msgstr "Заполняем…"
+
+#. CRM website enrichment
+msgid "Enriching…"
+msgstr "Заполняем…"
+
+#. CRM website enrichment
+msgid "Enrich from website"
+msgstr "Заполнить данные с сайта компании"
+
+#. CRM website enrichment
+msgid "Enrich from Website"
+msgstr "Заполнить данные с сайта"
+
+#. CRM website enrichment
+msgid "Domain Enrichment"
+msgstr "Заполнение данных с сайта"
+
+#. CRM website enrichment
+msgid "Enable enrichment"
+msgstr "Включить заполнение с сайта"
+
+#. CRM website enrichment
+msgid "Fill in company details from a record’s website"
+msgstr "Заполняйте данные компании по сайту, указанному в карточке"
+
+#. CRM website enrichment
+msgid "Turn on enrichment for this site. When off, the Enrich button is hidden and no record is enriched"
+msgstr "Разрешить заполнение данных с сайтов компаний. При отключении кнопка скрыта, новые запуски недоступны"
+
+#. CRM website enrichment
+msgid "Auto-enrich new records"
+msgstr "Автоматически заполнять новые карточки"
+
+#. CRM website enrichment
+msgid "Enrich a new record as soon as it is created"
+msgstr "Заполнять данные с сайта сразу после создания карточки"
+
+#. CRM website enrichment
+msgid "Automatically fill new leads, deals and organizations from their website. Applies only to enabled record types."
+msgstr "Автоматически заполнять новые лиды, сделки и организации по их сайту. Только для включённых типов карточек."
+
+#. CRM website enrichment
+msgid "Enriched. Filled: {0}"
+msgstr "Данные заполнены: {0}"
+
+#. CRM website enrichment
+msgid "Enrichment complete."
+msgstr "Заполнение данных завершено."
+
+#. CRM website enrichment
+msgid "Enrichment complete"
+msgstr "Заполнение данных завершено"
+
+#. CRM website enrichment
+msgid "Enrichment failed."
+msgstr "Не удалось заполнить данные с сайта."
+
+#. CRM website enrichment
+msgid "Enrichment Failed"
+msgstr "Не удалось заполнить данные"
+
+#. CRM website enrichment
+msgid "Enrichment failed. Check the error log."
+msgstr "Не удалось заполнить данные. Подробности — в журнале ошибок."
+
+#. CRM website enrichment
+msgid "Could not start enrichment."
+msgstr "Не удалось запустить заполнение с сайта."
+
+#. CRM website enrichment
+msgid "Set a Website on this record before enriching."
+msgstr "Сначала укажите сайт компании в карточке."
+
+#. CRM website enrichment
+msgid "Set a website on this record before enriching."
+msgstr "Сначала укажите сайт компании в карточке."
+
+#. CRM website enrichment
+msgid "Enter a Website first."
+msgstr "Сначала укажите сайт компании."
+
+#. CRM website enrichment
+msgid "Fill fields from the company website"
+msgstr "Заполнить поля данными с сайта компании"
+
+#. CRM website enrichment
+msgid "Filled {0} field(s) from the website."
+msgstr "Заполнено полей с сайта: {0}."
+
+#. CRM website enrichment
+msgid "Nothing could be extracted from this website."
+msgstr "На этом сайте не удалось найти данные для заполнения."
+
+#. CRM website enrichment
+msgid "Could not enrich from the website."
+msgstr "Не удалось получить данные с сайта."
+
+#. CRM website enrichment
+msgid "Enrichment is not enabled for {0}."
+msgstr "Заполнение с сайта отключено для типа «{0}»."
+
+#. CRM website enrichment
+msgid "You are not permitted to create {0}."
+msgstr "У вас нет прав на создание записи типа «{0}»."
+
+#. CRM website enrichment
+msgid "Unsupported record type for enrichment."
+msgstr "Этот тип карточки не поддерживает заполнение с сайта."
+
+#. CRM website enrichment
+msgid "Enter a valid website URL using http or https."
+msgstr "Укажите корректный адрес сайта с http или https."
+
+#. CRM website enrichment
+msgid "Retry Enrichment"
+msgstr "Повторить заполнение с сайта"
+
+#. CRM website enrichment
+msgid "Enrichment complete — a new run was created"
+msgstr "Заполнение завершено. Результат сохранён в новом запуске"
+
+#. CRM website enrichment
+msgid "No Website"
+msgstr "Сайт не указан"
+
+#. CRM website enrichment
+msgid "Queued…"
+msgstr "В очереди…"
+
+#. CRM website enrichment
+msgid "Starting"
+msgstr "Запускаем обработку"
+
+#. CRM website enrichment
+msgid "Discovering pages"
+msgstr "Ищем страницы сайта"
+
+#. CRM website enrichment
+msgid "Crawling website"
+msgstr "Читаем сайт"
+
+#. CRM website enrichment
+msgid "Crawling {0}"
+msgstr "Читаем страницу {0}"
+
+#. CRM website enrichment
+msgid "Extracting company information"
+msgstr "Получаем данные компании"
+
+#. CRM website enrichment
+msgid "Extracting contacts"
+msgstr "Ищем контактные данные"
+
+#. CRM website enrichment
+msgid "Classifying industry"
+msgstr "Определяем отрасль"
+
+#. CRM website enrichment
+msgid "Saving results"
+msgstr "Сохраняем результат"
+
+#. CRM website enrichment
+msgid "Couldn't reach this website (it timed out or refused the connection)."
+msgstr "Не удалось открыть сайт: он не ответил вовремя или отклонил соединение."
+
+#. CRM website enrichment
+msgid "This website is behind bot protection, so its content can't be read. Try the company's corporate domain (e.g. acme.com vs shop.acme.com)."
+msgstr "Сайт защищён от автоматических запросов. Попробуйте основной сайт компании вместо магазина или другого раздела."
+
+#. CRM website enrichment
+msgid "This site's main content is JavaScript-rendered; only page metadata (title/description/logo) could be read, so some fields may be blank."
+msgstr "Сайт загружает содержимое через JavaScript. Доступны только название, описание и логотип из метаданных; часть полей может остаться пустой."
+
+#. CRM website enrichment
+msgid "CRM Enrichment Settings"
+msgstr "Настройки заполнения с сайта"
+
+#. CRM website enrichment
+msgid "CRM Enrichment Run"
+msgstr "Запуск заполнения с сайта"
+
+#. CRM website enrichment
+msgid "CRM Enrichment Rule"
+msgstr "Правило заполнения с сайта"
+
+#. CRM website enrichment
+msgid "CRM Enrichment Rule Pattern"
+msgstr "Шаблон правила заполнения"
+
+#. CRM website enrichment
+msgid "CRM Enrichment Field Mapping"
+msgstr "Сопоставление полей заполнения"
+
+#. CRM website enrichment
+msgid "CRM Enrichment Domain"
+msgstr "Домен для заполнения"
+
+#. CRM website enrichment
+msgid "CRM Enrichment Link Priority"
+msgstr "Приоритет страницы сайта"
+
+#. CRM website enrichment
+msgid "CRM Enrichment Skip Pattern"
+msgstr "Шаблон исключения страниц"
+
+#. CRM website enrichment
+msgid "Master switch for the Domain Enrichment feature."
+msgstr "Включает или отключает заполнение данных с сайтов компаний."
+
+#. CRM website enrichment
+msgid "Enabled Doctypes"
+msgstr "Типы карточек"
+
+#. CRM website enrichment
+msgid "Enable for CRM Lead"
+msgstr "Включить для лидов"
+
+#. CRM website enrichment
+msgid "Enable for CRM Deal"
+msgstr "Включить для сделок"
+
+#. CRM website enrichment
+msgid "Enable for CRM Organization"
+msgstr "Включить для организаций"
+
+#. CRM website enrichment
+msgid "Crawl Tuning"
+msgstr "Настройки чтения сайта"
+
+#. CRM website enrichment
+msgid "Max Pages"
+msgstr "Максимум страниц"
+
+#. CRM website enrichment
+msgid "Maximum number of pages crawled per enrichment."
+msgstr "Максимальное число страниц сайта за один запуск."
+
+#. CRM website enrichment
+msgid "Max Depth"
+msgstr "Глубина переходов"
+
+#. CRM website enrichment
+msgid "Maximum link depth followed from the homepage."
+msgstr "Максимальное число переходов по ссылкам от главной страницы."
+
+#. CRM website enrichment
+msgid "Use Sitemap"
+msgstr "Использовать карту сайта"
+
+#. CRM website enrichment
+msgid "Seed the crawl queue from the site's sitemap (declared in robots.txt, or the conventional /sitemap.xml) so pages not reachable within Max Depth still get a chance to be crawled. This is an addition on top of ordinary link-following, not a replacement -- a site with no sitemap falls straight through to link-following with no error."
+msgstr "Использовать карту сайта из robots.txt или /sitemap.xml для поиска дополнительных страниц. Если карты нет, обработка продолжится по обычным ссылкам."
+
+#. CRM website enrichment
+msgid "Request Timeout (s)"
+msgstr "Время ожидания ответа, сек."
+
+#. CRM website enrichment
+msgid "Per-request timeout in seconds."
+msgstr "Максимальное время ожидания ответа на один запрос, в секундах."
+
+#. CRM website enrichment
+msgid "Max Download Bytes"
+msgstr "Максимальный размер страницы, байт"
+
+#. CRM website enrichment
+msgid "Maximum bytes downloaded per page (the stream is capped)."
+msgstr "Ограничивает размер загружаемой страницы в байтах."
+
+#. CRM website enrichment
+msgid "Retry Count"
+msgstr "Число повторных попыток"
+
+#. CRM website enrichment
+msgid "Number of retries on a failed request."
+msgstr "Сколько раз повторять запрос при временной ошибке."
+
+#. CRM website enrichment
+msgid "Quick Prefill (Preview)"
+msgstr "Заполнение при создании карточки"
+
+#. CRM website enrichment
+msgid "Preview Max Pages"
+msgstr "Максимум страниц для предпросмотра"
+
+#. CRM website enrichment
+msgid "Pages crawled for the fast, synchronous create-time prefill."
+msgstr "Число страниц для быстрого заполнения формы при создании карточки."
+
+#. CRM website enrichment
+msgid "Preview Timeout (s)"
+msgstr "Время ожидания при создании, сек."
+
+#. CRM website enrichment
+msgid "Per-request timeout in seconds for the preview prefill."
+msgstr "Время ожидания ответа сайта при заполнении новой карточки, в секундах."
+
+#. CRM website enrichment
+msgid "SSRF Guard"
+msgstr "Ограничения доступа к сайтам"
+
+#. CRM website enrichment
+msgid "Allowed Domains"
+msgstr "Разрешённые домены"
+
+#. CRM website enrichment
+msgid "Allowlist (subdomain-aware). If you add any domains here, the crawler may ONLY visit those domains and their subdomains — everything else is rejected by the SSRF guard. Leave empty (the normal case) to allow any public site; this is for locked-down deployments that should reach only specific domains."
+msgstr "Если список заполнен, доступны только указанные домены и их поддомены. Пустой список разрешает любые общедоступные сайты. Локальные и частные адреса всегда запрещены."
+
+#. CRM website enrichment
+msgid "Blocked Domains"
+msgstr "Запрещённые домены"
+
+#. CRM website enrichment
+msgid "Denylist (subdomain-aware). A host that equals or is a subdomain of any entry is always rejected by the SSRF guard — e.g. blocking \"acme.com\" also blocks \"shop.acme.com\". Use it to permanently exclude internal domains, known-bad hosts, or link shorteners. Always wins over the allowlist."
+msgstr "Запрещает указанные домены вместе с поддоменами. Запрет действует даже для доменов из списка разрешённых."
+
+#. CRM website enrichment
+msgid "Link Priority Order"
+msgstr "Приоритет страниц"
+
+#. CRM website enrichment
+msgid "Crawl-ordering hints (not extraction). Links whose URL path or anchor text contain one of these are fetched first; higher weight = sooner. Lets the crawler spend its page budget on company pages (about/contact/team) before the cap. Defaults are seeded; edit or remove as needed."
+msgstr "Страницы с указанными словами в адресе или тексте ссылки читаются первыми. Чем больше вес, тем выше приоритет. Например, можно сначала читать страницы о компании и контактах."
+
+#. CRM website enrichment
+msgid "Skip Patterns"
+msgstr "Исключённые страницы"
+
+#. CRM website enrichment
+msgid "Substrings that exclude a candidate link from the crawl."
+msgstr "Не читать страницы, адреса которых содержат указанные фрагменты."
+
+#. CRM website enrichment
+msgid "Rule Name"
+msgstr "Название правила"
+
+#. CRM website enrichment
+msgid "Rule Type"
+msgstr "Тип правила"
+
+#. CRM website enrichment
+msgid "Social"
+msgstr "Социальная сеть"
+
+#. CRM website enrichment
+msgid "Target Value"
+msgstr "Значение результата"
+
+#. CRM website enrichment
+msgid "The value this rule resolves to when it matches (e.g. the social network \"linkedin\"). For Industry rules, use the Industry link instead."
+msgstr "Значение, которое выдаёт правило при совпадении, например linkedin. Для определения отрасли используйте поле «Отрасль»."
+
+#. CRM website enrichment
+msgid "Match Scope"
+msgstr "Где искать совпадение"
+
+#. CRM website enrichment
+msgid "Headline"
+msgstr "Заголовок страницы"
+
+#. CRM website enrichment
+msgid "Full Text"
+msgstr "Весь текст"
+
+#. CRM website enrichment
+msgid "Headers"
+msgstr "Заголовки разделов"
+
+#. CRM website enrichment
+msgid "Where the patterns are matched."
+msgstr "Часть страницы, в которой ищутся совпадения с шаблонами."
+
+#. CRM website enrichment
+msgid "Score contributed per matched pattern (Industry classification scoring)."
+msgstr "Вес каждого совпадения при определении отрасли компании."
+
+#. CRM website enrichment
+msgid "Patterns"
+msgstr "Шаблоны"
+
+#. CRM website enrichment
+msgid "Is Regex"
+msgstr "Регулярное выражение"
+
+#. CRM website enrichment
+msgid "Treat the pattern as a regular expression instead of a plain substring."
+msgstr "Использовать регулярное выражение вместо поиска фрагмента текста."
+
+#. CRM website enrichment
+msgid "A substring (default) or a regular expression matched against the rule's match scope."
+msgstr "Фрагмент текста или регулярное выражение для поиска в выбранной части страницы."
+
+#. CRM website enrichment
+msgid "Source Key"
+msgstr "Источник данных"
+
+#. CRM website enrichment
+msgid "The enrichment result key to read the value from."
+msgstr "Какое найденное значение использовать для заполнения поля."
+
+#. CRM website enrichment
+msgid "Target Doctype"
+msgstr "Тип карточки"
+
+#. CRM website enrichment
+msgid "Target Fieldname"
+msgstr "Имя поля карточки"
+
+#. CRM website enrichment
+msgid "The fieldname on the target doctype to write the value to."
+msgstr "Техническое имя поля карточки, в которое записывается найденное значение."
+
+#. CRM website enrichment
+msgid "Write Policy"
+msgstr "Правило заполнения"
+
+#. CRM website enrichment
+msgid "Fill if empty"
+msgstr "Заполнять только пустые поля"
+
+#. CRM website enrichment
+msgid "Always refresh"
+msgstr "Обновлять при каждом запуске"
+
+#. CRM website enrichment
+msgid "Override defaults"
+msgstr "Заменять значения по умолчанию"
+
+#. CRM website enrichment
+msgid "Fill if empty: only write when the field is blank. Always refresh: overwrite on every run (for fully enrichment-derived fields). Override defaults: write even when the current value is a known default (see Default Values)."
+msgstr "Заполнять только пустые поля; обновлять при каждом запуске; либо заменять пустые поля и перечисленные значения по умолчанию. Пользовательские значения сохраняются, кроме режима обновления при каждом запуске."
+
+#. CRM website enrichment
+msgid "Default Values"
+msgstr "Значения по умолчанию"
+
+#. CRM website enrichment
+msgid "Newline-separated values treated as \"unset\" defaults that may be overwritten, in addition to a truly empty field."
+msgstr "По одному значению на строку. Такие значения считаются незаполненными и могут быть заменены данными с сайта."
+
+#. CRM website enrichment
+msgid "Create Missing Link"
+msgstr "Создавать отсутствующие связанные записи"
+
+#. CRM website enrichment
+msgid "If the value names a missing linked record (e.g. a CRM Industry), create it. Opt-in only."
+msgstr "Создавать отсутствующую связанную запись, например отрасль, если у пользователя есть соответствующие права."
+
+#. CRM website enrichment
+msgid "Substring matched against a candidate URL/anchor to prioritise crawling it (e.g. \"about\", \"team\", \"contact\")."
+msgstr "Слово в адресе страницы или тексте ссылки, повышающее приоритет чтения, например about, team или contact."
+
+#. CRM website enrichment
+msgid "Substring; a candidate URL containing it is skipped during the crawl (e.g. \"/blog/\", \".pdf\", \"?\")."
+msgstr "Фрагмент адреса для исключения страницы, например /blog/ или .pdf."
+
+#. CRM website enrichment
+msgid "Source Website"
+msgstr "Сайт компании"
+
+#. CRM website enrichment
+msgid "Timing"
+msgstr "Время выполнения"
+
+#. CRM website enrichment
+msgid "Started On"
+msgstr "Начало обработки"
+
+#. CRM website enrichment
+msgid "Finished On"
+msgstr "Завершение обработки"
+
+#. CRM website enrichment
+msgid "Industry Confidence"
+msgstr "Уверенность определения отрасли"
+
+#. CRM website enrichment
+msgid "Emails Found"
+msgstr "Найдено адресов эл. почты"
+
+#. CRM website enrichment
+msgid "Phones Found"
+msgstr "Найдено телефонов"
+
+#. CRM website enrichment
+msgid "Social Profiles"
+msgstr "Социальные сети"
+
+#. CRM website enrichment
+msgid "Raw"
+msgstr "Исходные данные"
+
+#. CRM website enrichment
+msgid "Raw JSON"
+msgstr "Исходные данные JSON"
+
+#. CRM website enrichment
+msgid "Target Doctype must be one of: {0}"
+msgstr "Тип карточки должен быть одним из следующих: {0}"
+
+#. CRM website enrichment
+msgid "{0} has no field {1}"
+msgstr "В типе карточки «{0}» нет поля «{1}»"
+
+#. CRM website enrichment
+msgid "company_name"
+msgstr "Название компании"
+
+#. CRM website enrichment
+msgid "description"
+msgstr "Описание компании"
+
+#. CRM website enrichment
+msgid "logo"
+msgstr "Логотип"
+
+#. CRM website enrichment
+msgid "industry"
+msgstr "Отрасль"
+
+#. CRM website enrichment
+msgid "primary_email"
+msgstr "Основной адрес эл. почты"
+
+#. CRM website enrichment
+msgid "primary_phone"
+msgstr "Основной телефон"
+
+#. CRM website enrichment
+msgid "secondary_phone"
+msgstr "Дополнительный телефон"
+
+#. CRM website enrichment
+msgid "Automation"
+msgstr "Автоматическое заполнение"
+
+#. CRM website enrichment
+msgid "Crawl"
+msgstr "Чтение сайта"
+
+#. CRM website enrichment
+msgid "Domain"
+msgstr "Домен"
+
+#. CRM website enrichment
+msgid "Keyword"
+msgstr "Ключевое слово"
+
+#. CRM website enrichment
+msgid "Pattern"
+msgstr "Шаблон"
+
+#. CRM website enrichment
+msgid "Summary"
+msgstr "Сводка"
+
+#. CRM website enrichment
+msgid "User Agent"
+msgstr "Идентификатор браузера"
+
+#. CRM website enrichment
+msgid "Weight"
+msgstr "Вес"
+
+#. CRM website enrichment
+msgid "linkedin"
+msgstr "LinkedIn"
+
+#. CRM website enrichment
+msgid "twitter"
+msgstr "X (Twitter)"
+
+#. CRM website enrichment
+msgid "github"
+msgstr "GitHub"
+
+#. CRM website enrichment
+msgid "facebook"
+msgstr "Facebook"
+
+#. CRM website enrichment
+msgid "instagram"
+msgstr "Instagram"
+
+#. CRM website enrichment
+msgid "youtube"
+msgstr "YouTube"
+
+#. CRM website enrichment
+msgid "Company description discovered by Domain Enrichment."
+msgstr "Описание компании, найденное при заполнении с сайта."
+
+#. CRM website enrichment
+msgid "Company logo discovered by Domain Enrichment."
+msgstr "Логотип компании, найденный при заполнении с сайта."
+
+msgid "A website is required."
+msgstr "Укажите сайт."
+
+msgid "Company Description"
+msgstr "Описание компании"
+
+msgid "Could not save"
+msgstr "Не удалось сохранить"
+
+msgid "Running"
+msgstr "Выполняется"
+
+msgid "See Error Log."
+msgstr "Подробности в журнале ошибок."
+
+msgid "This run has no linked record to re-enrich."
+msgstr "У этой попытки нет связанной записи для повторного заполнения."
+
+msgid "GitHub"
+msgstr "GitHub"
+
+msgid "HTML"
+msgstr "HTML"
+
+msgid "Instagram"
+msgstr "Instagram"
+
+msgid "LinkedIn"
+msgstr "LinkedIn"
+
+msgid "URL"
+msgstr "Адрес URL"
+
+msgid "X (Twitter)"
+msgstr "X (Twitter)"
+
+msgid "YouTube"
+msgstr "YouTube"

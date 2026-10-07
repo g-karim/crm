@@ -10223,3 +10223,87 @@ msgstr ""
 msgid "⚠️ No row found for idx: {0} in parent field: {1}"
 msgstr ""
 
+
+#. CRM website enrichment
+msgid "Enrichment"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Enriching"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Enable enrichment"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Fill in company details from a record’s website"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Turn on enrichment for this site. When off, the Enrich button is hidden and no record is enriched"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Auto-enrich new records"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Enrich a new record as soon as it is created"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Automatically fill new leads, deals and organizations from their website. Applies only to enabled record types."
+msgstr ""
+
+#. CRM website enrichment
+msgid "Unsupported record type for enrichment."
+msgstr ""
+
+#. CRM website enrichment
+msgid "Enter a valid website URL using http or https."
+msgstr ""
+
+#. CRM website enrichment
+msgid "Starting"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Discovering pages"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Crawling website"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Crawling {0}"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Extracting company information"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Extracting contacts"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Classifying industry"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Saving results"
+msgstr ""
+
+#. CRM website enrichment
+msgid "Couldn't reach this website (it timed out or refused the connection)."
+msgstr ""
+
+#. CRM website enrichment
+msgid "This website is behind bot protection, so its content can't be read. Try the company's corporate domain (e.g. acme.com vs shop.acme.com)."
+msgstr ""
+
+#. CRM website enrichment
+msgid "This site's main content is JavaScript-rendered; only page metadata (title/description/logo) could be read, so some fields may be blank."
+msgstr ""
