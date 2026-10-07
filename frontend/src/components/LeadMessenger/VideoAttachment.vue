@@ -242,8 +242,8 @@ const action = computed(() =>
 const immediateExternalFallback = computed(() =>
   Boolean(
     props.provider === 'vk_direct' &&
-    action.value &&
-    ['external', 'provider_embed'].includes(props.attachment.video_source),
+      action.value &&
+      ['external', 'provider_embed'].includes(props.attachment.video_source),
   ),
 )
 const cardAttachment = computed(() => ({

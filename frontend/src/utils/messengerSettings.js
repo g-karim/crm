@@ -37,8 +37,8 @@ export function makeMessengerChannelDraft(channel = null) {
   let defaults = PROVIDER_DEFAULTS[provider] || {}
   let implicitAvitoEnd = Boolean(
     channel?.name &&
-    channel?.avito_import_mode === 'period' &&
-    !channel?.avito_import_to_date,
+      channel?.avito_import_mode === 'period' &&
+      !channel?.avito_import_to_date,
   )
   let avitoEnd =
     channel?.avito_import_to_date ||

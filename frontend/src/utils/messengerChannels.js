@@ -201,11 +201,11 @@ export function isGenericFileOnlyMessage(message = {}) {
     : []
   return Boolean(
     message?.status !== 'deleted' &&
-    attachments.length &&
-    attachments.every((attachment) => attachment?.type === 'file') &&
-    !shouldShowMessengerMessageText(message) &&
-    !message?.reply_context &&
-    !message?.forward_context,
+      attachments.length &&
+      attachments.every((attachment) => attachment?.type === 'file') &&
+      !shouldShowMessengerMessageText(message) &&
+      !message?.reply_context &&
+      !message?.forward_context,
   )
 }
 
@@ -229,10 +229,12 @@ export function getMessengerDeliveryLabel(message = {}) {
 export function isMaxVideoProcessingMessage(message = {}) {
   return Boolean(
     message?.provider === 'max_direct' &&
-    getMessengerDeliveryState(message) === 'retrying' &&
-    message?.provider_status === 'attachment.not.ready' &&
-    (message?.message_type === 'video' ||
-      message?.attachments?.some((attachment) => attachment?.type === 'video')),
+      getMessengerDeliveryState(message) === 'retrying' &&
+      message?.provider_status === 'attachment.not.ready' &&
+      (message?.message_type === 'video' ||
+        message?.attachments?.some(
+          (attachment) => attachment?.type === 'video',
+        )),
   )
 }
 

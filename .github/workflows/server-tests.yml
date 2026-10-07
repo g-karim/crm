@@ -15,7 +15,7 @@ on:
         - cron: "0 0 * * *"
 env:
     CRM_BRANCH: ${{ github.base_ref || github.ref_name }}
-    CRM_MESSENGER_REF: feature/avito-lead-intake
+    CRM_MESSENGER_REF: ed2951c5ace0a1ccf81a3dc2819186eeb144b848
 
 concurrency:
     group: develop-crm-${{ github.event.number }}
@@ -105,6 +105,16 @@ jobs:
               with:
                   artifact-name: coverage-${{ matrix.frappe-branch }}
                   coverage-path: /home/runner/frappe-bench/sites/coverage.xml
+
+            - name: Run Messenger server tests
+              uses: ./.github/actions/run-server-tests
+              with:
+                  bench-path: "/home/runner/frappe-bench"
+                  site: "test_site"
+                  app: "crm_messenger"
+                  enable-coverage: "false"
+                  type: "server"
+                  ci-build-id: ${{ github.run_id }}
 
     coverage:
         name: Coverage Wrap Up
