@@ -15,6 +15,7 @@ on:
         - cron: "0 0 * * *"
 env:
     CRM_BRANCH: ${{ github.base_ref || github.ref_name }}
+    CRM_MESSENGER_REF: feature/avito-lead-intake
 
 concurrency:
     group: develop-crm-${{ github.event.number }}
@@ -31,11 +32,11 @@ jobs:
               id: resolve
               run: |
                   BASE="${{ github.base_ref || github.ref_name }}"
-                  # develop tracks frappe develop; the stable lane ships frappe 15 and 16.
+                  # Match pyproject.toml: this fork requires Frappe >=16.
                   if [ "$BASE" = "develop" ]; then
                       echo 'branches=["develop"]' >> "$GITHUB_OUTPUT"
                   else
-                      echo 'branches=["version-15","version-16"]' >> "$GITHUB_OUTPUT"
+                      echo 'branches=["version-16"]' >> "$GITHUB_OUTPUT"
                   fi
 
     test:
@@ -61,14 +62,31 @@ jobs:
             - name: Clone
               uses: actions/checkout@v6
 
+            - name: Check Messenger repository access
+              env:
+                  MESSENGER_TOKEN: ${{ secrets.CRM_MESSENGER_READ_TOKEN }}
+              run: |
+                  if [ -z "$MESSENGER_TOKEN" ]; then
+                      echo "::error::Set CRM_MESSENGER_READ_TOKEN with read access to the private g-karim/crm_messenger repository."
+                      exit 1
+                  fi
+
+            - name: Checkout Messenger integration
+              uses: actions/checkout@v6
+              with:
+                  repository: g-karim/crm_messenger
+                  ref: ${{ env.CRM_MESSENGER_REF }}
+                  token: ${{ secrets.CRM_MESSENGER_READ_TOKEN }}
+                  path: ci-crm-messenger
+
             - name: Setup environment
               uses: ./.github/actions/setup-server-env
               with:
                   python-version: "3.14"
                   node-version: "24"
                   type: "server"
-                  # erpnext: stable lane only, never v16 (v16 test bootstrap broken on bare bench)
-                  install-erpnext: ${{ (github.base_ref == 'main-hotfix' || github.base_ref == 'main') && matrix.frappe-branch != 'version-16' }}
+                  install-erpnext: "true"
+                  messenger-path: ${{ github.workspace }}/ci-crm-messenger
                   frappe-branch: ${{ matrix.frappe-branch }}
 
             - name: Run server tests

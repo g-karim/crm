@@ -1,7 +1,8 @@
 <template>
   <div
     data-message-metadata
-    class="mb-1 flex min-w-0 items-start justify-between gap-2"
+    class="mb-1 flex items-start justify-between gap-2"
+    :class="constrainIntrinsicWidth ? 'w-0 min-w-full' : 'min-w-0'"
   >
     <div
       data-message-labels
@@ -45,9 +46,14 @@ const props = defineProps({
   failed: { type: Boolean, default: false },
   editing: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
+  constrainIntrinsicWidth: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['start-edit', 'delete', 'retry', 'reply'])
+
+function capitalizeFirstLetter(label) {
+  return label.replace(/^./u, (letter) => letter.toUpperCase())
+}
 
 const menuOptions = computed(() =>
   getMessengerMessageActions(props.message).map((action) => {
@@ -67,7 +73,7 @@ const menuOptions = computed(() =>
     }
     if (action === 'edit') {
       return {
-        label: __('Edit'),
+        label: capitalizeFirstLetter(__('Edit')),
         icon: 'edit-3',
         onClick: () => emit('start-edit'),
       }

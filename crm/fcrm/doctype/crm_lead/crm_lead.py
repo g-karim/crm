@@ -121,6 +121,12 @@ class CRMLead(Document):
 	def before_save(self):
 		self.apply_sla()
 
+	def on_update(self):
+		if self.has_value_changed("lead_owner"):
+			previous = self.get_doc_before_save()
+			if previous and previous.lead_owner and previous.lead_owner != self.lead_owner:
+				frappe.publish_realtime("crm_notification", {}, user=previous.lead_owner, after_commit=True)
+
 	def validate_status(self):
 		if self.is_new() and not self.status:
 			if frappe.db.exists("CRM Lead Status", "New"):
@@ -369,6 +375,7 @@ class CRMLead(Document):
 			"idx",
 			"docstatus",
 			"status",
+			"source",
 			"email",
 			"mobile_no",
 			"phone",
@@ -491,6 +498,13 @@ class CRMLead(Document):
 				"type": "Data",
 				"key": "mobile_no",
 				"width": "11rem",
+			},
+			{
+				"label": "Source",
+				"type": "Link",
+				"key": "source",
+				"options": "CRM Lead Source",
+				"width": "9rem",
 			},
 			{
 				"label": "Assigned To",

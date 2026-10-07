@@ -7,8 +7,10 @@ vi.mock('frappe-ui', () => ({
   frappeRequest: vi.fn(),
   createResource(options) {
     let resource = {
+      options,
       data: options.initialData,
       reload: vi.fn(),
+      reset: vi.fn(),
       submit: vi.fn(async () => ({})),
     }
     resources.set(options.url, resource)
@@ -19,6 +21,7 @@ vi.mock('frappe-ui', () => ({
 import {
   notifications,
   notificationsStore,
+  loadNotificationsForUser,
   unreadNotificationsCount,
 } from '@/stores/notifications'
 
@@ -31,6 +34,20 @@ describe('notifications store', () => {
       has_more: false,
     }
     vi.clearAllMocks()
+  })
+
+  it('loads notifications after session startup and clears them on logout', async () => {
+    expect(
+      resources.get('crm.api.notifications.get_notifications').options.auto,
+    ).toBe(false)
+
+    await loadNotificationsForUser('specialist@example.test')
+    expect(notifications.reset).toHaveBeenCalledOnce()
+    expect(notifications.reload).toHaveBeenCalledOnce()
+
+    await loadNotificationsForUser(null)
+    expect(notifications.reset).toHaveBeenCalledTimes(2)
+    expect(notifications.reload).toHaveBeenCalledOnce()
   })
 
   it('uses the server unread count instead of the limited list', () => {

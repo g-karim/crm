@@ -89,7 +89,7 @@
             :label="__('Send Voice Message')"
             :loading="sending"
             :disabled="sending || !state.durationMs"
-            @click="send"
+            @click="requestSend"
           />
         </div>
       </div>
@@ -128,10 +128,16 @@ const props = defineProps({
   maxSizeBytes: { type: Number, default: 10 * 1024 * 1024 },
   scopeKey: { type: String, default: '' },
 })
-const emit = defineEmits(['active-change', 'queued'])
+const emit = defineEmits([
+  'active-change',
+  'draft-change',
+  'queued',
+  'send-requested',
+])
 const state = ref({ state: 'idle', durationMs: 0, waveform: [] })
 const sending = ref(false)
 let clientRequestId = ''
+let preserveNextScopeChange = false
 
 const recorder = createMessengerVoiceRecorder({
   maxDurationMs: props.maxDurationSeconds * 1000,
@@ -144,6 +150,16 @@ const recorder = createMessengerVoiceRecorder({
         ['requesting_permission', 'recording', 'paused', 'stopping'].includes(
           next.state,
         ),
+    )
+    emit(
+      'draft-change',
+      next.blob
+        ? {
+            durationMs: next.durationMs,
+            sizeBytes: next.blob.size,
+            mimeType: next.mimeType || next.blob.type || '',
+          }
+        : null,
     )
   },
 })
@@ -179,6 +195,15 @@ const stateLabel = computed(
 
 function startRecording() {
   if (!props.disabled) recorder.start()
+}
+
+function requestSend() {
+  if (sending.value || !state.value.blob || !props.conversation) return
+  emit('send-requested', {
+    durationMs: state.value.durationMs,
+    sizeBytes: state.value.blob.size,
+    mimeType: state.value.mimeType || state.value.blob.type || '',
+  })
 }
 
 async function send() {
@@ -240,13 +265,23 @@ function voiceFilename(mime = '') {
   return 'voice.m4a'
 }
 
+function retarget() {
+  clientRequestId = ''
+  preserveNextScopeChange = true
+}
+
 watch(
   () => props.scopeKey,
-  () => {
+  (scopeKey, previousScopeKey) => {
+    if (scopeKey === previousScopeKey) return
     clientRequestId = ''
+    if (preserveNextScopeChange) {
+      preserveNextScopeChange = false
+      return
+    }
     recorder.reset()
   },
 )
 onBeforeUnmount(() => recorder.dispose())
-defineExpose({ start: startRecording, reset: recorder.reset })
+defineExpose({ start: startRecording, reset: recorder.reset, send, retarget })
 </script>

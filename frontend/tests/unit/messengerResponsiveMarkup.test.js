@@ -13,6 +13,10 @@ const composerAttachmentsSource = readFileSync(
   ),
   'utf8',
 )
+const attachmentCardSource = readFileSync(
+  resolve(process.cwd(), 'src/components/LeadMessenger/AttachmentCard.vue'),
+  'utf8',
+)
 const desktopNotificationsSource = readFileSync(
   resolve(process.cwd(), 'src/components/Notifications.vue'),
   'utf8',
@@ -70,6 +74,19 @@ describe('messenger responsive markup', () => {
     expect(composerAttachmentsSource).not.toContain('bg-surface-blue-3')
   })
 
+  it('keeps generic file cards compact and long filenames constrained', () => {
+    expect(attachmentCardSource).toContain(
+      "? 'w-fit max-w-[min(20rem,100%)] justify-self-start'",
+    )
+    expect(attachmentCardSource).toContain(
+      `class="min-w-0" :class="isGenericFile ? '' : 'flex-1'"`,
+    )
+    expect(attachmentCardSource).toContain(
+      'class="truncate text-sm font-medium text-ink-gray-8"',
+    )
+    expect(attachmentCardSource).toContain("props.attachment.type === 'file'")
+  })
+
   it('lets long notification previews shrink and wrap on every layout', () => {
     for (let source of [
       desktopNotificationsSource,
@@ -90,7 +107,7 @@ describe('messenger responsive markup', () => {
       ':can-send="Boolean(item.message.can_react)"',
     )
     expect(conversationSource).toContain(
-      "reference_doctype: 'CRM Lead',\n      reference_name: props.leadName",
+      "reference_doctype: 'CRM Lead',\n      reference_name: context.lead",
     )
     expect(conversationSource).toContain('voiceRecorder.value?.reset?.()')
     expect(conversationSource).toContain('locationPickerOpen.value = false')

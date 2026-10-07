@@ -10,8 +10,14 @@ export const notifications = createResource({
   // This resource loads before main.js configures the global fetcher.
   resourceFetcher: frappeRequest,
   initialData: { notifications: [], unread_count: 0, has_more: false },
-  auto: true,
+  // App loads this after frappe-ui's request configuration is installed.
+  auto: false,
 })
+
+export function loadNotificationsForUser(user) {
+  notifications.reset()
+  return user ? notifications.reload() : Promise.resolve()
+}
 
 export const unreadNotificationsCount = computed(() => {
   const count = Number(notifications.data?.unread_count) || 0

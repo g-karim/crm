@@ -2,6 +2,7 @@
 # See license.txt
 
 
+import json
 from unittest.mock import patch
 
 import frappe
@@ -62,6 +63,31 @@ class TestDashboard(IntegrationTestCase):
 		make_test_records("CRM Organization")  # Load organizations before deals
 		make_test_records("CRM Lead")
 		make_test_records("CRM Deal")
+		cls.lead_fixture_names = []
+		for record in json.loads(
+			frappe.read_file(frappe.get_app_path("crm", "fcrm", "doctype", "crm_lead", "test_records.json"))
+		):
+			filters = {field: value for field, value in record.items() if field != "doctype"}
+			name = frappe.db.get_value("CRM Lead", filters, "name")
+			if not name:
+				raise AssertionError(f"Dashboard fixture was not created: {record['email']}")
+			cls.lead_fixture_names.append(name)
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.savepoint("dashboard_fixture_scope")
+		self.addCleanup(frappe.db.rollback, save_point="dashboard_fixture_scope")
+		# Other modules create Leads on the same test site. Keep their rows intact,
+		# but move them outside this suite's reporting periods until the rollback.
+		frappe.db.sql(
+			"""update `tabCRM Lead` set creation = %s
+			where name not in %s""",
+			("1900-01-01 00:00:00", tuple(self.lead_fixture_names)),
+		)
+		frappe.db.sql(
+			"update `tabCRM Lead` set creation = %s where name in %s",
+			(frappe.utils.now(), tuple(self.lead_fixture_names)),
+		)
 
 	@classmethod
 	def tearDownClass(cls):

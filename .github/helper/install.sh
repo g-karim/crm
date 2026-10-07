@@ -48,16 +48,25 @@ bench get-app crm "${GITHUB_WORKSPACE}"
 # Only pull erpnext when the integration is under test, to keep other runs fast.
 if [ "${INSTALL_ERPNEXT}" = "true" ]; then
     bench get-app erpnext --branch "${FRAPPE_BRANCH}"
+    bench get-app payments --branch "${FRAPPE_BRANCH}"
+fi
+
+if [ -n "${MESSENGER_PATH:-}" ]; then
+    bench get-app crm_messenger "${MESSENGER_PATH}"
 fi
 
 bench setup requirements --dev
 
-bench start &>> ~/frappe-bench/bench_start.log &
+bench start >> ~/frappe-bench/bench_start.log 2>&1 &
 CI=Yes bench build --app frappe &
 bench --site test_site reinstall --yes
 
 if [ "${INSTALL_ERPNEXT}" = "true" ]; then
-    bench --verbose --site test_site install-app erpnext crm
+    bench --verbose --site test_site install-app erpnext payments crm
 else
     bench --verbose --site test_site install-app crm
+fi
+
+if [ -n "${MESSENGER_PATH:-}" ]; then
+    bench --verbose --site test_site install-app crm_messenger
 fi

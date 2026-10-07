@@ -74,8 +74,24 @@
         }}
       </div>
 
+      <AvitoItemCard
+        v-if="!selectedAvitoRestricted"
+        :conversation="selectedConversation"
+      />
+
       <div class="relative min-h-0 flex-1">
         <div
+          v-if="selectedAvitoRestricted"
+          class="flex h-full flex-col items-center overflow-y-auto px-4 py-6 sm:px-10"
+          data-testid="avito-restricted-panel"
+        >
+          <AvitoRestrictedChat
+            :conversation="selectedConversation"
+            class="my-auto shrink-0"
+          />
+        </div>
+        <div
+          v-else
           ref="messagesEl"
           class="h-full overflow-y-auto px-4 py-5 sm:px-10"
           @scroll.passive="handleMessagesScroll"
@@ -87,7 +103,7 @@
             <LoadingIndicator class="size-5" />
           </div>
           <div
-            v-if="!messages.length"
+            v-if="!visibleMessages.length"
             class="flex h-full min-h-[260px] flex-col items-center justify-center gap-2 text-center"
           >
             <CommentIcon class="size-8 text-ink-gray-4" />
@@ -137,7 +153,12 @@
                     )
                       ? 'ring-2 ring-outline-blue-3'
                       : '',
+                    permissions.can_operate &&
+                    item.message.direction === 'inbound'
+                      ? 'cursor-pointer hover:ring-1 hover:ring-outline-blue-2'
+                      : '',
                   ]"
+                  @click="selectInboundMessage(item.message, $event)"
                   @contextmenu="openReactionPicker(item.message, $event)"
                 >
                   <span
@@ -148,6 +169,9 @@
                     aria-hidden="true"
                   />
                   <MessageMetadata
+                    :constrain-intrinsic-width="
+                      isGenericFileOnlyMessage(item.message)
+                    "
                     :message="item.message"
                     :sender="messageSender(item.message)"
                     :source="messageSource(item.message)"
@@ -206,6 +230,7 @@
                     :attachments="item.message.attachments"
                     :playback-scope="videoPlaybackScope"
                     :provider="item.message.provider"
+                    :outbound="item.message.direction === 'outbound'"
                   />
                   <MessageReactions
                     v-if="
@@ -227,7 +252,7 @@
                     class="mt-1 border-t border-outline-gray-1 pt-1 text-xs"
                     :class="messageStatusNoteClass(item.message)"
                   >
-                    {{ messageFailureReason(item.message) }}
+                    {{ __(messageFailureReason(item.message)) }}
                   </div>
                 </div>
               </div>
@@ -262,6 +287,28 @@
         @dragleave="draggingFiles = false"
         @drop="handleComposerDrop"
       >
+        <div
+          v-if="routingMismatch"
+          data-testid="conversation-routing-warning"
+          class="mb-2 flex flex-col gap-2 rounded-md border border-outline-amber-2 bg-surface-amber-1 px-3 py-2 text-sm text-ink-gray-8 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <span>{{ routingWarningText }}</span>
+          <Button
+            data-testid="conversation-routing-switch"
+            class="shrink-0"
+            variant="ghost"
+            :label="__('Switch')"
+            :disabled="sendingMessage"
+            @click="retargetComposerToLatestInbound"
+          />
+        </div>
+        <div
+          v-if="routingError"
+          data-testid="conversation-routing-error"
+          class="mb-2 rounded-md border border-outline-red-1 bg-surface-red-1 px-3 py-2 text-sm text-ink-red-8"
+        >
+          {{ routingError }}
+        </div>
         <div v-if="replyTarget" class="mb-2 flex items-start gap-2">
           <MessageReplyQuote
             class="min-w-0 flex-1"
@@ -284,7 +331,7 @@
         </div>
         <div class="mb-2 grid gap-2 sm:grid-cols-2">
           <FormControl
-            v-model="selectedChannel"
+            :model-value="selectedChannel"
             type="select"
             :options="channelOptions"
             :disabled="
@@ -295,10 +342,11 @@
               preparedHandoff
             "
             :placeholder="__('Platform')"
+            @update:modelValue="selectChannelManually"
           />
           <FormControl
             v-if="conversationCandidates.length > 1"
-            v-model="selectedConversationName"
+            :model-value="selectedConversationName"
             type="select"
             :options="conversationOptions"
             :disabled="
@@ -308,6 +356,7 @@
               Boolean(preparedHandoff)
             "
             :placeholder="__('External Chat')"
+            @update:modelValue="selectConversationManually"
           />
         </div>
         <div
@@ -332,29 +381,48 @@
           </div>
         </div>
         <Textarea
-          v-else
+          v-else-if="!selectedAvitoRestricted"
           ref="textareaRef"
           v-model="draftText"
           class="mb-2 min-h-20 w-full"
           :rows="3"
-          :disabled="baseSendDisabled || Boolean(pendingLocation)"
-          :placeholder="__('Enter a message...')"
+          :disabled="
+            baseSendDisabled ||
+            Boolean(pendingLocation) ||
+            (imageCaptionState.blocked && !draftText)
+          "
+          :placeholder="
+            imageCaptionState.blocked && !draftText
+              ? __('Image captions are unavailable for Avito.')
+              : __('Enter a message...')
+          "
           @keydown.enter.stop="sendOnEnter"
           @update:modelValue="handleComposerInput"
           @paste.stop="handleComposerPaste"
         />
         <ComposerAttachments
-          v-if="!preparedHandoff"
+          v-if="!preparedHandoff && !selectedAvitoRestricted"
           ref="composerAttachments"
-          :supportsAttachments="selectedCapabilities.supports_attachments"
+          :supportsAttachments="attachmentPolicy.supportsAttachments"
           :channelType="selectedChannelType"
-          :maxFiles="selectedCapabilities.max_attachment_count"
+          :maxFiles="attachmentPolicy.maxAttachmentCount"
+          :supportedAttachmentTypes="attachmentPolicy.supportedAttachmentTypes"
+          :acceptedFileTypes="attachmentPolicy.acceptedFileTypes"
+          :unsupportedFileMessage="attachmentPolicy.unsupportedFileMessage"
+          :unsupportedFormatMessage="attachmentPolicy.unsupportedFormatMessage"
           :conversation="selectedConversation?.name || ''"
           :disabled="
             baseSendDisabled || voiceActive || Boolean(pendingLocation)
           "
-          @change="pendingAttachments = $event"
+          @change="handleAttachmentsChange"
         />
+        <div
+          v-if="imageCaptionState.error"
+          data-testid="image-caption-warning"
+          class="mb-2 text-sm text-ink-amber-8"
+        >
+          {{ __(imageCaptionState.error) }}
+        </div>
         <div
           v-if="pendingLocation"
           class="mb-2 flex items-center justify-between rounded-md border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-sm"
@@ -389,11 +457,17 @@
           "
           :max-size-bytes="selectedCapabilities.voice.max_size_bytes"
           :scope-key="voiceScopeKey"
-          @active-change="voiceActive = $event"
+          @active-change="handleVoiceActive"
+          @draft-change="voiceDraft = $event"
           @queued="voiceQueued"
+          @send-requested="requestVoiceSend"
         />
         <div
-          v-if="!preparedHandoff && handoffChannelOptions.length"
+          v-if="
+            !preparedHandoff &&
+            handoffChannelOptions.length &&
+            !selectedAvitoRestricted
+          "
           class="mb-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
         >
           <FormControl
@@ -415,7 +489,10 @@
             @click="prepareHandoff"
           />
         </div>
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div
+          v-if="!selectedAvitoRestricted"
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
           <div class="min-w-0 flex-1 basis-40 text-sm text-ink-gray-5">
             <div class="truncate">{{ composerHint }}</div>
           </div>
@@ -431,7 +508,7 @@
                 Boolean(pendingAttachments.length) ||
                 Boolean(pendingLocation)
               "
-              @click="voiceRecorder?.start()"
+              @click="startVoiceRecording"
             />
             <Button
               v-if="!preparedHandoff && selectedCapabilities.location.send"
@@ -457,8 +534,7 @@
                 baseSendDisabled ||
                 voiceActive ||
                 Boolean(pendingLocation) ||
-                pendingAttachments.length >=
-                  selectedCapabilities.max_attachment_count
+                pendingAttachments.length >= attachmentPolicy.maxAttachmentCount
               "
               @click="composerAttachments?.openFileSelector()"
             />
@@ -475,7 +551,7 @@
                   !pendingAttachments.length &&
                   !pendingLocation)
               "
-              @click="sendMessage"
+              @click="requestSendMessage"
             />
           </div>
         </div>
@@ -493,6 +569,13 @@
 </template>
 
 <script setup>
+import AvitoItemCard from './AvitoItemCard.vue'
+import AvitoRestrictedChat from './AvitoRestrictedChat.vue'
+import {
+  isAvitoChatRestricted,
+  restrictedAvitoChats,
+} from '@/utils/messengerAvitoAccess'
+import { avitoConversationLabel } from '@/utils/messengerAvitoContext'
 import CommentIcon from '@/components/Icons/CommentIcon.vue'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
@@ -514,11 +597,14 @@ import {
   getMessengerCapabilities,
   getMessengerConversationNotice,
   getMessengerDeliveryState,
+  getMessengerFailureReason,
   getMessengerPlatformLabel,
+  isGenericFileOnlyMessage,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 import {
   getSingleImageBubbleWidthClass,
+  isSingleAudioAttachmentSet,
   isSingleImageAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
@@ -527,7 +613,12 @@ import {
   countNewMessengerMessages,
   createMessengerSyncController,
 } from '@/utils/messengerSync'
-import { isVideoFile, validateComposerFileMix } from '@/utils/messengerComposer'
+import {
+  getComposerAttachmentPolicy,
+  getComposerImageCaptionState,
+  isVideoFile,
+  validateComposerFileMix,
+} from '@/utils/messengerComposer'
 import {
   getForwardedContentKind,
   isStickerOnlyForwardContext,
@@ -537,6 +628,7 @@ import { createMessengerTypingController } from '@/utils/messengerTyping'
 import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
 import {
   createMessengerMessageActions,
+  getMessengerRetryConfirmation,
   openMessengerMessageEditor,
 } from '@/utils/messengerMessageActions'
 import {
@@ -567,10 +659,12 @@ const loadingHistory = ref(false)
 const loadingChannels = ref(false)
 const sendingMessage = ref(false)
 const conversations = ref([])
+const latestInbound = ref(null)
 const messages = ref([])
 const channels = ref([])
 const selectedChannel = ref('')
 const selectedConversationName = ref('')
+const selectionMode = ref('auto')
 const handoffTargetChannel = ref('')
 const handoffLoading = ref(false)
 const handoffCancelling = ref(false)
@@ -582,8 +676,10 @@ const pendingAttachments = ref([])
 const pendingLocation = ref(null)
 const locationPickerOpen = ref(false)
 const voiceActive = ref(false)
+const voiceDraft = ref(null)
 const sendWarning = ref('')
 const genericError = ref('')
+const routingError = ref('')
 const permissions = ref({
   can_read: false,
   can_operate: false,
@@ -610,8 +706,21 @@ const reactionComponents = new Map()
 let typingTimer = null
 let highlightTimer = null
 let preserveComposerScope = false
-let notificationReadPending = false
 let appliedRouteConversation = ''
+let contextGeneration = 0
+let channelRequest = 0
+let conversationRequest = 0
+let disposed = false
+
+function captureLeadContext() {
+  let generation = contextGeneration
+  let lead = props.leadName
+  return {
+    lead,
+    isCurrent: () =>
+      !disposed && generation === contextGeneration && lead === props.leadName,
+  }
+}
 
 const composerTyping = createMessengerTypingController({
   send(conversation) {
@@ -662,8 +771,54 @@ const conversationByName = computed(() => {
   })
   return map
 })
+const latestInboundConversation = computed(() => {
+  let conversation = conversationByName.value[latestInbound.value?.conversation]
+  return conversation?.status === 'Archived' ? null : conversation || null
+})
 const selectedChannelDoc = computed(
   () => channelByName.value[selectedChannel.value] || null,
+)
+const restrictedAvitoConversations = computed(() =>
+  restrictedAvitoChats(conversations.value, channels.value),
+)
+const selectedAvitoRestricted = computed(() =>
+  isAvitoChatRestricted(
+    selectedChannelDoc.value || selectedConversation.value?.channel_info,
+  ),
+)
+const visibleMessages = computed(() => {
+  const restricted = new Set(
+    restrictedAvitoConversations.value.map((conversation) => conversation.name),
+  )
+  return messages.value.filter(
+    (message) =>
+      !restricted.has(message.conversation) &&
+      !isAvitoChatRestricted(
+        channelByName.value[message.channel] || message.channel_info,
+      ),
+  )
+})
+const routingMismatch = computed(() => {
+  if (
+    !permissions.value.can_operate ||
+    replyTarget.value ||
+    preparedHandoff.value ||
+    !latestInboundConversation.value ||
+    !selectedChannel.value ||
+    needsConversationChoice.value
+  )
+    return false
+  return (
+    selectedConversation.value?.name !== latestInboundConversation.value.name
+  )
+})
+const routingWarningText = computed(() =>
+  __('The latest inbound message arrived in {0}, but {1} is selected.', [
+    conversationRoutingLabel(latestInboundConversation.value),
+    selectedConversation.value
+      ? conversationRoutingLabel(selectedConversation.value)
+      : channelRoutingLabel(selectedChannelDoc.value),
+  ]),
 )
 const selectedChannelType = computed(() =>
   getMessengerChannelType(
@@ -673,6 +828,19 @@ const selectedChannelType = computed(() =>
 const selectedCapabilities = computed(() =>
   getMessengerCapabilities(
     selectedChannelDoc.value || selectedConversation.value || {},
+  ),
+)
+const attachmentPolicy = computed(() =>
+  getComposerAttachmentPolicy(
+    selectedCapabilities.value,
+    selectedChannelType.value,
+  ),
+)
+const imageCaptionState = computed(() =>
+  getComposerImageCaptionState(
+    draftText.value,
+    pendingAttachments.value,
+    attachmentPolicy.value,
   ),
 )
 const conversationNotice = computed(() =>
@@ -697,6 +865,7 @@ const baseSendDisabled = computed(
   () =>
     !permissions.value.can_operate ||
     sendingMessage.value ||
+    selectedAvitoRestricted.value ||
     missingPhone.value ||
     selectedRequiresInbound.value ||
     needsConversationChoice.value ||
@@ -708,30 +877,35 @@ const sendDisabled = computed(
   () =>
     baseSendDisabled.value ||
     Boolean(attachmentMixError.value) ||
+    Boolean(imageCaptionState.value.error) ||
     pendingAttachments.value.some((item) => item.status !== 'uploaded'),
 )
 const attachmentMixError = computed(() => {
   if (!pendingAttachments.value.length) return ''
   return (
-    validateComposerFileMix([], pendingAttachments.value, {
-      supportsAttachments: selectedCapabilities.value.supports_attachments,
-      channelType: selectedChannelType.value,
-      maxAttachmentCount: selectedCapabilities.value.max_attachment_count,
-    }).error || ''
+    validateComposerFileMix(
+      [],
+      pendingAttachments.value,
+      attachmentPolicy.value,
+    ).error || ''
   )
 })
 const channelOptions = computed(() =>
   buildMessengerChannelOptions(channels.value),
 )
 const conversationOptions = computed(() =>
-  conversationCandidates.value.map(messengerConversationOption),
+  conversationCandidates.value.map((conversation) =>
+    messengerConversationOption(conversation, __),
+  ),
 )
 const handoffChannelOptions = computed(() =>
   buildMessengerChannelOptions(
     channels.value.filter((channel) => channel.name !== selectedChannel.value),
   ),
 )
-const messageItems = computed(() => buildMessengerMessageItems(messages.value))
+const messageItems = computed(() =>
+  buildMessengerMessageItems(visibleMessages.value),
+)
 const videoPlaybackScope = computed(
   () =>
     `${props.leadName}:${selectedConversation.value?.name || ''}:${props.active}`,
@@ -838,7 +1012,7 @@ const messageSync = createMessengerSyncController({
           previousLastMessage: change.changeSnapshot?.previousLastMessage,
         })
     }
-    scheduleMessengerNotificationRead()
+    readController.schedule()
   },
   onDeltaApplied(_merge, incoming) {
     let hasInbound = incoming.some((message) => message.direction === 'inbound')
@@ -852,14 +1026,12 @@ const messageSync = createMessengerSyncController({
     ) {
       clearTyping()
     }
-    if (
-      incoming.some(
-        (message) =>
-          message.conversation &&
-          !conversationByName.value[message.conversation],
-      )
-    ) {
-      loadConversations()
+    let hasUnknownConversation = incoming.some(
+      (message) =>
+        message.conversation && !conversationByName.value[message.conversation],
+    )
+    if (hasInbound || hasUnknownConversation) {
+      refreshConversations()
     }
   },
   onError(error) {
@@ -872,7 +1044,7 @@ const messageSync = createMessengerSyncController({
     else showTyping(payload.expires_in_ms)
   },
   onConversationStateChanged() {
-    loadConversations()
+    loadSelectionContext()
   },
 })
 
@@ -880,11 +1052,12 @@ const readController = createMessengerReadController({
   call,
   isEnabled: () =>
     permissions.value.can_operate &&
+    !selectedAvitoRestricted.value &&
     props.active &&
     document.visibilityState === 'visible' &&
     isNearBottom(),
   getConversation: () => selectedConversation.value,
-  getMessages: () => messages.value,
+  getMessages: () => visibleMessages.value,
   onConfirmed(result) {
     let conversation = conversations.value.find(
       (item) => item.name === result.conversation,
@@ -914,6 +1087,7 @@ function setEditorElement(messageName, element) {
 
 function startMessageEdit(message) {
   if (!permissions.value.can_operate) return false
+  pinSelection()
   return openMessengerMessageEditor(message, {
     startEdit: messageActions.startEdit,
     nextTick,
@@ -928,6 +1102,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
   resetComposer()
   messageSync.stop()
   readController.stop()
@@ -940,6 +1116,7 @@ onBeforeUnmount(() => {
 watch(
   () => props.leadName,
   () => initialize(true),
+  { flush: 'sync' },
 )
 
 watch(
@@ -952,33 +1129,42 @@ watch(
 )
 
 async function initialize(leadChanged = false) {
+  contextGeneration += 1
+  let context = captureLeadContext()
   genericError.value = ''
+  routingError.value = ''
   sendWarning.value = ''
   newMessageCount.value = 0
   loadingMessages.value = true
   if (leadChanged) {
-    await resetComposer()
+    let cleanup = resetComposer()
+    messageSync.setLead('')
     applyPermissions()
     messages.value = []
     conversations.value = []
+    channels.value = []
+    latestInbound.value = null
     selectedChannel.value = ''
     selectedConversationName.value = ''
+    selectionMode.value = 'auto'
+    appliedRouteConversation = ''
     handoffTargetChannel.value = ''
     messageEditorElements.clear()
+    await cleanup
+    if (!context.isCurrent()) return
   }
   try {
     await Promise.all([
-      loadChannels(),
-      loadConversations(),
+      loadSelectionContext(),
       leadChanged
-        ? messageSync.setLead(props.leadName)
-        : messageSync.start(props.leadName),
+        ? messageSync.setLead(context.lead)
+        : messageSync.start(context.lead),
     ])
-    scheduleMessengerNotificationRead()
+    if (context.isCurrent()) readController.schedule()
   } catch (error) {
-    handleError(error, __('Could not load messages.'))
+    if (context.isCurrent()) handleError(error, __('Could not load messages.'))
   } finally {
-    loadingMessages.value = false
+    if (context.isCurrent()) loadingMessages.value = false
   }
 }
 
@@ -1008,64 +1194,106 @@ function confirmDeleteMessage(message) {
 }
 
 async function loadAll() {
+  let context = captureLeadContext()
   genericError.value = ''
   sendWarning.value = ''
   loadingMessages.value = true
   try {
-    await Promise.all([
-      loadChannels(),
-      loadConversations(),
-      messageSync.loadSnapshot(),
-    ])
+    await Promise.all([loadSelectionContext(), messageSync.loadSnapshot()])
   } catch (error) {
-    handleError(error, __('Could not refresh messages.'))
+    if (context.isCurrent())
+      handleError(error, __('Could not refresh messages.'))
   } finally {
-    loadingMessages.value = false
+    if (context.isCurrent()) loadingMessages.value = false
   }
 }
 
+async function loadSelectionContext() {
+  let context = captureLeadContext()
+  let results = await Promise.all([loadChannels(), loadConversations()])
+  if (context.isCurrent() && results.every(Boolean)) reconcileSelection()
+}
+
 async function loadChannels() {
+  let context = captureLeadContext()
+  let request = ++channelRequest
+  let isCurrent = () => context.isCurrent() && request === channelRequest
   loadingChannels.value = true
   try {
     let result = await call('crm_messenger.api.channels.get_channels', {
       active_only: 1,
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
     })
+    if (!isCurrent()) return false
     if (!result?.ok)
       throw new Error(result?.message || __('Could not load channels.'))
     channels.value = result.channels || []
     applyPermissions(result.permissions)
-    ensureSelectedChannel()
+    return true
   } catch (error) {
-    handleError(error, __('Could not load channels.'))
+    if (isCurrent()) handleError(error, __('Could not load channels.'))
+    return isCurrent()
   } finally {
-    loadingChannels.value = false
+    if (isCurrent()) loadingChannels.value = false
   }
 }
 
 async function loadConversations() {
+  let context = captureLeadContext()
+  let request = ++conversationRequest
+  let isCurrent = () => context.isCurrent() && request === conversationRequest
   loadingConversation.value = true
   try {
     let result = await call(
       'crm_messenger.api.conversations.get_conversations',
       {
         reference_doctype: 'CRM Lead',
-        reference_name: props.leadName,
+        reference_name: context.lead,
         limit: 50,
       },
     )
+    if (!isCurrent()) return false
     if (!result?.ok)
       throw new Error(result?.message || __('Could not load the conversation.'))
     conversations.value = result.conversations || []
+    latestInbound.value = result.latest_inbound || null
     applyPermissions(result.permissions)
-    ensureSelectedChannel()
-    applyRequestedConversation()
+    return true
   } catch (error) {
-    handleError(error, __('Could not load the conversation.'))
+    if (isCurrent()) handleError(error, __('Could not load the conversation.'))
+    return isCurrent()
   } finally {
-    loadingConversation.value = false
+    if (isCurrent()) loadingConversation.value = false
   }
+}
+
+async function refreshConversations() {
+  let context = captureLeadContext()
+  if (await loadConversations()) {
+    if (context.isCurrent()) reconcileSelection()
+  }
+}
+
+function reconcileSelection() {
+  if (
+    selectionMode.value === 'pinned' &&
+    selectedConversationName.value &&
+    !activeConversationByName(selectedConversationName.value)
+  ) {
+    selectionMode.value = 'auto'
+    selectedConversationName.value = ''
+  }
+
+  if (selectionMode.value === 'auto' && latestInboundConversation.value) {
+    preserveComposerDuringScopeChange(() => {
+      selectedChannel.value = latestInboundConversation.value.channel
+      selectedConversationName.value = latestInboundConversation.value.name
+    })
+  } else {
+    ensureSelectedChannel()
+  }
+  applyRequestedConversation()
 }
 
 function ensureSelectedChannel() {
@@ -1091,13 +1319,95 @@ function applyRequestedConversation() {
   let requested = `${route.query.messenger_conversation || ''}`
   if (!requested || requested === appliedRouteConversation) return
   let conversation = conversations.value.find((row) => row.name === requested)
-  if (!conversation) return
-  selectedChannel.value = conversation.channel
-  selectedConversationName.value = conversation.name
+  if (!conversation || conversation.status === 'Archived') return
+  pinSelection()
+  preserveComposerDuringScopeChange(() => {
+    selectedChannel.value = conversation.channel
+    selectedConversationName.value = conversation.name
+  })
   appliedRouteConversation = requested
 }
 
+function activeConversationByName(name) {
+  let conversation = conversationByName.value[name]
+  return conversation?.status === 'Archived' ? null : conversation || null
+}
+
+function pinSelection() {
+  selectionMode.value = 'pinned'
+}
+
+async function selectChannelManually(channel) {
+  channel = `${channel || ''}`
+  pinSelection()
+  routingError.value = ''
+  if (!channel || channel === selectedChannel.value) return
+
+  let resolved = resolveMessengerConversationSelection({
+    conversations: conversations.value,
+    channel,
+  })
+  if (resolved.conversation && isComposerDirty()) {
+    await retargetComposerToConversation(resolved.conversation)
+    return
+  }
+  if (!isComposerDirty()) {
+    selectedChannel.value = channel
+    return
+  }
+
+  let target = {
+    channel,
+    channel_info: channelByName.value[channel] || null,
+  }
+  let compatibilityError = composerRetargetError(target)
+  if (compatibilityError) {
+    routingError.value = __(compatibilityError)
+    return
+  }
+  if (resolved.state === 'missing' && pendingAttachments.value.length) {
+    routingError.value = __(
+      'Remove attachments before switching to a channel without an existing conversation.',
+    )
+    return
+  }
+  if (resolved.state === 'missing' && voiceDraft.value) {
+    routingError.value = __(
+      'Delete the voice draft before switching to a channel without an existing conversation.',
+    )
+    return
+  }
+
+  composerAttachments.value?.preserveScopeChange?.()
+  if (voiceDraft.value) voiceRecorder.value?.retarget?.()
+  preserveComposerDuringScopeChange(() => {
+    selectedChannel.value = channel
+    selectedConversationName.value = ''
+  })
+}
+
+async function selectConversationManually(conversationName) {
+  conversationName = `${conversationName || ''}`
+  pinSelection()
+  routingError.value = ''
+  if (!conversationName || conversationName === selectedConversationName.value)
+    return
+  let conversation = activeConversationByName(conversationName)
+  if (!conversation) {
+    routingError.value = __(
+      'This external conversation is not available for sending.',
+    )
+    return
+  }
+  if (isComposerDirty()) {
+    await retargetComposerToConversation(conversation)
+    return
+  }
+  selectedConversationName.value = conversation.name
+}
+
 function handleComposerInput(value) {
+  if (`${value || ''}`.length) pinSelection()
   composerTyping.input({
     text: value,
     conversation: selectedConversation.value?.name,
@@ -1111,8 +1421,183 @@ function handleComposerInput(value) {
   })
 }
 
+function handleAttachmentsChange(items) {
+  if (items?.length) pinSelection()
+  pendingAttachments.value = items || []
+}
+
+function requestSendMessage() {
+  if (routingMismatch.value) {
+    openRoutingConfirmation(() => sendMessage())
+    return
+  }
+  sendMessage()
+}
+
+function openRoutingConfirmation(continueSend) {
+  let latest = latestInboundConversation.value
+  if (!latest || !routingMismatch.value) {
+    continueSend()
+    return
+  }
+  let currentLabel = selectedConversation.value
+    ? conversationRoutingLabel(selectedConversation.value)
+    : channelRoutingLabel(selectedChannelDoc.value)
+  $dialog({
+    title: __('Check sending conversation'),
+    message: routingWarningText.value,
+    actions: [
+      {
+        label: __('Send through {0}', [currentLabel]),
+        variant: 'solid',
+        onClick(close) {
+          close()
+          continueSend()
+        },
+      },
+      {
+        label: __('Switch to {0}', [conversationRoutingLabel(latest)]),
+        onClick: async (close) => {
+          if (await retargetComposerToConversation(latest)) close()
+        },
+      },
+      {
+        label: __('Cancel'),
+        onClick(close) {
+          close()
+        },
+      },
+    ],
+  })
+}
+
+async function retargetComposerToLatestInbound() {
+  return retargetComposerToConversation(latestInboundConversation.value)
+}
+
+async function retargetComposerToConversation(target) {
+  target = activeConversationByName(target?.name)
+  if (!target) {
+    routingError.value = __(
+      'This external conversation is not available for sending.',
+    )
+    return false
+  }
+  if (target.name === selectedConversation.value?.name) {
+    pinSelection()
+    routingError.value = ''
+    return true
+  }
+
+  routingError.value = ''
+  let compatibilityError = composerRetargetError(target)
+  if (compatibilityError) {
+    routingError.value = __(compatibilityError)
+    return false
+  }
+
+  try {
+    await composerAttachments.value?.retarget?.(target.name)
+    if (voiceDraft.value) voiceRecorder.value?.retarget?.()
+    pinSelection()
+    preserveComposerDuringScopeChange(() => {
+      selectedChannel.value = target.channel
+      selectedConversationName.value = target.name
+    })
+    await nextTick()
+    return true
+  } catch (error) {
+    routingError.value = __(
+      error?.messages?.[0] ||
+        error?.message ||
+        'Could not switch the external conversation.',
+    )
+    return false
+  }
+}
+
+function composerRetargetError(target) {
+  if (replyTarget.value)
+    return 'Cancel the reply before switching conversations.'
+  if (preparedHandoff.value)
+    return 'Cancel the prepared handoff before switching conversations.'
+  if (messageActionState.value.editingMessage)
+    return 'Finish editing the message before switching conversations.'
+
+  let channel =
+    channelByName.value[target.channel] || target.channel_info || target
+  let capabilities = getMessengerCapabilities(channel)
+  if (pendingAttachments.value.some((item) => item.status !== 'uploaded')) {
+    return 'Wait for attachments to finish uploading before switching.'
+  }
+  if (pendingAttachments.value.length) {
+    let validation = validateComposerFileMix(
+      [],
+      pendingAttachments.value,
+      getComposerAttachmentPolicy(
+        capabilities,
+        getMessengerChannelType(channel),
+      ),
+    )
+    if (validation.error) return validation.error
+  }
+  if (pendingLocation.value && !capabilities.location.send) {
+    return 'The target conversation does not support location messages.'
+  }
+  if (voiceActive.value && !voiceDraft.value) {
+    return 'Stop recording the voice message before switching conversations.'
+  }
+  if (voiceDraft.value) {
+    if (!capabilities.voice.send) {
+      return 'The target conversation does not support voice messages.'
+    }
+    if (
+      voiceDraft.value.durationMs >
+      capabilities.voice.max_duration_seconds * 1000
+    ) {
+      return 'The voice message exceeds the target conversation duration limit.'
+    }
+    if (voiceDraft.value.sizeBytes > capabilities.voice.max_size_bytes) {
+      return 'The voice message exceeds the target conversation size limit.'
+    }
+  }
+  return ''
+}
+
+function conversationRoutingLabel(conversation = {}) {
+  let channel =
+    channelByName.value[conversation.channel] ||
+    conversation.channel_info ||
+    conversation
+  let platform = __(getMessengerPlatformLabel(channel))
+  let listing = avitoConversationLabel(conversation, __)
+  return listing ? `${platform} · ${listing}` : platform
+}
+
+function channelRoutingLabel(channel = {}) {
+  return __(getMessengerPlatformLabel(channel || {}))
+}
+
+function startVoiceRecording() {
+  pinSelection()
+  voiceRecorder.value?.start()
+}
+
+function handleVoiceActive(active) {
+  voiceActive.value = active
+  if (active) pinSelection()
+}
+
+function requestVoiceSend(metadata) {
+  voiceDraft.value = metadata || voiceDraft.value
+  let send = () => voiceRecorder.value?.send()
+  if (routingMismatch.value) openRoutingConfirmation(send)
+  else send()
+}
+
 async function sendMessage() {
   if (!permissions.value.can_operate) return
+  let context = captureLeadContext()
   let handoff = preparedHandoff.value
   let text = handoff?.message || draftText.value.trim()
   if (
@@ -1139,8 +1624,8 @@ async function sendMessage() {
   let accepted = false
 
   try {
-    let conversation = await resolveConversationForSend()
-    if (!conversation?.name) return
+    let conversation = await resolveConversationForSend(context)
+    if (!context.isCurrent() || !conversation?.name) return
 
     let fingerprint = JSON.stringify({
       conversation: conversation.name,
@@ -1167,8 +1652,9 @@ async function sendMessage() {
       location: pendingLocation.value || undefined,
       reply_to_message: replyTarget.value?.name || undefined,
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
     })
+    if (!context.isCurrent()) return
     accepted = Boolean(result?.name)
     if (accepted) {
       composerTyping.reset()
@@ -1202,15 +1688,18 @@ async function sendMessage() {
       composerTyping.reset()
     }
   } catch (error) {
-    handleError(error, __('Could not send the message.'))
+    if (context.isCurrent())
+      handleError(error, __('Could not send the message.'))
   } finally {
-    if (!accepted) composerAttachments.value?.unfreeze()
+    if (context.isCurrent() && !accepted) composerAttachments.value?.unfreeze()
     sendingMessage.value = false
-    await Promise.all([loadConversations(), messageSync.syncDelta()])
+    if (context.isCurrent())
+      await Promise.all([refreshConversations(), messageSync.syncDelta()])
   }
 }
 
-async function resolveConversationForSend() {
+async function resolveConversationForSend(context) {
+  if (!context.isCurrent()) return null
   if (selectedConversation.value && !replyTarget.value)
     return selectedConversation.value
 
@@ -1218,11 +1707,12 @@ async function resolveConversationForSend() {
     'crm_messenger.api.conversations.resolve_send_target',
     {
       reference_doctype: 'CRM Lead',
-      reference_name: props.leadName,
+      reference_name: context.lead,
       channel: selectedChannel.value,
       reply_to_message: replyTarget.value?.name || undefined,
     },
   )
+  if (!context.isCurrent()) return null
   if (result?.ok && result.conversation?.name) {
     preserveComposerDuringScopeChange(() => {
       selectedChannel.value =
@@ -1238,7 +1728,7 @@ async function resolveConversationForSend() {
     )
   }
   if (result?.reason === 'missing_channel_conversation' && result.can_create)
-    return createConversation()
+    return createConversation(context)
 
   genericError.value =
     result?.reason === 'ambiguous_conversation'
@@ -1253,19 +1743,33 @@ async function resolveConversationForSend() {
 async function prepareHandoff() {
   if (!permissions.value.can_operate) return
   if (!handoffTargetChannel.value || !selectedConversation.value) return
+  pinSelection()
   genericError.value = ''
   let handoffAction = resolveMessengerHandoffAction(
     conversations.value,
     handoffTargetChannel.value,
   )
   if (handoffAction.state === 'switch') {
-    selectedChannel.value = handoffTargetChannel.value
-    selectedConversationName.value = handoffAction.conversation.name
+    if (
+      isComposerDirty() &&
+      !(await retargetComposerToConversation(handoffAction.conversation))
+    )
+      return
+    if (!isComposerDirty()) {
+      selectedChannel.value = handoffTargetChannel.value
+      selectedConversationName.value = handoffAction.conversation.name
+    }
     handoffTargetChannel.value = ''
     toast.success(__('Switched to an existing external chat.'))
     return
   }
   if (handoffAction.state === 'ambiguous') {
+    if (isComposerDirty()) {
+      genericError.value = __(
+        'Clear the current draft and attachments before preparing a handoff.',
+      )
+      return
+    }
     selectedChannel.value = handoffTargetChannel.value
     selectedConversationName.value = ''
     handoffTargetChannel.value = ''
@@ -1349,7 +1853,7 @@ function integrationWarningMessage(result = {}) {
     resultMessage.includes('avito')
   ) {
     return __(
-      'The Avito integration is not configured. Enter the Avito account ID and API token. The message was saved locally with an error status.',
+      'The Avito integration is not configured. Enter the Client ID and Client Secret in the Avito channel settings, then connect the channel. The message was saved locally with an error status.',
     )
   }
 
@@ -1364,7 +1868,8 @@ function integrationWarningMessage(result = {}) {
   )
 }
 
-async function createConversation() {
+async function createConversation(context) {
+  if (!context.isCurrent()) return null
   if (selectedCapabilities.value.requires_inbound) {
     genericError.value = __(
       'An incoming message must arrive in the selected channel first.',
@@ -1375,10 +1880,11 @@ async function createConversation() {
   let result = await call(
     'crm_messenger.api.conversations.get_or_create_lead_conversation',
     {
-      reference_name: props.leadName,
+      reference_name: context.lead,
       channel: selectedChannel.value,
     },
   )
+  if (!context.isCurrent()) return null
 
   if (result?.reason === 'missing_phone') {
     genericError.value = __('This lead has no phone number.')
@@ -1411,7 +1917,7 @@ function makeClientRequestId() {
 function sendOnEnter(event) {
   if (event.isComposing || event.shiftKey) return
   event.preventDefault()
-  sendMessage()
+  requestSendMessage()
 }
 
 function handleComposerPaste(event) {
@@ -1439,7 +1945,49 @@ function handleComposerDrop(event) {
 
 async function voiceQueued() {
   cancelReply()
-  await Promise.all([loadConversations(), messageSync.syncDelta()])
+  await Promise.all([refreshConversations(), messageSync.syncDelta()])
+}
+
+async function selectInboundMessage(message, event) {
+  if (
+    !permissions.value.can_operate ||
+    message?.direction !== 'inbound' ||
+    sendingMessage.value ||
+    eventTargetsInteractiveElement(event)
+  )
+    return
+  let conversation = activeConversationByName(message.conversation)
+  if (!conversation) {
+    routingError.value = __(
+      'This external conversation is not available for sending.',
+    )
+    return
+  }
+  if (conversation.name === selectedConversation.value?.name) {
+    pinSelection()
+    return
+  }
+  await retargetComposerToConversation(conversation)
+}
+
+function eventTargetsInteractiveElement(event) {
+  return Boolean(
+    event?.target?.closest?.(
+      'a, button, input, textarea, select, video, audio, [role="button"], [role="slider"], [data-attachment-renderer], [contenteditable="true"]',
+    ),
+  )
+}
+
+function isComposerDirty() {
+  return Boolean(
+    draftText.value ||
+      pendingAttachments.value.length ||
+      pendingLocation.value ||
+      voiceActive.value ||
+      replyTarget.value ||
+      preparedHandoff.value ||
+      messageActionState.value.editingMessage,
+  )
 }
 
 function scrollToBottom() {
@@ -1447,7 +1995,6 @@ function scrollToBottom() {
   messagesEl.value.scrollTop = messagesEl.value.scrollHeight
   newMessageCount.value = 0
   readController.schedule()
-  scheduleMessengerNotificationRead()
 }
 
 function isNearBottom() {
@@ -1458,7 +2005,6 @@ async function handleMessagesScroll() {
   if (isNearBottom()) {
     newMessageCount.value = 0
     readController.schedule()
-    scheduleMessengerNotificationRead()
   }
   if (
     !messagesEl.value ||
@@ -1498,6 +2044,7 @@ function startReply(message) {
     )
     return
   }
+  pinSelection()
   resetComposer()
   preserveComposerDuringScopeChange(() => {
     selectedChannel.value = conversation.channel
@@ -1522,6 +2069,7 @@ function selectLocation(location) {
     )
     return
   }
+  pinSelection()
   pendingLocation.value = location
 }
 
@@ -1536,11 +2084,10 @@ function retryMessage(message) {
     messageActions.retryMessage(message)
     return
   }
+  let confirmation = getMessengerRetryConfirmation(message)
   $dialog({
-    title: __('Retry sending?'),
-    message: __(
-      'VK may have already accepted the message. Retrying uses the same request ID.',
-    ),
+    title: __(confirmation.title),
+    message: __(confirmation.message),
     actions: [
       {
         label: __('Retry Sending'),
@@ -1609,44 +2156,7 @@ function handleVisibilityChange() {
     composerTyping.reset()
   } else {
     readController.schedule()
-    scheduleMessengerNotificationRead()
   }
-}
-
-async function markMessengerNotificationsRead() {
-  if (
-    notificationReadPending ||
-    !props.active ||
-    document.visibilityState !== 'visible' ||
-    !selectedConversation.value?.name ||
-    !isNearBottom()
-  )
-    return
-  let lastInbound = messages.value
-    .filter(
-      (message) =>
-        message.conversation === selectedConversation.value.name &&
-        message.direction === 'inbound' &&
-        message.status !== 'deleted' &&
-        message.ingest_source !== 'provider_history',
-    )
-    .at(-1)
-  if (!lastInbound?.name) return
-  notificationReadPending = true
-  try {
-    await call('crm.api.notifications.mark_messenger_as_read', {
-      conversation: selectedConversation.value.name,
-      last_event_id: lastInbound.name,
-    })
-  } catch {
-    // Notifications are auxiliary and must not interrupt the conversation UI.
-  } finally {
-    notificationReadPending = false
-  }
-}
-
-function scheduleMessengerNotificationRead() {
-  nextTick(() => markMessengerNotificationsRead())
 }
 
 watch(
@@ -1657,7 +2167,6 @@ watch(
       composerTyping.reset()
     } else {
       readController.schedule()
-      scheduleMessengerNotificationRead()
     }
   },
 )
@@ -1741,12 +2250,15 @@ function messageBubbleWidthClass(message) {
   if (isSingleLocationAttachmentSet(message.attachments)) {
     return 'w-[21.5rem] !max-w-[94%] sm:!max-w-[21.5rem]'
   }
+  if (isSingleAudioAttachmentSet(message.attachments)) {
+    return 'w-[24rem] !max-w-[94%] sm:!max-w-[24rem]'
+  }
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
   return getSingleImageBubbleWidthClass(message.attachments[0])
 }
 
 function messageFailureReason(message) {
-  return message.failure_reason || message.error || ''
+  return getMessengerFailureReason(message)
 }
 
 function messageFailed(message) {
@@ -1804,6 +2316,7 @@ async function resetComposer() {
   let handoff = preparedHandoff.value
   preparedHandoff.value = null
   draftText.value = ''
+  voiceDraft.value = null
   pendingLocation.value = null
   locationPickerOpen.value = false
   handoffTargetChannel.value = ''
@@ -1811,6 +2324,7 @@ async function resetComposer() {
   clientRequestFingerprint.value = ''
   draggingFiles.value = false
   sendWarning.value = ''
+  routingError.value = ''
   cancelReply()
   clearTyping()
   composerTyping.reset()

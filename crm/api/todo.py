@@ -44,9 +44,7 @@ def validate_crm_lead_assignment_permission(doc, method=None):
 def _assignment_references(doc):
 	references = {(doc.reference_type, doc.reference_name)}
 	if not doc.is_new():
-		previous = frappe.db.get_value(
-			"ToDo", doc.name, ["reference_type", "reference_name"], as_dict=True
-		)
+		previous = frappe.db.get_value("ToDo", doc.name, ["reference_type", "reference_name"], as_dict=True)
 		if previous:
 			references.add((previous.reference_type, previous.reference_name))
 	return references
@@ -72,6 +70,10 @@ def validate(doc, method):
 def after_insert(doc, method):
 	if doc.reference_type in ["CRM Lead", "CRM Deal"] and doc.reference_name and doc.allocated_to:
 		fieldname = "lead_owner" if doc.reference_type == "CRM Lead" else "deal_owner"
+		if doc.reference_type == "CRM Lead":
+			previous_owner = frappe.db.get_value("CRM Lead", doc.reference_name, "lead_owner")
+			if previous_owner and previous_owner != doc.allocated_to:
+				frappe.publish_realtime("crm_notification", {}, user=previous_owner, after_commit=True)
 		# Mirror assign_to: the latest assignment owns the record, overriding any prior owner.
 		frappe.db.set_value(
 			doc.reference_type, doc.reference_name, fieldname, doc.allocated_to, update_modified=False
@@ -91,6 +93,13 @@ def on_update(doc, method):
 	):
 		notify_assigned_user(doc, is_cancelled=True)
 		clear_owner_on_unassign(doc)
+	if (
+		doc.has_value_changed("status")
+		and doc.status in ("Cancelled", "Closed")
+		and doc.reference_type == "CRM Lead"
+		and doc.allocated_to
+	):
+		frappe.publish_realtime("crm_notification", {}, user=doc.allocated_to, after_commit=True)
 
 
 def clear_owner_on_unassign(doc):
@@ -150,21 +159,24 @@ def get_notification_text(owner, doc, reference_doc, is_cancelled=False):
 		if is_cancelled:
 			return f"""
                 <div class="mb-2 leading-5 text-ink-gray-5">
-                    <span>{ _('Your assignment on {0} {1} has been removed by {2}').format(
-                        doctype,
-                        f'<span class="font-medium text-ink-gray-9">{ name }</span>',
-                        f'<span class="font-medium text-ink-gray-9">{ owner }</span>'
-                    ) }</span>
+                    <span>{
+				_("Your assignment on {0} {1} has been removed by {2}").format(
+					doctype,
+					f'<span class="font-medium text-ink-gray-9">{name}</span>',
+					f'<span class="font-medium text-ink-gray-9">{owner}</span>',
+				)
+			}</span>
                 </div>
             """
 
 		return f"""
             <div class="mb-2 leading-5 text-ink-gray-5">
-                <span class="font-medium text-ink-gray-9">{ owner }</span>
-                <span>{ _('assigned a {0} {1} to you').format(
-                    doctype,
-                    f'<span class="font-medium text-ink-gray-9">{ name }</span>'
-                ) }</span>
+                <span class="font-medium text-ink-gray-9">{owner}</span>
+                <span>{
+			_("assigned a {0} {1} to you").format(
+				doctype, f'<span class="font-medium text-ink-gray-9">{name}</span>'
+			)
+		}</span>
             </div>
         """
 
@@ -172,18 +184,22 @@ def get_notification_text(owner, doc, reference_doc, is_cancelled=False):
 		if is_cancelled:
 			return f"""
                 <div class="mb-2 leading-5 text-ink-gray-5">
-                    <span>{ _('Your assignment on task {0} has been removed by {1}').format(
-                        f'<span class="font-medium text-ink-gray-9">{ reference_doc.title }</span>',
-                        f'<span class="font-medium text-ink-gray-9">{ owner }</span>'
-                    ) }</span>
+                    <span>{
+				_("Your assignment on task {0} has been removed by {1}").format(
+					f'<span class="font-medium text-ink-gray-9">{reference_doc.title}</span>',
+					f'<span class="font-medium text-ink-gray-9">{owner}</span>',
+				)
+			}</span>
                 </div>
             """
 		return f"""
             <div class="mb-2 leading-5 text-ink-gray-5">
-                <span class="font-medium text-ink-gray-9">{ owner }</span>
-                <span>{ _('assigned a new task {0} to you').format(
-                    f'<span class="font-medium text-ink-gray-9">{ reference_doc.title }</span>'
-                ) }</span>
+                <span class="font-medium text-ink-gray-9">{owner}</span>
+                <span>{
+			_("assigned a new task {0} to you").format(
+				f'<span class="font-medium text-ink-gray-9">{reference_doc.title}</span>'
+			)
+		}</span>
             </div>
         """
 

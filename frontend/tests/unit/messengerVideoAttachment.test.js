@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file */
 import { createApp } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -44,6 +43,25 @@ function mountVideo(attachment, provider = '', props = {}) {
 }
 
 describe('external messenger video', () => {
+  it('translates attachment processing status at the display boundary', () => {
+    let originalTranslate = globalThis.__
+    globalThis.__ = (message) =>
+      message === 'Processing' ? 'Обрабатывается' : message
+    try {
+      let root = mountVideo({
+        id: 'VIDEO-PROCESSING',
+        type: 'video',
+        status: 'processing',
+        file_name: 'video.mp4',
+      })
+
+      expect(root.textContent).toContain('Обрабатывается')
+      expect(root.textContent).not.toContain('Processing')
+    } finally {
+      globalThis.__ = originalTranslate
+    }
+  })
+
   it('letterboxes portrait previews and keeps landscape proportions', () => {
     let portrait = mountVideo({
       id: 'VIDEO-PORTRAIT',

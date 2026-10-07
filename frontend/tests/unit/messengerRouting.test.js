@@ -95,12 +95,15 @@ describe('messenger routing', () => {
       }).label,
     ).toContain('Голосовое сообщение')
     expect(
-      messengerConversationOption({
-        name: 'TG-VIDEO',
-        channel: 'TG',
-        last_message: { message_type: 'video' },
-      }).label,
-    ).toContain('Video')
+      messengerConversationOption(
+        {
+          name: 'TG-VIDEO',
+          channel: 'TG',
+          last_message: { message_type: 'video' },
+        },
+        (message) => (message === 'Video' ? 'Видео' : message),
+      ),
+    ).toEqual({ label: 'TG · Видео · TG-VIDEO', value: 'TG-VIDEO' })
   })
 
   it('pins reply to the source conversation regardless of selected channel', () => {

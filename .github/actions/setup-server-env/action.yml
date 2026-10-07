@@ -21,6 +21,10 @@ inputs:
         description: Frappe (and erpnext) branch to install and test against
         required: false
         default: "develop"
+    messenger-path:
+        description: Local checkout of crm_messenger for paired integration tests
+        required: false
+        default: ""
 runs:
     using: composite
     steps:
@@ -92,4 +96,5 @@ runs:
               TYPE: ${{ inputs.type }}
               INSTALL_ERPNEXT: ${{ inputs.install-erpnext }}
               FRAPPE_BRANCH: ${{ inputs.frappe-branch }}
+              MESSENGER_PATH: ${{ inputs.messenger-path }}
           run: bash ${GITHUB_WORKSPACE}/.github/helper/install.sh

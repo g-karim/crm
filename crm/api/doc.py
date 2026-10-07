@@ -698,6 +698,8 @@ def add_seen(doctype: str, name: str):
 
 @frappe.whitelist()
 def get_assigned_users(doctype: str, name: str | int, default_assigned_to: str | None = None):
+	if not frappe.has_permission(doctype, "read", name):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
 	assigned_users = frappe.get_all(
 		"ToDo",
 		fields=["allocated_to"],
@@ -728,7 +730,11 @@ def get_fields(doctype: str, allow_all_fieldtypes: bool = False):
 	_fields = []
 
 	for field in fields:
-		if field.fieldtype not in not_allowed_fieldtypes and field.fieldname and field.fieldname not in hidden_fields:
+		if (
+			field.fieldtype not in not_allowed_fieldtypes
+			and field.fieldname
+			and field.fieldname not in hidden_fields
+		):
 			_fields.append(field)
 
 	return _fields
@@ -773,6 +779,8 @@ def get_linked_docs_of_document(doctype: str, docname: str):
 		doc = frappe.get_doc(doctype, docname)
 	except frappe.DoesNotExistError:
 		return []
+	if not doc.has_permission("read"):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
 	linked_docs = get_linked_docs(doc)
 	dynamic_linked_docs = get_dynamic_linked_docs(doc)
@@ -788,6 +796,8 @@ def get_linked_docs_of_document(doctype: str, docname: str):
 		try:
 			data = frappe.get_doc(doc["reference_doctype"], doc["reference_docname"])
 		except (frappe.DoesNotExistError, frappe.ValidationError):
+			continue
+		if not data.has_permission("read"):
 			continue
 
 		title = data.get("title")

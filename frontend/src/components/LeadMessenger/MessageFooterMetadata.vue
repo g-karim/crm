@@ -46,6 +46,7 @@ import { formatDate } from '@/utils'
 import {
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
+  getMessengerFailureReason,
 } from '@/utils/messengerChannels'
 import { getMessengerMessageDisplay } from '@/utils/messengerMessageActions'
 import { Tooltip } from 'frappe-ui'
@@ -61,8 +62,8 @@ const display = computed(() => getMessengerMessageDisplay(props.message))
 const deliveryState = computed(() => getMessengerDeliveryState(props.message))
 const deliveryTooltip = computed(() => {
   let label = getMessengerDeliveryLabel(props.message)
-  let reason = props.message.failure_reason || props.message.error || ''
-  return reason ? `${__(label)}: ${reason}` : __(label)
+  let reason = getMessengerFailureReason(props.message)
+  return reason ? `${__(label)}: ${__(reason)}` : __(label)
 })
 const deliveryIconClass = computed(() => {
   if (deliveryState.value === 'read') return 'text-ink-blue-5'

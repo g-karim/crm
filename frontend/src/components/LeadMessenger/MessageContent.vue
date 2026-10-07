@@ -38,7 +38,30 @@
         class="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
         :class="display.tombstone ? 'italic text-ink-gray-5' : ''"
       >
-        {{ display.tombstone ? __('Message deleted') : display.text }}
+        <template v-if="display.tombstone">{{
+          __('Message deleted')
+        }}</template>
+        <template v-else>
+          {{
+            textPresentation.translate
+              ? __(textPresentation.text)
+              : textPresentation.text
+          }}
+          <a
+            v-if="
+              textPresentation.action === 'open_provider_chat' &&
+              externalChatUrl
+            "
+            data-provider-chat-action
+            :href="externalChatUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="mt-2 flex w-fit items-center gap-1.5 text-sm font-medium text-ink-blue-6 hover:underline"
+          >
+            <ExternalLinkIcon class="size-4 shrink-0" />
+            {{ __('Open chat in Avito') }}
+          </a>
+        </template>
       </div>
     </template>
 
@@ -49,10 +72,13 @@
 </template>
 
 <script setup>
+import ExternalLinkIcon from '@/components/Icons/ExternalLinkIcon.vue'
+import { getProviderExternalChatUrl } from '@/utils/messengerExternalLinks'
 import {
   canSaveMessengerMessageEdit,
   getMessengerMessageDisplay,
 } from '@/utils/messengerMessageActions'
+import { getMessengerMessageTextPresentation } from '@/utils/messengerMessagePresentation'
 import { Button, Textarea } from 'frappe-ui'
 import { computed } from 'vue'
 
@@ -77,4 +103,13 @@ function setEditorElement(element) {
 }
 
 const display = computed(() => getMessengerMessageDisplay(props.message))
+const textPresentation = computed(() =>
+  getMessengerMessageTextPresentation(props.message),
+)
+const externalChatUrl = computed(() =>
+  getProviderExternalChatUrl(
+    props.message.provider,
+    props.message.external_chat_id,
+  ),
+)
 </script>

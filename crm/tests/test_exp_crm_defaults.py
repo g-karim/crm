@@ -42,7 +42,7 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 		self.assertEqual(settings.favicon, "/files/customer-favicon.ico")
 
 	def test_hide_legacy_erpnext_crm_desktop_icon_but_not_frappe_crm_app(self):
-		self.ensure_desktop_icon(
+		legacy_icon = self.ensure_desktop_icon(
 			"CRM",
 			{
 				"label": "CRM",
@@ -53,7 +53,7 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 				"icon_type": "Link",
 			},
 		)
-		app_icon = self.ensure_desktop_icon(
+		crm_icon = self.ensure_desktop_icon(
 			APP_NAME,
 			{
 				"label": APP_NAME,
@@ -67,8 +67,8 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 
 		hide_legacy_erpnext_crm()
 
-		self.assertEqual(frappe.db.get_value("Desktop Icon", "CRM", "hidden"), 1)
-		self.assertEqual(frappe.db.get_value("Desktop Icon", app_icon.name, "hidden"), 0)
+		self.assertEqual(frappe.db.get_value("Desktop Icon", legacy_icon.name, "hidden"), 1)
+		self.assertEqual(frappe.db.get_value("Desktop Icon", crm_icon.name, "hidden"), 0)
 
 	def test_branding_repairs_migrated_crm_desktop_icon(self):
 		ensure_crm_branding_defaults()
@@ -137,12 +137,11 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 		)
 
 	def ensure_desktop_icon(self, name, values):
-		existing_name = frappe.db.exists("Desktop Icon", name) or frappe.db.exists(
-			"Desktop Icon", {"label": values["label"], "app": values["app"]}
-		)
-		if existing_name:
-			frappe.db.set_value("Desktop Icon", existing_name, values, update_modified=False)
-			return frappe.get_doc("Desktop Icon", existing_name)
+		# Migration can preserve the icon name while changing its unique label.
+		name = frappe.db.get_value("Desktop Icon", {"label": values["label"]}, "name") or name
+		if frappe.db.exists("Desktop Icon", name):
+			frappe.db.set_value("Desktop Icon", name, values, update_modified=False)
+			return frappe.get_doc("Desktop Icon", name)
 
 		doc = frappe.get_doc({"doctype": "Desktop Icon", "name": name, **values})
 		doc.insert(ignore_permissions=True, ignore_links=True)
