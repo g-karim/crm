@@ -13,6 +13,7 @@
         :actions="organization._actions"
       />
       <EnrichFromWebsite
+        v-if="permissions.data?.permissions?.write"
         doctype="CRM Organization"
         :docname="props.organizationId"
         :website="organization.doc?.website"

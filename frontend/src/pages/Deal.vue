@@ -17,6 +17,7 @@
         :actions="document.actions"
       />
       <EnrichFromWebsite
+        v-if="permissions.data?.permissions?.write"
         doctype="CRM Deal"
         :docname="dealId"
         :website="doc.website"

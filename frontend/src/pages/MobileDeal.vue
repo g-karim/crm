@@ -39,10 +39,17 @@
   </LayoutHeader>
   <div
     v-if="doc.name"
-    class="flex h-12 items-center justify-between gap-2 border-b px-3 py-2.5"
+    class="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5"
   >
     <AssignTo v-model="assignees.data" doctype="CRM Deal" :docname="dealId" />
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <EnrichFromWebsite
+        v-if="permissions.data?.permissions?.write"
+        doctype="CRM Deal"
+        :docname="dealId"
+        :website="doc.website"
+        @done="onEnriched"
+      />
       <CustomActions
         v-if="document._actions?.length"
         :actions="document._actions"
@@ -298,6 +305,7 @@ import Activities from '@/components/Activities/Activities.vue'
 import OrganizationModal from '@/components/Modals/OrganizationModal.vue'
 import LostReasonModal from '@/components/Modals/LostReasonModal.vue'
 import AssignTo from '@/components/AssignTo.vue'
+import EnrichFromWebsite from '@/components/EnrichFromWebsite.vue'
 import ContactModal from '@/components/Modals/ContactModal.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import Link from '@/components/Controls/Link.vue'
@@ -350,6 +358,7 @@ const {
   triggerOnChange,
   triggerOnRender,
   assignees,
+  permissions,
   document,
   scripts,
   error,
@@ -522,6 +531,11 @@ const sections = createResource({
   auto: true,
   transform: (data) => getParsedFields(data),
 })
+
+function onEnriched() {
+  document.reload?.()
+  sections.reload()
+}
 
 function getParsedFields(sections) {
   sections.forEach((section) => {

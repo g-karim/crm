@@ -67,8 +67,10 @@
             @click="createDeal"
           />
           <Button
+            v-if="isEnrichmentEnabled('CRM Deal')"
             :label="__('Enrich')"
             :loading="isEnriching"
+            :loadingText="__('Enriching')"
             :disabled="!deal.doc.website"
             :tooltip="__('Fill fields from the company website')"
             iconLeft="zap"
@@ -88,6 +90,7 @@ import { statusesStore } from '@/stores/statuses'
 import { isMobileView } from '@/composables/settings'
 import { showQuickEntryModal, quickEntryProps } from '@/composables/modals'
 import { useDocument } from '@/data/document'
+import { enrichmentStore } from '@/stores/enrichment'
 import { useTelemetry } from 'frappe-ui/frappe'
 import {
   Switch,
@@ -117,6 +120,7 @@ const hasContactSections = ref(true)
 
 const isDealCreating = ref(false)
 const isEnriching = ref(false)
+const { isEnabled: isEnrichmentEnabled } = enrichmentStore()
 const chooseExistingContact = ref(false)
 const chooseExistingOrganization = ref(false)
 const { capture } = useTelemetry()
@@ -155,7 +159,7 @@ async function enrichFromWebsite() {
       )
     } else {
       toast.info(
-        notes?.[0] || __('Nothing could be extracted from this website.'),
+        __(notes?.[0] || 'Nothing could be extracted from this website.'),
       )
     }
   } catch (e) {

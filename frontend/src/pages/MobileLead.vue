@@ -38,7 +38,7 @@
   </LayoutHeader>
   <div
     v-if="doc.name"
-    class="flex h-12 items-center justify-between gap-2 border-b px-3 py-2.5"
+    class="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5"
   >
     <AssignTo
       v-if="canWrite"
@@ -46,7 +46,14 @@
       doctype="CRM Lead"
       :docname="leadId"
     />
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <EnrichFromWebsite
+        v-if="canWrite"
+        doctype="CRM Lead"
+        :docname="leadId"
+        :website="doc.website"
+        @done="onEnriched"
+      />
       <CustomActions
         v-if="document._actions?.length"
         :actions="document._actions"
@@ -162,6 +169,7 @@ import LayoutHeader from '@/components/LayoutHeader.vue'
 import Activities from '@/components/Activities/Activities.vue'
 import LeadConversation from '@/components/LeadMessenger/LeadConversation.vue'
 import AssignTo from '@/components/AssignTo.vue'
+import EnrichFromWebsite from '@/components/EnrichFromWebsite.vue'
 import SidePanelLayout from '@/components/SidePanelLayout.vue'
 import SLASection from '@/components/SLASection.vue'
 import CustomActions from '@/components/CustomActions.vue'
@@ -379,6 +387,11 @@ const sections = createResource({
   params: { doctype: 'CRM Lead' },
   auto: true,
 })
+
+function onEnriched() {
+  document.reload?.()
+  sections.reload()
+}
 
 function updateField(name, value) {
   value = Array.isArray(name) ? '' : value

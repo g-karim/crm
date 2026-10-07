@@ -81,6 +81,9 @@ import {
   Switch,
   toast,
 } from 'frappe-ui'
+import { enrichmentStore } from '@/stores/enrichment'
+
+const { settings: featureSettings } = enrichmentStore()
 
 const targets = [
   { fieldname: 'enable_lead', label: 'Leads' },
@@ -99,12 +102,14 @@ const settings = createDocumentResource({
 function update(fieldname, value) {
   settings.doc[fieldname] = value ? 1 : 0
   settings.save.submit(null, {
-    onSuccess: () =>
+    onSuccess: () => {
+      featureSettings.reload()
       toast.success(
         value
           ? __('Setting enabled successfully')
           : __('Setting disabled successfully'),
-      ),
+      )
+    },
     onError: (err) => toast.error(err.messages?.[0] || __('Could not save')),
   })
 }

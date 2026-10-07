@@ -17,6 +17,7 @@
         :actions="document.actions"
       />
       <EnrichFromWebsite
+        v-if="canWrite"
         doctype="CRM Lead"
         :docname="leadId"
         :website="doc.website"
