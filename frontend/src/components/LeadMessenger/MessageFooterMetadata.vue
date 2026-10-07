@@ -22,7 +22,9 @@
         :class="deliveryIconClass"
       >
         <ClockIcon
-          v-if="['queued', 'sending', 'retrying'].includes(deliveryState)"
+          v-if="
+            ['queued', 'sending', 'accepted', 'retrying'].includes(deliveryState)
+          "
           class="size-4"
         />
         <CheckIcon v-else-if="deliveryState === 'sent'" class="size-4" />

@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, nextTick, reactive } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/utils', () => ({
@@ -110,6 +110,7 @@ describe('message footer metadata', () => {
   })
 
   it.each([
+    ['accepted', 'Awaiting provider status', 'text-ink-gray-5'],
     ['sent', 'Sent', 'text-ink-gray-5'],
     ['delivered', 'Delivered', 'text-ink-gray-5'],
     ['read', 'Read by recipient', 'text-ink-blue-5'],
@@ -134,6 +135,39 @@ describe('message footer metadata', () => {
       expect(footerOrder(root)).toEqual(['time', 'delivery'])
     },
   )
+
+  it('waits for Wazzup provider status before showing the sent check', async () => {
+    let outbound = reactive(
+      message({
+        provider: 'wazzup',
+        direction: 'outbound',
+        status: 'accepted',
+        delivery_status: 'accepted',
+        provider_request_id: 'REQUEST-1',
+        external_message_id: '',
+        is_edited: 0,
+      }),
+    )
+    let root = mountComponent(MessageFooterMetadata, { message: outbound })
+    let delivery = root.querySelector('[data-message-delivery]')
+
+    expect(delivery.querySelectorAll('svg')).toHaveLength(1)
+    expect(delivery.querySelector('.lucide-check')).toBeNull()
+    expect(delivery.closest('[data-test-tooltip]').title).toBe(
+      'Awaiting provider status',
+    )
+
+    Object.assign(outbound, {
+      status: 'sent',
+      delivery_status: 'sent',
+      external_message_id: 'PROVIDER-1',
+    })
+    await nextTick()
+
+    expect(delivery.querySelector('.lucide-check')).not.toBeNull()
+    expect(delivery.closest('[data-test-tooltip]').title).toBe('Sent')
+    expect(delivery.querySelectorAll('svg')).toHaveLength(1)
+  })
 
   it('shows Avito sent as one gray check and read as two blue checks', () => {
     let sent = mountComponent(MessageFooterMetadata, {

@@ -166,7 +166,7 @@ describe('messengerChannels', () => {
     ).toBe('')
   })
 
-  it.each(['sent', 'delivered', 'read', 'failed'])(
+  it.each(['accepted', 'sent', 'delivered', 'read', 'failed'])(
     'uses canonical delivery_status for %s',
     (deliveryStatus) => {
       expect(
@@ -265,6 +265,15 @@ describe('messengerChannels', () => {
   })
 
   it('returns delivery labels', () => {
+    expect(
+      getMessengerDeliveryLabel({
+        provider: 'wazzup',
+        direction: 'outbound',
+        status: 'accepted',
+        provider_request_id: 'REQUEST-1',
+      }),
+    ).toBe('Awaiting provider status')
+
     expect(
       getMessengerDeliveryLabel({
         direction: 'outbound',

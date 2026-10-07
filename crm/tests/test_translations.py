@@ -40,6 +40,18 @@ class TestCRMTranslations(TestCase):
 		self.assertEqual(translations["Wazzup"], "Wazzup")
 		self.assertEqual(translations["Connection Not Checked"], "Подключение не проверено")
 		self.assertEqual(
+			translations["Awaiting provider status"],
+			"Ожидание статуса от провайдера",
+		)
+		self.assertEqual(
+			translations["Partner API channels are managed by the server."],
+			"Каналы Partner API управляются сервером.",
+		)
+		self.assertEqual(
+			translations["Wazzup partner credentials cannot be stored in a channel."],
+			"Партнёрские данные доступа Wazzup нельзя хранить в канале.",
+		)
+		self.assertEqual(
 			translations[
 				"The provider may have accepted the message, but CRM did not receive a definitive result. Retrying may create a duplicate."
 			],

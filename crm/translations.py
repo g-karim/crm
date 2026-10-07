@@ -397,6 +397,9 @@ RUSSIAN_TRANSLATIONS = {
 	"Waiting": "Ожидание",
 	# Delivery, dates, uploads, and recording
 	"Sending": "Отправляется",
+	"Awaiting provider status": "Ожидание статуса от провайдера",
+	"Partner API channels are managed by the server.": "Каналы Partner API управляются сервером.",
+	"Wazzup partner credentials cannot be stored in a channel.": "Партнёрские данные доступа Wazzup нельзя хранить в канале.",
 	"Retrying": "Повторная попытка",
 	"Result unknown": "Результат неизвестен",
 	"Sent": "Отправлено",

@@ -13,6 +13,7 @@ const PLATFORM_LABELS = {
 const DELIVERY_LABELS = {
   queued: 'Queued',
   sending: 'Sending',
+  accepted: 'Awaiting provider status',
   retrying: 'Retrying',
   unknown: 'Result unknown',
   sent: 'Sent',
