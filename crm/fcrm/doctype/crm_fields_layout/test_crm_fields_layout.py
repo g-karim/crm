@@ -100,8 +100,7 @@ def get_layout_fields(layout):
 
 def get_layout_fieldnames(layout):
 	return [
-		field.get("fieldname") if isinstance(field, dict) else field
-		for field in get_layout_fields(layout)
+		field.get("fieldname") if isinstance(field, dict) else field for field in get_layout_fields(layout)
 	]
 
 

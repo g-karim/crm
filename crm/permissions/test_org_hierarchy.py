@@ -110,6 +110,24 @@ class TestOrgHierarchy(IntegrationTestCase):
 		assign_todo("CRM Lead", lead.name, "rep1@hier.test")
 		self.assertTrue(has_lead_permission(lead, "read", "manager@hier.test"))
 
+	def test_closed_assignment_retains_upstream_read_access(self):
+		lead = make_lead("rep1@hier.test")
+		assignment = assign_todo("CRM Lead", lead.name, "outsider@hier.test")
+		frappe.db.set_value("ToDo", assignment.name, "status", "Closed")
+		frappe.db.set_value("CRM Lead", lead.name, "lead_owner", "rep1@hier.test")
+		self.assertTrue(has_lead_permission(lead, "read", "outsider@hier.test"))
+
+	def test_manual_read_share_does_not_grant_write_access(self):
+		lead = make_lead("rep1@hier.test")
+		frappe.share.add("CRM Lead", lead.name, "outsider@hier.test", read=1, write=0)
+		frappe.set_user("outsider@hier.test")
+		try:
+			self.assertTrue(frappe.has_permission("CRM Lead", "read", doc=lead))
+			self.assertFalse(frappe.has_permission("CRM Lead", "write", doc=lead))
+			self.assertIn(lead.name, frappe.get_list("CRM Lead", pluck="name"))
+		finally:
+			frappe.set_user("Administrator")
+
 	# ------------------------------------------------------------------
 	# Deal permissions
 	# ------------------------------------------------------------------

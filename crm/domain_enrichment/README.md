@@ -61,7 +61,7 @@ DESK ADMIN (data)                         ENGINE (code, rule-agnostic)        RE
 | `pipeline.py` | `run(website, cfg, progress)` orchestrates crawl → extract → assemble `EnrichmentResult`. Never writes to the DB. |
 | `mapper.py` | `apply_to_document(doc, result, cfg)` — the **single** result→CRM-field authority, driven by Field Mapping records + write policies. |
 | `tasks.py` | `run_enrichment` (enqueued worker) + `write_run` (the **single** run-history writer). Streams realtime progress; never raises. |
-| `api.py` | Whitelisted `enrich` (enqueue) + `enrich_preview` (bounded sync prefill). Type-annotated; permission- and rate-limited. |
+| `api.py` | Whitelisted `enrich` (enqueue), `enrich_preview` (bounded sync prefill), `get_settings_flags` (operator feature switches), and `get_progress` (permission-checked completion recovery). Type-annotated; fetch entry points are rate-limited. |
 | `cross_record.py` | `copy_enrichment_from_organization` — the one link-time Org→Lead/Deal copy. |
 | `install.py` | Idempotent seeder: translates the original constant tables into Rule + Field Mapping records. |
 
@@ -91,6 +91,17 @@ Three doctypes hold all the tunable knowledge. `get_config()` reads them on dema
 
 If the Single has never been saved, the engine falls back to sane defaults
 (`config.DEFAULT_SETTINGS`).
+
+The CRM buttons honor both the master switch and the record-type switch, including
+the create dialogs and mobile record pages. Users without write permission do not
+see the action on a saved record. Saving settings refreshes the button switches.
+
+Manual enqueue responses include `queued_at`. While a run is pending, CRM checks
+`get_progress(reference_doctype, reference_name, queued_at)` every three seconds
+as a fallback to realtime events. The record's read permission is required, and
+older completed runs are ignored. Pending state survives record-tab remounts;
+listeners and timers are removed while the record is closed. Terminal events are
+published after commit so reloading the card sees the saved fields.
 
 ### 2. CRM Enrichment Rule (+ CRM Enrichment Rule Pattern)
 
@@ -129,7 +140,8 @@ The single source of result→field truth. One record = one field written.
 - **Fill if empty** — write only when the target field is currently empty.
 - **Always refresh** — overwrite (or clear) with the fresh value, even if the field
   had a previous value. Used for fully engine-derived fields that should always
-  reflect the latest crawl.
+  reflect the latest successful crawl. A blocked or unreachable homepage records
+  a failed run and does not apply any mappings, preserving existing field values.
 - **Override defaults** — treat the listed `default_values` (plus empty) as "unset"
   and fill over them, but respect any real user value. Useful for a field that ships
   with a meaningless placeholder default that enrichment should replace.

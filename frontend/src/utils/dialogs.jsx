@@ -1,4 +1,4 @@
-import { Dialog, ErrorMessage } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage } from 'frappe-ui'
 import { reactive, ref } from 'vue'
 
 let dialogs = ref([])
@@ -30,6 +30,23 @@ export let Dialogs = {
               <ErrorMessage class="mt-2" message={dialog.error} />,
             ]
           },
+          actions: ({ actions }) => (
+            <div
+              data-testid="dialog-actions"
+              class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end"
+            >
+              {actions.map((action) => (
+                <Button
+                  {...action}
+                  key={action.label}
+                  class={[
+                    action.class,
+                    'w-full min-w-0 sm:w-auto sm:max-w-full',
+                  ]}
+                />
+              ))}
+            </div>
+          ),
         }}
       </Dialog>
     ))

@@ -11,12 +11,20 @@
     :modalRef="modalRef"
   />
   <FadedScrollableDiv class="flex flex-col h-full overflow-y-auto">
+    <QuotationsList v-if="title == 'Quotations'" :deal="docname" />
     <div
-      v-if="all_activities?.loading"
+      v-else-if="all_activities?.loading"
       class="flex flex-1 flex-col items-center justify-center gap-3 text-2xl-medium text-ink-gray-4"
     >
       <LoadingIndicator class="h-6 w-6" />
       <span>{{ __('Loading...') }}</span>
+    </div>
+    <div
+      v-else-if="all_activities.error || activityLoadTimedOut"
+      class="flex flex-1 flex-col items-center justify-center gap-3 text-ink-gray-5"
+    >
+      <span>{{ __('Failed to load activities') }}</span>
+      <Button :label="__('Retry')" @click="all_activities.reload()" />
     </div>
     <div v-else-if="title == 'Events'" class="h-full activity">
       <EventArea :doctype="doctype" :docname="docname" />
@@ -382,7 +390,10 @@
         </div>
       </template>
     </div>
-    <div v-else-if="title == 'Data'" class="h-full flex flex-col px-3 sm:px-10">
+    <div
+      v-else-if="title == 'Data'"
+      class="flex h-full min-h-0 flex-col overflow-hidden px-3 sm:px-10"
+    >
       <DataFields
         v-model:fieldLayoutTabIndex="fieldLayoutTabIndex"
         v-model:fieldLayoutTabName="fieldLayoutTabName"
@@ -451,6 +462,7 @@ import CallArea from '@/components/Activities/CallArea.vue'
 import NoteArea from '@/components/Activities/NoteArea.vue'
 import TaskArea from '@/components/Activities/TaskArea.vue'
 import AttachmentArea from '@/components/Activities/AttachmentArea.vue'
+import QuotationsList from '@/components/Activities/QuotationsList.vue'
 import DataFields from '@/components/Activities/DataFields.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import ActivityIcon from '@/components/Icons/ActivityIcon.vue'
@@ -554,6 +566,23 @@ const all_activities = createResource({
   },
 })
 
+const activityLoadTimedOut = ref(false)
+let activityLoadTimer
+watch(
+  () => all_activities.loading,
+  (loading) => {
+    clearTimeout(activityLoadTimer)
+    if (loading) {
+      activityLoadTimedOut.value = false
+      activityLoadTimer = setTimeout(() => {
+        activityLoadTimedOut.value = true
+        all_activities.abort()
+      }, 20000)
+    }
+  },
+  { immediate: true },
+)
+
 const showWhatsappTemplates = ref(false)
 
 const whatsappMessages = createResource({
@@ -577,6 +606,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  clearTimeout(activityLoadTimer)
   $socket.off('whatsapp_message')
   $socket.off('docinfo_update', handleDocinfoUpdate)
   $socket.emit('doc_unsubscribe', props.doctype, props.docname)
@@ -604,7 +634,10 @@ onMounted(() => {
 })
 
 function handleDocinfoUpdate({ doc, key }) {
-  if (key !== 'comments') return
+  // 'comments' covers comment activity; 'communications' covers new/updated
+  // emails (e.g. a reply arriving, or a read-receipt coming in) so the
+  // timeline reflects them live instead of only after a manual reload.
+  if (key !== 'comments' && key !== 'communications') return
   if (doc.reference_doctype !== props.doctype) return
   if (doc.reference_name !== props.docname) return
 
@@ -733,49 +766,57 @@ const top = computed(() => {
 })
 
 const emptyText = computed(() => {
-  let text = 'No Activities Found'
+  let text = __('No Activities Found')
   if (title.value == 'Emails') {
-    text = 'No Emails Found'
+    text = __('No Emails Found')
   } else if (title.value == 'Comments') {
-    text = 'No Comments Found'
+    text = __('No Comments Found')
   } else if (title.value == 'Data') {
-    text = 'No Data Fields Added Yet'
+    text = __('No Data Fields Added Yet')
   } else if (title.value == 'Calls') {
-    text = 'No Call History'
+    text = __('No Call History')
   } else if (title.value == 'Notes') {
-    text = 'No Notes Found'
+    text = __('No Notes Found')
   } else if (title.value == 'Tasks') {
-    text = 'No Tasks Found'
+    text = __('No Tasks Found')
   } else if (title.value == 'Attachments') {
-    text = 'No Attachments Found'
+    text = __('No Attachments Found')
   } else if (title.value == 'WhatsApp') {
-    text = 'No WhatsApp Messages Found'
+    text = __('No WhatsApp Messages Found')
   }
   return __(text)
 })
 
 const emptyTextDescription = computed(() => {
-  let description =
-    'There are no activities to display here. Go ahead and make some changes.'
+  let description = __(
+    'There are no activities to display here. Go ahead and make some changes.',
+  )
   if (title.value == 'Emails') {
-    description =
-      'No emails found in your inbox. New messages will appear here soon.'
+    description = __(
+      'No emails found in your inbox. New messages will appear here soon.',
+    )
   } else if (title.value == 'Comments') {
-    description = 'Be the first to add one.'
+    description = __('Be the first to add one.')
   } else if (title.value == 'Data') {
-    description = 'No data fields have been added yet.'
+    description = __('No data fields have been added yet.')
   } else if (title.value == 'Calls') {
-    description = 'No recent calls to display. Log a call or call someone now!'
+    description = __(
+      'No recent calls to display. Log a call or call someone now!',
+    )
   } else if (title.value == 'Notes') {
-    description = 'Nothing here for now. Add a note to keep track of things.'
+    description = __(
+      'Nothing here for now. Add a note to keep track of things.',
+    )
   } else if (title.value == 'Tasks') {
-    description =
-      'Nothing to do at the moment. Start organizing by adding one here.'
+    description = __(
+      'Nothing to do at the moment. Start organizing by adding one here.',
+    )
   } else if (title.value == 'Attachments') {
-    description =
-      'No files have been attached yet. Upload files to see them here.'
+    description = __(
+      'No files have been attached yet. Upload files to see them here.',
+    )
   } else if (title.value == 'WhatsApp') {
-    description = 'Start a conversation now!'
+    description = __('Start a conversation now!')
   }
   return __(description)
 })
@@ -862,5 +903,5 @@ function scroll(hash) {
   }, 500)
 }
 
-defineExpose({ emailBox, all_activities, changeTabTo })
+defineExpose({ emailBox, all_activities, changeTabTo, modalRef })
 </script>

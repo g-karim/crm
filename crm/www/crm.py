@@ -87,6 +87,7 @@ def get_boot():
 			"is_demo_site": frappe.conf.get("is_demo_site"),
 			"demo_data_created": frappe.db.get_default("crm_demo_data_created") == "1",
 			"is_fc_site": is_fc_site(),
+			"crm_messenger_enabled": has_crm_messenger(),
 			"translated_doctypes": get_translated_doctypes(),
 			"translated_messages": translated_messages,
 			"timezone": {
@@ -97,6 +98,13 @@ def get_boot():
 			"state_options": get_state_options(),
 		}
 	)
+
+
+def has_crm_messenger() -> bool:
+	try:
+		return "crm_messenger" in get_installed_apps()
+	except Exception:
+		return False
 
 
 def get_state_options() -> dict[str, list[str]]:

@@ -83,9 +83,12 @@ def preview(website: str, cfg: EnrichmentConfig = None) -> EnrichmentResult:
 	crawled = crawl(website, fetch_cfg)
 	homepage, home_soup = crawled[0] if crawled else (None, None)
 	if home_soup is None:
+		reason = extractors.diagnose_readability([homepage] if homepage else [])
 		result.notes.append(
-			(homepage.error if homepage else "") or extractors.READABILITY_MESSAGES["unreachable"]
+			extractors.READABILITY_MESSAGES.get(reason, extractors.READABILITY_MESSAGES["unreachable"])
 		)
+		if homepage and homepage.error:
+			result.errors.append({"url": homepage.url, "error": homepage.error})
 		return result
 
 	# Metadata only: name / description / logo / sameAs social links from the <head>.

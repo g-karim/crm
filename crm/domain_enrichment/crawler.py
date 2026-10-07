@@ -21,6 +21,7 @@ from xml.etree import ElementTree as ET
 
 import tldextract
 from bs4 import BeautifulSoup
+from frappe import _
 
 from .http import build_session, fetch
 from .result import CrawledPage
@@ -399,7 +400,7 @@ def crawl(start_url, cfg, session=None, progress=None):
 			visited.add(url)
 
 			if progress:
-				progress(f"Crawling {url}")
+				progress(_("Crawling {0}").format(url))
 			page, soup = crawl_page(url, cfg, session=session)
 			resolved = normalize_url(page.url) if page.url else ""
 

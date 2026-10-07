@@ -148,12 +148,9 @@ class CRMSalesPipeline(Document):
 			self.external_pipeline_id,
 			PIPELINE_EXTERNAL_DOCTYPE,
 		)
-		if (
-			external_reference
-			and (
-				external_reference.reference_doctype != "CRM Sales Pipeline"
-				or external_reference.reference_name != self.name
-			)
+		if external_reference and (
+			external_reference.reference_doctype != "CRM Sales Pipeline"
+			or external_reference.reference_name != self.name
 		):
 			frappe.throw(
 				_("External pipeline ID {0} is already linked to pipeline {1}.").format(

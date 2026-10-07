@@ -78,11 +78,11 @@
   },
   {
    "default": "0",
-   "description": "Automatically enrich a CRM Organization in the background as soon as it is created (requires a website). When off, enrichment is triggered manually via the Enrich button.",
-   "depends_on": "eval:doc.enable_organization",
+   "description": "Automatically fill new leads, deals and organizations from their website. Applies only to enabled record types.",
+   "depends_on": "eval:doc.enabled",
    "fieldname": "auto_enrich",
    "fieldtype": "Check",
-   "label": "Auto-enrich new Organizations"
+   "label": "Auto-enrich new records"
   },
   {
    "fieldname": "crawl_tab",

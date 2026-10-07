@@ -2,18 +2,47 @@ import json
 
 import frappe
 from frappe import _
+from twilio.request_validator import RequestValidator
 from twilio.twiml.voice_response import VoiceResponse
 from werkzeug.wrappers import Response
 
 from crm.integrations.api import get_contact_by_phone_number
 
 from .twilio_handler import IncomingCall, Twilio, TwilioCallDetails
+from .utils import get_public_url
 
 
 def validate_twilio_request(args, require_application_sid: bool = False):
 	twilio = Twilio.connect()
 	if not twilio:
 		frappe.throw(_("Twilio configuration is missing"), frappe.PermissionError)
+
+	request = getattr(frappe.local, "request", None)
+	signature = request.headers.get("X-Twilio-Signature", "") if request else ""
+	if not signature:
+		frappe.throw(_("Invalid Twilio signature"), frappe.PermissionError)
+	# Voice callbacks use form-encoded POST or query-only GET. Never accept an
+	# unsigned JSON body through Frappe's automatic kwargs parsing.
+	if (
+		request.method not in {"GET", "POST"}
+		or (request.method == "POST" and request.mimetype != "application/x-www-form-urlencoded")
+		or (request.method == "GET" and request.get_data())
+	):
+		frappe.throw(_("Invalid Twilio request body"), frappe.PermissionError)
+
+	auth_token = twilio.settings.get_password("auth_token")
+	if not auth_token:
+		frappe.throw(_("Twilio configuration is missing"), frappe.PermissionError)
+
+	# Validate the original form, including parameters Frappe does not pass to the handler.
+	params = request.form if request.method == "POST" else {}
+	public_url = get_public_url(request.path)
+	if request.query_string:
+		public_url += "?" + request.query_string.decode("utf-8")
+	validator = RequestValidator(auth_token)
+	# TLS may terminate at the proxy; callbacks are generated with get_public_url().
+	if not any(validator.validate(url, params, signature) for url in {request.url, public_url}):
+		frappe.throw(_("Invalid Twilio signature"), frappe.PermissionError)
 
 	account_sid = frappe.utils.cstr(args.get("AccountSid"))
 	if not account_sid or account_sid != frappe.utils.cstr(twilio.account_sid):
@@ -51,7 +80,7 @@ def generate_access_token():
 	return {"token": frappe.safe_decode(token)}
 
 
-# webhook authenticity is enforced by validate_twilio_request(); guest access itself is unchanged
+# Twilio calls as Guest; validate_twilio_request() verifies its HMAC before any side effects.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 def voice(**kwargs):
 	"""This is a webhook called by twilio to get instructions when the voice call request comes to twilio server."""
@@ -84,7 +113,7 @@ def voice(**kwargs):
 	return Response(resp.to_xml(), mimetype="text/xml")
 
 
-# webhook authenticity is enforced by validate_twilio_request(); guest access itself is unchanged
+# Twilio calls as Guest; validate_twilio_request() verifies its HMAC before any side effects.
 @frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 def twilio_incoming_call_handler(**kwargs):
 	args = frappe._dict(kwargs)
@@ -162,7 +191,8 @@ def get_twilio_settings():
 	return frappe.get_single("CRM Twilio Settings")
 
 
-@frappe.whitelist(allow_guest=True)
+# Twilio calls as Guest; validate_twilio_request() verifies its HMAC before any side effects.
+@frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 def update_recording_info(**kwargs):
 	args = frappe._dict(kwargs)
 	validate_twilio_request(args)
@@ -182,7 +212,8 @@ def update_recording_info(**kwargs):
 		raise exc
 
 
-@frappe.whitelist(allow_guest=True)
+# Twilio calls as Guest; validate_twilio_request() verifies its HMAC before any side effects.
+@frappe.whitelist(allow_guest=True)  # nosemgrep: guest-whitelisted-method
 def update_call_status_info(**kwargs):
 	args = frappe._dict(kwargs)
 	validate_twilio_request(args)

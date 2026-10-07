@@ -43,9 +43,11 @@
             @click="createOrganization"
           />
           <Button
+            v-if="isEnrichmentEnabled('CRM Organization')"
             class="w-full"
             :label="__('Enrich')"
             :loading="isEnriching"
+            :loadingText="__('Enriching')"
             :disabled="!organization.doc.website"
             :tooltip="__('Fill fields from the company website')"
             iconLeft="zap"
@@ -64,6 +66,7 @@ import { usersStore } from '@/stores/users'
 import { isMobileView } from '@/composables/settings'
 import { showQuickEntryModal, quickEntryProps } from '@/composables/modals'
 import { useDocument } from '@/data/document'
+import { enrichmentStore } from '@/stores/enrichment'
 import { useDoctypeModal } from '@/composables/doctypeModal'
 import { useTelemetry } from 'frappe-ui/frappe'
 import { call, createResource, toast } from 'frappe-ui'
@@ -91,6 +94,7 @@ const { document: organization, triggerOnBeforeCreate } =
   useDocument('CRM Organization')
 
 const isEnriching = ref(false)
+const { isEnabled: isEnrichmentEnabled } = enrichmentStore()
 
 // Prefill the form from the company website (Domain Enrichment) — synchronous,
 // no document is created until the user clicks Create.
@@ -126,7 +130,7 @@ async function enrichFromWebsite() {
       )
     } else {
       toast.info(
-        notes?.[0] || __('Nothing could be extracted from this website.'),
+        __(notes?.[0] || 'Nothing could be extracted from this website.'),
       )
     }
   } catch (e) {
@@ -204,7 +208,9 @@ const tabs = createResource({
 })
 
 onMounted(() => {
-  organization.doc.no_of_employees = '1-10'
+  if (!props.data?.no_of_employees) {
+    organization.doc.no_of_employees = '1-10'
+  }
   Object.assign(organization.doc, props.data)
 })
 

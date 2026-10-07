@@ -172,6 +172,7 @@ doc_events = {
 	},
 	"ToDo": {
 		"before_validate": ["crm.api.todo.validate_crm_lead_assignment_permission"],
+		"validate": ["crm.api.todo.validate"],
 		"after_insert": ["crm.api.todo.after_insert"],
 		"on_update": ["crm.api.todo.on_update"],
 		"on_trash": ["crm.api.todo.validate_crm_lead_assignment_permission"],
@@ -196,6 +197,17 @@ doc_events = {
 	"Sales Order": {
 		"before_validate": [
 			"crm.fcrm.doctype.erpnext_crm_settings.erpnext_crm_settings.create_customer_on_sales_order"
+		],
+	},
+	"Quotation": {
+		"after_insert": [
+			"crm.fcrm.doctype.erpnext_crm_settings.erpnext_crm_settings.notify_deal_quotation_change"
+		],
+		"on_update": [
+			"crm.fcrm.doctype.erpnext_crm_settings.erpnext_crm_settings.notify_deal_quotation_change"
+		],
+		"on_trash": [
+			"crm.fcrm.doctype.erpnext_crm_settings.erpnext_crm_settings.notify_deal_quotation_change"
 		],
 	},
 	"Item": {

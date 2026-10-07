@@ -301,6 +301,8 @@ async function submitComment() {
   try {
     await sending
   } catch {
+    showCommentBox.value = true
+    reload.value = true
     return
   }
   newComment.value = ''
@@ -325,9 +327,23 @@ function toggleCommentBox() {
   showCommentBox.value = !showCommentBox.value
 }
 
+// Callable from outside (e.g. the command palette); setting the exposed ref
+// from a parent doesn't write through to .value, so open via a method.
+function openCommentBox() {
+  if (showEmailBox.value) showEmailBox.value = false
+  showCommentBox.value = true
+}
+
+function openEmailBox() {
+  if (showCommentBox.value) showCommentBox.value = false
+  showEmailBox.value = true
+}
+
 defineExpose({
   show: showEmailBox,
   showComment: showCommentBox,
   editor: newEmailEditor,
+  openCommentBox,
+  openEmailBox,
 })
 </script>

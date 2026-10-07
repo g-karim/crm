@@ -17,6 +17,7 @@
         :actions="document.actions"
       />
       <EnrichFromWebsite
+        v-if="permissions.data?.permissions?.write"
         doctype="CRM Deal"
         :docname="dealId"
         :website="doc.website"
@@ -44,10 +45,11 @@
   </LayoutHeader>
   <div v-if="doc.name" class="flex h-full overflow-hidden">
     <Tabs
+      ref="tabRoot"
       v-model="tabIndex"
       as="div"
       :tabs="tabs"
-      class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
+      class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:cursor-grab [&_[role='tab']:active]:cursor-grabbing [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
     >
       <template #tab-panel>
         <Activities
@@ -156,6 +158,15 @@
               <Link
                 value=""
                 doctype="Contact"
+                :grouping="
+                  doc.organization
+                    ? {
+                        filters: { company_name: doc.organization },
+                        label: __('Contacts at {0}', [doc.organization]),
+                        otherLabel: __('Other contacts'),
+                      }
+                    : null
+                "
                 :onCreate="
                   (value, close) => {
                     _contact = {
@@ -331,6 +342,7 @@
     v-model="showDeleteLinkedDocModal"
     :doctype="'CRM Deal'"
     :docname="dealId"
+    :title="doc.organization"
     name="Deals"
   />
   <LostReasonModal
@@ -361,6 +373,7 @@ import LinkIcon from '@/components/Icons/LinkIcon.vue'
 import ArrowUpRightIcon from '@/components/Icons/ArrowUpRightIcon.vue'
 import SuccessIcon from '@/components/Icons/SuccessIcon.vue'
 import AttachmentIcon from '@/components/Icons/AttachmentIcon.vue'
+import FileTextIcon from '@/components/Icons/FileTextIcon.vue'
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import Activities from '@/components/Activities/Activities.vue'
 import OrganizationModal from '@/components/Modals/OrganizationModal.vue'
@@ -382,7 +395,11 @@ import { statusesStore } from '@/stores/statuses'
 import { getMeta } from '@/stores/meta'
 import { useDocument } from '@/data/document'
 import { whatsappEnabled } from '@/composables/whatsapp'
+import { canViewQuotations } from '@/composables/erpnext'
 import { callEnabled } from '@/composables/telephony'
+import { useCommandPaletteContext } from '@/composables/useCommandPalette'
+import { flattenCommandActions } from '@/utils/commandPalette'
+import { recordCommands } from '@/components/CommandPalette/recordCommands'
 import { useBroadcast } from '@/composables/useBroadcast'
 import {
   createResource,
@@ -407,7 +424,9 @@ import {
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useActiveTabManager } from '@/composables/useActiveTabManager'
+import { useReorderableTabs } from '@/composables/useReorderableTabs'
 import { useUnsavedChangesWarning } from '@/composables/useUnsavedChangesWarning'
+import { useVisitedRecords } from '@/composables/useVisitedRecords'
 
 const { on } = useBroadcast()
 const { brand } = getSettings()
@@ -449,10 +468,10 @@ watch(error, (err) => {
   if (err) {
     errorTitle.value = __(
       err.exc_type == 'DoesNotExistError'
-        ? 'Document Not Found'
-        : 'Error Occurred',
+        ? __('Document Not Found')
+        : __('Error Occurred'),
     )
-    errorMessage.value = __(err.messages?.[0] || 'An Error Occurred')
+    errorMessage.value = __(err.messages?.[0] || __('An Error Occurred'))
   } else {
     errorTitle.value = ''
     errorMessage.value = ''
@@ -499,11 +518,14 @@ watch(
 
 const organization = computed(() => organizationDocument.value?.doc || {})
 
+const { markVisited } = useVisitedRecords('CRM Deal')
+
 onMounted(async () => {
   $socket.on('crm_customer_created', () => {
     toast.success(__('Customer Created Successfully'))
   })
   if (document.doc) await triggerOnRender()
+  markVisited(props.dealId)
 })
 
 onBeforeUnmount(() => {
@@ -562,6 +584,177 @@ const dealStatuses = computed(() =>
   statusOptions('deal', [], null, { pipeline: doc.value.pipeline }),
 )
 
+useCommandPaletteContext(() => dealCommands())
+
+function dealCommands() {
+  const commands = [
+    dealStatusCommand(),
+    ...flatDealStatusCommands(),
+    ...recordCommands(paletteContext()),
+    ...contactCommands(),
+    ...dealCommunicationCommands(),
+  ]
+  commands.push(...dealScriptCommands())
+  if (canDelete.value) commands.push(deleteDealCommand())
+  return commands
+}
+
+function paletteContext() {
+  return {
+    doctype: 'CRM Deal',
+    docname: props.dealId,
+    group: 'Deal',
+    assignees,
+    tabs,
+    changeTabTo,
+    activities: () => activities.value,
+    hasEmail: () => Boolean(doc.value?.email),
+    openEmailBox,
+    openFileUploader: () => (showFilesUploader.value = true),
+  }
+}
+
+function contactCommands() {
+  const commands = [
+    {
+      id: 'deal-add-contact',
+      title: 'Add contact',
+      group: 'Deal',
+      icon: 'user-round-plus',
+      keywords: 'link person attach contact',
+      children: async () => contactPickerChildren(),
+    },
+  ]
+  if (dealContacts.data?.length > 1) commands.push(primaryContactCommand())
+  return commands
+}
+
+async function contactPickerChildren() {
+  const results = await call('frappe.desk.search.search_link', {
+    txt: '',
+    doctype: 'Contact',
+  })
+  return results
+    .filter(
+      (result) => !dealContacts.data?.some((c) => c.name === result.value),
+    )
+    .map((result) => ({
+      id: `deal-add-contact-${result.value}`,
+      title: result.label || result.value,
+      translate: false,
+      icon: 'user-round',
+      perform: () => addContact(result.value),
+    }))
+}
+
+function primaryContactCommand() {
+  return {
+    id: 'deal-primary-contact',
+    title: 'Set primary contact',
+    group: 'Deal',
+    icon: 'user-round-check',
+    keywords: 'main default contact',
+    children: async () =>
+      dealContacts.data.map((contact) => ({
+        id: `deal-primary-contact-${contact.name}`,
+        title: contact.full_name || contact.name,
+        translate: false,
+        icon: 'user-round',
+        checked: contact.is_primary,
+        perform: () => setPrimaryContact(contact.name),
+      })),
+  }
+}
+
+function dealStatusCommand() {
+  return {
+    id: 'deal-status',
+    title: 'Change status',
+    group: 'Deal',
+    icon: 'circle-dot',
+    children: async () => dealStatusChildren(statuses.value),
+  }
+}
+
+function dealStatusChildren(options) {
+  return options.map((option) => ({
+    id: `deal-status-${option.label}`,
+    title: option.label,
+    translate: false,
+    icon: option.icon,
+    checked: option.value === doc.value.status,
+    perform: option.onClick,
+  }))
+}
+
+// Typing a status name sets it in one Enter, without drilling in.
+function flatDealStatusCommands() {
+  return statuses.value.map((option) => ({
+    id: `deal-status-flat-${option.label}`,
+    title: __('Set status: {0}', [option.label]),
+    translate: false,
+    group: 'Deal',
+    icon: option.icon,
+    hideWhenEmpty: true,
+    keywords: option.label,
+    checked: option.value === doc.value.status,
+    perform: option.onClick,
+  }))
+}
+
+function dealCommunicationCommands() {
+  const commands = []
+  if (doc.value.email) {
+    commands.push({
+      id: 'deal-email',
+      title: 'Send email',
+      group: 'Deal',
+      icon: 'mail',
+      perform: openEmailBox,
+    })
+  }
+  if (callEnabled.value) {
+    commands.push({
+      id: 'deal-call',
+      title: 'Make a call',
+      group: 'Deal',
+      icon: 'phone',
+      perform: triggerCall,
+    })
+  }
+  return commands
+}
+
+function dealScriptCommands() {
+  return flattenCommandActions([
+    ...(document._actions || []),
+    ...(document.actions || []),
+  ])
+    .filter(
+      (action) =>
+        action.label &&
+        action.onClick &&
+        (!action.condition || action.condition()),
+    )
+    .map((action, index) => ({
+      id: `deal-script-${index}-${action.label}`,
+      title: action.label,
+      group: 'Deal',
+      icon: action.icon || 'zap',
+      perform: () => action.onClick(() => {}),
+    }))
+}
+
+function deleteDealCommand() {
+  return {
+    id: 'deal-delete',
+    title: 'Delete deal',
+    group: 'Deal',
+    icon: 'trash-2',
+    perform: deleteDeal,
+  }
+}
+
 usePageMeta(() => {
   return {
     title: title.value,
@@ -569,8 +762,8 @@ usePageMeta(() => {
   }
 })
 
-const tabs = computed(() => {
-  let tabOptions = [
+const defaultTabs = computed(() => {
+  return [
     {
       name: 'Activity',
       label: __('Activity'),
@@ -622,11 +815,33 @@ const tabs = computed(() => {
       icon: WhatsAppIcon,
       condition: () => whatsappEnabled.value,
     },
+    {
+      name: 'Quotations',
+      label: __('Quotations'),
+      icon: FileTextIcon,
+      condition: () => canViewQuotations.value,
+    },
   ]
-  return tabOptions.filter((tab) => (tab.condition ? tab.condition() : true))
 })
 
-const { tabIndex } = useActiveTabManager(tabs, 'lastDealTab')
+const { tabs, tabRoot } = useReorderableTabs(
+  'CRM Deal',
+  defaultTabs,
+  (index) => (tabIndex.value = index),
+)
+const { tabIndex, changeTabTo } = useActiveTabManager(tabs, 'lastDealTab')
+
+// keep the active tab visible — later tabs (e.g. Quotations) otherwise stay
+// scrolled out of view behind the right panel
+function scrollActiveTabIntoView() {
+  nextTick(() => {
+    tabRoot.value?.$el
+      ?.querySelector('[role="tab"][aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+}
+watch(tabIndex, scrollActiveTabIntoView)
+onMounted(scrollActiveTabIntoView)
 
 const sections = createResource({
   url: 'crm.fcrm.doctype.crm_fields_layout.crm_fields_layout.get_sidepanel_sections',
@@ -758,8 +973,10 @@ const dealContacts = createResource({
   params: { name: props.dealId },
   cache: ['deal_contacts', props.dealId],
   transform: (data) => {
-    data.forEach((contact) => {
-      contact.opened = false
+    // get_deal_contacts orders primary first, so expanding the first contact
+    // surfaces the most relevant email and phone without a click.
+    data.forEach((contact, index) => {
+      contact.opened = index === 0
     })
     return data
   },
@@ -769,12 +986,12 @@ if (!dealContacts.data) dealContacts.fetch()
 
 function triggerCall() {
   let primaryContact = dealContacts.data?.find((c) => c.is_primary)
-  let mobile_no = primaryContact.mobile_no || null
-
   if (!primaryContact) {
     toast.error(__('No Primary Contact Set'))
     return
   }
+
+  let mobile_no = primaryContact.mobile_no || null
 
   if (!mobile_no) {
     toast.error(__('No Mobile Number Set'))
@@ -815,7 +1032,7 @@ function updateField(name, value) {
 
   document.save.submit(null, {
     onSuccess: () => (reload.value = true),
-    onError: (err) => {
+    onError: () => {
       if (Array.isArray(name)) {
         name.forEach((field) => (doc.value[field] = oldValues[field]))
       } else if (name == 'pipeline') {
@@ -824,7 +1041,6 @@ function updateField(name, value) {
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }
@@ -840,7 +1056,7 @@ function openEmailBox() {
   if (!['Emails', 'Comments', 'Activities'].includes(currentTab.name)) {
     activities.value.changeTabTo('emails')
   }
-  nextTick(() => (activities.value.emailBox.show = true))
+  nextTick(() => activities.value.emailBox?.openEmailBox())
 }
 
 function statusLabel(status) {

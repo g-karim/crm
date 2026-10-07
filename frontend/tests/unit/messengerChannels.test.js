@@ -9,9 +9,11 @@ import {
   getMessengerChannelType,
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
+  getMessengerFailureReason,
   getMessengerConversationNotice,
   getMessengerCapabilities,
   getMessengerPlatformLabel,
+  isGenericFileOnlyMessage,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 
@@ -163,6 +165,35 @@ describe('messengerChannels', () => {
     },
   )
 
+  it('replaces only the VK invalid-photo upload reason for presentation', () => {
+    let technicalReason = 'VK photo upload did not return photo data.'
+
+    expect(
+      getMessengerFailureReason({
+        provider: 'vk_direct',
+        failure_reason: technicalReason,
+      }),
+    ).toBe('Could not upload the image to VK. Try sending it again.')
+    expect(
+      getMessengerFailureReason({
+        provider: 'telegram_bot',
+        failure_reason: technicalReason,
+      }),
+    ).toBe(technicalReason)
+    expect(
+      getMessengerFailureReason({
+        provider: 'vk_direct',
+        error: 'Another VK failure.',
+      }),
+    ).toBe('Another VK failure.')
+    expect(
+      getMessengerFailureReason({
+        provider: 'vk_direct',
+        error: 'VK photo upload failed: unsupported format',
+      }),
+    ).toBe('Could not upload the image to VK. Try sending it again.')
+  })
+
   it('shows text only for content or a deleted placeholder', () => {
     expect(shouldShowMessengerText({ text: null })).toBe(false)
     expect(shouldShowMessengerText({ text: '   ' })).toBe(false)
@@ -170,6 +201,53 @@ describe('messengerChannels', () => {
     expect(shouldShowMessengerText({ status: 'deleted', text: null })).toBe(
       true,
     )
+    expect(
+      shouldShowMessengerText({
+        message_type: 'image',
+        text: '[image]',
+        attachments: [
+          { type: 'image', status: 'available', url: '/private/image.jpg' },
+        ],
+      }),
+    ).toBe(false)
+    expect(
+      shouldShowMessengerText({
+        provider: 'avito_direct',
+        message_type: 'video',
+        text: '[video]',
+        attachments: [],
+      }),
+    ).toBe(true)
+  })
+
+  it('classifies only generic file-only messages for compact bubble layout', () => {
+    let fileOnly = {
+      status: 'sent',
+      text: '',
+      attachments: [{ id: 'FILE-1', type: 'file' }],
+    }
+
+    expect(isGenericFileOnlyMessage(fileOnly)).toBe(true)
+    expect(
+      isGenericFileOnlyMessage({
+        ...fileOnly,
+        attachments: [
+          { id: 'FILE-1', type: 'file' },
+          { id: 'FILE-2', type: 'file' },
+        ],
+      }),
+    ).toBe(true)
+    for (let message of [
+      { ...fileOnly, text: 'caption' },
+      { ...fileOnly, reply_context: { message_id: 'REPLY-1' } },
+      { ...fileOnly, forward_context: { messages: [] } },
+      { ...fileOnly, attachments: [{ id: 'IMAGE-1', type: 'image' }] },
+      { ...fileOnly, attachments: [{ id: 'AUDIO-1', type: 'audio' }] },
+      { ...fileOnly, attachments: [{ id: 'VOICE-1', type: 'voice' }] },
+      { ...fileOnly, status: 'deleted' },
+    ]) {
+      expect(isGenericFileOnlyMessage(message)).toBe(false)
+    }
   })
 
   it('returns delivery labels', () => {
@@ -227,6 +305,8 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: false,
       supported_attachment_types: [],
+      supported_attachment_file_types: [],
+      supports_image_caption: undefined,
       max_attachment_count: 10,
       reactions: { receive: false, send: false },
       location: { receive: false, send: false },
@@ -254,6 +334,8 @@ describe('messengerChannels', () => {
           requires_phone: false,
           supports_attachments: true,
           supported_attachment_types: ['image', 'file'],
+          supported_attachment_file_types: ['image/jpeg', '.pdf'],
+          supports_image_caption: false,
           reactions: { receive: true, send: true },
           location: { receive: true, send: true },
           contact: { receive: true, send: false },
@@ -272,6 +354,8 @@ describe('messengerChannels', () => {
       requires_phone: false,
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
+      supported_attachment_file_types: ['image/jpeg', '.pdf'],
+      supports_image_caption: false,
       max_attachment_count: 10,
       reactions: { receive: true, send: true },
       location: { receive: true, send: true },

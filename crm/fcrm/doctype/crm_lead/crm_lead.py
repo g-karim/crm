@@ -121,6 +121,12 @@ class CRMLead(Document):
 	def before_save(self):
 		self.apply_sla()
 
+	def on_update(self):
+		if self.has_value_changed("lead_owner"):
+			previous = self.get_doc_before_save()
+			if previous and previous.lead_owner and previous.lead_owner != self.lead_owner:
+				frappe.publish_realtime("crm_notification", {}, user=previous.lead_owner, after_commit=True)
+
 	def validate_status(self):
 		if self.is_new() and not self.status:
 			if frappe.db.exists("CRM Lead Status", "New"):
@@ -282,6 +288,7 @@ class CRMLead(Document):
 				"territory": self.territory,
 				"industry": self.industry,
 				"annual_revenue": self.annual_revenue,
+				"no_of_employees": self.no_of_employees,
 			}
 		)
 		organization.insert(ignore_permissions=True)
@@ -368,6 +375,7 @@ class CRMLead(Document):
 			"idx",
 			"docstatus",
 			"status",
+			"source",
 			"email",
 			"mobile_no",
 			"phone",
@@ -492,6 +500,13 @@ class CRMLead(Document):
 				"width": "11rem",
 			},
 			{
+				"label": "Source",
+				"type": "Link",
+				"key": "source",
+				"options": "CRM Lead Source",
+				"width": "9rem",
+			},
+			{
 				"label": "Assigned To",
 				"type": "Text",
 				"key": "_assign",
@@ -546,6 +561,8 @@ def convert_to_deal(
 		frappe.throw(_("Not allowed to convert Lead to Deal"), frappe.PermissionError)
 
 	lead = frappe.get_cached_doc("CRM Lead", lead)
+	if frappe.get_cached_value("CRM Lead Status", lead.status, "type") == "Lost":
+		frappe.throw(_("Cannot convert a lead with status {0}").format(lead.status))
 	if frappe.db.exists("CRM Lead Status", "Qualified"):
 		lead.db_set("status", "Qualified")
 	lead.db_set("converted", 1)

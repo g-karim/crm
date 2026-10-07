@@ -1,10 +1,17 @@
-import { createApp, nextTick } from 'vue'
+import { createApp, h, nextTick, reactive } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
   let handlers = new Map()
   return {
+    attachmentPreserve: vi.fn(),
+    attachmentRetarget: vi.fn(async () => {}),
     call: vi.fn(),
+    dialog: vi.fn(),
+    toastError: vi.fn(),
+    route: { query: {} },
+    voiceRetarget: vi.fn(),
+    voiceSend: vi.fn(),
     socket: {
       on: vi.fn((event, handler) => {
         let listeners = handlers.get(event) || []
@@ -56,11 +63,11 @@ vi.mock('frappe-ui', () => ({
     format: () => '2026-08-23',
     fromNow: () => 'now',
   }),
-  toast: { error: vi.fn() },
+  toast: { error: mocks.toastError },
 }))
 
 vi.mock('@/stores/global', () => ({
-  globalStore: () => ({ $dialog: vi.fn(), $socket: mocks.socket }),
+  globalStore: () => ({ $dialog: mocks.dialog, $socket: mocks.socket }),
 }))
 vi.mock('@/stores/users', () => ({
   usersStore: () => ({
@@ -68,7 +75,7 @@ vi.mock('@/stores/users', () => ({
   }),
 }))
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => mocks.route,
 }))
 
 const emptyComponent = vi.hoisted(() => () => ({
@@ -81,11 +88,21 @@ vi.mock('@/components/LeadMessenger/LocationPickerDialog.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageContent.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageFooterMetadata.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageForwardStack.vue', emptyComponent)
-vi.mock('@/components/LeadMessenger/MessageMetadata.vue', emptyComponent)
+vi.mock('@/components/LeadMessenger/MessageMetadata.vue', () => ({
+  default: {
+    props: ['message', 'constrainIntrinsicWidth'],
+    emits: ['retry'],
+    template: `<div data-message-metadata :class="constrainIntrinsicWidth ? 'w-0 min-w-full' : 'min-w-0'">
+			<button v-if="message.can_retry" data-testid="mock-message-retry" @click="$emit('retry')">retry</button>
+		</div>`,
+  },
+}))
 vi.mock('@/components/LeadMessenger/MessageReactions.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageReplyQuote.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
   default: {
+    props: ['acceptedFileTypes', 'maxFiles', 'supportedAttachmentTypes'],
+    emits: ['change'],
     methods: {
       discard() {},
       freeze() {
@@ -93,14 +110,33 @@ vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
       },
       unfreeze() {},
       release() {},
+      retarget(conversation) {
+        return mocks.attachmentRetarget(conversation)
+      },
+      preserveScopeChange() {
+        mocks.attachmentPreserve()
+      },
       openFileSelector() {},
     },
-    template: '<span />',
+    template: `<span>
+      <button data-testid="mock-attachment-draft" @click="$emit('change', [{ status: 'uploaded', file: { name: 'draft.pdf', type: 'application/pdf' } }])">attachment draft</button>
+      <button data-testid="mock-image-draft" @click="$emit('change', [{ status: 'uploaded', file: { name: 'photo.jpg', type: 'image/jpeg' } }])">image draft</button>
+      <button data-testid="mock-clear-attachments" @click="$emit('change', [])">clear attachments</button>
+    </span>`,
   },
 }))
 vi.mock('@/components/LeadMessenger/ComposerVoiceRecorder.vue', () => ({
   default: {
-    methods: { reset() {}, start() {} },
+    methods: {
+      reset() {},
+      start() {},
+      send() {
+        mocks.voiceSend()
+      },
+      retarget() {
+        mocks.voiceRetarget()
+      },
+    },
     template: '<span />',
   },
 }))
@@ -111,8 +147,11 @@ let mounted = []
 let permissions
 let preparedResult
 let snapshotMessages
+let channelRows
+let conversationRows
+let latestInbound
 
-const channel = (name) => ({
+const channel = (name, capabilities = {}) => ({
   name,
   provider: 'telegram_bot',
   platform: 'telegram',
@@ -126,6 +165,7 @@ const channel = (name) => ({
     location: { send: false },
     reactions: { receive: true, send: true },
     video: {},
+    ...capabilities,
   },
 })
 
@@ -144,27 +184,32 @@ beforeEach(() => {
     message: 'Перейдите в другой канал\nCRM-ABCDEFGHIJKLMNOPQRSTUVWXYZ',
   }
   snapshotMessages = []
+  channelRows = [channel('CHANNEL-1'), channel('CHANNEL-2')]
+  conversationRows = [
+    {
+      name: 'CONVERSATION-1',
+      channel: 'CHANNEL-1',
+      status: 'Open',
+      external_chat_id: 'chat-1',
+    },
+  ]
+  latestInbound = null
+  mocks.route.query = {}
   mocks.socket.reset()
   vi.clearAllMocks()
   mocks.call.mockImplementation(async (method) => {
     if (method.endsWith('get_channels')) {
       return {
         ok: true,
-        channels: [channel('CHANNEL-1'), channel('CHANNEL-2')],
+        channels: channelRows,
         permissions,
       }
     }
     if (method.endsWith('get_conversations')) {
       return {
         ok: true,
-        conversations: [
-          {
-            name: 'CONVERSATION-1',
-            channel: 'CHANNEL-1',
-            status: 'Open',
-            external_chat_id: 'chat-1',
-          },
-        ],
+        conversations: conversationRows,
+        latest_inbound: latestInbound,
         permissions,
       }
     }
@@ -200,6 +245,16 @@ beforeEach(() => {
   })
 })
 
+function deferred() {
+  let resolve
+  let reject
+  let promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 afterEach(() => {
   for (let { app, root } of mounted) {
     app.unmount()
@@ -211,10 +266,11 @@ afterEach(() => {
 async function mountConversation(props = {}) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(LeadConversation, { leadName: 'LEAD-1', ...props })
+  let liveProps = reactive({ leadName: 'LEAD-1', ...props })
+  let app = createApp({ render: () => h(LeadConversation, liveProps) })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
-  mounted.push({ app, root })
+  mounted.push({ app, root, props: liveProps })
   await nextTick()
   await new Promise((resolve) => setTimeout(resolve, 0))
   await nextTick()
@@ -222,6 +278,1039 @@ async function mountConversation(props = {}) {
   await nextTick()
   return root
 }
+
+function deferSelectionRequests() {
+  let channelsRequest = deferred()
+  let conversationsRequest = deferred()
+  let defaultCall = mocks.call.getMockImplementation()
+  mocks.call.mockImplementation((method, args) => {
+    if (method.endsWith('get_channels')) return channelsRequest.promise
+    if (method.endsWith('get_conversations'))
+      return conversationsRequest.promise
+    return defaultCall(method, args)
+  })
+  return {
+    resolveChannels() {
+      channelsRequest.resolve({ ok: true, channels: channelRows, permissions })
+    },
+    resolveConversations() {
+      conversationsRequest.resolve({
+        ok: true,
+        conversations: conversationRows,
+        latest_inbound: latestInbound,
+        permissions,
+      })
+    },
+  }
+}
+
+async function resolveSelectionRequests(requests, first) {
+  await vi.waitFor(() => {
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('get_channels')),
+    ).toBe(true)
+    expect(
+      mocks.call.mock.calls.some(([method]) =>
+        method.endsWith('get_conversations'),
+      ),
+    ).toBe(true)
+  })
+  if (first === 'channels') {
+    requests.resolveChannels()
+    await nextTick()
+    requests.resolveConversations()
+  } else {
+    requests.resolveConversations()
+    await nextTick()
+    requests.resolveChannels()
+  }
+}
+
+describe('Avito subscription restriction', () => {
+  function restrictedChannel() {
+    return {
+      ...channel('AVITO'),
+      provider: 'avito_direct',
+      platform: 'avito',
+      capabilities: {
+        ...channel('AVITO').capabilities,
+        messenger_access: 'subscription_required',
+        supports_text: false,
+        supports_attachments: false,
+      },
+      can_send: false,
+      disabled_reason: 'messenger_subscription_required',
+    }
+  }
+
+  it('shows the real chat link, hides old messages and removes the composer', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [restrictedChannel()]
+    conversationRows = [
+      {
+        name: 'AVITO-CHAT',
+        provider: 'avito_direct',
+        channel: 'AVITO',
+        external_chat_id: 'A'.repeat(26),
+        status: 'Open',
+      },
+    ]
+    conversationRows[0].avito_item = {
+      id: '123',
+      title: 'Balancing machine',
+      price_string: '1 615 680 ₽',
+      url: 'https://www.avito.ru/item_123',
+    }
+    snapshotMessages = [
+      {
+        name: 'OLD-AVITO-MESSAGE',
+        conversation: 'AVITO-CHAT',
+        channel: 'AVITO',
+        provider: 'avito_direct',
+        direction: 'inbound',
+        text: 'old content',
+        message_datetime: '2026-08-23 10:00:00',
+      },
+    ]
+    let root = await mountConversation()
+    let notice = root.querySelector('[data-testid="avito-subscription-notice"]')
+    expect(notice?.textContent).toContain(
+      'The lead is synchronized automatically',
+    )
+    expect(notice?.querySelector('[data-testid="avito-open-chat"]').href).toBe(
+      `https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`,
+    )
+    expect(
+      root.querySelector('[data-message-id="OLD-AVITO-MESSAGE"]'),
+    ).toBeNull()
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]'),
+    ).toBeNull()
+    expect(root.querySelector('[data-testid="avito-item-card"]')).toBeNull()
+    expect(
+      root.querySelectorAll('[data-testid="avito-subscription-notice"]'),
+    ).toHaveLength(1)
+    expect(root.textContent.match(/Balancing machine/g)).toHaveLength(1)
+    expect(notice.textContent).toContain('1 615 680 ₽')
+    expect(root.textContent).not.toContain('No messages yet')
+  })
+
+  it('reloads channel access when an open conversation is invalidated', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [restrictedChannel()]
+    conversationRows = [
+      {
+        name: 'AVITO-CHAT',
+        provider: 'avito_direct',
+        channel: 'AVITO',
+        external_chat_id: 'A'.repeat(26),
+        status: 'Open',
+      },
+    ]
+    conversationRows[0].avito_item = { id: '123', title: 'Balancing machine' }
+    let root = await mountConversation({ active: true })
+    expect(
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
+    ).not.toBeNull()
+    channelRows = [
+      { ...channel('AVITO'), provider: 'avito_direct', platform: 'avito' },
+    ]
+    mocks.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation_state_changed: true,
+      scope_invalidated: true,
+    })
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('[data-testid="avito-subscription-notice"]'),
+      ).toBeNull(),
+    )
+    expect(root.querySelector('[data-testid="avito-item-card"]')).not.toBeNull()
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]'),
+    ).not.toBeNull()
+  })
+
+  it('keeps another messenger available in the same lead', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [channel('TELEGRAM'), restrictedChannel()]
+    conversationRows = [
+      {
+        name: 'TELEGRAM-CHAT',
+        channel: 'TELEGRAM',
+        provider: 'telegram_bot',
+        external_chat_id: 'chat-1',
+        status: 'Open',
+      },
+      {
+        name: 'AVITO-CHAT',
+        channel: 'AVITO',
+        provider: 'avito_direct',
+        external_chat_id: 'A'.repeat(26),
+        status: 'Open',
+      },
+    ]
+    latestInbound = { conversation: 'TELEGRAM-CHAT', channel: 'TELEGRAM' }
+    let root = await mountConversation()
+    expect(
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
+    ).toBeNull()
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]')?.disabled,
+    ).toBe(false)
+  })
+})
+
+describe('messenger initial selection', () => {
+  it.each(['success', 'failure', 'return-to-same-lead'])(
+    'ignores obsolete Lead context responses: %s',
+    async (outcome) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [channel('CHANNEL-2')]
+      conversationRows = [
+        { name: 'CURRENT-CHAT', channel: 'CHANNEL-2', status: 'Open' },
+      ]
+      latestInbound = { conversation: 'CURRENT-CHAT', channel: 'CHANNEL-2' }
+      let oldChannels = deferred()
+      let oldConversations = deferred()
+      let deferredMethods = new Set()
+      let defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((method, args) => {
+        if (args?.reference_name === 'LEAD-1' && !deferredMethods.has(method)) {
+          if (
+            method.endsWith('get_channels') ||
+            method.endsWith('get_conversations')
+          ) {
+            deferredMethods.add(method)
+            return method.endsWith('get_channels')
+              ? oldChannels.promise
+              : oldConversations.promise
+          }
+        }
+        return defaultCall(method, args)
+      })
+      let mounting = mountConversation()
+      await vi.waitFor(() => expect(deferredMethods.size).toBe(2))
+      mounted.at(-1).props.leadName = 'LEAD-2'
+      let root = await mounting
+      if (outcome === 'return-to-same-lead') {
+        mounted.at(-1).props.leadName = 'LEAD-1'
+        await nextTick()
+        await vi.waitFor(() =>
+          expect(
+            root.querySelector('input[placeholder="Platform"]')?.value,
+          ).toBe('CHANNEL-2'),
+        )
+      }
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Current Lead draft'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      if (outcome === 'failure') {
+        oldChannels.reject(new Error('Obsolete channel failure'))
+        oldConversations.reject(new Error('Obsolete conversation failure'))
+      } else {
+        oldChannels.resolve({
+          ok: true,
+          channels: [channel('OLD-CHANNEL')],
+          permissions: { can_read: true, can_operate: false },
+        })
+        oldConversations.resolve({
+          ok: true,
+          conversations: [{ name: 'OLD-CHAT', channel: 'OLD-CHANNEL' }],
+          latest_inbound: { conversation: 'OLD-CHAT' },
+          permissions: { can_read: true, can_operate: false },
+        })
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await nextTick()
+      expect(root.querySelector('input[placeholder="Platform"]')?.value).toBe(
+        'CHANNEL-2',
+      )
+      expect(
+        root.querySelector('input[placeholder="Enter a message..."]')?.value,
+      ).toBe('Current Lead draft')
+      expect(root.textContent).not.toContain('Obsolete')
+      expect(root.textContent).not.toContain('Read Only')
+    },
+  )
+
+  it('selects the conversation containing the latest inbound message', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = [
+      { name: 'CONVERSATION-1', channel: 'CHANNEL-1', status: 'Open' },
+      { name: 'CONVERSATION-2', channel: 'CHANNEL-2', status: 'Open' },
+    ]
+    latestInbound = {
+      message: 'MESSAGE-2',
+      conversation: 'CONVERSATION-2',
+      channel: 'CHANNEL-2',
+      message_datetime: '2026-08-28 10:00:00',
+      creation: '2026-08-28 10:00:00',
+    }
+
+    let root = await mountConversation()
+
+    expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+      'CHANNEL-2',
+    )
+    expect(
+      root.querySelector('[data-testid="conversation-routing-warning"]'),
+    ).toBeNull()
+  })
+
+  it.each(['channels', 'conversations'])(
+    'selects the first conversation channel when %s resolve first',
+    async (first) => {
+      permissions = { ...permissions, can_operate: true }
+      conversationRows = [
+        {
+          name: 'CONVERSATION-2',
+          channel: 'CHANNEL-2',
+          status: 'Open',
+          external_chat_id: 'chat-2',
+        },
+      ]
+      let requests = deferSelectionRequests()
+      let mounting = mountConversation()
+
+      await resolveSelectionRequests(requests, first)
+      let root = await mounting
+
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-2',
+      )
+    },
+  )
+
+  it('falls back to the first channel when there are no conversations', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = []
+
+    let root = await mountConversation()
+
+    expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+      'CHANNEL-1',
+    )
+  })
+
+  it.each(['channels', 'conversations'])(
+    'applies a requested conversation when %s resolve first',
+    async (first) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        channel('CHANNEL-1'),
+        channel('CHANNEL-2'),
+        channel('CHANNEL-3'),
+      ]
+      conversationRows = [
+        {
+          name: 'CONVERSATION-RECENT',
+          channel: 'CHANNEL-2',
+          status: 'Open',
+        },
+        {
+          name: 'CONVERSATION-REQUESTED-1',
+          channel: 'CHANNEL-3',
+          status: 'Open',
+        },
+        {
+          name: 'CONVERSATION-REQUESTED-2',
+          channel: 'CHANNEL-3',
+          status: 'Open',
+        },
+      ]
+      mocks.route.query = {
+        messenger_conversation: 'CONVERSATION-REQUESTED-2',
+      }
+      let requests = deferSelectionRequests()
+      let mounting = mountConversation()
+
+      await resolveSelectionRequests(requests, first)
+      let root = await mounting
+
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-3',
+      )
+      expect(
+        root.querySelector('input[placeholder="External Chat"]').value,
+      ).toBe('CONVERSATION-REQUESTED-2')
+    },
+  )
+
+  it('preserves a valid explicit selection across refresh and realtime reload', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = [
+      {
+        name: 'CONVERSATION-2',
+        channel: 'CHANNEL-2',
+        status: 'Open',
+      },
+      {
+        name: 'CONVERSATION-1A',
+        channel: 'CHANNEL-1',
+        status: 'Open',
+        external_chat_id: 'chat-1a',
+      },
+      {
+        name: 'CONVERSATION-1B',
+        channel: 'CHANNEL-1',
+        status: 'Open',
+        external_chat_id: 'chat-1b',
+      },
+    ]
+    latestInbound = {
+      message: 'MESSAGE-2',
+      conversation: 'CONVERSATION-2',
+      channel: 'CHANNEL-2',
+      message_datetime: '2026-08-28 10:00:00',
+      creation: '2026-08-28 10:00:00',
+    }
+    let root = await mountConversation()
+    let platform = root.querySelector('input[placeholder="Platform"]')
+    platform.value = 'CHANNEL-1'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+    let externalChat = root.querySelector('input[placeholder="External Chat"]')
+    externalChat.value = 'CONVERSATION-1B'
+    externalChat.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    let channelLoads = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('get_channels'),
+    ).length
+    ;[...root.querySelectorAll('button')]
+      .find((button) => button.textContent === 'Refresh')
+      .click()
+    await vi.waitFor(() =>
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('get_channels'),
+        ).length,
+      ).toBeGreaterThan(channelLoads),
+    )
+    expect(platform.value).toBe('CHANNEL-1')
+    expect(externalChat.value).toBe('CONVERSATION-1B')
+
+    let conversationLoads = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('get_conversations'),
+    ).length
+    mocks.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONVERSATION-2',
+      conversation_state_changed: true,
+    })
+    await vi.waitFor(() =>
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('get_conversations'),
+        ).length,
+      ).toBeGreaterThan(conversationLoads),
+    )
+    expect(platform.value).toBe('CHANNEL-1')
+    expect(externalChat.value).toBe('CONVERSATION-1B')
+  })
+
+  it('does not replace a draft-pinned conversation with a newer inbound', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = [
+      { name: 'CONVERSATION-1', channel: 'CHANNEL-1', status: 'Open' },
+      { name: 'CONVERSATION-2', channel: 'CHANNEL-2', status: 'Open' },
+    ]
+    latestInbound = {
+      message: 'MESSAGE-1',
+      conversation: 'CONVERSATION-1',
+      channel: 'CHANNEL-1',
+      message_datetime: '2026-08-28 10:00:00',
+      creation: '2026-08-28 10:00:00',
+    }
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+    composer.value = 'Keep this draft on conversation 1'
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    latestInbound = {
+      message: 'MESSAGE-2',
+      conversation: 'CONVERSATION-2',
+      channel: 'CHANNEL-2',
+      message_datetime: '2026-08-28 10:01:00',
+      creation: '2026-08-28 10:01:00',
+    }
+
+    mocks.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+      conversation: 'CONVERSATION-2',
+      conversation_state_changed: true,
+    })
+
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('[data-testid="conversation-routing-warning"]'),
+      ).not.toBeNull(),
+    )
+    expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+      'CHANNEL-1',
+    )
+    expect(composer.value).toBe('Keep this draft on conversation 1')
+  })
+})
+
+describe('Avito messenger UX', () => {
+  function avitoChannel() {
+    return {
+      name: 'CHANNEL-1',
+      provider: 'avito_direct',
+      platform: 'avito',
+      channel_type: 'avito',
+      capabilities: {
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        max_attachment_count: 1,
+        requires_inbound: true,
+        requires_phone: false,
+        voice: { send: false },
+        location: { send: false },
+        reactions: { receive: false, send: false },
+        video: {},
+      },
+    }
+  }
+
+  it('opens an Avito unknown retry dialog without VK request ID copy', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [avitoChannel()]
+    snapshotMessages = [
+      {
+        name: 'MESSAGE-UNKNOWN',
+        provider: 'avito_direct',
+        channel: 'CHANNEL-1',
+        conversation: 'CONVERSATION-1',
+        direction: 'outbound',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        message_type: 'text',
+        text: 'проверка',
+        attachments: [],
+        can_retry: true,
+        retry_requires_confirmation: true,
+        message_datetime: '2026-09-14 10:56:00',
+      },
+    ]
+    let root = await mountConversation()
+
+    root.querySelector('[data-testid="mock-message-retry"]').click()
+
+    expect(mocks.dialog).toHaveBeenCalledOnce()
+    let dialog = mocks.dialog.mock.calls[0][0]
+    expect(dialog.title).toBe('Retry sending?')
+    expect(dialog.message).toContain('Avito may have accepted')
+    expect(dialog.message).toContain('may create a duplicate')
+    expect(dialog.message).not.toContain('VK')
+    expect(dialog.message).not.toContain('same request ID')
+  })
+
+  it('lets the user clear an existing draft while an Avito image blocks caption sending', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [avitoChannel()]
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+    composer.value = 'Send this separately'
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+
+    expect(composer.disabled).toBe(false)
+    expect(composer.value).toBe('Send this separately')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).not.toBeNull()
+    expect(root.textContent).toContain(
+      'Avito API does not support image captions. Send the text as a separate message.',
+    )
+    let send = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Send',
+    )
+    expect(send.disabled).toBe(true)
+
+    root.querySelector('[data-testid="mock-clear-attachments"]').click()
+    await nextTick()
+
+    expect(composer.disabled).toBe(false)
+    expect(composer.value).toBe('Send this separately')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).toBeNull()
+
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+
+    composer.value = ''
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    expect(composer.disabled).toBe(true)
+    expect(composer.value).toBe('')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).toBeNull()
+    expect(send.disabled).toBe(false)
+
+    root.querySelector('[data-testid="mock-clear-attachments"]').click()
+    await nextTick()
+
+    expect(composer.disabled).toBe(false)
+    expect(composer.value).toBe('')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).toBeNull()
+  })
+
+  it('disables an empty Avito image caption without showing a warning', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [avitoChannel()]
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+
+    expect(composer.disabled).toBe(true)
+    expect(composer.value).toBe('')
+    expect(composer.placeholder).toBe(
+      'Image captions are unavailable for Avito.',
+    )
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]'),
+    ).toBeNull()
+  })
+})
+
+describe('messenger conversation routing guard', () => {
+  function prepareRoutingFixture({ attachments = false } = {}) {
+    permissions = { ...permissions, can_operate: true }
+    let capabilityOverrides = attachments ? { supports_attachments: true } : {}
+    channelRows = [
+      channel('CHANNEL-1', capabilityOverrides),
+      channel('CHANNEL-2', capabilityOverrides),
+    ]
+    conversationRows = [
+      {
+        name: 'CONVERSATION-1',
+        channel: 'CHANNEL-1',
+        status: 'Open',
+        external_chat_id: 'chat-1',
+      },
+      {
+        name: 'CONVERSATION-2',
+        channel: 'CHANNEL-2',
+        status: 'Open',
+        external_chat_id: 'chat-2',
+      },
+    ]
+    latestInbound = {
+      message: 'MESSAGE-2',
+      conversation: 'CONVERSATION-2',
+      channel: 'CHANNEL-2',
+      message_datetime: '2026-08-28 10:01:00',
+      creation: '2026-08-28 10:01:00',
+    }
+  }
+
+  async function selectConversationOne(root, text = '') {
+    let platform = root.querySelector('input[placeholder="Platform"]')
+    platform.value = 'CHANNEL-1'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+    if (text) {
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = text
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+    }
+  }
+
+  function sendButton(root) {
+    return [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Send',
+    )
+  }
+
+  it('names both Avito listings when routing between conversations of one account', async () => {
+    prepareRoutingFixture()
+    channelRows = [
+      {
+        ...channel('CHANNEL-1'),
+        provider: 'avito_direct',
+        platform: 'avito',
+        channel_type: 'avito',
+        label: 'Avito shop',
+      },
+    ]
+    conversationRows = [1, 2].map((id) => ({
+      name: `CONVERSATION-${id}`,
+      channel: 'CHANNEL-1',
+      status: 'Open',
+      provider: 'avito_direct',
+      external_chat_id: `chat-${id}`,
+      avito_item: { id: `${id}`, title: id === 1 ? 'Bicycle' : 'Scooter' },
+    }))
+    latestInbound.channel = 'CHANNEL-1'
+    let root = await mountConversation()
+    expect(
+      root.querySelector('[data-testid="avito-item-card"]').textContent,
+    ).toContain('Scooter')
+    let selector = root.querySelector('input[placeholder="External Chat"]')
+    selector.value = 'CONVERSATION-1'
+    selector.dispatchEvent(new Event('input'))
+    await nextTick()
+    let warning = root.querySelector(
+      '[data-testid="conversation-routing-warning"]',
+    )
+    expect(warning.textContent).toContain('Scooter · #2 · CONVERSATION-2')
+    expect(warning.textContent).toContain('Bicycle · #1 · CONVERSATION-1')
+    expect(
+      root.querySelector('[data-testid="avito-item-card"]').textContent,
+    ).toContain('Bicycle')
+    root.querySelector('[data-testid="conversation-routing-switch"]').click()
+    await nextTick()
+    await nextTick()
+    expect(
+      root.querySelector('[data-testid="conversation-routing-warning"]'),
+    ).toBeNull()
+    expect(
+      root.querySelector('[data-testid="avito-item-card"]').textContent,
+    ).toContain('Scooter')
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+  })
+
+  it('shows the mismatch warning only for a different selected conversation', async () => {
+    prepareRoutingFixture()
+    channelRows[0].label = 'Telegram - Support'
+    channelRows[1].label = 'Telegram - Sales'
+    conversationRows[0].client_name = 'Иван'
+    conversationRows[0].last_message_at = '2026-08-28 10:00:00'
+    conversationRows[1].client_name = 'Пётр'
+    conversationRows[1].last_message_at = '2026-08-28 10:01:00'
+    let root = await mountConversation()
+
+    expect(
+      root.querySelector('[data-testid="conversation-routing-warning"]'),
+    ).toBeNull()
+
+    await selectConversationOne(root)
+
+    let warning = root.querySelector(
+      '[data-testid="conversation-routing-warning"]',
+    )
+    expect(warning).not.toBeNull()
+    expect(warning.textContent).toContain('Telegram - Sales')
+    expect(warning.textContent).toContain('Telegram - Support')
+    expect(warning.textContent).not.toContain('Иван')
+    expect(warning.textContent).not.toContain('Пётр')
+    expect(warning.textContent).not.toContain('CONVERSATION-')
+    expect(warning.textContent).not.toContain('2026-08-28')
+  })
+
+  it('confirms and sends through the intentionally selected conversation', async () => {
+    prepareRoutingFixture()
+    channelRows[0].label = 'Telegram - Support'
+    channelRows[1].label = 'Telegram - Sales'
+    let root = await mountConversation()
+    await selectConversationOne(root, 'Send intentionally through chat 1')
+
+    sendButton(root).click()
+
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+    let dialog = mocks.dialog.mock.calls.at(-1)[0]
+    expect(dialog.title).toBe('Check sending conversation')
+    expect(dialog.message).toBe(
+      'The latest inbound message arrived in Telegram - Sales, but Telegram - Support is selected.',
+    )
+    expect(dialog.actions.map((action) => action.label)).toEqual([
+      'Send through Telegram - Support',
+      'Switch to Telegram - Sales',
+      'Cancel',
+    ])
+    dialog.actions
+      .find((action) => action.label.startsWith('Send through'))
+      .onClick(vi.fn())
+
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.messages.send_message',
+        expect.objectContaining({
+          conversation: 'CONVERSATION-1',
+          text: 'Send intentionally through chat 1',
+        }),
+      ),
+    )
+  })
+
+  it('does not send when the routing confirmation is cancelled', async () => {
+    prepareRoutingFixture()
+    let root = await mountConversation()
+    await selectConversationOne(root, 'Do not send this')
+
+    sendButton(root).click()
+    let dialog = mocks.dialog.mock.calls.at(-1)[0]
+    dialog.actions.find((action) => action.label === 'Cancel').onClick(vi.fn())
+    await nextTick()
+
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+  })
+
+  it('retargets uploaded composer attachments before switching', async () => {
+    prepareRoutingFixture({ attachments: true })
+    let root = await mountConversation()
+    await selectConversationOne(root, 'Keep the composer draft')
+    root.querySelector('[data-testid="mock-attachment-draft"]').click()
+    await nextTick()
+
+    root.querySelector('[data-testid="conversation-routing-switch"]').click()
+
+    await vi.waitFor(() =>
+      expect(mocks.attachmentRetarget).toHaveBeenCalledWith('CONVERSATION-2'),
+    )
+    await vi.waitFor(() =>
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-2',
+      ),
+    )
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]').value,
+    ).toBe('Keep the composer draft')
+  })
+
+  it('selects and pins the source conversation of an inbound message click', async () => {
+    prepareRoutingFixture()
+    snapshotMessages = [
+      {
+        name: 'MESSAGE-1',
+        conversation: 'CONVERSATION-1',
+        channel: 'CHANNEL-1',
+        direction: 'inbound',
+        status: 'received',
+        message_datetime: '2026-08-28 10:00:00',
+      },
+    ]
+    let root = await mountConversation()
+
+    root.querySelector('[data-message-bubble]').click()
+
+    await vi.waitFor(() =>
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        'CHANNEL-1',
+      ),
+    )
+    expect(
+      root.querySelector('[data-testid="conversation-routing-warning"]'),
+    ).not.toBeNull()
+  })
+
+  it.each([
+    ['telegram_bot', 'telegram', 'Telegram - Support Bot'],
+    ['max_direct', 'max', 'MAX - Support Bot'],
+    ['vk_direct', 'vk', 'VK - Support Bot'],
+  ])(
+    'constrains metadata intrinsic width for a %s generic file-only message',
+    async (provider, platform, label) => {
+      channelRows = [
+        {
+          ...channel('CHANNEL-1'),
+          provider,
+          platform,
+          channel_type: platform,
+          label,
+        },
+      ]
+      snapshotMessages = [
+        {
+          name: `MESSAGE-${provider}`,
+          provider,
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'outbound',
+          status: 'sent',
+          text: '',
+          attachments: [{ id: 'FILE-1', type: 'file' }],
+          message_datetime: '2026-09-14 10:56:00',
+        },
+      ]
+
+      let root = await mountConversation()
+      let metadata = root.querySelector('[data-message-metadata]')
+
+      expect(metadata.className.split(/\s+/)).toEqual(
+        expect.arrayContaining(['w-0', 'min-w-full']),
+      )
+    },
+  )
+
+  it('hides the technical VK photo upload reason below the message bubble', async () => {
+    channelRows = [
+      {
+        ...channel('CHANNEL-1'),
+        provider: 'vk_direct',
+        platform: 'vk',
+        channel_type: 'vk',
+      },
+    ]
+    snapshotMessages = [
+      {
+        name: 'MESSAGE-VK-FAILED-PHOTO',
+        provider: 'vk_direct',
+        channel: 'CHANNEL-1',
+        conversation: 'CONVERSATION-1',
+        direction: 'outbound',
+        status: 'failed',
+        delivery_status: 'failed',
+        message_type: 'image',
+        text: '',
+        failure_reason: 'VK photo upload did not return photo data.',
+        attachments: [
+          {
+            id: 'IMAGE-1',
+            type: 'image',
+            status: 'failed',
+            url: '/api/method/crm_messenger.api.attachments.stream_file',
+          },
+        ],
+        message_datetime: '2026-09-15 10:00:00',
+      },
+    ]
+
+    let root = await mountConversation()
+
+    expect(root.textContent).toContain(
+      'Could not upload the image to VK. Try sending it again.',
+    )
+    expect(root.textContent).not.toContain(
+      'VK photo upload did not return photo data.',
+    )
+  })
+
+  it.each(['error', 'not_configured'])(
+    'ignores a late %s from a send started on another Lead',
+    async (outcome) => {
+      prepareRoutingFixture()
+      let oldSend = deferred()
+      let defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((method, args) => {
+        if (method.endsWith('send_message') && args.reference_name === 'LEAD-1')
+          return oldSend.promise
+        return defaultCall(method, args)
+      })
+      let root = await mountConversation()
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Message from A'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      sendButton(root).click()
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            reference_name: 'LEAD-1',
+            text: 'Message from A',
+          }),
+        ),
+      )
+
+      mounted.at(-1).props.leadName = 'LEAD-2'
+      await vi.waitFor(() => expect(sendButton(root)?.disabled).toBe(true))
+      if (outcome === 'error') oldSend.reject(new Error('Old Lead send error'))
+      else oldSend.resolve({ ok: false, reason: 'not_configured' })
+      await vi.waitFor(() =>
+        expect(
+          root.querySelector('input[placeholder="Enter a message..."]')
+            ?.disabled,
+        ).toBe(false),
+      )
+      expect(root.textContent).not.toContain('Old Lead send error')
+      expect(root.textContent).not.toContain('not configured')
+      expect(mocks.toastError).not.toHaveBeenCalled()
+
+      composer = root.querySelector('input[placeholder="Enter a message..."]')
+      composer.value = 'Message from B'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      sendButton(root).click()
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            reference_name: 'LEAD-2',
+            text: 'Message from B',
+          }),
+        ),
+      )
+    },
+  )
+
+  it('does not send after a stale Lead target resolution', async () => {
+    permissions = { ...permissions, can_operate: true }
+    conversationRows = []
+    let oldTarget = deferred()
+    let defaultCall = mocks.call.getMockImplementation()
+    mocks.call.mockImplementation((method, args) => {
+      if (
+        method.endsWith('resolve_send_target') &&
+        args.reference_name === 'LEAD-1'
+      )
+        return oldTarget.promise
+      return defaultCall(method, args)
+    })
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+    composer.value = 'Old Lead draft'
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    sendButton(root).click()
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.conversations.resolve_send_target',
+        expect.objectContaining({ reference_name: 'LEAD-1' }),
+      ),
+    )
+
+    mounted.at(-1).props.leadName = 'LEAD-2'
+    await nextTick()
+    oldTarget.resolve({
+      ok: true,
+      conversation: { name: 'OLD-CONVERSATION', channel: 'CHANNEL-1' },
+    })
+    await vi.waitFor(() =>
+      expect(
+        root.querySelector('input[placeholder="Enter a message..."]')?.disabled,
+      ).toBe(false),
+    )
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+    expect(root.textContent).not.toContain('OLD-CONVERSATION')
+    expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+})
 
 describe('messenger permission rendering', () => {
   it('renders read-only history without composer or handoff controls', async () => {
@@ -267,7 +1356,8 @@ describe('messenger permission rendering', () => {
     ).toBe(false)
   })
 
-  it('marks a Messenger notification at the loaded event boundary', async () => {
+  it('reads the current user’s Messenger notification through the chat read boundary', async () => {
+    permissions = { ...permissions, can_operate: true }
     snapshotMessages = [
       {
         name: 'MESSAGE-INBOUND-1',
@@ -276,6 +1366,7 @@ describe('messenger permission rendering', () => {
         status: 'received',
         ingest_source: 'provider_webhook',
         message_datetime: '2026-08-23 12:00:00',
+        local_inbound_sequence: 1,
       },
     ]
 
@@ -283,16 +1374,17 @@ describe('messenger permission rendering', () => {
 
     await vi.waitFor(() =>
       expect(mocks.call).toHaveBeenCalledWith(
-        'crm.api.notifications.mark_messenger_as_read',
+        'crm_messenger.api.conversations.mark_read',
         {
           conversation: 'CONVERSATION-1',
-          last_event_id: 'MESSAGE-INBOUND-1',
+          up_to_message: 'MESSAGE-INBOUND-1',
         },
       ),
     )
   })
 
-  it('does not mark Messenger notifications while the tab is inactive', async () => {
+  it('does not read Messenger notifications while the tab is inactive', async () => {
+    permissions = { ...permissions, can_operate: true }
     snapshotMessages = [
       {
         name: 'MESSAGE-INBOUND-1',
@@ -301,15 +1393,14 @@ describe('messenger permission rendering', () => {
         status: 'received',
         ingest_source: 'provider_webhook',
         message_datetime: '2026-08-23 12:00:00',
+        local_inbound_sequence: 1,
       },
     ]
 
     await mountConversation({ active: false })
 
     expect(
-      mocks.call.mock.calls.some(([method]) =>
-        method.endsWith('mark_messenger_as_read'),
-      ),
+      mocks.call.mock.calls.some(([method]) => method.endsWith('mark_read')),
     ).toBe(false)
   })
 

@@ -42,7 +42,7 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 		self.assertEqual(settings.favicon, "/files/customer-favicon.ico")
 
 	def test_hide_legacy_erpnext_crm_desktop_icon_but_not_frappe_crm_app(self):
-		self.ensure_desktop_icon(
+		legacy_icon = self.ensure_desktop_icon(
 			"CRM",
 			{
 				"label": "CRM",
@@ -53,7 +53,7 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 				"icon_type": "Link",
 			},
 		)
-		self.ensure_desktop_icon(
+		crm_icon = self.ensure_desktop_icon(
 			APP_NAME,
 			{
 				"label": APP_NAME,
@@ -67,8 +67,35 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 
 		hide_legacy_erpnext_crm()
 
-		self.assertEqual(frappe.db.get_value("Desktop Icon", "CRM", "hidden"), 1)
-		self.assertEqual(frappe.db.get_value("Desktop Icon", APP_NAME, "hidden"), 0)
+		self.assertEqual(frappe.db.get_value("Desktop Icon", legacy_icon.name, "hidden"), 1)
+		self.assertEqual(frappe.db.get_value("Desktop Icon", crm_icon.name, "hidden"), 0)
+
+	def test_branding_repairs_migrated_crm_desktop_icon(self):
+		ensure_crm_branding_defaults()
+		icon_name = frappe.get_all("Desktop Icon", filters={"app": "crm"}, pluck="name")[0]
+		frappe.db.set_value(
+			"Desktop Icon",
+			icon_name,
+			{
+				"parent_icon": APP_NAME,
+				"link_type": "Workspace Sidebar",
+				"link_to": "Frappe CRM",
+				"link": None,
+			},
+			update_modified=False,
+		)
+
+		ensure_crm_branding_defaults()
+		icon = frappe.db.get_value(
+			"Desktop Icon",
+			icon_name,
+			["parent_icon", "link_type", "link", "link_to"],
+			as_dict=True,
+		)
+		self.assertIsNone(icon.parent_icon)
+		self.assertEqual(icon.link_type, "External")
+		self.assertEqual(icon.link, "/crm")
+		self.assertIsNone(icon.link_to)
 
 	def test_hide_legacy_erpnext_crm_workspace(self):
 		if not frappe.db.table_exists("Workspace"):
@@ -110,6 +137,8 @@ class TestEXPCRMDefaults(IntegrationTestCase):
 		)
 
 	def ensure_desktop_icon(self, name, values):
+		# Migration can preserve the icon name while changing its unique label.
+		name = frappe.db.get_value("Desktop Icon", {"label": values["label"]}, "name") or name
 		if frappe.db.exists("Desktop Icon", name):
 			frappe.db.set_value("Desktop Icon", name, values, update_modified=False)
 			return frappe.get_doc("Desktop Icon", name)

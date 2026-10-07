@@ -14,6 +14,7 @@ from crm.api.notifications import (
 	get_hash,
 	get_notifications,
 	mark_all_as_read,
+	mark_as_read,
 	mark_messenger_as_read,
 )
 from crm.fcrm.doctype.crm_notification.crm_notification import CRMNotification, has_permission
@@ -167,6 +168,26 @@ class TestMessengerNotificationLifecycle(IntegrationTestCase):
 			4,
 		)
 
+	def test_explicit_messenger_notification_read_changes_only_the_recipient(self):
+		frappe.db.set_value("CRM Lead", self.lead.name, "lead_owner", USER1, update_modified=False)
+		personal = frappe.get_doc(
+			{
+				"doctype": "CRM Notification",
+				"to_user": USER1,
+				"type": "Messenger",
+				"notification_type_doctype": "Messenger Conversation",
+				"notification_type_doc": self.conversation.name,
+				"reference_doctype": "CRM Lead",
+				"reference_name": self.lead.name,
+				"last_event_id": self.message.name,
+			}
+		).insert(ignore_permissions=True)
+		frappe.set_user(USER1)
+		self.assertEqual(mark_as_read(self.notification.name)["marked"], 0)
+		self.assertEqual(mark_as_read(personal.name)["marked"], 1)
+		self.assertTrue(frappe.db.get_value("CRM Notification", personal.name, "read"))
+		self.assertFalse(frappe.db.get_value("CRM Notification", self.notification.name, "read"))
+
 	def test_notifications_response_is_bounded_and_uses_server_unread_count(self):
 		result = get_notifications(limit=1000)
 
@@ -283,7 +304,46 @@ class TestMessengerNotificationLifecycle(IntegrationTestCase):
 			self._revoke_user_lead_access()
 			queued_callback()
 
+			publish.assert_called_once_with("crm_notification", {}, user=USER1)
+
+	def test_revoked_lead_access_hides_assignment_and_realtime_reference(self):
+		frappe.db.set_value("CRM Lead", self.lead.name, "lead_owner", USER1, update_modified=False)
+		frappe.set_user(USER1)
+		notification = frappe.get_doc(
+			{
+				"doctype": "CRM Notification",
+				"to_user": USER1,
+				"type": "Assignment",
+				"notification_text": "Sensitive lead name",
+				"reference_doctype": "CRM Lead",
+				"reference_name": self.lead.name,
+			}
+		).insert(ignore_permissions=True)
+		visible = get_notifications()
+		self.assertIn(notification.name, {row["name"] for row in visible["notifications"]})
+		self.assertEqual(client.get("CRM Notification", notification.name).name, notification.name)
+
+		with (
+			patch.object(type(frappe.db.after_commit), "add", autospec=True) as add_after_commit,
+			patch.object(frappe, "publish_realtime") as publish,
+		):
+			CRMNotification.on_update(notification)
 			publish.assert_not_called()
+			queued_callback = add_after_commit.call_args.args[1]
+			self._revoke_user_lead_access()
+			queued_callback()
+			publish.assert_called_once_with("crm_notification", {}, user=USER1)
+
+		hidden = get_notifications()
+		self.assertNotIn(notification.name, {row["name"] for row in hidden["notifications"]})
+		self.assertEqual(hidden["unread_count"], visible["unread_count"] - 1)
+		self.assertEqual(mark_as_read(notification.name)["marked"], 0)
+		self.assertNotIn(
+			notification.name,
+			{row.name for row in client.get_list("CRM Notification", fields=["name"])},
+		)
+		with self.assertRaises(frappe.PermissionError):
+			client.get("CRM Notification", notification.name)
 
 	def test_retention_deletes_only_expired_messenger_notifications(self):
 		old = add_to_date(now_datetime(), days=-100)

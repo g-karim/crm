@@ -178,6 +178,7 @@
   {
    "fieldname": "source",
    "fieldtype": "Link",
+   "in_standard_filter": 1,
    "label": "Source",
    "options": "CRM Lead Source"
   },
@@ -528,5 +529,6 @@
  "sort_order": "DESC",
  "states": [],
  "title_field": "lead_name",
- "track_changes": 1
+ "track_changes": 1,
+ "track_seen": 1
 }

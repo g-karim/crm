@@ -340,9 +340,9 @@ function isMatchingCustomField(leadField, dealField) {
 function isCustomField(field) {
   return Boolean(
     field?.is_custom_field ||
-    field?.custom ||
-    field?.fieldname?.startsWith('custom_') ||
-    field?.name === `${field?.parent}-${field?.fieldname}`,
+      field?.custom ||
+      field?.fieldname?.startsWith('custom_') ||
+      field?.name === `${field?.parent}-${field?.fieldname}`,
   )
 }
 

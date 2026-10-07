@@ -1,6 +1,6 @@
 <template>
   <div
-    class="overflow-hidden rounded-md border border-outline-gray-2 bg-surface-base"
+    class="isolate overflow-hidden rounded-md border border-outline-gray-2 bg-surface-base"
   >
     <div
       ref="mapElement"

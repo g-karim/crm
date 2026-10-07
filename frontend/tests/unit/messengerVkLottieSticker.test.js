@@ -134,13 +134,11 @@ describe('VK Lottie sticker', () => {
   it('rejects animations with external assets and keeps the preview', async () => {
     fetch.mockResolvedValue({
       ok: true,
-      json: vi
-        .fn()
-        .mockResolvedValue(
-          animationData({
-            assets: [{ id: 'image_0', u: 'https://evil.test/' }],
-          }),
-        ),
+      json: vi.fn().mockResolvedValue(
+        animationData({
+          assets: [{ id: 'image_0', u: 'https://evil.test/' }],
+        }),
+      ),
     })
     let root = mountSticker()
     await settle()

@@ -1066,9 +1066,9 @@ function openStageArchiveDialog(stage) {
       await archiveStage(stage, {
         force: Boolean(
           !restoring &&
-          isActiveType &&
-          activeDeals &&
-          canForceArchivePipeline.value,
+            isActiveType &&
+            activeDeals &&
+            canForceArchivePipeline.value,
         ),
       })
     },

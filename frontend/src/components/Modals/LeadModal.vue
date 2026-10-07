@@ -39,8 +39,10 @@
             @click="createNewLead"
           />
           <Button
+            v-if="isEnrichmentEnabled('CRM Lead')"
             :label="__('Enrich')"
             :loading="isEnriching"
+            :loadingText="__('Enriching')"
             :disabled="!lead.doc.website"
             :tooltip="__('Fill fields from the company website')"
             iconLeft="zap"
@@ -63,6 +65,7 @@ import { showQuickEntryModal, quickEntryProps } from '@/composables/modals'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
 import { createResource, call, toast } from 'frappe-ui'
 import { useDocument } from '@/data/document'
+import { enrichmentStore } from '@/stores/enrichment'
 import { computed, onMounted, ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -83,6 +86,7 @@ const isLeadCreating = ref(false)
 const { document: lead, triggerOnBeforeCreate } = useDocument('CRM Lead')
 
 const isEnriching = ref(false)
+const { isEnabled: isEnrichmentEnabled } = enrichmentStore()
 
 // Prefill the form from the company website (Domain Enrichment) — synchronous,
 // no document is created until the user clicks Create.
@@ -118,7 +122,7 @@ async function enrichFromWebsite() {
       )
     } else {
       toast.info(
-        notes?.[0] || __('Nothing could be extracted from this website.'),
+        __(notes?.[0] || 'Nothing could be extracted from this website.'),
       )
     }
   } catch (e) {
@@ -145,7 +149,7 @@ const tabs = createResource({
             if (field.fieldname == 'status') {
               field.fieldtype = 'Select'
               field.options = leadStatuses.value
-              field.prefix = getLeadStatus(lead.doc.status).color
+              field.prefix = getLeadStatus(lead.doc.status)?.color
             }
 
             if (field.fieldtype === 'Table') {

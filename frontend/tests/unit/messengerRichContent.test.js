@@ -121,9 +121,11 @@ describe('messenger rich content', () => {
 
     expect(root.textContent).toContain('Voice message')
     expect(root.textContent).not.toContain('voice.ogg')
-    expect(root.querySelector('[data-messenger-audio]').className).toContain(
-      'w-[min(22rem,calc(100vw-3rem))]',
-    )
+    let player = root.querySelector('[data-messenger-audio]')
+    expect(player.className).toContain('w-full')
+    expect(player.className).toContain('min-w-0')
+    expect(player.className).not.toContain('border')
+    expect(player.className).not.toContain('p-3')
   })
 
   it('uses the parent width for a compact forwarded voice player', () => {
@@ -140,6 +142,58 @@ describe('messenger rich content', () => {
     expect(player.className).toContain('w-full')
     expect(player.className).toContain('min-w-0')
     expect(player.className).not.toContain('w-[min(22rem,calc(100vw-3rem))]')
+  })
+
+  it('does not synthesize a waveform when the provider did not return one', () => {
+    let root = mount(MessengerAudioPlayer, {
+      attachment: {
+        type: 'audio',
+        status: 'available',
+        is_voice: true,
+        url: '/private/voice.ogg',
+      },
+    })
+
+    expect(root.querySelector('[role="slider"]')).toBeNull()
+    expect(root.querySelector('input[type="range"]')).not.toBeNull()
+  })
+
+  it('updates the range fallback before, during and after playback', async () => {
+    let root = mount(MessengerAudioPlayer, {
+      attachment: {
+        type: 'audio',
+        status: 'available',
+        is_voice: true,
+        url: '/private/avito-voice.ogg',
+        duration_ms: 5000,
+      },
+    })
+    let range = root.querySelector('input[aria-label="Playback Position"]')
+    let audio = root.querySelector('audio')
+    Object.defineProperty(audio, 'duration', { configurable: true, value: 5 })
+    Object.defineProperty(audio, 'currentTime', {
+      configurable: true,
+      writable: true,
+      value: 0,
+    })
+
+    expect(range.classList.contains('audio-seek-range')).toBe(true)
+    expect(range.style.getPropertyValue('--seek-progress')).toBe('0%')
+
+    audio.dispatchEvent(new Event('loadedmetadata'))
+    audio.dispatchEvent(new Event('playing'))
+    audio.currentTime = 2.5
+    audio.dispatchEvent(new Event('timeupdate'))
+    await nextTick()
+    expect(range.style.getPropertyValue('--seek-progress')).toBe('50%')
+
+    audio.dispatchEvent(new Event('pause'))
+    await nextTick()
+    expect(range.style.getPropertyValue('--seek-progress')).toBe('50%')
+
+    audio.dispatchEvent(new Event('ended'))
+    await nextTick()
+    expect(range.style.getPropertyValue('--seek-progress')).toBe('100%')
   })
 
   it('renders a location card without the OpenStreetMap embed footer', async () => {

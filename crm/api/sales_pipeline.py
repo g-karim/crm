@@ -41,9 +41,7 @@ STAGE_FIELDS = [
 ]
 
 COUNT_NAME = (
-	{"COUNT": "name", "as": "count"}
-	if is_frappe_version("16", above=True)
-	else "count(name) as count"
+	{"COUNT": "name", "as": "count"} if is_frappe_version("16", above=True) else "count(name) as count"
 )
 
 ACTIVE_DEAL_STAGE_TYPES = ["Open", "Ongoing", "On Hold"]

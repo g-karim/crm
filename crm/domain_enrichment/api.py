@@ -17,8 +17,9 @@ import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
-from .config import ENABLE_FLAG_BY_DOCTYPE, EnrichmentConfig, get_config
+from .config import ENABLE_FLAG_BY_DOCTYPE, EnrichmentConfig, _setting, get_config, get_settings
 from .mapper import get_value_for_source_key
+from .pipeline import _normalize_website
 from .pipeline import preview as run_preview
 from .tasks import enqueue_enrichment
 
@@ -27,6 +28,54 @@ from .tasks import enqueue_enrichment
 # synchronous crawl -- 10/min is far above any real human burst while capping scripted
 # abuse (queue-flooding, or using preview as a fetch oracle).
 ENRICH_RATE_LIMIT = 10
+
+
+@frappe.whitelist()
+def get_settings_flags() -> dict:
+	"""Expose feature switches to operators without exposing administrator settings."""
+	settings = get_settings()
+	return {
+		"enabled": bool(_setting(settings, "enabled")),
+		"doctypes": {
+			doctype: bool(_setting(settings, flag)) for doctype, flag in ENABLE_FLAG_BY_DOCTYPE.items()
+		},
+	}
+
+
+@frappe.whitelist()
+def get_progress(reference_doctype: str, reference_name: str, queued_at: str) -> dict:
+	"""Recover a terminal result when the browser missed the realtime event."""
+	if reference_doctype not in ENABLE_FLAG_BY_DOCTYPE:
+		frappe.throw(_("Unsupported record type for enrichment."), frappe.ValidationError)
+	frappe.get_doc(reference_doctype, reference_name).check_permission("read")
+	runs = frappe.get_all(
+		"CRM Enrichment Run",
+		filters={
+			"reference_doctype": reference_doctype,
+			"reference_name": reference_name,
+			"finished_on": [">=", queued_at],
+		},
+		fields=["status", "raw_json"],
+		order_by="finished_on desc, creation desc",
+		limit_page_length=1,
+	)
+	if not runs:
+		return {"status": "running"}
+	run = runs[0]
+	result = frappe.parse_json(run.raw_json) or {}
+	meta = result.get("_meta", {})
+	if run.status == "Failed":
+		return {
+			"status": "error",
+			"message": _(next(iter(meta.get("notes", [])), "Enrichment failed. Check the error log.")),
+		}
+	return {
+		"status": "completed",
+		"payload": {
+			"filled_fields": [_(label) for label in meta.get("filled_fields", [])],
+			"notes": [_(note) for note in meta.get("notes", [])],
+		},
+	}
 
 
 def _enabled_doctypes(cfg: EnrichmentConfig) -> list[str]:
@@ -56,6 +105,10 @@ def _enqueue_run(cfg, reference_doctype: str, reference_name: str, website: str)
 	website = (website or "").strip()
 	if not website:
 		frappe.throw(_("Set a website on this record before enriching."), frappe.ValidationError)
+	try:
+		website = _normalize_website(website)
+	except ValueError:
+		frappe.throw(_("Enter a valid website URL using http or https."), frappe.ValidationError)
 
 	return enqueue_enrichment(reference_doctype, reference_name, website, frappe.session.user)
 
@@ -66,7 +119,7 @@ def enrich(reference_doctype: str, reference_name: str) -> dict:
 	"""Enqueue a full enrichment run for one CRM record, using the record's own
 	``website`` field. The initial trigger (the "Enrich from Website" button).
 
-	Returns ``{queued: bool, job_id: str, website: str}``.
+	Returns ``{queued: bool, job_id: str, website: str, queued_at: datetime}``.
 	"""
 	cfg = get_config()
 	doc = frappe.get_doc(reference_doctype, reference_name)
@@ -81,7 +134,7 @@ def retry(run: str) -> dict:
 	button on each run). Re-enriches the run's linked record, preferring the record's
 	current ``website`` and falling back to the website this run originally scraped.
 
-	Returns ``{queued: bool, job_id: str, website: str}``.
+	Returns ``{queued: bool, job_id: str, website: str, queued_at: datetime}``.
 	"""
 	run_doc = frappe.get_doc("CRM Enrichment Run", run)
 	if not run_doc.reference_doctype or not run_doc.reference_name:
@@ -127,7 +180,10 @@ def enrich_preview(website: str, doctype: str = "CRM Deal") -> dict:
 			frappe.PermissionError,
 		)
 
-	result = run_preview(website, cfg=cfg)
+	try:
+		result = run_preview(website, cfg=cfg)
+	except ValueError:
+		frappe.throw(_("Enter a valid website URL using http or https."), frappe.ValidationError)
 
 	fields: dict = {}
 	for mapping in cfg.mappings_by_doctype.get(doctype, []):

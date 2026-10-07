@@ -44,13 +44,45 @@ jobs:
               with:
                   path: pr-crm
 
+            - name: Checkout the actual base repository
+              uses: actions/checkout@v6
+              with:
+                  repository: ${{ github.event.pull_request.base.repo.full_name || github.repository }}
+                  ref: ${{ github.event.pull_request.base.sha || github.sha }}
+                  path: base-crm
+
+            - name: Check Messenger repository access
+              env:
+                  MESSENGER_TOKEN: ${{ secrets.CRM_MESSENGER_READ_TOKEN }}
+              run: |
+                  if [ -z "$MESSENGER_TOKEN" ]; then
+                      echo "::error::Set CRM_MESSENGER_READ_TOKEN with read access to the private g-karim/crm_messenger repository."
+                      exit 1
+                  fi
+
+            - name: Checkout Messenger base
+              uses: actions/checkout@v6
+              with:
+                  repository: g-karim/crm_messenger
+                  ref: exp/main2
+                  token: ${{ secrets.CRM_MESSENGER_READ_TOKEN }}
+                  path: base-crm-messenger
+
+            - name: Checkout Messenger upgrade
+              uses: actions/checkout@v6
+              with:
+                  repository: g-karim/crm_messenger
+                  ref: ed2951c5ace0a1ccf81a3dc2819186eeb144b848
+                  token: ${{ secrets.CRM_MESSENGER_READ_TOKEN }}
+                  path: pr-crm-messenger
+
             - name: Resolve frappe branch for base
               id: frappe
               run: |
-                  # Stable lanes run on frappe version-15; develop tracks frappe develop.
+                  # Match the fork's >=16 dependency, including custom PR base branches.
                   case "$BASE_BRANCH" in
-                      main|main-hotfix) echo "branch=version-15" >> "$GITHUB_OUTPUT" ;;
-                      *)                echo "branch=develop"    >> "$GITHUB_OUTPUT" ;;
+                      develop) echo "branch=develop" >> "$GITHUB_OUTPUT" ;;
+                      *)       echo "branch=version-16" >> "$GITHUB_OUTPUT" ;;
                   esac
 
             - name: Setup Python
@@ -91,17 +123,21 @@ jobs:
                   mkdir sites/test_site
                   cp "${GITHUB_WORKSPACE}/pr-crm/.github/helper/site_config.json" sites/test_site/site_config.json
                   sed -i 's/watch:/# watch:/g; s/schedule:/# schedule:/g; s/socketio:/# socketio:/g; s/redis_socketio:/# redis_socketio:/g' Procfile
-                  bench get-app crm "https://github.com/frappe/crm" --branch "$BASE_BRANCH"
+                  bench get-app crm "${GITHUB_WORKSPACE}/base-crm"
+                  bench get-app erpnext --branch "${{ steps.frappe.outputs.branch }}"
+                  bench get-app payments --branch "${{ steps.frappe.outputs.branch }}"
+                  bench get-app crm_messenger "${GITHUB_WORKSPACE}/base-crm-messenger"
                   bench setup requirements --dev
-                  bench start &>> "$BENCH_PATH/bench_start.log" &
+                  bench start >> "$BENCH_PATH/bench_start.log" 2>&1 &
                   CI=Yes bench build --app frappe &
                   bench --site test_site reinstall --yes
-                  bench --verbose --site test_site install-app crm
+                  bench --verbose --site test_site install-app erpnext payments crm crm_messenger
 
             - name: Upgrade CRM to PR code and migrate
               working-directory: /home/runner/frappe-bench
               run: |
                   # Swap the installed (base branch) code for the PR code, keep the git dir.
                   rsync -a --delete --exclude=".git" "${GITHUB_WORKSPACE}/pr-crm/" apps/crm/
+                  rsync -a --delete --exclude=".git" "${GITHUB_WORKSPACE}/pr-crm-messenger/" apps/crm_messenger/
                   bench setup requirements --dev
                   bench --site test_site migrate

@@ -39,10 +39,17 @@
   </LayoutHeader>
   <div
     v-if="doc.name"
-    class="flex h-12 items-center justify-between gap-2 border-b px-3 py-2.5"
+    class="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5"
   >
     <AssignTo v-model="assignees.data" doctype="CRM Deal" :docname="dealId" />
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <EnrichFromWebsite
+        v-if="permissions.data?.permissions?.write"
+        doctype="CRM Deal"
+        :docname="dealId"
+        :website="doc.website"
+        @done="onEnriched"
+      />
       <CustomActions
         v-if="document._actions?.length"
         :actions="document._actions"
@@ -84,6 +91,15 @@
                   <Link
                     value=""
                     doctype="Contact"
+                    :grouping="
+                      doc.organization
+                        ? {
+                            filters: { company_name: doc.organization },
+                            label: __('Contacts at {0}', [doc.organization]),
+                            otherLabel: __('Other contacts'),
+                          }
+                        : null
+                    "
                     :onCreate="
                       (value, close) => {
                         _contact = {
@@ -255,6 +271,7 @@
     v-model="showDeleteLinkedDocModal"
     :doctype="'CRM Deal'"
     :docname="dealId"
+    :title="doc.organization"
     name="Deals"
   />
   <LostReasonModal
@@ -281,12 +298,14 @@ import AttachmentIcon from '@/components/Icons/AttachmentIcon.vue'
 import WhatsAppIcon from '@/components/Icons/WhatsAppIcon.vue'
 import IndicatorIcon from '@/components/Icons/IndicatorIcon.vue'
 import ArrowUpRightIcon from '@/components/Icons/ArrowUpRightIcon.vue'
+import FileTextIcon from '@/components/Icons/FileTextIcon.vue'
 import SuccessIcon from '@/components/Icons/SuccessIcon.vue'
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import Activities from '@/components/Activities/Activities.vue'
 import OrganizationModal from '@/components/Modals/OrganizationModal.vue'
 import LostReasonModal from '@/components/Modals/LostReasonModal.vue'
 import AssignTo from '@/components/AssignTo.vue'
+import EnrichFromWebsite from '@/components/EnrichFromWebsite.vue'
 import ContactModal from '@/components/Modals/ContactModal.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import Link from '@/components/Controls/Link.vue'
@@ -303,7 +322,9 @@ import { useDocument } from '@/data/document'
 import { isMobileView } from '@/composables/settings'
 import { whatsappEnabled } from '@/composables/whatsapp'
 import { callEnabled } from '@/composables/telephony'
+import { canViewQuotations } from '@/composables/erpnext'
 import { useActiveTabManager } from '@/composables/useActiveTabManager'
+import { useVisitedRecords } from '@/composables/useVisitedRecords'
 import {
   createResource,
   Dropdown,
@@ -337,6 +358,7 @@ const {
   triggerOnChange,
   triggerOnRender,
   assignees,
+  permissions,
   document,
   scripts,
   error,
@@ -344,8 +366,11 @@ const {
 
 const doc = computed(() => document.doc || {})
 
+const { markVisited } = useVisitedRecords('CRM Deal')
+
 onMounted(async () => {
   if (document.doc) await triggerOnRender()
+  markVisited(props.dealId)
 })
 
 watch(error, (err) => {
@@ -488,6 +513,12 @@ const tabs = computed(() => {
       icon: WhatsAppIcon,
       condition: () => whatsappEnabled.value,
     },
+    {
+      name: 'Quotations',
+      label: __('Quotations'),
+      icon: FileTextIcon,
+      condition: () => canViewQuotations.value,
+    },
   ]
   return tabOptions.filter((tab) => (tab.condition ? tab.condition() : true))
 })
@@ -500,6 +531,11 @@ const sections = createResource({
   auto: true,
   transform: (data) => getParsedFields(data),
 })
+
+function onEnriched() {
+  document.reload?.()
+  sections.reload()
+}
 
 function getParsedFields(sections) {
   sections.forEach((section) => {
@@ -626,7 +662,9 @@ const dealContacts = createResource({
       (section) => section.name == 'contacts_section',
     )
     if (!contactSection) return
-    contactSection.contacts = data.map((contact) => {
+    // get_deal_contacts orders primary first, so expanding the first contact
+    // surfaces the most relevant email and phone without a click.
+    contactSection.contacts = data.map((contact, index) => {
       return {
         name: contact.name,
         full_name: contact.full_name,
@@ -634,7 +672,7 @@ const dealContacts = createResource({
         mobile_no: contact.mobile_no,
         image: contact.image,
         is_primary: contact.is_primary,
-        opened: false,
+        opened: index === 0,
       }
     })
   },
@@ -662,7 +700,7 @@ function updateField(name, value) {
 
   document.save.submit(null, {
     onSuccess: () => (reload.value = true),
-    onError: (err) => {
+    onError: () => {
       if (Array.isArray(name)) {
         name.forEach((field) => (doc.value[field] = oldValues[field]))
       } else if (name == 'pipeline') {
@@ -671,7 +709,6 @@ function updateField(name, value) {
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }

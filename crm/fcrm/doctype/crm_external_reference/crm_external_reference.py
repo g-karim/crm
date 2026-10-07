@@ -5,7 +5,6 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-
 REFERENCE_FIELDS = [
 	"name",
 	"reference_doctype",

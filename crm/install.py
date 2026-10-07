@@ -482,11 +482,7 @@ def add_field_to_fields_layout(layout_name, section_name, fieldname, reference_f
 	target_column = section["columns"][0]
 	if reference_field:
 		target_column = next(
-			(
-				column
-				for column in section["columns"]
-				if reference_field in (column.get("fields") or [])
-			),
+			(column for column in section["columns"] if reference_field in (column.get("fields") or [])),
 			target_column,
 		)
 
@@ -704,6 +700,10 @@ def add_default_lead_sources():
 		"Campaign",
 		"Walk In",
 		"Facebook",
+		"Avito",
+		"VK",
+		"Telegram bot",
+		"MAX",
 		"Website",
 		"Web Form",
 	]

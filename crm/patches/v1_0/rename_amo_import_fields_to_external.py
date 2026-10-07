@@ -40,11 +40,7 @@ def copy_if_columns_exist(doctype: str, field_map: dict[str, str], source_value:
 			)
 			old_value_conditions.append(f"coalesce(`{old_field}`, '') != ''")
 
-	if (
-		assignments
-		and frappe.db.has_column(doctype, "external_source")
-		and old_value_conditions
-	):
+	if assignments and frappe.db.has_column(doctype, "external_source") and old_value_conditions:
 		assignments.append(
 			"`external_source` = if(coalesce(`external_source`, '') = '' and ("
 			+ " or ".join(old_value_conditions)

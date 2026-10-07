@@ -100,7 +100,7 @@ def run_call_analysis(call_log_name: str, user: str | None = None, language: str
 
 
 def _safe_user_error(exc: Exception) -> str:
-	if isinstance(exc, (CallAnalysisConfigurationError, RecordingDownloadError)):
+	if isinstance(exc, CallAnalysisConfigurationError | RecordingDownloadError):
 		message = str(exc or "").strip()
 		if message:
 			return message

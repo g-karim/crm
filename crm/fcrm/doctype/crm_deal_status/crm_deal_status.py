@@ -167,12 +167,9 @@ class CRMDealStatus(Document):
 				STAGE_EXTERNAL_DOCTYPE,
 				self.external_pipeline_id,
 			)
-			if (
-				external_reference
-				and (
-					external_reference.reference_doctype != "CRM Deal Status"
-					or external_reference.reference_name != self.name
-				)
+			if external_reference and (
+				external_reference.reference_doctype != "CRM Deal Status"
+				or external_reference.reference_name != self.name
 			):
 				frappe.throw(
 					_("External status ID {0} already exists in pipeline {1}.").format(

@@ -39,7 +39,10 @@ DEAL_DATA_FIELDS_LAYOUT = [
 				"name": "forecast_section",
 				"opened": True,
 				"columns": [
-					{"name": "forecast_money_column", "fields": ["deal_value", "expected_deal_value", "currency"]},
+					{
+						"name": "forecast_money_column",
+						"fields": ["deal_value", "expected_deal_value", "currency"],
+					},
 					{
 						"name": "forecast_timing_column",
 						"fields": ["probability", "expected_closure_date", "closed_date"],
@@ -196,11 +199,7 @@ def insert_field_in_section(section, fieldname, reference_field=None, before=Fal
 	target_column = section["columns"][0]
 	if reference_field:
 		target_column = next(
-			(
-				column
-				for column in section["columns"]
-				if reference_field in (column.get("fields") or [])
-			),
+			(column for column in section["columns"] if reference_field in (column.get("fields") or [])),
 			target_column,
 		)
 

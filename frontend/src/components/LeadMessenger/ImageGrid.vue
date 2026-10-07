@@ -10,11 +10,7 @@
     @click="open(singleImage)"
   >
     <img
-      v-if="
-        singleImage.url &&
-        getAttachmentState(singleImage).active &&
-        showSingleImageBackdrop
-      "
+      v-if="canDisplayLocalImage(singleImage) && showSingleImageBackdrop"
       data-media-backdrop
       :src="singleImage.url"
       alt=""
@@ -27,7 +23,7 @@
       class="pointer-events-none absolute inset-0 bg-black/30"
     />
     <img
-      v-if="singleImage.url && getAttachmentState(singleImage).active"
+      v-if="canDisplayLocalImage(singleImage)"
       :src="singleImage.url"
       :alt="singleImage.file_name || __('Image')"
       :width="imageDimension(singleImage.width)"
@@ -46,6 +42,13 @@
       />
       <ImageOffIcon v-else class="size-5" />
       <span>{{ __(getAttachmentState(singleImage).label) }}</span>
+    </div>
+    <div
+      v-if="isVkProviderUploadFailure(singleImage)"
+      data-vk-image-send-failed
+      class="absolute inset-x-0 bottom-0 z-20 bg-red-700/90 px-3 py-2 text-center text-xs font-medium text-white"
+    >
+      {{ __('Failed to send image to VK') }}
     </div>
   </button>
 
@@ -66,7 +69,7 @@
       @click="open(image)"
     >
       <img
-        v-if="image.url && getAttachmentState(image).active"
+        v-if="canDisplayLocalImage(image)"
         :src="image.url"
         :alt="image.file_name || __('Image')"
         class="size-full object-cover"
@@ -82,6 +85,13 @@
         />
         <ImageOffIcon v-else class="size-5" />
         <span>{{ __(getAttachmentState(image).label) }}</span>
+      </div>
+      <div
+        v-if="isVkProviderUploadFailure(image)"
+        data-vk-image-send-failed
+        class="absolute inset-x-0 bottom-0 z-10 bg-red-700/90 px-2 py-1.5 text-center text-xs font-medium text-white"
+      >
+        {{ __('Failed to send image to VK') }}
       </div>
       <div
         v-if="index === 3 && images.length > 4"
@@ -109,6 +119,8 @@ import ImageOffIcon from '~icons/lucide/image-off'
 const props = defineProps({
   images: { type: Array, default: () => [] },
   compactPreview: { type: Boolean, default: false },
+  provider: { type: String, default: '' },
+  outbound: { type: Boolean, default: false },
 })
 const emit = defineEmits(['open-image'])
 const actualWidth = ref(0)
@@ -142,8 +154,7 @@ const singleImageDimensions = computed(() =>
 )
 const showSingleImageBackdrop = computed(
   () =>
-    Boolean(singleImage.value?.url) &&
-    getAttachmentState(singleImage.value).active &&
+    canDisplayLocalImage(singleImage.value) &&
     singleImageDimensions.value.letterboxed,
 )
 const visibleImages = computed(() => visibleImageAttachments(props.images))
@@ -162,6 +173,22 @@ const compactGridStyle = computed(() =>
 function open(image) {
   if (!image.url || !getAttachmentState(image).active) return
   emit('open-image', image)
+}
+
+function isVkProviderUploadFailure(image) {
+  return (
+    props.outbound &&
+    props.provider === 'vk_direct' &&
+    image?.status === 'failed' &&
+    Boolean(image.url)
+  )
+}
+
+function canDisplayLocalImage(image) {
+  return (
+    Boolean(image?.url) &&
+    (getAttachmentState(image).active || isVkProviderUploadFailure(image))
+  )
 }
 
 function imageDimension(value) {

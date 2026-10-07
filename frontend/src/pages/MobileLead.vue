@@ -28,7 +28,7 @@
               :iconRight="open ? 'chevron-up' : 'chevron-down'"
             >
               <template #prefix>
-                <IndicatorIcon :class="getLeadStatus(doc.status).color" />
+                <IndicatorIcon :class="getLeadStatus(doc.status)?.color" />
               </template>
             </Button>
           </template>
@@ -38,7 +38,7 @@
   </LayoutHeader>
   <div
     v-if="doc.name"
-    class="flex h-12 items-center justify-between gap-2 border-b px-3 py-2.5"
+    class="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5"
   >
     <AssignTo
       v-if="canWrite"
@@ -46,7 +46,14 @@
       doctype="CRM Lead"
       :docname="leadId"
     />
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <EnrichFromWebsite
+        v-if="canWrite"
+        doctype="CRM Lead"
+        :docname="leadId"
+        :website="doc.website"
+        @done="onEnriched"
+      />
       <CustomActions
         v-if="document._actions?.length"
         :actions="document._actions"
@@ -55,11 +62,19 @@
         v-if="document.actions?.length"
         :actions="document.actions"
       />
-      <Button
-        :label="__('Convert')"
-        variant="solid"
-        @click="showConvertToDealModal = true"
-      />
+      <Tooltip
+        :disabled="!isLeadConversionDisabled"
+        :text="__('Cannot convert a lost lead to deal')"
+      >
+        <div class="inline-flex">
+          <Button
+            :label="__('Convert')"
+            variant="solid"
+            :disabled="isLeadConversionDisabled"
+            @click="showConvertToDealModal = true"
+          />
+        </div>
+      </Tooltip>
     </div>
   </div>
   <div v-if="doc.name" class="flex h-full overflow-hidden">
@@ -125,6 +140,7 @@
     v-model="showDeleteLinkedDocModal"
     :doctype="'CRM Lead'"
     :docname="leadId"
+    :title="doc.lead_name"
     name="Leads"
   />
   <LostReasonModal
@@ -153,6 +169,7 @@ import LayoutHeader from '@/components/LayoutHeader.vue'
 import Activities from '@/components/Activities/Activities.vue'
 import LeadConversation from '@/components/LeadMessenger/LeadConversation.vue'
 import AssignTo from '@/components/AssignTo.vue'
+import EnrichFromWebsite from '@/components/EnrichFromWebsite.vue'
 import SidePanelLayout from '@/components/SidePanelLayout.vue'
 import SLASection from '@/components/SLASection.vue'
 import CustomActions from '@/components/CustomActions.vue'
@@ -166,9 +183,11 @@ import { useDocument } from '@/data/document'
 import { isMobileView } from '@/composables/settings'
 import { whatsappEnabled } from '@/composables/whatsapp'
 import { useActiveTabManager } from '@/composables/useActiveTabManager'
+import { useVisitedRecords } from '@/composables/useVisitedRecords'
 import {
   createResource,
   Dropdown,
+  Tooltip,
   Tabs,
   Breadcrumbs,
   call,
@@ -207,9 +226,15 @@ const {
 
 const canWrite = computed(() => permissions.data?.permissions?.write || false)
 const doc = computed(() => document.doc || {})
+const isLeadConversionDisabled = computed(
+  () => doc.value.status && getLeadStatus(doc.value.status)?.type === 'Lost',
+)
+
+const { markVisited } = useVisitedRecords('CRM Lead')
 
 onMounted(async () => {
   if (document.doc) await triggerOnRender()
+  markVisited(props.leadId)
 })
 
 watch(error, (err) => {
@@ -363,6 +388,11 @@ const sections = createResource({
   auto: true,
 })
 
+function onEnriched() {
+  document.reload?.()
+  sections.reload()
+}
+
 function updateField(name, value) {
   value = Array.isArray(name) ? '' : value
   let oldValues = Array.isArray(name) ? {} : doc.value[name]
@@ -375,13 +405,12 @@ function updateField(name, value) {
 
   document.save.submit(null, {
     onSuccess: () => (reload.value = true),
-    onError: (err) => {
+    onError: () => {
       if (Array.isArray(name)) {
         name.forEach((field) => (doc.value[field] = oldValues[field]))
       } else {
         doc.value[name] = oldValues
       }
-      toast.error(__(err.messages?.[0] || 'Error updating field'))
     },
   })
 }

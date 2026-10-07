@@ -69,12 +69,12 @@
           <div class="flex items-center justify-between gap-6 p-4">
             <div>
               <div class="text-base-medium text-ink-gray-8">
-                {{ __('Store raw webhook events') }}
+                {{ __('Store detailed webhook payloads') }}
               </div>
               <div class="mt-1 text-p-sm text-ink-gray-5">
                 {{
                   __(
-                    'Use this only for diagnostics. Keep it disabled in normal operation.',
+                    'Applies only to future events. Detailed payloads can contain message text and customer personal data; secrets are always redacted. Enable only for diagnostics.',
                   )
                 }}
               </div>
@@ -94,7 +94,7 @@
               class="size-4 transition-transform"
               :class="showAdvanced && 'rotate-90'"
             />
-            {{ __('Webhooks and Avito OAuth') }}
+            {{ __('Webhooks') }}
           </button>
           <div
             v-if="showAdvanced"
@@ -106,27 +106,6 @@
               :label="__('Shared Webhook Secret')"
               :placeholder="
                 secretPlaceholder(settings.webhook_secret_configured)
-              "
-              :description="__('Leave blank to keep the current secret.')"
-            />
-            <FormControl
-              v-model="settings.oauth_site_url"
-              type="text"
-              :label="__('OAuth Site URL')"
-              placeholder="https://crm.example.com"
-            />
-            <FormControl
-              v-model="settings.avito_oauth_broker_url"
-              type="text"
-              :label="__('Avito OAuth Broker URL')"
-              placeholder="https://broker.example.com"
-            />
-            <FormControl
-              v-model="settings.avito_oauth_broker_secret"
-              type="password"
-              :label="__('Avito OAuth Broker Secret')"
-              :placeholder="
-                secretPlaceholder(settings.avito_oauth_broker_secret_configured)
               "
               :description="__('Leave blank to keep the current secret.')"
             />
@@ -154,7 +133,22 @@
           </div>
 
           <div
-            v-if="!channels.length"
+            v-if="loadError"
+            class="flex flex-col items-center rounded-lg border border-dashed border-outline-gray-2 px-6 py-12 text-center"
+          >
+            <div class="text-base-medium text-ink-red-3">
+              {{ __('Could not load message channel settings.') }}
+            </div>
+            <Button
+              class="mt-4"
+              :label="__('Try Again')"
+              variant="subtle"
+              @click="loadSettings(true, true)"
+            />
+          </div>
+
+          <div
+            v-else-if="!channels.length"
             class="flex flex-col items-center rounded-lg border border-dashed border-outline-gray-2 px-6 py-12 text-center"
           >
             <div
@@ -298,26 +292,6 @@
 
           <FormControl
             v-if="channelDraft.provider === 'avito_direct'"
-            v-model="channelDraft.auth_type"
-            type="select"
-            :options="avitoAuthTypes"
-            :label="__('Avito Connection Method')"
-          />
-          <FormControl
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type !== 'authorization_code'
-            "
-            v-model="channelDraft.external_account_id"
-            type="text"
-            required
-            :label="__('Avito Account ID')"
-          />
-          <FormControl
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type === 'client_credentials'
-            "
             v-model="channelDraft.client_id"
             type="text"
             required
@@ -334,10 +308,7 @@
             :description="__('Leave blank to keep the current token.')"
           />
           <FormControl
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type === 'client_credentials'
-            "
+            v-if="channelDraft.provider === 'avito_direct'"
             v-model="channelDraft.client_secret"
             type="password"
             :required="!channelDraft.client_secret_configured"
@@ -349,9 +320,163 @@
           />
         </div>
 
+        <section
+          v-if="channelDraft.provider === 'avito_direct'"
+          class="rounded-lg border border-outline-gray-1 bg-surface-gray-1 p-4"
+        >
+          <div class="text-base-medium text-ink-gray-8">
+            {{ __('Avito chat import') }}
+          </div>
+          <p class="mt-1 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Choose which past chats create leads when the channel connects or this setting is saved. Chats created after connection are processed automatically.',
+              )
+            }}
+          </p>
+          <p
+            v-if="!settings.auto_create_lead"
+            class="mt-2 text-p-sm text-ink-orange-7"
+          >
+            {{
+              __(
+                'Turn on Create leads from new conversations above to create Avito leads.',
+              )
+            }}
+          </p>
+          <div class="mt-3 grid gap-2">
+            <label
+              v-for="option in avitoImportOptions"
+              :key="option.value"
+              class="flex cursor-pointer items-start gap-3 rounded-lg border bg-surface-cards p-3"
+              :class="
+                channelDraft.avito_import_mode === option.value
+                  ? 'border-outline-blue-3'
+                  : 'border-outline-gray-2'
+              "
+            >
+              <input
+                v-model="channelDraft.avito_import_mode"
+                type="radio"
+                name="avito-import-mode"
+                :value="option.value"
+                class="mt-1 accent-blue-600"
+              />
+              <span>
+                <span class="block text-p-medium text-ink-gray-8">{{
+                  __(option.label)
+                }}</span>
+                <span class="mt-0.5 block text-p-sm text-ink-gray-5">{{
+                  __(option.description)
+                }}</span>
+              </span>
+            </label>
+          </div>
+          <div
+            v-if="channelDraft.avito_import_mode === 'period'"
+            class="mt-4 grid gap-3 md:grid-cols-2"
+          >
+            <FormControl
+              v-model="channelDraft.avito_import_from_date"
+              type="date"
+              :label="__('From date')"
+              data-avito-import-date
+              required
+            />
+            <FormControl
+              v-model="channelDraft.avito_import_to_date"
+              type="date"
+              :label="__('Through date')"
+              data-avito-import-date
+              required
+            />
+          </div>
+          <p class="mt-3 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Dates use the CRM time zone and the chat’s last activity. Available messages from selected chats are loaded. If Avito hides message details, later activity in old chats may remain unverified.',
+              )
+            }}
+          </p>
+          <p v-if="channelDraft.channel" class="mt-2 text-p-sm text-ink-gray-5">
+            {{
+              __(
+                'Changing this selection does not remove leads already created from Avito chats.',
+              )
+            }}
+          </p>
+          <div
+            v-if="
+              channelDraft.channel &&
+              channelDraft.enabled &&
+              ['connected', 'degraded'].includes(channelDraft.state)
+            "
+            class="mt-4 border-t border-outline-gray-2 pt-3"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="text-p-medium text-ink-gray-8">
+                {{ __('Import status') }}
+              </div>
+              <div class="flex gap-2">
+                <Button
+                  :label="__('Refresh import status')"
+                  variant="subtle"
+                  :loading="loadingAvitoImport"
+                  @click="loadAvitoImportStatus"
+                />
+                <Button
+                  :label="__('Scan chats now')"
+                  variant="subtle"
+                  :disabled="channelBusy || channelDirty"
+                  :loading="scanningAvitoImport"
+                  @click="scanAvitoChats"
+                />
+              </div>
+            </div>
+            <p v-if="avitoImportStatus" class="mt-2 text-p-sm text-ink-gray-6">
+              {{ __(avitoImportStatusLabel(avitoImportStatus.status)) }}
+              <span v-if="avitoImportStatus.counts?.chat_created">
+                ·
+                {{
+                  __('New chats in last scan: {0}', [
+                    avitoImportStatus.counts.chat_created,
+                  ])
+                }}</span
+              >
+              <span v-if="avitoImportStatus.counts?.chat_skipped">
+                ·
+                {{
+                  __('Skipped chats: {0}', [
+                    avitoImportStatus.counts.chat_skipped,
+                  ])
+                }}</span
+              >
+              <span v-if="avitoImportStatus.counts?.chat_unverified">
+                ·
+                {{
+                  __('Chats awaiting verification: {0}', [
+                    avitoImportStatus.counts.chat_unverified,
+                  ])
+                }}</span
+              >
+            </p>
+            <p
+              v-if="avitoImportStatus?.incomplete"
+              class="mt-2 text-p-sm text-ink-orange-7"
+            >
+              {{
+                __(
+                  'The scan is incomplete. Some chats could not be verified or are unavailable through the Avito API.',
+                )
+              }}
+            </p>
+          </div>
+        </section>
+
         <div
-          v-if="isDirectMessengerProvider(channelDraft.provider)"
-          class="rounded-lg bg-surface-blue-1 px-3 py-2 text-p-sm text-ink-blue-3"
+          v-if="showWebhookUrlWarning"
+          data-testid="webhook-url-warning"
+          class="rounded-lg border border-outline-blue-4 bg-surface-blue-2 px-3 py-2 text-p-sm font-semibold text-ink-blue-9"
         >
           {{
             __(
@@ -361,10 +486,11 @@
         </div>
 
         <div
-          v-if="channelDraft.auth_error"
-          class="rounded-lg bg-surface-red-1 px-3 py-2 text-p-sm text-ink-red-3"
+          v-if="channelError || channelDraft.auth_error"
+          data-testid="channel-auth-error"
+          class="rounded-lg border border-outline-red-4 bg-surface-red-2 px-3 py-2 text-p-sm font-semibold text-ink-red-8"
         >
-          {{ clientProviderMessage(channelDraft.auth_error) }}
+          {{ channelError || clientProviderMessage(channelDraft.auth_error) }}
         </div>
 
         <div
@@ -372,60 +498,39 @@
           class="flex flex-wrap gap-2 border-t border-outline-gray-1 pt-4"
         >
           <Button
-            v-if="isDirectMessengerProvider(channelDraft.provider)"
+            v-if="usesCommonConnectionActions"
             :label="__('Test')"
             variant="subtle"
             :loading="channelAction === 'test'"
+            :disabled="channelBusy"
             @click="runChannelAction('test')"
           />
           <Button
-            v-if="isDirectMessengerProvider(channelDraft.provider)"
+            v-if="usesCommonConnectionActions"
             :label="__('Connect / Repair')"
             variant="solid"
             :loading="channelAction === 'connect'"
+            :disabled="channelBusy"
             @click="runChannelAction('connect')"
           />
           <Button
-            v-if="isDirectMessengerProvider(channelDraft.provider)"
+            v-if="usesCommonConnectionActions"
             :label="__('Refresh Status')"
             variant="subtle"
             :loading="channelAction === 'status'"
+            :disabled="channelBusy"
             @click="runChannelAction('status')"
           />
           <Button
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type === 'authorization_code'
-            "
-            :label="__('Connect Avito')"
-            variant="solid"
-            :loading="channelAction === 'avito-oauth'"
-            @click="runChannelAction('avito-oauth')"
-          />
-          <Button
-            v-if="
-              channelDraft.provider === 'avito_direct' &&
-              channelDraft.auth_type !== 'authorization_code'
-            "
-            :label="__('Register Webhook')"
-            variant="subtle"
-            :loading="channelAction === 'avito-webhook'"
-            @click="runChannelAction('avito-webhook')"
-          />
-          <Button
-            v-if="
-              isDirectMessengerProvider(channelDraft.provider) &&
-              channelDraft.enabled
-            "
+            v-if="usesCommonConnectionActions && channelDraft.enabled"
             :label="__('Disconnect')"
             variant="subtle"
             theme="red"
             :loading="channelAction === 'disconnect'"
+            :disabled="channelBusy"
             @click="runChannelAction('disconnect')"
           />
         </div>
-
-        <ErrorMessage v-if="channelError" :message="channelError" />
       </div>
     </template>
     <template #actions>
@@ -439,6 +544,7 @@
           :label="channelDraft.channel ? __('Save') : __('Create Channel')"
           variant="solid"
           :loading="savingChannel"
+          :disabled="Boolean(channelAction)"
           @click="saveChannel"
         />
       </div>
@@ -462,7 +568,6 @@ import {
   Badge,
   Button,
   Dialog,
-  ErrorMessage,
   FeatherIcon,
   FormControl,
   LoadingIndicator,
@@ -479,36 +584,55 @@ const defaultSettings = () => ({
   log_raw_webhooks: false,
   webhook_secret: '',
   webhook_secret_configured: false,
-  avito_oauth_broker_url: '',
-  avito_oauth_broker_secret: '',
-  avito_oauth_broker_secret_configured: false,
-  oauth_site_url: '',
+  webhook_base_url: '',
+  webhook_base_url_is_public_https: false,
 })
 
 const settings = reactive(defaultSettings())
 const channels = ref([])
 const loading = ref(true)
 const refreshing = ref(false)
+const loadError = ref(false)
 const savingSettings = ref(false)
 const settingsSnapshot = ref('')
 const showAdvanced = ref(false)
 
 const showChannelDialog = ref(false)
 const channelDraft = ref(makeMessengerChannelDraft())
+const channelSnapshot = ref('')
 const savingChannel = ref(false)
 const channelAction = ref('')
 const channelError = ref('')
+const avitoImportStatus = ref(null)
+const loadingAvitoImport = ref(false)
+const scanningAvitoImport = ref(false)
+const avitoImportOptions = [
+  {
+    value: 'all',
+    label: 'All available chats',
+    description: 'Create leads from all past chats available through Avito.',
+  },
+  {
+    value: 'period',
+    label: 'Chats in a date range',
+    description:
+      'Create leads from chats last active between the selected dates.',
+  },
+  {
+    value: 'new_activity',
+    label: 'Only new customer activity',
+    description: 'Skip past chats until new customer activity can be verified.',
+  },
+]
+const channelBusy = computed(
+  () => savingChannel.value || Boolean(channelAction.value),
+)
+const channelDirty = computed(() => channelState() !== channelSnapshot.value)
 
 const wazzupPlatforms = [
   { label: 'WhatsApp', value: 'whatsapp' },
   { label: 'Telegram', value: 'telegram' },
 ]
-const avitoAuthTypes = [
-  { label: __('OAuth'), value: 'authorization_code' },
-  { label: __('Client ID / Secret'), value: 'client_credentials' },
-  { label: __('API Token'), value: 'api_token' },
-]
-
 const providerOptions = computed(() =>
   MESSENGER_PROVIDER_OPTIONS.map((option) => ({
     ...option,
@@ -520,9 +644,6 @@ const settingsDirty = computed(
   () => settingsSnapshot.value && settingsSnapshot.value !== settingsState(),
 )
 const showsApiToken = computed(() => {
-  if (channelDraft.value.provider === 'avito_direct') {
-    return channelDraft.value.auth_type === 'api_token'
-  }
   return ['telegram_bot', 'vk_direct', 'max_direct', 'wazzup'].includes(
     channelDraft.value.provider,
   )
@@ -539,6 +660,14 @@ const hasConnectionActions = computed(
     isDirectMessengerProvider(channelDraft.value.provider) ||
     channelDraft.value.provider === 'avito_direct',
 )
+const usesCommonConnectionActions = computed(() =>
+  isDirectMessengerProvider(channelDraft.value.provider),
+)
+const showWebhookUrlWarning = computed(
+  () =>
+    isDirectMessengerProvider(channelDraft.value.provider) &&
+    !settings.webhook_base_url_is_public_https,
+)
 
 function settingsState() {
   return JSON.stringify({
@@ -548,10 +677,7 @@ function settingsState() {
       settings.enable_provider_history_tombstones,
     ),
     log_raw_webhooks: Boolean(settings.log_raw_webhooks),
-    avito_oauth_broker_url: settings.avito_oauth_broker_url || '',
-    oauth_site_url: settings.oauth_site_url || '',
     webhook_secret: settings.webhook_secret || '',
-    avito_oauth_broker_secret: settings.avito_oauth_broker_secret || '',
   })
 }
 
@@ -563,11 +689,12 @@ async function loadSettings(isRefresh = false, channelsOnly = false) {
     if (!channelsOnly) {
       Object.assign(settings, defaultSettings(), result.settings || {})
       settings.webhook_secret = ''
-      settings.avito_oauth_broker_secret = ''
       settingsSnapshot.value = settingsState()
     }
     channels.value = result.channels || []
+    loadError.value = false
   } catch (error) {
+    loadError.value = true
     toast.error(
       clientProviderMessage(
         error?.messages?.[0] || 'Could not load message channel settings.',
@@ -589,14 +716,10 @@ async function saveGlobalSettings() {
         settings.enable_provider_history_tombstones,
       ),
       log_raw_webhooks: Boolean(settings.log_raw_webhooks),
-      avito_oauth_broker_url: settings.avito_oauth_broker_url || '',
-      oauth_site_url: settings.oauth_site_url || '',
       webhook_secret: settings.webhook_secret || '',
-      avito_oauth_broker_secret: settings.avito_oauth_broker_secret || '',
     })
     Object.assign(settings, result || {})
     settings.webhook_secret = ''
-    settings.avito_oauth_broker_secret = ''
     settingsSnapshot.value = settingsState()
     toast.success(__('Message channel settings saved.'))
   } catch (error) {
@@ -611,12 +734,15 @@ async function saveGlobalSettings() {
 }
 
 function openNewChannel() {
+  avitoImportStatus.value = null
   channelDraft.value = makeMessengerChannelDraft()
+  channelSnapshot.value = channelState()
   channelError.value = ''
   showChannelDialog.value = true
 }
 
 function openChannel(channel) {
+  avitoImportStatus.value = null
   channelDraft.value = {
     ...makeMessengerChannelDraft(channel),
     state: channel.state,
@@ -624,8 +750,16 @@ function openChannel(channel) {
     provider_display_name: channel.provider_display_name,
     label: channel.label,
   }
+  channelSnapshot.value = channelState()
   channelError.value = ''
   showChannelDialog.value = true
+  if (
+    channel.provider === 'avito_direct' &&
+    channel.enabled &&
+    ['connected', 'degraded'].includes(channel.state)
+  ) {
+    loadAvitoImportStatus()
+  }
 }
 
 function changeProvider(provider) {
@@ -634,6 +768,7 @@ function changeProvider(provider) {
 }
 
 async function saveChannel() {
+  if (channelBusy.value) return
   let error = validateMessengerChannelDraft(channelDraft.value)
   if (error) {
     channelError.value = __(error)
@@ -662,43 +797,117 @@ async function saveChannel() {
 }
 
 async function runChannelAction(action) {
+  if (channelBusy.value) return
+  if (channelDirty.value) {
+    channelError.value = __(
+      'Save channel changes before running connection actions.',
+    )
+    return
+  }
+  let draft = channelDraft.value
+  let snapshot = channelState()
   let methods = {
     test: 'crm_messenger.api.channels.test_provider_connection',
     connect: 'crm_messenger.api.channels.register_provider_webhook',
     status: 'crm_messenger.api.channels.get_provider_webhook_status',
     disconnect: 'crm_messenger.api.channels.remove_provider_webhook',
-    'avito-webhook': 'crm_messenger.api.channels.register_avito_webhook',
-    'avito-oauth': 'crm_messenger.api.avito_oauth.start_connection',
   }
   channelAction.value = action
   channelError.value = ''
   try {
     let params = { channel: channelDraft.value.channel }
-    if (action === 'avito-oauth') params.return_url = window.location.href
     let result = await call(methods[action], params)
     if (!result?.ok) {
-      throw new Error(result?.message || __('The provider operation failed.'))
+      throw new Error(providerActionFailureMessage(result))
     }
     if (result.authorization_url) {
       window.open(result.authorization_url, '_blank', 'noopener')
     }
     await loadSettings(true, true)
-    let fresh = channels.value.find(
-      (row) => row.name === channelDraft.value.channel,
-    )
-    if (fresh) openChannel(fresh)
+    let fresh = channels.value.find((row) => row.name === draft.channel)
+    if (
+      fresh &&
+      showChannelDialog.value &&
+      channelDraft.value === draft &&
+      channelState() === snapshot
+    ) {
+      openChannel(fresh)
+    }
     toast.success(
       clientProviderMessage(result.message || 'Operation completed.'),
     )
   } catch (error) {
-    channelError.value = clientProviderMessage(
-      error?.messages?.[0] ||
-        error?.message ||
-        'The provider operation failed.',
-    )
+    if (channelDraft.value === draft) {
+      channelError.value = clientProviderMessage(
+        error?.messages?.[0] ||
+          error?.message ||
+          'The provider operation failed.',
+      )
+    }
   } finally {
     channelAction.value = ''
   }
+}
+
+async function loadAvitoImportStatus() {
+  if (!channelDraft.value.channel) return
+  const channel = channelDraft.value.channel
+  loadingAvitoImport.value = true
+  try {
+    const result = await call(
+      'crm_messenger.api.provider_sync.get_channel_sync_status',
+      { channel },
+    )
+    if (channelDraft.value.channel === channel && result?.ok)
+      avitoImportStatus.value = result
+  } catch {
+    if (channelDraft.value.channel === channel) avitoImportStatus.value = null
+  } finally {
+    loadingAvitoImport.value = false
+  }
+}
+
+async function scanAvitoChats() {
+  if (channelBusy.value || channelDirty.value || !channelDraft.value.channel)
+    return
+  scanningAvitoImport.value = true
+  try {
+    const result = await call(
+      'crm_messenger.api.provider_sync.enqueue_channel_sync',
+      {
+        channel: channelDraft.value.channel,
+      },
+    )
+    if (!result?.ok)
+      throw new Error(result?.message || 'Could not start the Avito chat scan.')
+    toast.success(__('Avito chat scan started.'))
+    await loadAvitoImportStatus()
+  } catch (error) {
+    toast.error(
+      clientProviderMessage(
+        error?.message || 'Could not start the Avito chat scan.',
+      ),
+    )
+  } finally {
+    scanningAvitoImport.value = false
+  }
+}
+
+function avitoImportStatusLabel(status) {
+  return (
+    {
+      never: 'No chat scan yet',
+      queued: 'Chat scan queued',
+      running: 'Scanning chats',
+      succeeded: 'Chat scan completed',
+      incomplete: 'Chat scan incomplete',
+      failed: 'Chat scan failed',
+    }[status] || 'No chat scan yet'
+  )
+}
+
+function channelState() {
+  return JSON.stringify(buildMessengerChannelPayload(channelDraft.value))
 }
 
 function channelTitle(channel) {
@@ -736,6 +945,20 @@ function clientProviderMessage(message) {
   if (!text) return ''
   if (/wazzup(?:24)?/i.test(text)) return __('The provider operation failed.')
   return __(text)
+}
+
+function providerActionFailureMessage(result = {}) {
+  if (result.reason === 'messenger_subscription_required') {
+    if (result.response?.chat_discovery_available) {
+      return __(
+        'Chat discovery is available. Connect this channel to create Avito leads automatically; read and reply on Avito.',
+      )
+    }
+    return __(
+      'This account does not have access to the Avito Messenger API. Switch to a subscription that includes the Messenger API, then try again.',
+    )
+  }
+  return result.message || __('The provider operation failed.')
 }
 
 onMounted(() => loadSettings())

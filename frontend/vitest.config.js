@@ -1,15 +1,21 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
+import vueJsx from '@vitejs/plugin-vue-jsx'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), vueJsx()],
   test: {
     globals: true,
     environment: 'happy-dom',
     root: import.meta.dirname,
     setupFiles: ['./tests/setup.js'],
     include: ['tests/**/*.test.js', 'src/**/*.test.js'],
+    server: {
+      deps: {
+        inline: ['frappe-ui'],
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'json-summary'],
@@ -66,6 +72,10 @@ export default defineConfig({
         'tests/stubs/IconStub.vue',
       ),
       '~icons/lucide/x': path.resolve(
+        import.meta.dirname,
+        'tests/stubs/IconStub.vue',
+      ),
+      '~icons/lucide/layout-dashboard': path.resolve(
         import.meta.dirname,
         'tests/stubs/IconStub.vue',
       ),

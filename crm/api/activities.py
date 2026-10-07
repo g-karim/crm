@@ -8,6 +8,7 @@ from frappe.query_builder import JoinType
 from frappe.translate import get_translated_doctypes
 
 from crm.fcrm.doctype.crm_call_log.crm_call_log import parse_call_log
+from crm.fcrm.doctype.crm_fields_layout.crm_fields_layout import get_permlevel_access
 
 
 @frappe.whitelist()
@@ -26,10 +27,7 @@ def get_deal_activities(name: str):
 
 	get_docinfo("", "CRM Deal", name)
 	docinfo = frappe.response["docinfo"]
-	deal_meta = frappe.get_meta("CRM Deal")
-	deal_fields = {
-		field.fieldname: {"label": field.label, "options": field.options} for field in deal_meta.fields
-	}
+	deal_fields = get_readable_fields("CRM Deal")
 	avoid_fields = [
 		"lead",
 		"response_by",
@@ -183,10 +181,7 @@ def get_lead_activities(name: str):
 
 	get_docinfo("", "CRM Lead", name)
 	docinfo = frappe.response["docinfo"]
-	lead_meta = frappe.get_meta("CRM Lead")
-	lead_fields = {
-		field.fieldname: {"label": field.label, "options": field.options} for field in lead_meta.fields
-	}
+	lead_fields = get_readable_fields("CRM Lead")
 	avoid_fields = [
 		"converted",
 		"response_by",
@@ -318,6 +313,21 @@ def get_lead_activities(name: str):
 	return activities, calls, notes, tasks, attachments
 
 
+def get_readable_fields(doctype: str):
+	"""Map of fieldname to label & options, skipping fields the user cannot read.
+
+	Permlevel restrictions already hide these fields on the form layout, so the
+	activity timeline has to hide them too instead of leaking their values.
+	"""
+	allowed_permlevels = get_permlevel_access("read", doctype)
+
+	return {
+		field.fieldname: {"label": field.label, "options": field.options}
+		for field in frappe.get_meta(doctype).fields
+		if field.permlevel == 0 or field.permlevel in allowed_permlevels
+	}
+
+
 def get_attachments(doctype: str, name: str):
 	return (
 		frappe.db.get_all(
@@ -394,6 +404,8 @@ def get_linked_calls(name: str):
 			"recording_url",
 			"creation",
 			"note",
+			"reference_doctype",
+			"reference_docname",
 		],
 	)
 
@@ -423,6 +435,8 @@ def get_linked_calls(name: str):
 				CallLog.recording_url,
 				CallLog.creation,
 				CallLog.note,
+				CallLog.reference_doctype,
+				CallLog.reference_docname,
 				Link.link_doctype,
 				Link.link_name,
 			)

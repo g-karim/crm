@@ -286,7 +286,13 @@ function updateColumn(d, fetchNewColumns = false) {
   let data = { kanban_columns: _columns, fetchNewColumns }
 
   if (toColumn != fromColumn) {
-    data = { item: itemName, to: toColumn, kanban_columns: _columns }
+    data = {
+      item: itemName,
+      to: toColumn,
+      from: fromColumn,
+      fromIndex: d?.oldIndex,
+      kanban_columns: _columns,
+    }
   }
 
   emit('update', data)
@@ -314,8 +320,8 @@ function cardMeta(fields) {
   background: rgba(240, 249, 255, 0.94);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.92),
-    inset 0 -16px 28px
-      rgba(56, 189, 248, calc(0.1 + var(--freeze-progress) * 0.12));
+    inset 0 -16px 28px rgba(56, 189, 248, calc(0.1 + var(--freeze-progress) *
+            0.12));
 }
 
 .kanban-card-freeze > * {

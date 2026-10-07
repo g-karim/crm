@@ -66,7 +66,11 @@ def get_fields_layout(doctype: str, type: str, parent_doctype: str | None = None
 
 	hidden_fields = set(get_hidden_fields(doctype))
 	fields = frappe.get_meta(doctype).fields
-	fields = [field for field in fields if field.fieldname in allowed_fields and field.fieldname not in hidden_fields]
+	fields = [
+		field
+		for field in fields
+		if field.fieldname in allowed_fields and field.fieldname not in hidden_fields
+	]
 
 	required_fields = []
 
@@ -198,7 +202,7 @@ def get_field_obj(field):
 		field["placeholder"] = field.get("placeholder") or _("Select {0}...").format(_(field.label))
 	elif field.fieldtype == "Select" and field.options:
 		field["placeholder"] = field.get("placeholder") or _("Select {0}...").format(_(field.label))
-		field["options"] = [{"label": option, "value": option} for option in field.options.split("\n")]
+		field["options"] = [{"label": _(option), "value": option} for option in field.options.split("\n")]
 	else:
 		field["placeholder"] = field.get("placeholder") or _("Add {0}...").format(_(field.label))
 

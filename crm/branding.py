@@ -61,6 +61,8 @@ def ensure_desktop_icon_branding():
 				"label": APP_NAME,
 				"icon_type": "App",
 				"app": "crm",
+				"link_type": "External",
+				"link": APP_ROUTE,
 				"logo_url": APP_LOGO_URL,
 				"hidden": 0,
 				"standard": 1,
@@ -88,6 +90,20 @@ def ensure_desktop_icon_branding():
 
 		if doc.hidden:
 			values["hidden"] = 0
+
+		# Migrated app icons can retain a deleted workspace parent and become
+		# invisible in Desk even though the CRM app is installed.
+		if doc.parent_icon:
+			values["parent_icon"] = None
+
+		if doc.link_type != "External":
+			values["link_type"] = "External"
+
+		if doc.link != APP_ROUTE:
+			values["link"] = APP_ROUTE
+
+		if doc.link_to:
+			values["link_to"] = None
 
 		if values:
 			frappe.db.set_value("Desktop Icon", name, values, update_modified=False)

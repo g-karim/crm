@@ -324,8 +324,11 @@ def get_data(
 	data = []
 	_list = get_controller(doctype)
 	default_rows = []
+	default_column_keys = []
 	if hasattr(_list, "default_list_data"):
-		default_rows = _list.default_list_data().get("rows")
+		default_list_data = _list.default_list_data()
+		default_rows = default_list_data.get("rows")
+		default_column_keys = [column.get("key") for column in default_list_data.get("columns", [])]
 
 	meta = frappe.get_meta(doctype)
 	hidden_fields = set(get_hidden_fields(doctype))
@@ -363,20 +366,21 @@ def get_data(
 			columns = _list.default_list_data().get("columns")
 
 		rows = [row for row in rows or [] if row not in hidden_fields]
-		columns = [column for column in columns or [] if column.get("key") not in hidden_fields]
-
 		visible_columns = []
-		# check if rows has all keys from columns if not add them
-		for column in columns:
-			column_meta = meta.get_field(column.get("key"))
-			if column_meta and column_meta.get("hidden"):
+		for column in columns or []:
+			key = column.get("key")
+			if key in hidden_fields:
+				continue
+			# Schema-hidden fields are allowed when the controller selected them.
+			column_meta = meta.get_field(key)
+			if column_meta and column_meta.get("hidden") and key not in default_column_keys:
 				continue
 
-			if column.get("key") not in rows:
-				rows.append(column.get("key"))
+			if key not in rows:
+				rows.append(key)
 			column["label"] = _(column.get("label"))
 
-			if column.get("key") == "_liked_by" and column.get("width") == "10rem":
+			if key == "_liked_by" and column.get("width") == "10rem":
 				column["width"] = "50px"
 
 			visible_columns.append(column)
@@ -387,6 +391,9 @@ def get_data(
 			group_by_field = None
 		if group_by_field and group_by_field not in rows:
 			rows.append(group_by_field)
+
+		if meta.track_seen and "_seen" not in rows:
+			rows.append("_seen")
 
 		data = (
 			frappe.get_list(
@@ -453,11 +460,12 @@ def get_data(
 			if kc.get("delete"):
 				column_data = []
 			else:
-				page_length = kc.get("page_length", 20)
+				# don't shadow the top-level page_length echoed in the response
+				column_page_length = kc.get("page_length", 20)
 
 				if order:
 					column_data = get_records_based_on_order(
-						doctype, rows, column_filters, page_length, order
+						doctype, rows, column_filters, column_page_length, order
 					)
 				else:
 					column_data = frappe.get_list(
@@ -465,7 +473,7 @@ def get_data(
 						fields=rows,
 						filters=column_filters,
 						order_by=order_by,
-						page_length=page_length,
+						page_length=column_page_length,
 					)
 
 				all_count = frappe.get_list(
@@ -682,7 +690,16 @@ def remove_assignments(doctype: str, name: str, assignees: str | list, ignore_pe
 
 
 @frappe.whitelist()
+def add_seen(doctype: str, name: str):
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("read")
+	doc.add_seen()
+
+
+@frappe.whitelist()
 def get_assigned_users(doctype: str, name: str | int, default_assigned_to: str | None = None):
+	if not frappe.has_permission(doctype, "read", name):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
 	assigned_users = frappe.get_all(
 		"ToDo",
 		fields=["allocated_to"],
@@ -713,7 +730,11 @@ def get_fields(doctype: str, allow_all_fieldtypes: bool = False):
 	_fields = []
 
 	for field in fields:
-		if field.fieldtype not in not_allowed_fieldtypes and field.fieldname and field.fieldname not in hidden_fields:
+		if (
+			field.fieldtype not in not_allowed_fieldtypes
+			and field.fieldname
+			and field.fieldname not in hidden_fields
+		):
 			_fields.append(field)
 
 	return _fields
@@ -758,6 +779,8 @@ def get_linked_docs_of_document(doctype: str, docname: str):
 		doc = frappe.get_doc(doctype, docname)
 	except frappe.DoesNotExistError:
 		return []
+	if not doc.has_permission("read"):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
 
 	linked_docs = get_linked_docs(doc)
 	dynamic_linked_docs = get_dynamic_linked_docs(doc)
@@ -773,6 +796,8 @@ def get_linked_docs_of_document(doctype: str, docname: str):
 		try:
 			data = frappe.get_doc(doc["reference_doctype"], doc["reference_docname"])
 		except (frappe.DoesNotExistError, frappe.ValidationError):
+			continue
+		if not data.has_permission("read"):
 			continue
 
 		title = data.get("title")

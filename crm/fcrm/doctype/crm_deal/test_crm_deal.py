@@ -1,6 +1,8 @@
 # Copyright (c) 2023, Frappe Technologies Pvt. Ltd. and Contributors
 # See license.txt
 
+from unittest.mock import patch
+
 import frappe
 from frappe.desk.form.assign_to import add as assign_add
 from frappe.desk.form.assign_to import remove as assign_remove
@@ -14,18 +16,19 @@ from crm.api.doc import (
 	sort_options,
 )
 from crm.fcrm.doctype.crm_deal.api import get_deal_contacts
-from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
 from crm.fcrm.doctype.crm_deal.crm_deal import (
 	add_contact,
 	create_deal,
 	remove_contact,
 	set_primary_contact,
 )
+from crm.fcrm.doctype.crm_external_reference.crm_external_reference import find_external_reference
 from crm.fcrm.doctype.crm_sales_pipeline.crm_sales_pipeline import get_default_pipeline
 
 
 class TestCRMDeal(IntegrationTestCase):
 	def tearDown(self) -> None:
+		frappe.set_user("Administrator")
 		frappe.db.rollback()
 
 	def test_deal_creation_with_organization(self):
@@ -242,7 +245,7 @@ class TestCRMDeal(IntegrationTestCase):
 				organization="External Duplicate Org",
 				external_source="bitrix24",
 				external_record_id=external_record_id,
-				)
+			)
 
 	def test_external_record_id_requires_external_source(self):
 		"""Test that external IDs require source context to avoid ambiguous imports"""
@@ -427,7 +430,9 @@ class TestCRMDeal(IntegrationTestCase):
 		deal.save()
 
 		self.assertEqual(deal.status, won_stage.name)
-		self.assertTrue(any("closed without these fields" in warning for warning in deal._pipeline_rule_warnings))
+		self.assertTrue(
+			any("closed without these fields" in warning for warning in deal._pipeline_rule_warnings)
+		)
 		self.assertTrue(any("Contact" in warning for warning in deal._pipeline_rule_warnings))
 
 	def test_stage_skip_block_prevents_save(self):
@@ -641,6 +646,40 @@ class TestCRMDeal(IntegrationTestCase):
 		assign_remove("CRM Deal", deal.name, "crm.user1@example.com")  # remove a non-owner assignee
 		self.assertIsNone(frappe.db.get_value("CRM Deal", deal.name, "deal_owner"))
 
+	def test_todo_assignment_checks_deal_write_permission(self):
+		"""The direct ToDo hook checks deal write access before accepting an assignment."""
+		deal = create_test_deal(organization="No Access Assign Org", deal_owner="crm.user1@example.com")
+		from crm.api.todo import validate as validate_todo
+
+		assignment = frappe.get_doc(
+			{
+				"doctype": "ToDo",
+				"description": "Take over",
+				"reference_type": "CRM Deal",
+				"reference_name": deal.name,
+				"allocated_to": "crm.user2@example.com",
+			}
+		)
+		# Frappe sets __islocal immediately before insert hooks run.
+		assignment.set("__islocal", True)
+		with patch("crm.api.todo.frappe.get_doc") as get_doc:
+			get_doc.return_value.check_permission.side_effect = frappe.PermissionError
+			with self.assertRaises(frappe.PermissionError):
+				validate_todo(assignment, "validate")
+			get_doc.assert_called_once_with("CRM Deal", deal.name)
+			get_doc.return_value.check_permission.assert_called_once_with("write")
+
+		self.assertEqual(frappe.db.get_value("CRM Deal", deal.name, "deal_owner"), "crm.user1@example.com")
+
+	def test_owner_can_assign_via_standard_api(self):
+		"""A deal owner can use Frappe's assignment API to hand ownership to another user."""
+		deal = create_test_deal(organization="Direct Assign Org", deal_owner="crm.user1@example.com")
+
+		frappe.set_user("crm.user1@example.com")
+		assign_add({"assign_to": ["crm.user2@example.com"], "doctype": "CRM Deal", "name": deal.name})
+
+		self.assertEqual(frappe.db.get_value("CRM Deal", deal.name, "deal_owner"), "crm.user2@example.com")
+
 	def test_task_unassign_does_not_touch_owner(self):
 		"""Cancelling a CRM Task assignment is a no-op for owner fields"""
 		deal = create_test_deal(organization="Task Org")
@@ -784,6 +823,21 @@ class TestCRMDeal(IntegrationTestCase):
 		deal = frappe.get_doc("CRM Deal", deal_name)
 		self.assertEqual(deal.organization, org.name)
 
+	def test_create_deal_api_propagates_no_of_employees(self):
+		"""Test that no_of_employees is copied onto the organization create_deal creates"""
+		deal_name = create_deal(
+			{
+				"organization_name": "Employees Test Org",
+				"no_of_employees": "51-200",
+				"first_name": "Employees",
+				"email": "employeestest@example.com",
+			}
+		)
+
+		deal = frappe.get_doc("CRM Deal", deal_name)
+		org = frappe.get_doc("CRM Organization", deal.organization)
+		self.assertEqual(org.no_of_employees, "51-200")
+
 	def test_create_deal_with_existing_contact(self):
 		"""Test create_deal with existing contact"""
 		# Create contact first
@@ -894,6 +948,43 @@ class TestCRMDeal(IntegrationTestCase):
 		for fieldname in ("annual_revenue", "deal_value", "expected_deal_value", "total", "net_total"):
 			with self.subTest(fieldname=fieldname), self.assertRaises(frappe.NonNegativeError):
 				create_test_deal(organization=f"Negative {fieldname}", **{fieldname: -100})
+
+
+class TestGetDealContacts(IntegrationTestCase):
+	def tearDown(self) -> None:
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+
+	def test_get_deal_contacts_requires_read_permission(self):
+		"""A user without read access on the deal must not get its contact PII"""
+		contact = create_test_contact(
+			first_name="Alice",
+			last_name="Confidential",
+			email="alice@example.com",
+			mobile_no="+919000000000",
+		)
+		deal = create_test_deal(organization="Perm Test Org")
+		deal.append("contacts", {"contact": contact.name})
+		deal.save()
+
+		self.assertEqual(get_deal_contacts(deal.name)[0]["name"], contact.name)
+
+		frappe.set_user(create_test_user_without_deal_access())
+		with self.assertRaises(frappe.PermissionError):
+			get_deal_contacts(deal.name)
+
+
+def create_test_user_without_deal_access():
+	"""Create (or reuse) a user with no role granting access to CRM Deal"""
+	email = "deal-noperm@example.com"
+	if not frappe.db.exists("User", email):
+		user = frappe.new_doc("User")
+		user.email = email
+		user.first_name = "No"
+		user.last_name = "Perm"
+		user.send_welcome_email = 0
+		user.insert(ignore_permissions=True)
+	return email
 
 
 def create_test_deal(**kwargs):

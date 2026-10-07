@@ -19,6 +19,7 @@ import frappe
 from frappe.utils.telemetry import capture
 
 from .config import _setting, auto_enrich_enabled_for, get_config, get_settings
+from .extractors import READABILITY_MESSAGES
 from .mapper import apply_to_document
 from .pipeline import PROGRESS_STEPS
 from .pipeline import run as run_pipeline
@@ -48,6 +49,7 @@ def _publish(reference_doctype, reference_name, status, message="", step=0, payl
 				"payload": payload or {},
 			},
 			user=user,
+			after_commit=status in ("completed", "error"),
 		)
 	except Exception:
 		pass
@@ -61,6 +63,7 @@ def write_run(
 	result=None,
 	started_on=None,
 	notes: str = "",
+	filled_fields: list[str] | None = None,
 ):
 	"""Persist exactly one ``CRM Enrichment Run`` from an ``EnrichmentResult``.
 
@@ -89,7 +92,9 @@ def write_run(
 		doc.emails_found = len(result.emails)
 		doc.phones_found = len(result.phones)
 		doc.social_profiles = social
-		doc.raw_json = frappe.as_json(result.to_dict())
+		data = result.to_dict()
+		data["_meta"]["filled_fields"] = filled_fields or []
+		doc.raw_json = frappe.as_json(data)
 		if not notes and result.notes:
 			doc.notes = "\n".join(result.notes)
 
@@ -126,7 +131,12 @@ def enqueue_enrichment(
 		user=user,
 		trigger=trigger,
 	)
-	return {"queued": True, "job_id": job_id, "website": website}
+	return {
+		"queued": True,
+		"job_id": job_id,
+		"website": website,
+		"queued_at": frappe.utils.now_datetime(),
+	}
 
 
 def auto_enrich_on_create(doc, method=None):
@@ -178,16 +188,43 @@ def run_enrichment(
 			reference_doctype,
 			reference_name,
 			status="running",
-			message=message,
+			message=frappe._(message),
 			step=step_index,
 			user=user,
 		)
 
 	try:
 		cfg = get_config()
-		_publish(reference_doctype, reference_name, status="running", message="Starting", step=0, user=user)
+		_publish(
+			reference_doctype,
+			reference_name,
+			status="running",
+			message=frappe._("Starting"),
+			step=0,
+			user=user,
+		)
 
 		result = run_pipeline(website, cfg=cfg, progress=progress)
+		# A blocked/unreachable site has no fresh data. Never clear previously
+		# enriched fields through an Always refresh mapping in this case.
+		unreadable = {READABILITY_MESSAGES["blocked"], READABILITY_MESSAGES["unreachable"]}
+		if any(note in unreadable for note in result.notes):
+			write_run(
+				reference_doctype,
+				reference_name,
+				website,
+				status="Failed",
+				result=result,
+				started_on=started_on,
+			)
+			_publish(
+				reference_doctype,
+				reference_name,
+				status="error",
+				message=frappe._(result.notes[0]),
+				user=user,
+			)
+			return
 
 		doc = frappe.get_doc(reference_doctype, reference_name)
 		doc.check_permission("write")
@@ -202,13 +239,14 @@ def run_enrichment(
 			status="Completed",
 			result=result,
 			started_on=started_on,
+			filled_fields=filled_fields,
 		)
 
 		_publish(
 			reference_doctype,
 			reference_name,
 			status="completed",
-			message="Completed",
+			message=frappe._("Completed"),
 			step=TOTAL_STEPS - 1,
 			payload={
 				"filled_fields": filled_fields,

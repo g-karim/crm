@@ -2,7 +2,6 @@
 # For license information, please see license.txt
 
 import frappe
-import frappe.share
 from frappe.desk.form.assign_to import _add, _remove, add, remove
 from frappe.tests import IntegrationTestCase
 
@@ -25,13 +24,7 @@ class TestLeadAssignmentPermissions(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.savepoint("test_lead_assignment_permissions")
 		self.lead = make_lead("assignment-writer@example.com")
-		frappe.share.add(
-			"CRM Lead",
-			self.lead.name,
-			"assignment-reader@example.com",
-			read=1,
-			write=0,
-		)
+		frappe.share.add("CRM Lead", self.lead.name, "assignment-reader@example.com", read=1, write=0)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -39,6 +32,8 @@ class TestLeadAssignmentPermissions(IntegrationTestCase):
 
 	def test_read_only_user_cannot_assign_self_or_another_user(self):
 		frappe.set_user("assignment-reader@example.com")
+		self.assertTrue(frappe.has_permission("CRM Lead", "read", doc=self.lead))
+		self.assertFalse(frappe.has_permission("CRM Lead", "write", doc=self.lead))
 
 		for assignee, ignore_permissions in (
 			("assignment-reader@example.com", False),

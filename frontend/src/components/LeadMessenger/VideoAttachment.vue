@@ -80,7 +80,7 @@
       <img
         v-if="attachment.preview_url"
         :src="attachment.preview_url"
-        :alt="title"
+        :alt="__(title)"
         class="absolute inset-0 z-10 size-full object-contain"
         loading="lazy"
         @load="handlePreviewImageLoad"
@@ -138,7 +138,7 @@
       />
       <img
         :src="attachment.preview_url"
-        :alt="title"
+        :alt="__(title)"
         class="absolute inset-0 z-10 size-full object-contain"
         loading="lazy"
         @load="handlePreviewImageLoad"
@@ -242,8 +242,8 @@ const action = computed(() =>
 const immediateExternalFallback = computed(() =>
   Boolean(
     props.provider === 'vk_direct' &&
-    action.value &&
-    ['external', 'provider_embed'].includes(props.attachment.video_source),
+      action.value &&
+      ['external', 'provider_embed'].includes(props.attachment.video_source),
   ),
 )
 const cardAttachment = computed(() => ({
@@ -287,7 +287,7 @@ const actionLabel = computed(() =>
 )
 const statusLabel = computed(() => {
   if (immediateExternalFallback.value) return __('Available only on VK')
-  if (state.value.busy) return state.value.label
+  if (state.value.busy) return __(state.value.label)
   if (state.value.unsupported) return __('Video format is not supported')
   if (props.provider === 'vk_direct' && !playable.value && action.value)
     return __('Available only on VK')
