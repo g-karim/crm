@@ -433,6 +433,31 @@ describe('messengerSettings', () => {
   )
 
   it.each([
+    ['not_connected', 'Channel Not Connected', 'gray'],
+    ['provisioning', 'Preparing connection', 'gray'],
+    ['waiting_qr', 'Waiting for QR scan', 'orange'],
+    ['waiting_2fa', 'Two-factor authentication required', 'orange'],
+    ['active', 'Channel Connected', 'green'],
+    ['unauthorized', 'Authorization expired', 'red'],
+    ['error', 'Needs Attention', 'red'],
+    ['unknown', 'Result unknown', 'orange'],
+    ['reconnecting', 'Reconnecting', 'gray'],
+    ['deleted', 'Channel Deleted', 'gray'],
+  ])(
+    'shows Partner lifecycle %s before the local enable flag',
+    (status, label, theme) => {
+      expect(
+        messengerChannelState({
+          provider: 'wazzup',
+          wazzup_api_mode: 'partner_api_v2',
+          wazzup_status: status,
+          enabled: false,
+        }),
+      ).toEqual({ label, theme })
+    },
+  )
+
+  it.each([
     ['connected', 'Channel Connected', 'green'],
     ['degraded', 'Needs Attention', 'orange'],
     ['error', 'Needs Attention', 'orange'],

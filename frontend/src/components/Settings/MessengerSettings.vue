@@ -17,6 +17,12 @@
           @click="saveGlobalSettings"
         />
         <Button
+          v-if="settings.wazzup_partner_available"
+          :label="__('Connect WhatsApp / Telegram')"
+          variant="subtle"
+          @click="openPartnerConnection()"
+        />
+        <Button
           :label="__('New Channel')"
           icon-left="lucide-plus"
           variant="solid"
@@ -766,10 +772,20 @@
       </div>
     </template>
   </Dialog>
+
+  <WazzupPartnerConnection
+    v-if="showPartnerConnection"
+    :channel="partnerChannel"
+    @updated="updatePartnerChannel"
+    @deleted="deletePartnerChannel"
+    @close="showPartnerConnection = false"
+  />
 </template>
 
 <script setup>
 import SettingsLayoutBase from '@/components/Layouts/SettingsLayoutBase.vue'
+import WazzupPartnerConnection from '@/components/Settings/WazzupPartnerConnection.vue'
+import { isWazzupPartnerChannel } from '@/utils/wazzupPartnerConnection'
 import {
   MESSENGER_PROVIDER_OPTIONS,
   applyMessengerProviderDefaults,
@@ -806,6 +822,7 @@ const defaultSettings = () => ({
   webhook_secret_configured: false,
   webhook_base_url: '',
   webhook_base_url_is_public_https: false,
+  wazzup_partner_available: false,
 })
 
 const settings = reactive(defaultSettings())
@@ -818,6 +835,8 @@ const settingsSnapshot = ref('')
 const showAdvanced = ref(false)
 
 const showChannelDialog = ref(false)
+const showPartnerConnection = ref(false)
+const partnerChannel = ref(null)
 const channelDraft = ref(makeMessengerChannelDraft())
 const channelSnapshot = ref('')
 const savingChannel = ref(false)
@@ -1047,6 +1066,10 @@ function openNewChannel() {
 }
 
 function openChannel(channel) {
+  if (isWazzupPartnerChannel(channel)) {
+    openPartnerConnection(channel)
+    return
+  }
   avitoImportStatus.value = null
   wazzupConnection.value = channel.integration?.wazzup_connection || null
   wazzupOperations.value = null
@@ -1069,6 +1092,21 @@ function openChannel(channel) {
   ) {
     loadAvitoImportStatus()
   }
+}
+
+function openPartnerConnection(channel = null) {
+  partnerChannel.value = channel
+  showPartnerConnection.value = true
+}
+
+function updatePartnerChannel(channel) {
+  const index = channels.value.findIndex((row) => row.name === channel.name)
+  if (index < 0) channels.value.push(channel)
+  else channels.value[index] = { ...channels.value[index], ...channel }
+}
+
+function deletePartnerChannel(name) {
+  channels.value = channels.value.filter((channel) => channel.name !== name)
 }
 
 function changeProvider(provider) {

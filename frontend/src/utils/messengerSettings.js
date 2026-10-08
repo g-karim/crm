@@ -1,3 +1,8 @@
+import {
+  isWazzupPartnerChannel,
+  wazzupPartnerStatus,
+} from '@/utils/wazzupPartnerConnection'
+
 export const DIRECT_MESSENGER_PROVIDERS = [
   'telegram_bot',
   'vk_direct',
@@ -218,6 +223,9 @@ export function validateMessengerChannelDraft(draft) {
 }
 
 export function messengerChannelState(channel = {}) {
+  if (isWazzupPartnerChannel(channel)) {
+    return wazzupPartnerStatus(channel.wazzup_status)
+  }
   if (!channel.enabled) {
     return { label: 'Channel Disabled', theme: 'gray' }
   }

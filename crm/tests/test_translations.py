@@ -77,6 +77,28 @@ class TestCRMTranslations(TestCase):
 				self.assertIn(source, translations)
 				self.assertNotEqual(translations[source], source)
 
+	def test_wazzup_partner_onboarding_has_runtime_translations(self):
+		user_facing = {
+			"Connect WhatsApp / Telegram", "Connect", "Preparing connection",
+			"Waiting for QR scan", "Two-factor authentication required", "Authorization expired",
+			"Reconnecting", "Reconnect", "Channel Deleted", "Delete Channel",
+			"QR code has expired. Request a new code.", "Refresh QR code", "Channel QR code",
+			"Scan this QR code in the messenger app.", "Use the simulator button below to test the QR scan.",
+			"Waiting for QR code.",
+			"Enter the two-factor authentication password for this account.",
+			"Two-factor authentication password", "Submit password", "The messenger account is connected.",
+			"Refresh the channel status or reconnect to restore access.", "Local simulator", "Simulate QR scan",
+			"Delete this channel? Existing messages will remain in CRM.",
+			"The two-factor authentication password was rejected. Try again.",
+			"The connection result is unknown. Refresh its status before trying again.",
+			"Could not submit the password. Refresh the connection status.",
+			"Could not delete the channel. Refresh its status.",
+			"Could not update the connection. Refresh its status and try again.",
+		}
+		translations = get_crm_translations("ru")
+		self.assertEqual(user_facing - translations.keys(), set())
+		self.assertTrue(all(translations[source] != source for source in user_facing))
+
 	def test_user_facing_avito_errors_have_runtime_translations(self):
 		user_facing = {
 			"This account does not have access to the Avito Messenger API. Switch to a subscription that includes the Messenger API, then try again.",

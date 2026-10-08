@@ -55,6 +55,14 @@ vi.mock('@/components/Layouts/SettingsLayoutBase.vue', () => ({
   },
 }))
 
+vi.mock('@/components/Settings/WazzupPartnerConnection.vue', () => ({
+  default: {
+    props: ['channel'],
+    template:
+      '<div data-wazzup-partner-management>{{ channel?.name || "new-partner" }}</div>',
+  },
+}))
+
 vi.mock('@/utils/messengerSettings', async (importOriginal) => ({
   ...(await importOriginal()),
   callWazzupSettings: (...args) => {
@@ -156,13 +164,14 @@ describe('MessengerSettings Wazzup connection', () => {
   }
   function setup({
     stored = [channel()],
+    settings = { enabled: true },
     diagnostics = null,
     extra = () => {},
   } = {}) {
     mocks.call.mockImplementation((method, params) => {
       if (method === 'crm_messenger.api.settings.get_settings')
         return Promise.resolve({
-          settings: { enabled: true },
+          settings,
           channels: stored,
         })
       if (method === 'crm_messenger.api.diagnostics.get_health_summary')
@@ -170,6 +179,40 @@ describe('MessengerSettings Wazzup connection', () => {
       return extra(method, params)
     })
   }
+
+  it('routes Partner v2 rows to onboarding without opening the legacy key form', async () => {
+    setup({
+      stored: [
+        channel({
+          wazzup_api_mode: 'partner_api_v2',
+          wazzup_status: 'waiting_qr',
+          api_token_configured: false,
+          enabled: false,
+        }),
+      ],
+    })
+    const root = await mountSettings()
+    expect(root.textContent).toContain('Waiting for QR scan')
+    await clickButton(root, 'Wazzup Sales')
+    expect(
+      root.querySelector('[data-wazzup-partner-management]').textContent,
+    ).toContain('wazzup-1')
+    expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+    expect(mocks.call.mock.calls.map(([method]) => method)).not.toContain(
+      'crm_messenger.api.wazzup_connection.check_channel',
+    )
+  })
+
+  it('shows the separate connection entry only when the server makes it available', async () => {
+    setup({ settings: { enabled: false, wazzup_partner_available: true } })
+    const root = await mountSettings()
+    await clickButton(root, 'Connect WhatsApp / Telegram')
+    expect(
+      root.querySelector('[data-wazzup-partner-management]').textContent,
+    ).toBe('new-partner')
+    expect(button(root, 'New Channel')).toBeTruthy()
+    expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+  })
 
   it('loads channels using a draft key without saving it and selects the UUID plus personal Telegram platform', async () => {
     setup({
