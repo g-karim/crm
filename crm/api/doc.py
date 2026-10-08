@@ -12,6 +12,7 @@ from pypika import Criterion
 
 from crm.api.views import get_views
 from crm.fcrm.doctype.crm_form_script.crm_form_script import get_form_script
+from crm.list_settings import STATUS_SORT_FIELD, STATUS_SORT_LABEL, normalize_phone_filters
 from crm.utils import is_frappe_version
 
 COUNT_NAME = (
@@ -50,6 +51,10 @@ def sort_options(doctype: str):
 		{"label": "Modified By", "fieldname": "modified_by"},
 		{"label": "Owner", "fieldname": "owner"},
 	]
+	if doctype == "CRM Lead" and (sort_field := frappe.get_meta(doctype).get_field(STATUS_SORT_FIELD)):
+		standard_fields.append(
+			{"label": sort_field.label or STATUS_SORT_LABEL, "fieldname": STATUS_SORT_FIELD}
+		)
 
 	for field in standard_fields:
 		field["label"] = _(field["label"])
@@ -399,7 +404,7 @@ def get_data(
 			frappe.get_list(
 				doctype,
 				fields=rows,
-				filters=filters,
+				filters=_get_list_filters(doctype, filters),
 				order_by=order_by,
 				page_length=page_length,
 			)
@@ -471,14 +476,14 @@ def get_data(
 					column_data = frappe.get_list(
 						doctype,
 						fields=rows,
-						filters=column_filters,
+						filters=_get_list_filters(doctype, column_filters),
 						order_by=order_by,
 						page_length=column_page_length,
 					)
 
 				all_count = frappe.get_list(
 					doctype,
-					filters=column_filters,
+					filters=_get_list_filters(doctype, column_filters),
 					fields=[COUNT_NAME],
 				)[0].total_count
 
@@ -579,7 +584,11 @@ def get_data(
 		"page_length_count": page_length_count,
 		"is_default": is_default,
 		"views": get_views(doctype),
-		"total_count": frappe.get_list(doctype, filters=filters, fields=[COUNT_NAME])[0].total_count,
+		"total_count": frappe.get_list(
+			doctype,
+			filters=_get_list_filters(doctype, filters),
+			fields=[COUNT_NAME],
+		)[0].total_count,
 		"row_count": len(data),
 		"form_script": get_form_script(doctype),
 		"list_script": get_form_script(doctype, "List"),
@@ -592,6 +601,12 @@ def parse_list_data(data, doctype):
 	if hasattr(_list, "parse_list_data"):
 		data = _list.parse_list_data(data)
 	return data
+
+
+def _get_list_filters(doctype, filters):
+	if is_frappe_version("16", above=True) and frappe.db.db_type == "mariadb":
+		return normalize_phone_filters(doctype, filters)
+	return filters
 
 
 def get_deal_pipeline_kanban_columns(pipeline, existing_columns=None):
@@ -650,7 +665,7 @@ def get_records_based_on_order(doctype, rows, filters, page_length, order):
 	records = frappe.get_list(
 		doctype,
 		fields=rows,
-		filters=in_filters,
+		filters=_get_list_filters(doctype, in_filters),
 		order_by="creation desc",
 		page_length=page_length,
 	)
@@ -661,7 +676,7 @@ def get_records_based_on_order(doctype, rows, filters, page_length, order):
 		remaining_records = frappe.get_list(
 			doctype,
 			fields=rows,
-			filters=not_in_filters,
+			filters=_get_list_filters(doctype, not_in_filters),
 			order_by="creation desc",
 			page_length=page_length - len(records),
 		)

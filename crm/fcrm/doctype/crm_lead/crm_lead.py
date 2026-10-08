@@ -106,6 +106,9 @@ class CRMLead(Document):
 			self.assign_agent(self.lead_owner)
 		if self.has_value_changed("status"):
 			add_status_change_log(self)
+		from crm.list_settings import update_lead_sort_date
+
+		update_lead_sort_date(self)
 
 	def after_insert(self):
 		if self.lead_owner:
