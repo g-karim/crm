@@ -90,6 +90,7 @@
         <div
           v-if="
             [
+              'last_touch_at',
               'modified',
               'creation',
               'first_response_time',
@@ -162,6 +163,7 @@
         <div
           v-if="
             [
+              'last_touch_at',
               'modified',
               'creation',
               'first_response_time',
@@ -428,7 +430,7 @@ function parseRows(rows, columns = []) {
       if (
         fieldType &&
         ['Date', 'Datetime'].includes(fieldType) &&
-        !['modified', 'creation'].includes(row)
+        !['modified', 'creation', 'last_touch_at'].includes(row)
       ) {
         _rows[row] = formatDate(lead[row], '', true, fieldType == 'Datetime')
       }
@@ -493,8 +495,12 @@ function parseRows(rows, columns = []) {
           image: getUser(user).user_image,
           label: getUser(user).full_name,
         }))
-      } else if (['modified', 'creation'].includes(row)) {
-        _rows[row] = timestampCell(lead[row])
+      } else if (['modified', 'creation', 'last_touch_at'].includes(row)) {
+        _rows[row] = timestampCell(
+          lead[row] || (row === 'last_touch_at' ? lead.creation : null),
+        )
+        if (row === 'last_touch_at')
+          _rows[row].value = lead[row] || lead.creation
       } else if (
         ['first_response_time', 'first_responded_on', 'response_by'].includes(
           row,

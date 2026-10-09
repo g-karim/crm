@@ -320,6 +320,10 @@
   />
 </template>
 <script setup>
+import {
+  usesDefaultTouchSort,
+  touchExportEndpoint,
+} from '@/utils/touchTracking'
 import Icon from '@/components/Icon.vue'
 import ListIcon from '@/components/Icons/ListIcon.vue'
 import KanbanIcon from '@/components/Icons/KanbanIcon.vue'
@@ -414,6 +418,7 @@ const route = useRoute()
 const router = useRouter()
 
 const defaultParams = ref('')
+const defaultOrderBy = ref('modified desc')
 
 const viewUpdated = ref(false)
 const showViewModal = ref(false)
@@ -513,7 +518,7 @@ function getParams() {
   const view_name = _view?.name || ''
   const view_type = _view?.type || route.params.viewType || 'list'
   const filters = (_view?.filters && JSON.parse(_view.filters)) || {}
-  const order_by = _view?.order_by || 'modified desc'
+  const order_by = _view?.order_by || defaultOrderBy.value
   const group_by_field = _view?.group_by_field || 'owner'
   const columns = _view?.columns || ''
   const rows = _view?.rows || ''
@@ -551,6 +556,7 @@ function getParams() {
       custom_view_name: view_name,
       view_type: view_type,
       group_by_field: group_by_field,
+      default_sort: usesDefaultTouchSort(_view),
     },
     column_field: column_field,
     title_field: title_field,
@@ -571,9 +577,14 @@ listResource = createResource({
   cache: [props.doctype, route.query.view, route.params.viewType],
   auto: true,
   onSuccess(data) {
+    defaultOrderBy.value = data.default_order_by || 'modified desc'
     let cv = getView(route.query.view, route.params.viewType, props.doctype)
     let params = listResource.params || getParams()
     listResource.params = params
+    if (params.view?.default_sort) {
+      params.order_by = data.order_by || params.order_by
+      view.value.order_by = params.order_by
+    }
     defaultParams.value = {
       doctype: props.doctype,
       filters: params.filters,
@@ -583,6 +594,7 @@ listResource = createResource({
         custom_view_name: cv?.name || '',
         view_type: cv?.type || route.params.viewType || 'list',
         group_by_field: params?.view?.group_by_field || 'owner',
+        default_sort: Boolean(params.view?.default_sort),
       },
       column_field: data.column_field,
       title_field: data.title_field,
@@ -690,13 +702,14 @@ async function exportRows() {
 
   filters = JSON.stringify(filters)
 
-  let order_by = list.value.params.order_by
+  let order_by = list.value.data.order_by || list.value.params.order_by
   let page_length = list.value.params.page_length
   if (export_all.value) {
     page_length = list.value.data.total_count
   }
 
-  let url = `/api/method/frappe.desk.reportview.export_query?file_format_type=${export_type.value}&title=${props.doctype}&doctype=${props.doctype}&fields=${fields}&filters=${encodeURIComponent(filters)}&order_by=${order_by}&page_length=${page_length}&start=0&view=Report&with_comment_count=1`
+  const exportEndpoint = touchExportEndpoint(props.doctype, order_by)
+  let url = `/api/method/${exportEndpoint}?file_format_type=${export_type.value}&title=${props.doctype}&doctype=${props.doctype}&fields=${fields}&filters=${encodeURIComponent(filters)}&order_by=${encodeURIComponent(order_by)}&page_length=${page_length}&start=0&view=Report&with_comment_count=1`
 
   // Add selected items parameter if rows are selected
   if (selectedRows.value?.length && !export_all.value) {
@@ -1157,6 +1170,7 @@ function updateSort(order_by) {
   }
   list.value.params = defaultParams.value
   list.value.params.order_by = order_by
+  list.value.params.view.default_sort = !order_by
   view.value.order_by = order_by
   list.value.reload()
 

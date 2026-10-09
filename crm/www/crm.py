@@ -88,6 +88,7 @@ def get_boot():
 			"demo_data_created": frappe.db.get_default("crm_demo_data_created") == "1",
 			"is_fc_site": is_fc_site(),
 			"crm_messenger_enabled": has_crm_messenger(),
+			"crm_touch_settings_available": bool(frappe.db.exists("DocType", "CRM Touch Settings")),
 			"translated_doctypes": get_translated_doctypes(),
 			"translated_messages": translated_messages,
 			"timezone": {

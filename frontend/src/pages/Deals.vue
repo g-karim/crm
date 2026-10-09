@@ -96,6 +96,7 @@
         <div
           v-if="
             [
+              'last_touch_at',
               'modified',
               'creation',
               'first_response_time',
@@ -157,6 +158,7 @@
         <div
           v-if="
             [
+              'last_touch_at',
               'modified',
               'creation',
               'first_response_time',
@@ -375,7 +377,7 @@ const dealFilters = computed(() => {
 const pipelineFilterReady = computed(() => {
   return Boolean(
     selectedPipeline.value ||
-      (pipelinesLoaded.value && salesPipelines.data?.length === 0),
+    (pipelinesLoaded.value && salesPipelines.data?.length === 0),
   )
 })
 
@@ -609,7 +611,7 @@ function parseRows(rows, columns = []) {
       if (
         fieldType &&
         ['Date', 'Datetime'].includes(fieldType) &&
-        !['modified', 'creation'].includes(row)
+        !['modified', 'creation', 'last_touch_at'].includes(row)
       ) {
         _rows[row] = formatDate(deal[row], '', true, fieldType == 'Datetime')
       }
@@ -671,8 +673,12 @@ function parseRows(rows, columns = []) {
           image: getUser(user).user_image,
           label: getUser(user).full_name,
         }))
-      } else if (['modified', 'creation'].includes(row)) {
-        _rows[row] = timestampCell(deal[row])
+      } else if (['modified', 'creation', 'last_touch_at'].includes(row)) {
+        _rows[row] = timestampCell(
+          deal[row] || (row === 'last_touch_at' ? deal.creation : null),
+        )
+        if (row === 'last_touch_at')
+          _rows[row].value = deal[row] || deal.creation
       } else if (
         ['first_response_time', 'first_responded_on', 'response_by'].includes(
           row,
