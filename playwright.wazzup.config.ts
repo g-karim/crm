@@ -8,7 +8,10 @@ const fixture = loadWazzupFixture();
 // This project never starts against the developer's bench by default.
 export default defineConfig({
   testDir: "./frontend/tests/browser",
-  testMatch: /wazzup-local\.spec\.ts/,
+  testMatch:
+    process.env.WAZZUP_PARTNER_E2E === "1"
+      ? /wazzup-partner-local\.spec\.ts/
+      : /wazzup-local\.spec\.ts/,
   workers: 1,
   retries: 0,
   timeout: 180000,

@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   call: vi.fn(),
   safeCall: vi.fn(),
   toast: { error: vi.fn(), success: vi.fn() },
+  deferPartnerConnection: false,
+  finishPartnerConnection: null,
 }))
 
 const components = vi.hoisted(() => ({
@@ -20,9 +22,9 @@ vi.mock('frappe-ui', () => ({
   Badge: { props: ['label'], template: '<span>{{ label }}</span>' },
   Button: components.button,
   Dialog: {
-    props: ['open'],
+    props: ['open', 'options', 'dismissible', 'showCloseButton'],
     template:
-      '<div v-if="open"><slot name="body-content" /><slot name="actions" /></div>',
+      '<div v-if="open" data-dialog :data-title="options?.title" :data-dismissible="dismissible" :data-close-button="showCloseButton"><slot name="body-content" /><slot name="actions" /></div>',
   },
   FeatherIcon: { template: '<span />' },
   FormControl: {
@@ -57,9 +59,29 @@ vi.mock('@/components/Layouts/SettingsLayoutBase.vue', () => ({
 
 vi.mock('@/components/Settings/WazzupPartnerConnection.vue', () => ({
   default: {
-    props: ['channel'],
-    template:
-      '<div data-wazzup-partner-management>{{ channel?.name || "new-partner" }}</div>',
+    props: ['channel', 'platform', 'displayName', 'available'],
+    emits: ['updated', 'deleted', 'busy'],
+    methods: {
+      connected() {
+        this.$emit('busy', true)
+        const finish = () => {
+          this.$emit('updated', {
+            name: 'created-partner',
+            provider: 'wazzup',
+            platform: this.platform,
+            custom_display_name: this.displayName,
+            wazzup_api_mode: 'partner_api_v2',
+            wazzup_status: 'active',
+            enabled: true,
+            state: 'connected',
+          })
+          this.$emit('busy', false)
+        }
+        if (mocks.deferPartnerConnection) mocks.finishPartnerConnection = finish
+        else finish()
+      },
+    },
+    template: `<div data-wazzup-partner-management :data-platform="platform" :data-name="displayName" :data-available="available">{{ channel?.name || 'new-partner' }}<button v-if="!channel?.name" @click="connected">Connect</button><button v-else @click="$emit('deleted', channel.name)">Delete Channel</button></div>`,
   },
 }))
 
@@ -85,6 +107,8 @@ afterEach(() => {
   mocks.safeCall.mockReset()
   mocks.toast.error.mockReset()
   mocks.toast.success.mockReset()
+  mocks.deferPartnerConnection = false
+  mocks.finishPartnerConnection = null
 })
 
 async function mountSettings() {
@@ -171,7 +195,7 @@ describe('MessengerSettings Wazzup connection', () => {
     mocks.call.mockImplementation((method, params) => {
       if (method === 'crm_messenger.api.settings.get_settings')
         return Promise.resolve({
-          settings,
+          settings: { wazzup_legacy_ui_enabled: true, ...settings },
           channels: stored,
         })
       if (method === 'crm_messenger.api.diagnostics.get_health_summary')
@@ -203,16 +227,44 @@ describe('MessengerSettings Wazzup connection', () => {
     )
   })
 
-  it('shows the separate connection entry only when the server makes it available', async () => {
-    setup({ settings: { enabled: false, wazzup_partner_available: true } })
-    const root = await mountSettings()
-    await clickButton(root, 'Connect WhatsApp / Telegram')
-    expect(
-      root.querySelector('[data-wazzup-partner-management]').textContent,
-    ).toBe('new-partner')
-    expect(button(root, 'New Channel')).toBeTruthy()
-    expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
-  })
+  it.each([
+    ['WhatsApp', 'whatsapp'],
+    ['Telegram personal chats', 'telegram'],
+  ])(
+    'opens %s Partner onboarding from New Channel even before server configuration',
+    async (label, platform) => {
+      setup({
+        settings: {
+          wazzup_legacy_ui_enabled: false,
+          wazzup_partner_available: false,
+        },
+      })
+      const root = await mountSettings()
+      await clickButton(root, 'New Channel')
+      expect(root.textContent).not.toContain('Wazzup User API v3 (legacy)')
+      await editField(
+        root,
+        'Provider',
+        platform === 'telegram' ? 'partner_telegram' : 'partner_whatsapp',
+      )
+      expect(
+        root.querySelector('[data-wazzup-partner-management]').textContent,
+      ).toContain('new-partner')
+      expect(
+        root.querySelector('[data-wazzup-partner-management]').dataset.platform,
+      ).toBe(platform)
+      expect(
+        root.querySelector('[data-wazzup-partner-management]').dataset
+          .available,
+      ).toBe('false')
+      expect(button(root, 'New Channel')).toBeTruthy()
+      expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+      expect(root.querySelector('[data-label="Channel ID"]')).toBeNull()
+      expect(root.querySelector('[data-label="Provider"]')).not.toBeNull()
+      expect(root.querySelectorAll('[data-dialog]')).toHaveLength(1)
+      expect(root.querySelector('[data-label="Platform"]')).toBeNull()
+    },
+  )
 
   it('loads channels using a draft key without saving it and selects the UUID plus personal Telegram platform', async () => {
     setup({
@@ -349,7 +401,10 @@ describe('MessengerSettings Wazzup connection', () => {
     let stored = channel({ provider_channel_id: 'legacy-channel-id' })
     mocks.call.mockImplementation((method, params) => {
       if (method === 'crm_messenger.api.settings.get_settings')
-        return Promise.resolve({ settings: {}, channels: [stored] })
+        return Promise.resolve({
+          settings: { wazzup_legacy_ui_enabled: true },
+          channels: [stored],
+        })
       if (method === 'crm_messenger.api.diagnostics.get_health_summary')
         return Promise.resolve({ channels: [] })
       if (method === 'crm_messenger.api.settings.save_channel') {
@@ -398,7 +453,10 @@ describe('MessengerSettings Wazzup connection', () => {
     let stored = channel({ enabled: false })
     mocks.call.mockImplementation((method, params) => {
       if (method === 'crm_messenger.api.settings.get_settings')
-        return Promise.resolve({ settings: {}, channels: [stored] })
+        return Promise.resolve({
+          settings: { wazzup_legacy_ui_enabled: true },
+          channels: [stored],
+        })
       if (method === 'crm_messenger.api.diagnostics.get_health_summary')
         return Promise.resolve({ channels: [] })
       if (method === 'crm_messenger.api.settings.save_channel') {
@@ -505,7 +563,7 @@ describe('MessengerSettings Wazzup connection', () => {
     mocks.call.mockImplementation((method) => {
       if (method === 'crm_messenger.api.settings.get_settings')
         return Promise.resolve({
-          settings: { enabled: true },
+          settings: { wazzup_legacy_ui_enabled: true, enabled: true },
           channels: [stored],
         })
       if (method === 'crm_messenger.api.diagnostics.get_health_summary')
@@ -547,7 +605,7 @@ describe('MessengerSettings Wazzup connection', () => {
       if (method === 'crm_messenger.api.settings.get_settings') {
         if (++loads > 1) return Promise.reject(new Error('reload failed'))
         return Promise.resolve({
-          settings: { enabled: true },
+          settings: { wazzup_legacy_ui_enabled: true, enabled: true },
           channels: [channel({ integration: { wazzup_connection: cached } })],
         })
       }
@@ -582,7 +640,7 @@ describe('MessengerSettings Wazzup connection', () => {
     mocks.call.mockImplementation((method) => {
       if (method === 'crm_messenger.api.settings.get_settings')
         return Promise.resolve({
-          settings: { enabled: true },
+          settings: { wazzup_legacy_ui_enabled: true, enabled: true },
           channels: [stored],
         })
       if (method === 'crm_messenger.api.diagnostics.get_health_summary')
@@ -667,7 +725,10 @@ describe('MessengerSettings Wazzup connection', () => {
     )
     mocks.call.mockImplementation((method) =>
       method === 'crm_messenger.api.settings.get_settings'
-        ? Promise.resolve({ settings: {}, channels: [channel()] })
+        ? Promise.resolve({
+            settings: { wazzup_legacy_ui_enabled: true },
+            channels: [channel()],
+          })
         : Promise.reject({
             messages: ['Authorization: Bearer private-key; private payload'],
           }),
@@ -712,7 +773,7 @@ describe('MessengerSettings Wazzup connection', () => {
     mocks.call.mockImplementation((method, params) => {
       if (method === 'crm_messenger.api.settings.get_settings')
         return Promise.resolve({
-          settings: { enabled: globalEnabled },
+          settings: { wazzup_legacy_ui_enabled: true, enabled: globalEnabled },
           channels: [stored],
         })
       if (method === 'crm_messenger.api.diagnostics.get_health_summary')
@@ -751,7 +812,7 @@ describe('MessengerSettings Wazzup connection', () => {
       if (method === 'crm_messenger.api.settings.get_settings') {
         if (++loads > 1) return Promise.reject(new Error('reload failed'))
         return Promise.resolve({
-          settings: { enabled: true },
+          settings: { wazzup_legacy_ui_enabled: true, enabled: true },
           channels: [
             channel({ integration: { wazzup_connection: connection() } }),
           ],
@@ -799,7 +860,7 @@ describe('MessengerSettings Wazzup connection', () => {
       if (method === 'crm_messenger.api.settings.get_settings') {
         if (++loads > 1) return Promise.reject(new Error('reload failed'))
         return Promise.resolve({
-          settings: { enabled: true },
+          settings: { wazzup_legacy_ui_enabled: true, enabled: true },
           channels: [previous],
         })
       }
@@ -1012,6 +1073,227 @@ describe('MessengerSettings unsaved channel changes', () => {
     resolveTest({ ok: true })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(mounted[0].app._instance.setupState.showChannelDialog).toBe(false)
+  })
+})
+
+describe('MessengerSettings ordinary channel creation', () => {
+  it('refreshes server connection flags without overwriting unsaved messaging settings', async () => {
+    let loads = 0
+    mocks.call.mockImplementation(() =>
+      Promise.resolve({
+        settings: {
+          enabled: true,
+          wazzup_partner_available: ++loads > 1,
+          wazzup_legacy_ui_enabled: loads > 1,
+        },
+        channels: [],
+      }),
+    )
+    const root = await mountSettings()
+    const toggle = root.querySelector('input[type="checkbox"]')
+    toggle.checked = false
+    toggle.dispatchEvent(new Event('change', { bubbles: true }))
+    await nextTick()
+    const refresh = [...root.querySelectorAll('button')].find(
+      (button) => !button.textContent.trim(),
+    )
+    refresh.click()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await clickButton(root, 'New Channel')
+    expect(root.textContent).toContain('Wazzup User API v3 (legacy)')
+    await editField(root, 'Provider', 'partner_whatsapp')
+    expect(
+      root.querySelector('[data-wazzup-partner-management]').dataset.available,
+    ).toBe('true')
+    expect(toggle.checked).toBe(false)
+  })
+
+  it('hides legacy rows and creation controls by default while keeping Partner channels visible', async () => {
+    mocks.call.mockResolvedValue({
+      settings: {},
+      channels: [
+        {
+          name: 'old',
+          provider: 'wazzup',
+          platform: 'whatsapp',
+          custom_display_name: 'Old legacy channel',
+        },
+        {
+          name: 'partner',
+          provider: 'wazzup',
+          platform: 'telegram',
+          wazzup_api_mode: 'partner_api_v2',
+          provider_channel_id: 'private-provider-uuid',
+          external_account_id: 'private-account-id',
+        },
+      ],
+    })
+    const root = await mountSettings()
+    expect(root.textContent).not.toContain('Old legacy channel')
+    expect(root.textContent).toContain('Telegram personal chats')
+    expect(root.textContent).not.toContain('private-provider-uuid')
+    expect(root.textContent).not.toContain('private-account-id')
+    await clickButton(root, 'New Channel')
+    const provider = root.querySelector('[data-label="Provider"]')
+    expect([...provider.options].map((option) => option.textContent)).toEqual([
+      'WhatsApp',
+      'Telegram personal chats',
+      'Telegram Bot',
+      'VK',
+      'MAX',
+      'Avito',
+    ])
+    expect(provider.value).toBe('partner_whatsapp')
+    expect(root.querySelectorAll('[data-dialog]')).toHaveLength(1)
+    expect(root.querySelector('[data-channel-picker]')).toBeNull()
+    expect(root.querySelector('[data-label="Platform"]')).toBeNull()
+    expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+    expect(root.textContent).not.toContain('Wazzup')
+  })
+
+  it('restores legacy creation and existing channel settings only with the explicit flag', async () => {
+    mocks.call.mockResolvedValue({
+      settings: { wazzup_legacy_ui_enabled: true },
+      channels: [
+        {
+          name: 'old',
+          provider: 'wazzup',
+          platform: 'whatsapp',
+          custom_display_name: 'Old legacy channel',
+          api_token_configured: true,
+        },
+      ],
+    })
+    const root = await mountSettings()
+    expect(root.textContent).toContain('Old legacy channel')
+    await clickButton(root, 'New Channel')
+    await editField(root, 'Provider', 'wazzup')
+    expect(root.querySelector('[data-label="Wazzup API key"]')).not.toBeNull()
+    expect(root.querySelector('[data-label="Channel ID"]')).not.toBeNull()
+  })
+
+  it.each([
+    ['VK', 'vk_direct', 'Community Access Token'],
+    ['MAX', 'max_direct', 'Bot Token'],
+    ['Telegram Bot', 'telegram_bot', 'Bot Token'],
+    ['Avito', 'avito_direct', 'Client ID'],
+  ])(
+    'keeps the existing %s connection form',
+    async (label, provider, credentialLabel) => {
+      mocks.call.mockResolvedValue({ settings: {}, channels: [] })
+      const root = await mountSettings()
+      await clickButton(root, 'New Channel')
+      await editField(root, 'Provider', provider)
+      expect(root.querySelector('[data-label="Provider"]').value).toBe(provider)
+      expect(
+        root.querySelector(`[data-label="${credentialLabel}"]`),
+      ).not.toBeNull()
+      expect(root.querySelector('[data-wazzup-partner-management]')).toBeNull()
+      expect(
+        [...root.querySelector('[data-label="Provider"]').options].map(
+          (option) => option.value,
+        ),
+      ).not.toContain('wazzup')
+    },
+  )
+
+  it.each([
+    ['WhatsApp', 'whatsapp'],
+    ['Telegram personal chats', 'telegram'],
+  ])(
+    'uses the same ordinary %s entry with the simulator available',
+    async (label, platform) => {
+      mocks.call.mockResolvedValue({
+        settings: { wazzup_partner_available: true },
+        channels: [],
+      })
+      const root = await mountSettings()
+      await clickButton(root, 'New Channel')
+      await editField(
+        root,
+        'Provider',
+        platform === 'telegram' ? 'partner_telegram' : 'partner_whatsapp',
+      )
+      const dialog = root.querySelector('[data-wazzup-partner-management]')
+      expect(dialog.dataset.platform).toBe(platform)
+      expect(dialog.dataset.available).toBe('true')
+      expect(root.querySelector('[data-channel-picker]')).toBeNull()
+      expect(root.querySelectorAll('[data-dialog]')).toHaveLength(1)
+    },
+  )
+
+  it('keeps Partner creation, active state, settings and deletion in the same channel shell', async () => {
+    mocks.call.mockResolvedValue({
+      settings: { wazzup_partner_available: true },
+      channels: [],
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'New Channel')
+    const dialog = root.querySelector('[data-dialog]')
+    expect(dialog.dataset.title).toBe('New Channel')
+    await editField(root, 'Channel Name', 'Support WhatsApp')
+    expect(
+      root.querySelector('[data-wazzup-partner-management]').dataset.name,
+    ).toBe('Support WhatsApp')
+    await clickButton(root, 'Connect')
+    expect(root.querySelectorAll('[data-dialog]')).toHaveLength(1)
+    expect(root.querySelector('[data-dialog]')).toBe(dialog)
+    expect(dialog.dataset.title).toBe('Channel Settings')
+    expect(dialog.textContent).toContain('Support WhatsApp')
+    expect(dialog.textContent).toContain('WhatsApp')
+    expect(dialog.textContent).toContain('Channel Connected')
+    expect(root.querySelector('[data-label="Provider"]').disabled).toBe(true)
+    expect(root.querySelector('[data-label="Channel Name"]').disabled).toBe(
+      true,
+    )
+    expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+    expect(root.querySelector('[data-label="Channel ID"]')).toBeNull()
+    expect(root.querySelector('[data-label="Platform"]')).toBeNull()
+    await clickButton(root, 'Close')
+    expect(root.querySelector('[data-dialog]')).toBeNull()
+    await clickButton(root, 'Support WhatsApp')
+    expect(root.querySelector('[data-dialog]').dataset.title).toBe(
+      'Channel Settings',
+    )
+    expect(root.querySelectorAll('[data-dialog]')).toHaveLength(1)
+    expect(root.textContent).not.toContain('Connect WhatsApp / Telegram')
+    await clickButton(root, 'Delete Channel')
+    expect(root.querySelector('[data-dialog]')).toBeNull()
+    expect(root.textContent).not.toContain('Support WhatsApp')
+  })
+
+  it('protects a pending Partner creation from provider changes and modal dismissal, then restores closing', async () => {
+    mocks.call.mockResolvedValue({
+      settings: { wazzup_partner_available: true },
+      channels: [],
+    })
+    mocks.deferPartnerConnection = true
+    const root = await mountSettings()
+    await clickButton(root, 'New Channel')
+    await editField(root, 'Channel Name', 'Pending WhatsApp')
+    const dialog = root.querySelector('[data-dialog]')
+    await clickButton(root, 'Connect')
+    expect(root.querySelector('[data-label="Provider"]').disabled).toBe(true)
+    expect(root.querySelector('[data-label="Channel Name"]').disabled).toBe(
+      true,
+    )
+    expect(dialog.dataset.dismissible).toBe('false')
+    expect(dialog.dataset.closeButton).toBe('false')
+    const close = [...dialog.querySelectorAll('button')].find(
+      (item) => item.textContent === 'Close',
+    )
+    expect(close.disabled).toBe(true)
+    await clickButton(root, 'Close')
+    expect(root.querySelector('[data-dialog]')).toBe(dialog)
+    mocks.finishPartnerConnection()
+    await nextTick()
+    expect(dialog.dataset.title).toBe('Channel Settings')
+    expect(dialog.dataset.dismissible).toBe('true')
+    expect(dialog.dataset.closeButton).toBe('true')
+    expect(close.disabled).toBe(false)
+    await clickButton(root, 'Close')
+    expect(root.querySelector('[data-dialog]')).toBeNull()
+    expect(root.textContent).toContain('Pending WhatsApp')
   })
 })
 

@@ -63,6 +63,7 @@ test('real settings controls select Wazzup channels, reuse a saved key, and keep
       result = {
         settings: {
           enabled: true,
+          wazzup_legacy_ui_enabled: true,
           webhook_base_url_is_public_https: true,
           webhook_secret_configured: true,
         },
@@ -134,7 +135,9 @@ test('real settings controls select Wazzup channels, reuse a saved key, and keep
   await page
     .getByRole('combobox', { name: /^Provider(?: \(required\))?$/ })
     .click()
-  await page.getByRole('option', { name: 'Wazzup', exact: true }).click()
+  await page
+    .getByRole('option', { name: 'Wazzup User API v3 (legacy)', exact: true })
+    .click()
   await expect(
     page.getByRole('switch', { name: 'Active in CRM', exact: true }),
   ).not.toBeChecked()
@@ -206,7 +209,14 @@ test('draft-key exception responses stay silent with real frappe-ui controls', a
   await page.route('**/api/method/**', async (route) => {
     const method = route.request().url().split('/api/method/')[1]
     if (method === 'crm_messenger.api.settings.get_settings')
-      await route.fulfill({ json: { message: { settings: {}, channels: [] } } })
+      await route.fulfill({
+        json: {
+          message: {
+            settings: { wazzup_legacy_ui_enabled: true },
+            channels: [],
+          },
+        },
+      })
     else if (method === 'crm_messenger.api.wazzup_connection.list_channels') {
       expect(route.request().postDataJSON()).toEqual({
         api_token: 'fixture-draft-secret',
@@ -224,7 +234,9 @@ test('draft-key exception responses stay silent with real frappe-ui controls', a
   await page
     .getByRole('combobox', { name: /^Provider(?: \(required\))?$/ })
     .click()
-  await page.getByRole('option', { name: 'Wazzup', exact: true }).click()
+  await page
+    .getByRole('option', { name: 'Wazzup User API v3 (legacy)', exact: true })
+    .click()
   await page.getByLabel('Wazzup API key').fill('fixture-draft-secret')
   await page
     .getByRole('button', { name: 'Load Wazzup channels', exact: true })

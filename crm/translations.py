@@ -72,6 +72,7 @@ RUSSIAN_TRANSLATIONS = {
 	"Channel Settings": "Настройка канала",
 	"Provider": "Провайдер",
 	"Channel Name": "Название канала",
+	"Connection status": "Состояние подключения",
 	"For example, Sales": "Например, отдел продаж",
 	"Platform": "Платформа",
 	"Channel ID": "ID канала",
@@ -402,6 +403,9 @@ RUSSIAN_TRANSLATIONS = {
 	"Wazzup partner credentials cannot be stored in a channel.": "Партнёрские данные доступа Wazzup нельзя хранить в канале.",
 	# Wazzup Partner channel connection
 	"Connect WhatsApp / Telegram": "Подключить WhatsApp / Telegram",
+	"Select a messenger and complete its connection.": "Выберите мессенджер и выполните подключение.",
+	"Wazzup User API v3 (legacy)": "Wazzup User API v3 (устаревший режим)",
+	"Connection is not configured. Ask your system administrator to enable it.": "Подключение не настроено. Обратитесь к системному администратору, чтобы включить его.",
 	"Connect": "Подключить",
 	"Preparing connection": "Подготовка подключения",
 	"Waiting for QR scan": "Ожидание сканирования QR-кода",

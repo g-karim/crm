@@ -79,7 +79,10 @@ class TestCRMTranslations(TestCase):
 
 	def test_wazzup_partner_onboarding_has_runtime_translations(self):
 		user_facing = {
-			"Connect WhatsApp / Telegram", "Connect", "Preparing connection",
+			"Connection status", "Connect", "Preparing connection",
+			"Select a messenger and complete its connection.",
+			"Wazzup User API v3 (legacy)",
+			"Connection is not configured. Ask your system administrator to enable it.",
 			"Waiting for QR scan", "Two-factor authentication required", "Authorization expired",
 			"Reconnecting", "Reconnect", "Channel Deleted", "Delete Channel",
 			"QR code has expired. Request a new code.", "Refresh QR code", "Channel QR code",

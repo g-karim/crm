@@ -18,6 +18,27 @@ export const MESSENGER_PROVIDER_OPTIONS = [
   { label: 'Wazzup', value: 'wazzup' },
 ]
 
+export function messengerChannelCreationOptions(legacyEnabled = false) {
+  return [
+    { label: 'WhatsApp', value: 'partner_whatsapp', platform: 'whatsapp' },
+    {
+      label: 'Telegram personal chats',
+      value: 'partner_telegram',
+      platform: 'telegram',
+    },
+    ...MESSENGER_PROVIDER_OPTIONS.filter(
+      (option) => option.value !== 'wazzup' || legacyEnabled,
+    ).map((option) => ({
+      label:
+        option.value === 'wazzup'
+          ? 'Wazzup User API v3 (legacy)'
+          : option.label,
+      provider: option.value,
+      value: option.value,
+    })),
+  ]
+}
+
 const PROVIDER_DEFAULTS = {
   telegram_bot: { platform: 'telegram', auth_type: 'api_token' },
   vk_direct: { platform: 'vk', auth_type: 'api_token' },
@@ -31,6 +52,8 @@ export function isDirectMessengerProvider(provider) {
 }
 
 export function messengerProviderLabel(provider) {
+  if (provider === 'partner_whatsapp') return 'WhatsApp'
+  if (provider === 'partner_telegram') return 'Telegram personal chats'
   return (
     MESSENGER_PROVIDER_OPTIONS.find((option) => option.value === provider)
       ?.label || provider

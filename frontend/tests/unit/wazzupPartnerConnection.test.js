@@ -14,7 +14,7 @@ vi.mock('frappe-ui', () => ({
   Dialog: {
     props: ['open'],
     template:
-      '<div v-if="open"><slot name="body-content" /><slot name="actions" /></div>',
+      '<div v-if="open" data-dialog><slot name="body-content" /><slot name="actions" /></div>',
   },
   FormControl: {
     props: ['modelValue', 'label', 'type', 'disabled', 'options'],
@@ -79,21 +79,24 @@ async function settle() {
   await nextTick()
 }
 
-async function mount(channel = null) {
+async function mount(channel = null, props = {}) {
   const root = document.createElement('div')
   const updated = vi.fn()
   const deleted = vi.fn()
-  const close = vi.fn()
+  const busy = vi.fn()
   document.body.appendChild(root)
   const app = createApp(WazzupPartnerConnection, {
     channel,
+    platform: channel?.platform || 'whatsapp',
+    displayName: '',
+    ...props,
     onUpdated: updated,
     onDeleted: deleted,
-    onClose: close,
+    onBusy: busy,
   })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
-  const entry = { root, app, updated, deleted, close }
+  const entry = { root, app, updated, deleted, busy }
   mounted.push(entry)
   await settle()
   return entry
@@ -120,7 +123,73 @@ async function edit(root, label, value) {
   await nextTick()
 }
 
-describe('Wazzup Partner connection dialog', () => {
+describe('embedded Partner connection state and actions', () => {
+  it('explains unavailable configuration without asking for credentials or making a request', async () => {
+    const { root } = await mount(null, {
+      available: false,
+      platform: 'telegram',
+    })
+    expect(root.querySelector('[data-dialog]')).toBeNull()
+    expect(root.querySelector('[data-label="Platform"]')).toBeNull()
+    expect(root.querySelector('[data-label="Channel Name"]')).toBeNull()
+    expect(root.textContent).toContain('Connection is not configured.')
+    expect(
+      [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Connect',
+      ).disabled,
+    ).toBe(true)
+    expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+    expect(root.querySelector('[data-label="Channel ID"]')).toBeNull()
+    expect(mocks.call).not.toHaveBeenCalled()
+  })
+
+  it.each(['whatsapp', 'telegram'])(
+    'starts the selected %s platform without a manual provider UUID or API key',
+    async (platform) => {
+      mocks.call.mockResolvedValue(
+        result('waiting_qr', { channel: { platform } }),
+      )
+      const { root } = await mount(null, {
+        platform,
+        displayName: '  Support  ',
+      })
+      await click(root, 'Connect')
+      expect(mocks.call).toHaveBeenCalledWith('start_connection', {
+        platform,
+        custom_display_name: 'Support',
+        client_request_id: expect.any(String),
+      })
+      expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+      expect(root.querySelector('[data-label="Channel ID"]')).toBeNull()
+      expect(root.querySelector('[data-label="Platform"]')).toBeNull()
+      expect(root.querySelector('[data-label="Channel Name"]')).toBeNull()
+      expect(root.querySelector('[data-dialog]')).toBeNull()
+      expect(root.textContent).not.toContain('Wazzup')
+    },
+  )
+
+  it('reports manual connection busy until the request finishes and rejects duplicate clicks', async () => {
+    let finish
+    mocks.call.mockImplementation(
+      () => new Promise((resolve) => (finish = resolve)),
+    )
+    const { root, busy, updated } = await mount(null, {
+      platform: 'whatsapp',
+      displayName: 'Support',
+    })
+    await click(root, 'Connect')
+    expect(busy).toHaveBeenLastCalledWith(true)
+    expect(root.querySelector('button').disabled).toBe(true)
+    await click(root, 'Connect')
+    expect(mocks.call).toHaveBeenCalledTimes(1)
+    finish(result('waiting_qr'))
+    await settle()
+    expect(busy.mock.calls.map(([value]) => value)).toEqual([true, false])
+    expect(updated).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'PARTNER-1' }),
+    )
+    expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
+  })
   it('connects WhatsApp, displays QR and becomes active without emitting QR in the public channel', async () => {
     mocks.call.mockImplementation(async (method) =>
       method === 'simulator_scan' ? result('active') : result(),
@@ -172,8 +241,7 @@ describe('Wazzup Partner connection dialog', () => {
         channel: { name: 'PARTNER-1', platform: 'telegram' },
       })
     })
-    const { root } = await mount()
-    await edit(root, 'Platform', 'telegram')
+    const { root } = await mount(null, { platform: 'telegram' })
     await click(root, 'Connect')
     await click(root, 'Simulate QR scan')
     expect(mocks.call).toHaveBeenCalledWith('simulator_scan', {
@@ -234,7 +302,7 @@ describe('Wazzup Partner connection dialog', () => {
     expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
   })
 
-  it('clears the password before HTTP completes and ignores a result after closing', async () => {
+  it('clears the password before HTTP completes and ignores a result after the parent unmounts it', async () => {
     let resolvePassword
     mocks.call.mockImplementation((method) => {
       if (method === 'submit_2fa') {
@@ -248,11 +316,12 @@ describe('Wazzup Partner connection dialog', () => {
         }),
       )
     })
-    const { root, updated, close } = await mount({
+    const entry = await mount({
       name: 'PARTNER-1',
       platform: 'telegram',
       wazzup_status: 'waiting_2fa',
     })
+    const { root, updated } = entry
     await edit(
       root,
       'Two-factor authentication password',
@@ -262,14 +331,15 @@ describe('Wazzup Partner connection dialog', () => {
     expect(root.querySelector('[data-wazzup-2fa] input').value).toBe('')
     expect(root.textContent).not.toContain('private-pending-password')
     const updates = updated.mock.calls.length
-    await click(root, 'Close')
+    entry.app.unmount()
+    mounted = mounted.filter((item) => item !== entry)
     resolvePassword(result('active'))
     await settle()
     await vi.advanceTimersByTimeAsync(10000)
     expect(updated).toHaveBeenCalledTimes(updates)
-    expect(close).toHaveBeenCalledTimes(1)
     expect(root.querySelector('[data-wazzup-partner-connection]')).toBeNull()
     expect(mocks.call).toHaveBeenCalledTimes(2)
+    root.remove()
   })
 
   it('polls active state, displays unauthorized and permits explicit reconnect', async () => {
@@ -324,7 +394,7 @@ describe('Wazzup Partner connection dialog', () => {
         simulator: false,
       }),
     )
-    const { root, deleted, close } = await mount({
+    const { root, deleted } = await mount({
       name: 'PARTNER-1',
       wazzup_status: 'active',
     })
@@ -339,7 +409,8 @@ describe('Wazzup Partner connection dialog', () => {
       channel: 'PARTNER-1',
     })
     expect(deleted).toHaveBeenCalledWith('PARTNER-1')
-    expect(close).toHaveBeenCalledTimes(1)
-    expect(root.querySelector('[data-wazzup-partner-connection]')).toBeNull()
+    const calls = mocks.call.mock.calls.length
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(mocks.call).toHaveBeenCalledTimes(calls)
   })
 })

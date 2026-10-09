@@ -17,12 +17,6 @@
           @click="saveGlobalSettings"
         />
         <Button
-          v-if="settings.wazzup_partner_available"
-          :label="__('Connect WhatsApp / Telegram')"
-          variant="subtle"
-          @click="openPartnerConnection()"
-        />
-        <Button
           :label="__('New Channel')"
           icon-left="lucide-plus"
           variant="solid"
@@ -154,7 +148,7 @@
           </div>
 
           <div
-            v-else-if="!channels.length"
+            v-else-if="!visibleChannels.length"
             class="flex flex-col items-center rounded-lg border border-dashed border-outline-gray-2 px-6 py-12 text-center"
           >
             <div
@@ -169,11 +163,7 @@
               {{ __('No channels yet') }}
             </div>
             <div class="mt-1 max-w-md text-p-sm text-ink-gray-5">
-              {{
-                __(
-                  'Create a channel, save its token, and complete the connection.',
-                )
-              }}
+              {{ __('Select a messenger and complete its connection.') }}
             </div>
             <Button
               class="mt-4"
@@ -188,7 +178,7 @@
             class="overflow-hidden rounded-lg border border-outline-gray-1"
           >
             <button
-              v-for="(channel, index) in channels"
+              v-for="(channel, index) in visibleChannels"
               :key="channel.name"
               type="button"
               class="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-surface-gray-1"
@@ -198,7 +188,7 @@
               <div
                 class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-gray-2 text-sm-medium text-ink-gray-7"
               >
-                {{ providerInitial(channel.provider) }}
+                {{ providerInitial(channel) }}
               </div>
               <div class="min-w-0 flex-1">
                 <div class="truncate text-base-medium text-ink-gray-8">
@@ -227,6 +217,8 @@
 
   <Dialog
     v-model:open="showChannelDialog"
+    :dismissible="!partnerBusy"
+    :show-close-button="!partnerBusy"
     :options="{
       title: channelDraft.channel ? __('Channel Settings') : __('New Channel'),
     }"
@@ -258,7 +250,7 @@
             :model-value="channelDraft.provider"
             type="select"
             required
-            :disabled="Boolean(channelDraft.channel)"
+            :disabled="Boolean(channelDraft.channel) || partnerBusy"
             :options="providerOptions"
             :label="__('Provider')"
             @update:modelValue="changeProvider"
@@ -268,6 +260,9 @@
             type="text"
             :label="__('Channel Name')"
             :placeholder="__('For example, Sales')"
+            :disabled="
+              isPartnerDraft && (partnerBusy || Boolean(channelDraft.channel))
+            "
           />
 
           <FormControl
@@ -352,6 +347,18 @@
             :description="__('Leave blank to keep the current secret.')"
           />
         </div>
+
+        <WazzupPartnerConnection
+          v-if="showChannelDialog && isPartnerDraft"
+          :key="channelDraft.provider"
+          :channel="partnerChannel"
+          :platform="partnerPlatform"
+          :display-name="channelDraft.custom_display_name"
+          :available="settings.wazzup_partner_available"
+          @busy="partnerBusy = $event"
+          @updated="updatePartnerChannel"
+          @deleted="deletePartnerChannel"
+        />
 
         <section
           v-if="channelDraft.provider === 'wazzup'"
@@ -760,9 +767,11 @@
         <Button
           :label="__('Close')"
           variant="subtle"
+          :disabled="partnerBusy"
           @click="showChannelDialog = false"
         />
         <Button
+          v-if="!isPartnerDraft"
           :label="channelDraft.channel ? __('Save') : __('Create Channel')"
           variant="solid"
           :loading="savingChannel"
@@ -772,14 +781,6 @@
       </div>
     </template>
   </Dialog>
-
-  <WazzupPartnerConnection
-    v-if="showPartnerConnection"
-    :channel="partnerChannel"
-    @updated="updatePartnerChannel"
-    @deleted="deletePartnerChannel"
-    @close="showPartnerConnection = false"
-  />
 </template>
 
 <script setup>
@@ -787,7 +788,6 @@ import SettingsLayoutBase from '@/components/Layouts/SettingsLayoutBase.vue'
 import WazzupPartnerConnection from '@/components/Settings/WazzupPartnerConnection.vue'
 import { isWazzupPartnerChannel } from '@/utils/wazzupPartnerConnection'
 import {
-  MESSENGER_PROVIDER_OPTIONS,
   applyMessengerProviderDefaults,
   buildMessengerChannelPayload,
   callWazzupSettings,
@@ -795,6 +795,7 @@ import {
   makeMessengerChannelDraft,
   messengerChannelState,
   messengerProviderLabel,
+  messengerChannelCreationOptions,
   validateMessengerChannelDraft,
   wazzupConnectionMessage,
   wazzupConnectionRows,
@@ -823,6 +824,7 @@ const defaultSettings = () => ({
   webhook_base_url: '',
   webhook_base_url_is_public_https: false,
   wazzup_partner_available: false,
+  wazzup_legacy_ui_enabled: false,
 })
 
 const settings = reactive(defaultSettings())
@@ -835,8 +837,16 @@ const settingsSnapshot = ref('')
 const showAdvanced = ref(false)
 
 const showChannelDialog = ref(false)
-const showPartnerConnection = ref(false)
 const partnerChannel = ref(null)
+const partnerBusy = ref(false)
+const visibleChannels = computed(() =>
+  channels.value.filter(
+    (channel) =>
+      channel.provider !== 'wazzup' ||
+      isWazzupPartnerChannel(channel) ||
+      settings.wazzup_legacy_ui_enabled,
+  ),
+)
 const channelDraft = ref(makeMessengerChannelDraft())
 const channelSnapshot = ref('')
 const savingChannel = ref(false)
@@ -875,17 +885,27 @@ const channelBusy = computed(
     loadingWazzupChannels.value,
 )
 const channelDirty = computed(() => channelState() !== channelSnapshot.value)
-const draftChannelState = computed(() =>
-  messengerChannelState(
-    channelDraft.value.provider === 'wazzup' && channelDirty.value
-      ? { ...channelDraft.value, state: 'unchecked' }
-      : channelDraft.value.provider === 'wazzup'
-        ? {
-            ...channelDraft.value,
-            integration: { wazzup_connection: wazzupConnection.value },
-          }
-        : channelDraft.value,
+const isPartnerDraft = computed(() =>
+  ['partner_whatsapp', 'partner_telegram'].includes(
+    channelDraft.value.provider,
   ),
+)
+const partnerPlatform = computed(() =>
+  channelDraft.value.provider === 'partner_telegram' ? 'telegram' : 'whatsapp',
+)
+const draftChannelState = computed(() =>
+  isPartnerDraft.value
+    ? messengerChannelState(partnerChannel.value || {})
+    : messengerChannelState(
+        channelDraft.value.provider === 'wazzup' && channelDirty.value
+          ? { ...channelDraft.value, state: 'unchecked' }
+          : channelDraft.value.provider === 'wazzup'
+            ? {
+                ...channelDraft.value,
+                integration: { wazzup_connection: wazzupConnection.value },
+              }
+            : channelDraft.value,
+      ),
 )
 const wazzupDiagnosticRows = computed(() =>
   wazzupConnectionRows(wazzupConnection.value || {}),
@@ -919,10 +939,9 @@ const wazzupPlatforms = computed(() => [
   { label: __('Telegram personal chats'), value: 'telegram' },
 ])
 const providerOptions = computed(() =>
-  MESSENGER_PROVIDER_OPTIONS.map((option) => ({
-    ...option,
-    label: __(option.label),
-  })),
+  messengerChannelCreationOptions(settings.wazzup_legacy_ui_enabled).map(
+    (option) => ({ value: option.value, label: __(option.label) }),
+  ),
 )
 
 const settingsDirty = computed(
@@ -976,6 +995,13 @@ async function loadSettings(isRefresh = false, channelsOnly = false) {
       Object.assign(settings, defaultSettings(), result.settings || {})
       settings.webhook_secret = ''
       settingsSnapshot.value = settingsState()
+    } else {
+      settings.wazzup_partner_available = Boolean(
+        result.settings?.wazzup_partner_available,
+      )
+      settings.wazzup_legacy_ui_enabled = Boolean(
+        result.settings?.wazzup_legacy_ui_enabled,
+      )
     }
     channels.value = result.channels || []
     loadError.value = false
@@ -1060,31 +1086,42 @@ function openNewChannel() {
   wazzupOperations.value = null
   resetWazzupChannels()
   channelDraft.value = makeMessengerChannelDraft()
+  changeProvider('partner_whatsapp')
   channelSnapshot.value = channelState()
   channelError.value = ''
   showChannelDialog.value = true
 }
 
 function openChannel(channel) {
-  if (isWazzupPartnerChannel(channel)) {
-    openPartnerConnection(channel)
+  const partner = isWazzupPartnerChannel(channel)
+  if (
+    channel.provider === 'wazzup' &&
+    !partner &&
+    !settings.wazzup_legacy_ui_enabled
+  )
     return
-  }
   avitoImportStatus.value = null
   wazzupConnection.value = channel.integration?.wazzup_connection || null
   wazzupOperations.value = null
   resetWazzupChannels()
   channelDraft.value = {
     ...makeMessengerChannelDraft(channel),
+    provider: partner
+      ? channel.platform === 'telegram'
+        ? 'partner_telegram'
+        : 'partner_whatsapp'
+      : channel.provider,
     state: channel.state,
     auth_error: channel.auth_error,
     provider_display_name: channel.provider_display_name,
     label: channel.label,
   }
+  partnerChannel.value = partner ? channel : null
+  partnerBusy.value = false
   channelSnapshot.value = channelState()
   channelError.value = ''
   showChannelDialog.value = true
-  if (channel.provider === 'wazzup') loadWazzupOperations()
+  if (channel.provider === 'wazzup' && !partner) loadWazzupOperations()
   if (
     channel.provider === 'avito_direct' &&
     channel.enabled &&
@@ -1094,24 +1131,32 @@ function openChannel(channel) {
   }
 }
 
-function openPartnerConnection(channel = null) {
-  partnerChannel.value = channel
-  showPartnerConnection.value = true
-}
-
 function updatePartnerChannel(channel) {
+  partnerChannel.value = channel
+  Object.assign(channelDraft.value, {
+    channel: channel.name,
+    platform: channel.platform,
+    custom_display_name: channel.custom_display_name,
+    provider_display_name: channel.provider_display_name,
+    state: channel.state,
+    enabled: channel.enabled,
+  })
   const index = channels.value.findIndex((row) => row.name === channel.name)
   if (index < 0) channels.value.push(channel)
   else channels.value[index] = { ...channels.value[index], ...channel }
 }
 
 function deletePartnerChannel(name) {
+  showChannelDialog.value = false
   channels.value = channels.value.filter((channel) => channel.name !== name)
 }
 
 function changeProvider(provider) {
+  if (partnerBusy.value || channelDraft.value.channel) return
+  partnerChannel.value = null
   channelDraft.value.provider = provider
   applyMessengerProviderDefaults(channelDraft.value)
+  if (isPartnerDraft.value) channelDraft.value.platform = partnerPlatform.value
 }
 
 function wazzupCredentialIdentity() {
@@ -1401,12 +1446,22 @@ function channelTitle(channel) {
   return (
     channel.custom_display_name ||
     channel.provider_display_name ||
+    (channel.provider === 'wazzup' &&
+      __(
+        channel.platform === 'telegram'
+          ? 'Telegram personal chats'
+          : 'WhatsApp',
+      )) ||
     channel.label ||
     localizedProviderLabel(channel.provider)
   )
 }
 
 function providerDescription(channel) {
+  if (channel.provider === 'wazzup')
+    return __(
+      channel.platform === 'telegram' ? 'Telegram personal chats' : 'WhatsApp',
+    )
   let parts = [localizedProviderLabel(channel.provider)]
   if (channel.platform) parts.push(channel.platform)
   if (channel.external_account_id) parts.push(channel.external_account_id)
@@ -1414,8 +1469,13 @@ function providerDescription(channel) {
   return parts.join(' · ')
 }
 
-function providerInitial(provider) {
-  let label = messengerProviderLabel(provider)
+function providerInitial(channel) {
+  let label =
+    channel.provider === 'wazzup'
+      ? channel.platform === 'telegram'
+        ? 'Telegram'
+        : 'WhatsApp'
+      : messengerProviderLabel(channel.provider)
   return label === 'Telegram Bot' ? 'TG' : label.slice(0, 2).toUpperCase()
 }
 
