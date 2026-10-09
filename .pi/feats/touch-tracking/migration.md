@@ -12,10 +12,35 @@
 
 2. Сверить версии, Git HEAD, локальные изменения, установленные приложения и DNS/маршрут. Не менять DNS в рамках выпуска приложения. Проверенный снимок 2026-10-09: Frappe 16.25.0 `9a8daf343db69a0127f470bad8be0af192cd80c8`, CRM `df556e380cf95042562b9198aa0f09bb3d165bcd`, fcrm_telephony `3f9da381a039f14e3f18cbf5931a9de8fa8d3c59`, crm_messenger `eb4af567072df2ba9dc0360561e42cab24aeea19`, MariaDB 10.6.23, Python 3.14.4.
 3. Проверить полную резервную копию БД, public/private files, конфигурации и ключа шифрования; выполнить отдельное восстановление. Снимок ID/дат Stage 6 **не заменяет** такую копию.
-4. Установить проверенный код и добавить схему при выключенном tracking. Сохранить старые артефакты frontend и версии кода. Старое поле не удалять. Проверить новые поля обоих DocType и скрытые migration controls Singleton.
+4. Установить проверенный код и добавить схему при выключенном tracking. Сохранить старые артефакты frontend и версии кода. Старое поле не удалять. Проверить новые поля обоих DocType и скрытые migration controls Singleton. Для этого выпуска использовать узкий импорт семи DocType ниже, без общего `bench migrate`: репетиция полного migrate на восстановленной БД также переписывала служебные строки Has Role и удаляла orphan desktop metadata других приложений. Узкий импорт сохраняет все исходные бизнес-строки, роли и комментарии.
 5. На короткое время приостановить записи для этого сайта. Закончить старые транзакции и дождаться ранее принятых событий; не очищать общие очереди. До миграции tracking выключен и migration ID пуст.
 
 ## Подготовка и применение
+
+Схема устанавливается штатным импортёром Frappe 16.25, в контексте нужного сайта/System Manager, при приостановленных записях. Новых patches в этой ветке нет. Не включать scheduler на проверочной копии:
+
+```python
+from frappe.modules.import_file import import_file_by_path
+from frappe.core.doctype.scheduled_job_type.scheduled_job_type import sync_jobs
+
+assert not frappe.db.exists("DocType", "CRM Touch Settings")
+frappe.flags.in_migrate = True
+try:
+    for name in (
+        "crm_touch_settings", "crm_touch_policy", "crm_touch_event",
+        "crm_touch_change", "crm_touch_receipt", "crm_lead", "crm_deal",
+    ):
+        path = frappe.get_app_path("crm", "fcrm", "doctype", name, name + ".json")
+        assert import_file_by_path(path, force=True, reset_permissions=False)
+    assert not frappe.get_doc("CRM Touch Settings").enabled
+    sync_jobs()
+    frappe.db.commit()
+    frappe.clear_cache()
+finally:
+    frappe.flags.in_migrate = False
+```
+
+DDL не является полностью откатываемой транзакцией: до импорта нужна проверенная полная копия. Повторять этот шаг на уже мигрированном сайте нельзя без проверки его состояния. Функциональный откат сохраняет дополнительную схему. Штатный `sync_jobs()` при возврате старого кода может добавить audit-комментарии об удалении двух заданий tracking; исходные пользовательские комментарии не меняются.
 
 Из контекста правильного сайта/System Manager:
 
