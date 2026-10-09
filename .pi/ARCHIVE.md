@@ -597,3 +597,10 @@ CRM runtime `1cf733aec46b8693fa45c31cb1f8390d5e557c43`, fcrm_telephony `f36781fe
 - На production выполнены read-only проверки существующего сотрудника: порядок Lead/Deal, поиск по последним четырём цифрам реальных номеров, сохранность остальных slots списка Усмана. Проверены list API всех 11 сайтов; новые schema/settings активны только у Таткардана. HTTPS login origin возвращает 200. На production не создавались тестовые лиды, комментарии, звонки или сообщения и не сбрасывались пароли.
 
 Private artifacts и scripts: `/Users/g-karim/Documents/Codex/2026-09-22/new-chat/work/crm-touch-stage7-release-20261009` и `/home/frappe/validation/crm-touch-stage7-20261009`. SQL/config/auth/manifest не публикуются в Git. Изолированные проверки/checkout сохраняются; preview и validation Redis останавливаются после проверок.
+
+
+### Финальная проверка Nginx
+
+После основного cutover GET нового JavaScript выявил 404: `copytree` перенёс `0700` private build/staging каталогов на публичные frontend-каталоги. Clone HTTP/браузер работали от пользователя frappe и не обнаружили ограничение пользователя www-data. Изменены права только app frontend assets: каталоги 0755, обычные файлы 0644; код, БД и пользовательские файлы не изменялись. Через production Nginx проверены все 26 entry/preload JavaScript/CSS ресурсов — 200 с корректными content types. В release helper/runbook добавлено явное выставление режимов и требование проверки через реальный Nginx перед окончанием maintenance.
+
+После выпуска Error Log Таткардана не содержит новых ошибок, ошибок touch tracking или подключения MariaDB; pending Touch Event — 0, maintenance и pause_scheduler выключены. Isolated preview и два validation Redis остановлены, исходные/финальные restore sites, базы, checkout и backup сохранены для восстановления.
