@@ -80,6 +80,12 @@ def update_lead_sort_date(doc):
 	"""Only sites that installed the optional field use this ordering."""
 	if not doc.meta.has_field(STATUS_SORT_FIELD):
 		return
+	import frappe
+
+	if frappe.db.exists("DocType", "CRM Touch Settings"):
+		settings = frappe.get_cached_doc("CRM Touch Settings")
+		if settings.get("legacy_sort_retired") or (settings.enabled and settings.track_leads):
+			return
 	if doc.is_new() or doc.has_value_changed("status"):
 		from frappe.utils import now_datetime
 

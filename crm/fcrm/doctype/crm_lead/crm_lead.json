@@ -76,7 +76,8 @@
   "facebook_form_id",
   "lost_details_tab",
   "lost_reason",
-  "lost_notes"
+  "lost_notes",
+  "last_touch_at"
  ],
  "fields": [
   {
@@ -471,6 +472,15 @@
    "fieldtype": "Data",
    "label": "Facebook",
    "no_copy": 1
+  },
+  {
+   "fieldname": "last_touch_at",
+   "fieldtype": "Datetime",
+   "label": "Last Touch",
+   "read_only": 1,
+   "hidden": 1,
+   "no_copy": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,

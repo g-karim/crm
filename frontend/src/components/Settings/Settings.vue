@@ -75,6 +75,7 @@ import FormsSettings from '@/components/Settings/Forms/FormsSettings.vue'
 import SalesPipelines from '@/components/Settings/SalesPipelines.vue'
 import GeneralSettings from '@/components/Settings/GeneralSettings.vue'
 import EnrichmentSettings from '@/components/Settings/EnrichmentSettings.vue'
+import TouchSettings from '@/components/Settings/TouchSettings.vue'
 import DashboardSettings from '@/components/Settings/DashboardSettings.vue'
 import EmailTemplatePage from '@/components/Settings/EmailTemplate/EmailTemplatePage.vue'
 import Icon from '@/components/Icon.vue'
@@ -126,6 +127,12 @@ const tabs = computed(() => {
           label: __('General'),
           component: markRaw(GeneralSettings),
           icon: SettingsIcon,
+        },
+        {
+          label: __('Touches and interactions'),
+          component: markRaw(TouchSettings),
+          icon: 'activity',
+          condition: () => globalThis.crm_touch_settings_available === true,
         },
         {
           label: __('Dashboard'),

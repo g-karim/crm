@@ -2806,7 +2806,7 @@ msgstr "Редактирование строки {0}"
 #: frontend/src/pages/Organization.vue:531
 #: frontend/src/pages/PersonaForm.vue:77
 msgid "Email"
-msgstr "Email"
+msgstr "Эл. почта"
 
 #: frontend/src/components/Settings/Profile/UserEmailSettings.vue:67
 msgid "Email Account"
@@ -4649,7 +4649,7 @@ msgstr ""
 #: frontend/src/components/Modals/LostReasonModal.vue:2
 #: frontend/src/components/Modals/LostReasonModal.vue:14
 msgid "Lost Reason"
-msgstr "Забыли Причина"
+msgstr "Причина потери"
 
 #: frontend/src/components/Modals/LostReasonModal.vue:80
 msgid "Lost Reason is required"
@@ -9576,3 +9576,308 @@ msgstr "X (Twitter)"
 
 msgid "YouTube"
 msgstr "YouTube"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Touches and interactions"
+msgstr "Касания и взаимодействия"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Choose which actions update the last interaction date on this site."
+msgstr "Выберите действия, которые обновляют дату последнего касания на этом сайте."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Discard and reload"
+msgstr "Сбросить изменения и загрузить заново"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Enable touch tracking"
+msgstr "Включить учёт касаний"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Rules apply to future actions. Existing records are not recalculated."
+msgstr "Правила применяются к будущим действиям. Даты существующих записей не пересчитываются."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Record type"
+msgstr "Тип карточки"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Track leads"
+msgstr "Учитывать касания лидов"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Track deals"
+msgstr "Учитывать касания сделок"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Record changes"
+msgstr "Изменения карточки"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Record created"
+msgstr "Создание карточки"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Status changed"
+msgstr "Смена статуса"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Search fields"
+msgstr "Поиск полей"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "No matching fields"
+msgstr "Поля не найдены"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Field unavailable: {0}"
+msgstr "Поле недоступно: {0}"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Comments, notes and tasks"
+msgstr "Комментарии, заметки и задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Changing a task date counts at the time of the edit, not at the planned date. Completion and other status changes are separate rules."
+msgstr "Изменение даты задачи учитывается по времени редактирования, а не по запланированной дате. Завершение и другие смены статуса задаются отдельно."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Action sources"
+msgstr "Источники действий"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Selected actions from CRM users are counted. Allow background jobs, imports and token API actions separately."
+msgstr "Учитываются выбранные действия пользователей CRM. Фоновые задания, импорт и действия через API по токену разрешаются отдельно."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Allow automated field and internal changes"
+msgstr "Учитывать автоматические изменения полей и внутренние события"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Messaging, calls and email"
+msgstr "Переписка, звонки и почта"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Messaging"
+msgstr "Переписка"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Touch rules not connected"
+msgstr "Учёт касаний не подключён"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "App not installed"
+msgstr "Приложение не установлено"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "These touch rules are unavailable until the channel event handling is connected and verified."
+msgstr "Эти правила недоступны до подключения и проверки обработки событий канала."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "New standard lists use the last touch date. Saved views and your chosen sort order are preserved."
+msgstr "Новые стандартные списки используют дату последнего касания. Сохранённые представления и выбранная сортировка сохраняются."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Touch settings saved"
+msgstr "Настройки касаний сохранены"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Could not load touch settings"
+msgstr "Не удалось загрузить настройки касаний"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Last Touch"
+msgstr "Последнее касание"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Could not load interaction details"
+msgstr "Не удалось загрузить причину касания"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Request timed out. Please retry."
+msgstr "Время ожидания истекло. Повторите попытку."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Incoming message"
+msgstr "Входящее сообщение"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Successfully sent message"
+msgstr "Успешно отправленное сообщение"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Automated outgoing messages"
+msgstr "Автоматические исходящие сообщения"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Only received messages and confirmed successful sends will count."
+msgstr "Учитываются только полученные сообщения и подтверждённые успешные отправки."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Answered incoming call"
+msgstr "Состоявшийся входящий разговор"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Answered outgoing call"
+msgstr "Состоявшийся исходящий разговор"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Missed incoming call"
+msgstr "Пропущенный входящий звонок"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Unsuccessful outgoing call"
+msgstr "Безуспешный исходящий звонок"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Manually logged call"
+msgstr "Звонок, зафиксированный вручную"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "A completed conversation must be confirmed by the phone provider."
+msgstr "Состоявшийся разговор должен быть подтверждён провайдером телефонии."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Received email"
+msgstr "Полученное письмо"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Successfully sent email"
+msgstr "Успешно отправленное письмо"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Automated outgoing emails"
+msgstr "Автоматические исходящие письма"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Drafts, queued mail and failed sends will not count."
+msgstr "Черновики, письма в очереди и неудачные отправки не учитываются."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "New comment"
+msgstr "Новый комментарий"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Comment edited"
+msgstr "Редактирование комментария"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "New note"
+msgstr "Новая заметка"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Note edited"
+msgstr "Редактирование заметки"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "New task"
+msgstr "Новая задача"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Task completed"
+msgstr "Завершение задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Task status changed"
+msgstr "Смена статуса задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Task deadline changed"
+msgstr "Изменение срока задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Task start date changed"
+msgstr "Изменение даты начала задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Task priority changed"
+msgstr "Изменение приоритета задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Task assignee changed"
+msgstr "Смена исполнителя задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Task title changed"
+msgstr "Изменение названия задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Task description changed"
+msgstr "Изменение описания задачи"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "New task comment"
+msgstr "Новый комментарий к задаче"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Invalid touch sort"
+msgstr "Недопустимая сортировка по касаниям"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Invalid touch settings"
+msgstr "Недопустимые настройки касаний"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Settings changed. Reload before saving."
+msgstr "Настройки уже изменены. Загрузите их заново перед сохранением."
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Unsupported touch target"
+msgstr "Этот тип карточки не поддерживает касания"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Creation date; no recorded interaction"
+msgstr "Дата создания; касание не зарегистрировано"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Initial date; no recorded reason"
+msgstr "Исходная дата; причина касания не зарегистрирована"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Interaction details are unavailable"
+msgstr "Подробности касания недоступны"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Field changed: {0}"
+msgstr "Изменено поле: {0}"
+
+#: crm/touch_tracking_ui.py frontend/src/components/Settings/TouchSettings.vue frontend/src/components/TouchCell.vue
+msgid "Open source record"
+msgstr "Открыть исходную запись"
+
+msgid "Channel checks passed"
+msgstr "Канал проверен"
+
+msgid "Channel checks required"
+msgstr "Требуется проверка канала"
+
+msgid "Provider events must be checked before enabling these rules. Manual call logging is available separately."
+msgstr "Перед включением правил нужно проверить события провайдера. Ручная фиксация звонков доступна отдельно."
+
+#: crm/touch_tracking_channels.py
+msgid "Channel checks are required before enabling this touch rule"
+msgstr "Перед включением этого правила касаний нужно проверить канал"
+
+#: crm/touch_tracking_channels.py
+msgid "Unsupported channel touch rule"
+msgstr "Это правило касаний для канала не поддерживается"
+
+#: crm/touch_tracking_internal.py
+msgid "Invalid touch selections for {0}"
+msgstr "Недопустимый выбор правил касаний для {0}"
+
+#: crm/touch_tracking_internal.py
+msgid "Unsupported touch selection for {0}"
+msgstr "Выбранное правило касаний для {0} не поддерживается"
+
+#: crm/fcrm/doctype/crm_touch_settings/crm_touch_settings.py
+msgid "Touch tracking currently requires MariaDB"
+msgstr "Учёт касаний сейчас доступен только при использовании MariaDB"
+
+#: frontend/src/components/Settings/TouchSettings.vue
+msgid "Reload"
+msgstr "Загрузить заново"
+
+#: frontend/src/components/Settings/TouchSettings.vue
+msgid "Retry"
+msgstr "Повторить"

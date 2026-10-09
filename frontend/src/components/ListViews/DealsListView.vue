@@ -94,8 +94,14 @@
           </div>
         </template>
         <template #default="{ label }">
+          <TouchCell
+            v-if="column.key === 'last_touch_at'"
+            doctype="CRM Deal"
+            :name="row.name"
+            :item="item"
+          />
           <div
-            v-if="
+            v-else-if="
               [
                 'modified',
                 'creation',
@@ -250,6 +256,7 @@
 </template>
 
 <script setup>
+import TouchCell from '@/components/TouchCell.vue'
 import HeartIcon from '@/components/Icons/HeartIcon.vue'
 import MultipleAvatar from '@/components/MultipleAvatar.vue'
 import IndicatorIcon from '@/components/Icons/IndicatorIcon.vue'
