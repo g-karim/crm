@@ -328,7 +328,7 @@ describe('processField', () => {
 
 ## Touch Tracking — Backend Records
 
-> Реализовано и проверено в отдельном checkout Stages 2–5 (local channel implementation) (`codex/crm-touch-tracking-stage2`), ещё не выпущено на production. Контракт не меняет Form Script API. История и проверки: [Stage 2](./ARCHIVE.md#touch-tracking--stage-2), [Stage 3](./ARCHIVE.md#touch-tracking--stage-3).
+> Реализовано в отдельном checkout (`codex/crm-touch-tracking-stage2`), выпущено на Таткардан 2026-10-09: [Stage 7](./ARCHIVE.md#touch-tracking--stage-7). Начальный профиль — создание/смена статуса; каналы ожидают live acceptance. Контракт не меняет Form Script API. История и проверки: [Stage 2](./ARCHIVE.md#touch-tracking--stage-2), [Stage 3](./ARCHIVE.md#touch-tracking--stage-3).
 
 | Record / field | Contract |
 |---|---|

@@ -562,3 +562,38 @@ Novofon выключен/ключи отсутствуют; все 6 Email Accou
 - Все временные business fixtures удалены только в отдельной тестовой БД; tracking/providers/allowlist выключены, scheduler paused. Реальных звонков/писем/сообщений не отправлялось.
 
 Отчёты и воспроизводимые scripts: `/Users/g-karim/Documents/Codex/2026-09-22/new-chat/work/crm-touch-stage6-validation-20261009` — `stage6-backend-results.json`, `frontend-tests.log`, `stage6-build.log`, `rehearsal-results.json`, `stage6-concurrency-results.json`, `rollback-concurrency-results.json`, `old-code-results.json`. Snapshot/manifest содержат представления и защищены chmod 600; не предназначены для Git/публичных отчётов.
+
+
+---
+
+## Touch Tracking — Stage 7
+
+> **Выпуск на Таткардане выполнен 2026-10-09, 11:37:58–11:38:24 Europe/Moscow.** Проверка в обычной работе и последующее удаление прежнего поля остаются в PLAN; проверка живых каналов остаётся Stage 5.
+
+### Выпущено
+
+CRM runtime `1cf733aec46b8693fa45c31cb1f8390d5e557c43`, fcrm_telephony `f36781fe2624b96b60283cb2aecbeb30c6b1490d`. Frappe `9a8daf343db69a0127f470bad8be0af192cd80c8` / 16.25.0, MariaDB 10.6.23 и Python 3.14.4 не обновлялись. CRM разделён на логические commits для tracking, migration, UI и документации. PR: [CRM #16](https://github.com/g-karim/crm/pull/16), основан на уже выпущенном #15; [Novofon producer #1](https://github.com/g-karim/fcrm-telephony/pull/1). PR не объединялись автоматически.
+
+- На `tatkardan.exp-verse.com` включены отдельное поле «Последнее касание», настройки каждого типа карточки и базовый профиль: создание/фактическая смена статуса Lead/Deal. Обычный `modified` не изменён. Комментарии, заметки, задачи/их даты, дополнительные поля и каналы выключены.
+- Все прежние Lead dates и полный порядок **3807 лидов** сохранены точно. **3 сделки** получили seed из создания и достоверной нативной истории статусов. Синтетических исторических событий не создано.
+- Миграция переименовала только ссылки на старое поле в трёх представлениях: 19, 20, 22. По отдельному прямому ответу пользователя стандартный Lead list Усмана (18) переключён с modified на последнее касание; все остальные настройки этого списка сохранены, другие представления не переопределены.
+- Старый `custom_crm_status_sort_date` заморожен для отката; параллельного writer нет. Схема/профиль установлены только на Таткардане. Shared source обновлён на bench: list API остальных **10 CRM-сайтов** работают без новой схемы/включения, их конфигурации сохранились.
+- Novofon выключен, credentials не настроены; incoming/outgoing всех шести Email Account выключены; Messenger Channel отсутствуют. Verified adapter allowlist не включался. Live provider acceptance пока не выполнен.
+
+### Полная копия, репетиция и откат
+
+Полный native backup БД, public/private files, site/common config и encryption key проверен и сохранён вне сервера. Восстановление выполнено отдельно на целевой MariaDB 10.6 с точными app sources, независимыми Redis, без scheduler/workers и исходящих каналов. Preserve: оригинальные ID, все бизнес-значения, 4509 status rows, 64 задачи, 756 заметок, 15620 комментариев, связи, роли/права и credentials; 11 локальных файлов проверены по SHA-256. Единственный remote File — внешняя Gravatar-аватарка.
+
+Полная репетиция `bench migrate` обнаружила переписывание служебных Has Role и очистку orphan desktop metadata; поэтому выпуск использовал штатный узкий импорт семи CRM DocType, без миграций остальных приложений. При узком импорте и apply все 19 защищённых наборов/бизнес-столбцов, роли, права и credentials совпали по полным digest. Оригинальные DocPerm/Custom DocPerm отдельно сравнивались с dump.
+
+Проверены создание/смена статуса, комментарий и изменение due_date задачи, поиск телефона, точные даты/порядок, повтор apply, сохранность новых карточек и пользовательских предпочтений после rollback. Функциональный откат и прежние CRM/fcrm sources с добавленной схемой выполняют нативные операции. Native schedule sync на rollback добавляет два системных audit-комментария удаления tracking jobs; доказано, что все исходные 15620 комментариев сохранились неизменными.
+
+Финальная копия `20261009_113804` также полностью восстановлена в отдельный site/БД. Все 19 защищённых наборов совпали с production-before snapshot, файлы и encryption key проверены. Во время production cutover scheduler/workers завершены плавно, общие очереди не очищались. Сохранены старые sources/assets и private migration/override manifests. Maintenance/pause восстановлены; все Supervisor-сервисы работают.
+
+### Проверки
+
+- **142 backend tests**, без failures/errors/skips; **627 frontend tests в 55 файлах**, production build **3014 modules**. CRM Ruff / изменённые frontend ESLint и Prettier прошли. Novofon tests входят в общий backend suite; в прежних файлах fcrm остаются исходные lint-замечания без новых.
+- Реальный Chrome/Playwright через HTTP на полной копии: Administrator и существующий Sales User, оба списка с last touch, окно настроек, отдельные вкладки Lead/Deal, дополнительные события выключены; 0 page errors/ошибочных HTTP. Clone socketio не запускался, его недоступность не относится к production.
+- На production выполнены read-only проверки существующего сотрудника: порядок Lead/Deal, поиск по последним четырём цифрам реальных номеров, сохранность остальных slots списка Усмана. Проверены list API всех 11 сайтов; новые schema/settings активны только у Таткардана. HTTPS login origin возвращает 200. На production не создавались тестовые лиды, комментарии, звонки или сообщения и не сбрасывались пароли.
+
+Private artifacts и scripts: `/Users/g-karim/Documents/Codex/2026-09-22/new-chat/work/crm-touch-stage7-release-20261009` и `/home/frappe/validation/crm-touch-stage7-20261009`. SQL/config/auth/manifest не публикуются в Git. Изолированные проверки/checkout сохраняются; preview и validation Redis останавливаются после проверок.
