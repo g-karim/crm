@@ -1,0 +1,177 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Touch Receipt",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "field_order": [
+  "source_doctype",
+  "source_name",
+  "reference_doctype",
+  "reference_name",
+  "adapter",
+  "origin",
+  "actor",
+  "bound_at",
+  "rule",
+  "occurred_at",
+  "confirmation_key",
+  "policy_revision",
+  "event_source_doctype",
+  "event_source_name",
+  "change_name",
+  "provider_started_at",
+  "provider_timezone",
+  "provider_agent_id",
+  "provider_phone_key",
+  "probe_attempts",
+  "next_probe_at",
+  "probe_state",
+  "provider_call_key"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_doctype",
+   "fieldtype": "Data",
+   "label": "Source Doctype"
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Data",
+   "label": "Source Name"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Select",
+   "label": "Reference Doctype",
+   "options": "CRM Lead\nCRM Deal"
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Data",
+   "label": "Reference Name"
+  },
+  {
+   "fieldname": "adapter",
+   "fieldtype": "Data",
+   "label": "Adapter"
+  },
+  {
+   "fieldname": "origin",
+   "fieldtype": "Select",
+   "label": "Origin",
+   "options": "User\nAutomation\nExternal\nUnknown"
+  },
+  {
+   "fieldname": "actor",
+   "fieldtype": "Data",
+   "label": "Actor"
+  },
+  {
+   "fieldname": "bound_at",
+   "fieldtype": "Datetime",
+   "label": "Bound At"
+  },
+  {
+   "fieldname": "rule",
+   "fieldtype": "Data",
+   "label": "Rule"
+  },
+  {
+   "fieldname": "occurred_at",
+   "fieldtype": "Datetime",
+   "label": "Occurred At"
+  },
+  {
+   "fieldname": "confirmation_key",
+   "fieldtype": "Data",
+   "label": "Confirmation Key",
+   "unique": 1
+  },
+  {
+   "fieldname": "policy_revision",
+   "fieldtype": "Data",
+   "label": "Policy Revision"
+  },
+  {
+   "fieldname": "event_source_doctype",
+   "fieldtype": "Data",
+   "label": "Event Source Doctype",
+   "search_index": 1
+  },
+  {
+   "fieldname": "event_source_name",
+   "fieldtype": "Data",
+   "label": "Event Source Name",
+   "search_index": 1
+  },
+  {
+   "fieldname": "change_name",
+   "fieldtype": "Data",
+   "label": "Change Name",
+   "search_index": 1
+  },
+  {
+   "fieldname": "provider_started_at",
+   "fieldtype": "Datetime",
+   "label": "Provider Started At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "provider_timezone",
+   "fieldtype": "Data",
+   "label": "Provider Timezone",
+   "read_only": 1
+  },
+  {
+   "fieldname": "provider_agent_id",
+   "fieldtype": "Data",
+   "label": "Provider Agent ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "provider_phone_key",
+   "fieldtype": "Data",
+   "label": "Provider Phone Key",
+   "read_only": 1
+  },
+  {
+   "fieldname": "probe_attempts",
+   "fieldtype": "Int",
+   "label": "Probe Attempts",
+   "read_only": 1
+  },
+  {
+   "fieldname": "next_probe_at",
+   "fieldtype": "Datetime",
+   "label": "Next Probe At",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "probe_state",
+   "fieldtype": "Data",
+   "label": "Probe State",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "provider_call_key",
+   "fieldtype": "Data",
+   "label": "Provider Call Key",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1
+  }
+ ],
+ "autoname": "hash",
+ "track_changes": 0,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "actions": [],
+ "links": [],
+ "states": []
+}

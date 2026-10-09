@@ -13,6 +13,8 @@ from pypika import Criterion
 from crm.api.views import get_views
 from crm.fcrm.doctype.crm_form_script.crm_form_script import get_form_script
 from crm.list_settings import STATUS_SORT_FIELD, STATUS_SORT_LABEL, normalize_phone_filters
+from crm.touch_tracking_ui import default_order, list_records, resolve_order
+from crm.touch_tracking_ui import enabled_for as touch_enabled
 from crm.utils import is_frappe_version
 
 COUNT_NAME = (
@@ -51,6 +53,8 @@ def sort_options(doctype: str):
 		{"label": "Modified By", "fieldname": "modified_by"},
 		{"label": "Owner", "fieldname": "owner"},
 	]
+	if touch_enabled(doctype):
+		standard_fields.append({"label": "Last Touch", "fieldname": "last_touch_at"})
 	if doctype == "CRM Lead" and (sort_field := frappe.get_meta(doctype).get_field(STATUS_SORT_FIELD)):
 		standard_fields.append(
 			{"label": sort_field.label or STATUS_SORT_LABEL, "fieldname": STATUS_SORT_FIELD}
@@ -304,6 +308,8 @@ def get_data(
 	columns = frappe.parse_json(columns or "[]")
 	kanban_fields = frappe.parse_json(kanban_fields or "[]")
 	kanban_columns = frappe.parse_json(kanban_columns or "[]")
+	view = frappe.parse_json(view or "{}")
+	order_by = resolve_order(doctype, order_by, view)
 
 	custom_view_name = view.get("custom_view_name") if view else None
 	view_type = view.get("view_type") if view else None
@@ -337,6 +343,9 @@ def get_data(
 
 	meta = frappe.get_meta(doctype)
 	hidden_fields = set(get_hidden_fields(doctype))
+	show_touch = touch_enabled(doctype)
+	if meta.has_field("last_touch_at"):
+		default_column_keys.append("last_touch_at")
 
 	if view_type != "kanban":
 		if columns or rows:
@@ -369,6 +378,10 @@ def get_data(
 		elif not custom_view or (is_default and hasattr(_list, "default_list_data")):
 			rows = default_rows
 			columns = _list.default_list_data().get("columns")
+			if show_touch:
+				columns.append(
+					{"label": "Last Touch", "type": "Datetime", "key": "last_touch_at", "width": "12rem"}
+				)
 
 		rows = [row for row in rows or [] if row not in hidden_fields]
 		visible_columns = []
@@ -390,6 +403,8 @@ def get_data(
 
 			visible_columns.append(column)
 		columns = visible_columns
+		if "last_touch_at" in rows and "creation" not in rows:
+			rows.append("creation")
 
 		# check if rows has group_by_field if not add it
 		if group_by_field in hidden_fields:
@@ -401,7 +416,7 @@ def get_data(
 			rows.append("_seen")
 
 		data = (
-			frappe.get_list(
+			list_records(
 				doctype,
 				fields=rows,
 				filters=_get_list_filters(doctype, filters),
@@ -447,6 +462,8 @@ def get_data(
 		for field in kanban_fields:
 			if field not in rows:
 				rows.append(field)
+		if "last_touch_at" in rows and "creation" not in rows:
+			rows.append("creation")
 
 		for kc in kanban_columns:
 			# Start with base filters
@@ -473,7 +490,7 @@ def get_data(
 						doctype, rows, column_filters, column_page_length, order
 					)
 				else:
-					column_data = frappe.get_list(
+					column_data = list_records(
 						doctype,
 						fields=rows,
 						filters=_get_list_filters(doctype, column_filters),
@@ -508,7 +525,13 @@ def get_data(
 			"options": field.options,
 		}
 		for field in fields
-		if field.label and field.fieldname and field.fieldname not in hidden_fields and not field.hidden
+		if field.label
+		and field.fieldname
+		and field.fieldname not in hidden_fields
+		and (
+			not field.hidden
+			or (field.fieldname == "last_touch_at" and (show_touch or "last_touch_at" in rows))
+		)
 	]
 
 	std_fields = [
@@ -572,6 +595,8 @@ def get_data(
 
 	return {
 		"data": data,
+		"order_by": order_by,
+		"default_order_by": default_order(doctype),
 		"columns": columns,
 		"rows": rows,
 		"fields": fields,

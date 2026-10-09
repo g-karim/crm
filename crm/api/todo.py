@@ -70,14 +70,17 @@ def validate(doc, method):
 def after_insert(doc, method):
 	if doc.reference_type in ["CRM Lead", "CRM Deal"] and doc.reference_name and doc.allocated_to:
 		fieldname = "lead_owner" if doc.reference_type == "CRM Lead" else "deal_owner"
+		previous_owner = frappe.db.get_value(doc.reference_type, doc.reference_name, fieldname)
 		if doc.reference_type == "CRM Lead":
-			previous_owner = frappe.db.get_value("CRM Lead", doc.reference_name, "lead_owner")
 			if previous_owner and previous_owner != doc.allocated_to:
 				frappe.publish_realtime("crm_notification", {}, user=previous_owner, after_commit=True)
 		# Mirror assign_to: the latest assignment owns the record, overriding any prior owner.
 		frappe.db.set_value(
 			doc.reference_type, doc.reference_name, fieldname, doc.allocated_to, update_modified=False
 		)
+		# Observe the final owner after on_update too: inserting a Cancelled ToDo
+		# mirrors then clears it in the same operation and must not fake a change.
+		doc.flags.touch_initial_owner = {"value": previous_owner}
 
 	if doc.reference_type in ["CRM Lead", "CRM Deal", "CRM Task"] and doc.reference_name and doc.allocated_to:
 		notify_assigned_user(doc)
@@ -100,6 +103,17 @@ def on_update(doc, method):
 		and doc.allocated_to
 	):
 		frappe.publish_realtime("crm_notification", {}, user=doc.allocated_to, after_commit=True)
+	if doc.flags.touch_initial_owner:
+		from crm.touch_tracking_internal import owner_assignment
+
+		fieldname = "lead_owner" if doc.reference_type == "CRM Lead" else "deal_owner"
+		owner_assignment(
+			doc,
+			fieldname,
+			doc.flags.touch_initial_owner["value"],
+			frappe.db.get_value(doc.reference_type, doc.reference_name, fieldname),
+		)
+		doc.flags.pop("touch_initial_owner", None)
 
 
 def clear_owner_on_unassign(doc):
@@ -107,9 +121,14 @@ def clear_owner_on_unassign(doc):
 	if doc.reference_type not in ["CRM Lead", "CRM Deal"]:
 		return
 	fieldname = "lead_owner" if doc.reference_type == "CRM Lead" else "deal_owner"
+	previous_owner = frappe.db.get_value(doc.reference_type, doc.reference_name, fieldname)
 	# Mirror assign_to: cancelling an assignment clears the owner. Wrinkle (accepted):
 	# removing one of several manual co-assignees also clears, since owner is single-valued.
 	frappe.db.set_value(doc.reference_type, doc.reference_name, fieldname, None, update_modified=False)
+	from crm.touch_tracking_internal import owner_assignment
+
+	if not doc.flags.touch_initial_owner:
+		owner_assignment(doc, fieldname, previous_owner, None)
 
 
 def notify_assigned_user(doc, is_cancelled=False):

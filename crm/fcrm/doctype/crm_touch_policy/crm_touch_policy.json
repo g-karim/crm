@@ -1,0 +1,169 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Touch Policy",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "field_order": [
+  "effective_from",
+  "enabled",
+  "track_leads",
+  "track_deals",
+  "lead_status_changes",
+  "deal_status_changes",
+  "lead_fields",
+  "lead_events",
+  "lead_allow_automation",
+  "deal_fields",
+  "deal_events",
+  "deal_allow_automation",
+  "lead_channels",
+  "lead_messenger_automation",
+  "lead_email_automation",
+  "deal_channels",
+  "deal_messenger_automation",
+  "deal_email_automation"
+ ],
+ "fields": [
+  {
+   "fieldname": "effective_from",
+   "fieldtype": "Datetime",
+   "label": "Effective From",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable Touch Tracking",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "track_leads",
+   "fieldtype": "Check",
+   "label": "Track Leads",
+   "default": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "track_deals",
+   "fieldtype": "Check",
+   "label": "Track Deals",
+   "default": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_status_changes",
+   "fieldtype": "Check",
+   "label": "Lead Status Changes",
+   "default": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deal_status_changes",
+   "fieldtype": "Check",
+   "label": "Deal Status Changes",
+   "default": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_fields",
+   "fieldtype": "JSON",
+   "label": "Lead Selected Fields",
+   "default": "[]",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_events",
+   "fieldtype": "JSON",
+   "label": "Lead Selected Internal Events",
+   "default": "[]",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_allow_automation",
+   "fieldtype": "Check",
+   "label": "Lead Allow Automated Internal Changes",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deal_fields",
+   "fieldtype": "JSON",
+   "label": "Deal Selected Fields",
+   "default": "[]",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deal_events",
+   "fieldtype": "JSON",
+   "label": "Deal Selected Internal Events",
+   "default": "[]",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deal_allow_automation",
+   "fieldtype": "Check",
+   "label": "Deal Allow Automated Internal Changes",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_channels",
+   "fieldtype": "JSON",
+   "label": "Lead Channel rules",
+   "default": "[]",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_messenger_automation",
+   "fieldtype": "Check",
+   "label": "Lead Automated outgoing messages",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_email_automation",
+   "fieldtype": "Check",
+   "label": "Lead Automated outgoing emails",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deal_channels",
+   "fieldtype": "JSON",
+   "label": "Deal Channel rules",
+   "default": "[]",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deal_messenger_automation",
+   "fieldtype": "Check",
+   "label": "Deal Automated outgoing messages",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deal_email_automation",
+   "fieldtype": "Check",
+   "label": "Deal Automated outgoing emails",
+   "default": "0",
+   "read_only": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1
+  }
+ ],
+ "issingle": 0,
+ "autoname": "hash",
+ "track_changes": 0,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "row_format": "Dynamic",
+ "actions": [],
+ "links": [],
+ "states": []
+}

@@ -1,0 +1,189 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Touch Settings",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "track_leads",
+  "track_deals",
+  "lead_status_changes",
+  "deal_status_changes",
+  "policy_revision",
+  "lead_fields",
+  "lead_events",
+  "lead_allow_automation",
+  "deal_fields",
+  "deal_events",
+  "deal_allow_automation",
+  "lead_channels",
+  "lead_messenger_automation",
+  "lead_email_automation",
+  "deal_channels",
+  "deal_messenger_automation",
+  "deal_email_automation",
+  "legacy_sort_retired",
+  "legacy_sort_migration_id",
+  "legacy_sort_retired_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enable Touch Tracking",
+   "default": "0"
+  },
+  {
+   "fieldname": "track_leads",
+   "fieldtype": "Check",
+   "label": "Track Leads",
+   "default": "1"
+  },
+  {
+   "fieldname": "track_deals",
+   "fieldtype": "Check",
+   "label": "Track Deals",
+   "default": "1"
+  },
+  {
+   "fieldname": "lead_status_changes",
+   "fieldtype": "Check",
+   "label": "Lead Status Changes",
+   "default": "1"
+  },
+  {
+   "fieldname": "deal_status_changes",
+   "fieldtype": "Check",
+   "label": "Deal Status Changes",
+   "default": "1"
+  },
+  {
+   "fieldname": "policy_revision",
+   "fieldtype": "Data",
+   "label": "Policy Revision",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "lead_fields",
+   "fieldtype": "JSON",
+   "label": "Lead Selected Fields",
+   "default": "[]"
+  },
+  {
+   "fieldname": "lead_events",
+   "fieldtype": "JSON",
+   "label": "Lead Selected Internal Events",
+   "default": "[]"
+  },
+  {
+   "fieldname": "lead_allow_automation",
+   "fieldtype": "Check",
+   "label": "Lead Allow Automated Internal Changes",
+   "default": "0"
+  },
+  {
+   "fieldname": "deal_fields",
+   "fieldtype": "JSON",
+   "label": "Deal Selected Fields",
+   "default": "[]"
+  },
+  {
+   "fieldname": "deal_events",
+   "fieldtype": "JSON",
+   "label": "Deal Selected Internal Events",
+   "default": "[]"
+  },
+  {
+   "fieldname": "deal_allow_automation",
+   "fieldtype": "Check",
+   "label": "Deal Allow Automated Internal Changes",
+   "default": "0"
+  },
+  {
+   "fieldname": "lead_channels",
+   "fieldtype": "JSON",
+   "label": "Lead Channel rules",
+   "default": "[]",
+   "read_only": 0
+  },
+  {
+   "fieldname": "lead_messenger_automation",
+   "fieldtype": "Check",
+   "label": "Lead Automated outgoing messages",
+   "default": "0",
+   "read_only": 0
+  },
+  {
+   "fieldname": "lead_email_automation",
+   "fieldtype": "Check",
+   "label": "Lead Automated outgoing emails",
+   "default": "0",
+   "read_only": 0
+  },
+  {
+   "fieldname": "deal_channels",
+   "fieldtype": "JSON",
+   "label": "Deal Channel rules",
+   "default": "[]",
+   "read_only": 0
+  },
+  {
+   "fieldname": "deal_messenger_automation",
+   "fieldtype": "Check",
+   "label": "Deal Automated outgoing messages",
+   "default": "0",
+   "read_only": 0
+  },
+  {
+   "fieldname": "deal_email_automation",
+   "fieldtype": "Check",
+   "label": "Deal Automated outgoing emails",
+   "default": "0",
+   "read_only": 0
+  },
+  {
+   "fieldname": "legacy_sort_retired",
+   "fieldtype": "Check",
+   "label": "Legacy Sort Retired",
+   "read_only": 1,
+   "hidden": 1,
+   "default": "0"
+  },
+  {
+   "fieldname": "legacy_sort_migration_id",
+   "fieldtype": "Data",
+   "label": "Legacy Sort Migration ID",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "legacy_sort_retired_at",
+   "fieldtype": "Datetime",
+   "label": "Legacy Sort Retired At",
+   "read_only": 1,
+   "hidden": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 1
+  }
+ ],
+ "issingle": 1,
+ "autoname": "",
+ "track_changes": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "row_format": "Dynamic",
+ "actions": [],
+ "links": [],
+ "states": []
+}

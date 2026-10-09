@@ -164,6 +164,14 @@ override_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
+	"CRM Lead": {
+		"before_validate": [
+			"crm.touch_tracking.protect_last_touch",
+			"crm.touch_tracking_internal.remember_card_input",
+		],
+		"after_insert": ["crm.touch_tracking.capture_created"],
+		"on_update": ["crm.touch_tracking.capture_status_change"],
+	},
 	"Contact": {
 		"validate": ["crm.api.contact.validate"],
 	},
@@ -178,20 +186,37 @@ doc_events = {
 		"on_trash": ["crm.api.todo.validate_crm_lead_assignment_permission"],
 	},
 	"Communication": {
-		"after_insert": ["crm.utils.on_communication_insert"],
+		"after_insert": [
+			"crm.utils.on_communication_insert",
+			"crm.touch_tracking_channels.capture_communication",
+		],
 		"on_update": ["crm.utils.on_communication_update"],
 	},
 	"Comment": {
 		"after_insert": ["crm.utils.on_comment_insert"],
-		"on_update": ["crm.api.comment.on_update"],
+		"on_update": ["crm.api.comment.on_update", "crm.touch_tracking_internal.capture_internal"],
 	},
+	"FCRM Note": {"on_update": ["crm.touch_tracking_internal.capture_internal"]},
+	"CRM Task": {"on_update": ["crm.touch_tracking_internal.capture_internal"]},
+	"CRM Call Log": {"after_insert": ["crm.touch_tracking_channels.capture_manual_call"]},
+	"Messenger Message": {
+		"after_insert": ["crm.touch_tracking_channels.on_message"],
+		"on_update": ["crm.touch_tracking_channels.on_message"],
+	},
+	"Email Queue": {"after_insert": ["crm.touch_tracking_channels.capture_queue"]},
 	"WhatsApp Message": {
 		"validate": ["crm.api.whatsapp.validate"],
 		"on_update": ["crm.api.whatsapp.on_update"],
 	},
 	"CRM Deal": {
+		"before_validate": [
+			"crm.touch_tracking.protect_last_touch",
+			"crm.touch_tracking_internal.remember_card_input",
+		],
+		"after_insert": ["crm.touch_tracking.capture_created"],
 		"on_update": [
-			"crm.fcrm.doctype.erpnext_crm_settings.erpnext_crm_settings.create_customer_in_erpnext"
+			"crm.touch_tracking.capture_status_change",
+			"crm.fcrm.doctype.erpnext_crm_settings.erpnext_crm_settings.create_customer_in_erpnext",
 		],
 	},
 	"Sales Order": {
@@ -235,6 +260,12 @@ doc_events = {
 	},
 }
 
+# Cooperative Frappe 16 extensions: preserve native methods and other app mixins.
+extend_doctype_class = {
+	"Email Queue": ["crm.touch_tracking_channels.TouchEmailQueueMixin"],
+	"Email Account": ["crm.touch_tracking_channels.TouchEmailAccountMixin"],
+}
+
 # Scheduled Tasks
 # ---------------
 
@@ -253,7 +284,10 @@ scheduler_events = {
 	"hourly_long": ["crm.lead_syncing.background_sync.sync_leads_from_sources_hourly"],
 	"monthly_long": ["crm.lead_syncing.background_sync.sync_leads_from_sources_monthly"],
 	"cron": {
-		"*/5 * * * *": ["crm.lead_syncing.background_sync.sync_leads_from_sources_5_minutes"],
+		"*/5 * * * *": [
+			"crm.lead_syncing.background_sync.sync_leads_from_sources_5_minutes",
+			"crm.touch_tracking.maintenance",
+		],
 		"*/10 * * * *": ["crm.lead_syncing.background_sync.sync_leads_from_sources_10_minutes"],
 		"*/15 * * * *": ["crm.lead_syncing.background_sync.sync_leads_from_sources_15_minutes"],
 	},
