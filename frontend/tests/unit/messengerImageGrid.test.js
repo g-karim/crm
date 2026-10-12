@@ -196,7 +196,8 @@ describe('messenger image layout', () => {
     let document = root.querySelector('[data-test-attachment-card]')
 
     expect(renderer.className).toContain('max-w-[20rem]')
-    expect(renderer.className).toContain('w-fit')
+    expect(renderer.className).toContain('grid-cols-1')
+    expect(renderer.className).not.toContain('max-w-full')
     expect(root.querySelector('[data-mixed-single-image-row]')).toBeNull()
     expect(root.querySelector('[data-media-side-line]')).toBeNull()
     expect(media.style.width).toBe('320px')
@@ -243,8 +244,8 @@ describe('messenger image layout', () => {
     let renderer = root.querySelector('[data-attachment-renderer]')
 
     expect(renderer.className).toContain('max-w-[20rem]')
-    expect(renderer.className).toContain('max-w-full')
-    expect(renderer.className.split(/\s+/)).toContain('w-fit')
+    expect(renderer.className).toContain('grid-cols-1')
+    expect(renderer.className).not.toContain('max-w-full')
     expect(root.querySelector('[data-test-video]')).not.toBeNull()
   })
 

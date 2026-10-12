@@ -95,9 +95,7 @@ test("generic file-only bubbles are sized by the attachment in a real browser", 
   page,
 }) => {
   expect(conversationSource).toContain(':constrain-intrinsic-width="');
-  expect(conversationSource).toContain(
-    "isGenericFileOnlyMessage(item.message)",
-  );
+  expect(conversationSource).toContain("item.message.attachments?.length");
   expect(metadataSource).toContain("? 'w-0 min-w-full' : 'min-w-0'");
 
   await page.setViewportSize({ width: 960, height: 720 });

@@ -65,8 +65,8 @@ export function makeMessengerChannelDraft(channel = null) {
   let defaults = PROVIDER_DEFAULTS[provider] || {}
   let implicitAvitoEnd = Boolean(
     channel?.name &&
-      channel?.avito_import_mode === 'period' &&
-      !channel?.avito_import_to_date,
+    channel?.avito_import_mode === 'period' &&
+    !channel?.avito_import_to_date,
   )
   let avitoEnd =
     channel?.avito_import_to_date ||
@@ -104,6 +104,12 @@ export function makeMessengerChannelDraft(channel = null) {
     avito_import_from_date: channel?.avito_import_from_date || '',
     avito_import_to_date: avitoEnd,
     avito_import_to_date_implicit: implicitAvitoEnd ? avitoEnd : '',
+    original_avito_import_selection: implicitAvitoEnd
+      ? {
+          channel: channel.name,
+          from_date: channel.avito_import_from_date || '',
+        }
+      : null,
     enabled: Boolean(channel?.enabled),
     api_token: '',
     api_token_source_channel: '',
@@ -126,6 +132,7 @@ export function applyMessengerProviderDefaults(draft) {
   draft.avito_import_to_date =
     draft.provider === 'avito_direct' ? todayInCrmTimezone() : ''
   draft.avito_import_to_date_implicit = ''
+  draft.original_avito_import_selection = null
   draft.api_token = ''
   draft.api_token_source_channel = ''
   draft.client_secret = ''
@@ -159,11 +166,14 @@ export function buildMessengerChannelPayload(draft) {
         ? clean(draft.avito_import_from_date)
         : ''
     let end = clean(draft.avito_import_to_date)
+    const original = draft.original_avito_import_selection
+    const unchangedImplicitEnd = Boolean(
+      original?.channel === draft.channel &&
+      original?.from_date === payload.avito_import_from_date &&
+      end === draft.avito_import_to_date_implicit,
+    )
     payload.avito_import_to_date =
-      draft.avito_import_mode === 'period' &&
-      end !== draft.avito_import_to_date_implicit
-        ? end
-        : ''
+      draft.avito_import_mode === 'period' && !unchangedImplicitEnd ? end : ''
   }
   if (draft.channel) payload.channel = draft.channel
   if (clean(draft.api_token)) payload.api_token = clean(draft.api_token)

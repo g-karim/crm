@@ -97,14 +97,57 @@ describe('messenger message actions', () => {
     expect(confirmation.message).not.toContain('same request ID')
   })
 
-  it('preserves the existing VK retry confirmation', () => {
+  it('does not promise that a VK request ID makes resending safe', () => {
     let confirmation = getMessengerRetryConfirmation({
       provider: 'vk_direct',
       status: 'unknown',
     })
 
     expect(confirmation.message).toContain('VK may have already accepted')
-    expect(confirmation.message).toContain('same request ID')
+    expect(confirmation.message).toContain('may create a duplicate')
+    expect(confirmation.message).not.toContain('same request ID')
+  })
+
+  it.each([false, true])(
+    'blocks retry of an unknown VK image even with stale can_retry=%s',
+    async (canRetry) => {
+      let message = {
+        name: 'VK-UNKNOWN',
+        provider: 'vk_direct',
+        direction: 'outbound',
+        message_type: 'image',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        can_retry: canRetry,
+      }
+      let { controller, call } = harness()
+
+      expect(getMessengerMessageActions(message)).toEqual([])
+      expect(await controller.retryMessage(message)).toBe(false)
+      expect(await controller.retryMessage(message, true)).toBe(false)
+      expect(call).not.toHaveBeenCalled()
+    },
+  )
+
+  it('allows an explicit retry after a definitive VK image failure', async () => {
+    let message = {
+      name: 'VK-FAILED',
+      provider: 'vk_direct',
+      direction: 'outbound',
+      message_type: 'image',
+      status: 'failed',
+      delivery_status: 'failed',
+      can_retry: true,
+    }
+    let { controller, call } = harness()
+
+    expect(getMessengerMessageActions(message)).toEqual(['retry'])
+    expect(await controller.retryMessage(message)).toBe(true)
+    expect(call).toHaveBeenCalledOnce()
+    expect(call).toHaveBeenCalledWith(
+      'crm_messenger.api.messages.retry_outbound_message',
+      { message: 'VK-FAILED', confirm_unknown: 0 },
+    )
   })
 
   it('does not promise VK idempotency or retry a blocked Wazzup unknown result', async () => {

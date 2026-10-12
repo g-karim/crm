@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => {
   return {
     attachmentPreserve: vi.fn(),
     attachmentRetarget: vi.fn(async () => {}),
+    attachmentRelease: vi.fn(),
+    attachmentUnmount: vi.fn(),
     call: vi.fn(),
     dialog: vi.fn(),
     toastError: vi.fn(),
@@ -112,13 +114,19 @@ vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
     ],
     emits: ['change'],
     data: () => ({ files: [] }),
+    beforeUnmount() {
+      mocks.attachmentUnmount()
+    },
     methods: {
       discard() {},
       freeze() {
         return this.files
       },
       unfreeze() {},
-      release() {},
+      release() {
+        mocks.attachmentRelease()
+        this.clearDraft()
+      },
       retarget(conversation) {
         return mocks.attachmentRetarget(conversation)
       },
@@ -939,6 +947,102 @@ describe('messenger initial selection', () => {
       'CHANNEL-1',
     )
     expect(composer.value).toBe('Keep this draft on conversation 1')
+  })
+})
+
+describe('VK image outbound composer', () => {
+  async function mountVKImageComposer() {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [
+      {
+        ...channel('CHANNEL-1', { supports_attachments: true }),
+        provider: 'vk_direct',
+        platform: 'vk',
+        channel_type: 'vk',
+      },
+    ]
+    conversationRows[0].provider = 'vk_direct'
+    let root = await mountConversation()
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+    let send = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Send',
+    )
+    return { root, send }
+  }
+
+  it('consumes the accepted image once and blocks concurrent sends', async () => {
+    let request = deferred()
+    let defaultCall = mocks.call.getMockImplementation()
+    mocks.call.mockImplementation((method, args) =>
+      method.endsWith('send_message')
+        ? request.promise
+        : defaultCall(method, args),
+    )
+    let { send } = await mountVKImageComposer()
+
+    send.click()
+    send.click()
+    await vi.waitFor(() =>
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('send_message'),
+        ),
+      ).toHaveLength(1),
+    )
+    expect(send.disabled).toBe(true)
+    expect(mocks.call).toHaveBeenCalledWith(
+      'crm_messenger.api.messages.send_message',
+      expect.objectContaining({
+        attachments: ['FILE-photo.jpg'],
+        client_request_id: expect.any(String),
+      }),
+    )
+
+    request.resolve({ ok: true, name: 'VK-IMAGE-1', status: 'queued' })
+    await vi.waitFor(() =>
+      expect(mocks.attachmentRelease).toHaveBeenCalledOnce(),
+    )
+    expect(send.disabled).toBe(true)
+    send.click()
+    expect(
+      mocks.call.mock.calls.filter(([method]) =>
+        method.endsWith('send_message'),
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('keeps the same request ID for a user retry after the CRM RPC response is lost', async () => {
+    let defaultCall = mocks.call.getMockImplementation()
+    mocks.call.mockImplementation(async (method, args) => {
+      if (method.endsWith('send_message')) throw new Error('network error')
+      return defaultCall(method, args)
+    })
+    let { root, send } = await mountVKImageComposer()
+    send.click()
+    await vi.waitFor(() => expect(mocks.toastError).toHaveBeenCalledOnce())
+    expect(mocks.attachmentRelease).not.toHaveBeenCalled()
+    await vi.waitFor(() => {
+      send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      expect(send?.disabled).toBe(false)
+    })
+    let calls = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('send_message'),
+    )
+    expect(calls).toHaveLength(1)
+    expect(mocks.attachmentUnmount).not.toHaveBeenCalled()
+
+    send.click()
+    await vi.waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(2))
+    calls = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('send_message'),
+    )
+    expect(calls).toHaveLength(2)
+    expect(calls[1][1].client_request_id).toBe(calls[0][1].client_request_id)
+    expect(calls[1][1].attachments).toEqual(calls[0][1].attachments)
+    expect(mocks.attachmentUnmount).not.toHaveBeenCalled()
   })
 })
 

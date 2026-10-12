@@ -182,9 +182,9 @@ describe('messenger attachment contract v1', () => {
 
   it('uses content-sized bubble classes for compact media', () => {
     expect(getSingleImageBubbleWidthClass({ width: 100, height: 200 })).toBe(
-      'w-fit max-w-full',
+      'w-fit',
     )
-    expect(getSingleImageBubbleWidthClass({})).toBe('w-fit max-w-full')
+    expect(getSingleImageBubbleWidthClass({})).toBe('w-fit')
     expect(getSingleImageMediaWidthClass({ width: 100, height: 200 })).toBe(
       'max-w-full',
     )

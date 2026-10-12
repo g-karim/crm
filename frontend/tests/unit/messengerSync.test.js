@@ -178,6 +178,56 @@ describe('messenger sync', () => {
     ])
   })
 
+  it('reconciles late VK image delivery in the existing bubble without resending', async () => {
+    let pending = {
+      name: 'VK-IMAGE-1',
+      provider: 'vk_direct',
+      direction: 'outbound',
+      message_type: 'image',
+      status: 'unknown',
+      delivery_status: 'unknown',
+      external_message_id: '',
+      failure_reason: 'VK message delivery result is unknown.',
+      message_datetime: '2026-10-12 10:00:00',
+      modified: '2026-10-12 10:00:01',
+      attachments: [{ type: 'image', url: '/private/files/photo.jpg' }],
+    }
+    let confirmed = {
+      ...pending,
+      status: 'sent',
+      delivery_status: 'sent',
+      external_message_id: 'VK-PROVIDER-1',
+      failure_reason: '',
+      modified: '2026-10-12 10:01:00',
+    }
+    let harness = createHarness({
+      get_message_page: snapshot([pending]),
+      get_message_changes: delta([confirmed]),
+    })
+    await harness.controller.start('LEAD-1')
+
+    harness.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+    })
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages()).toEqual([confirmed]),
+    )
+
+    expect(harness.changes.at(-1).updated).toEqual(['VK-IMAGE-1'])
+    expect(harness.changes.at(-1).inserted).toEqual([])
+    expect(
+      harness.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+    expect(
+      harness.calls.some(([method]) =>
+        method.endsWith('retry_outbound_message'),
+      ),
+    ).toBe(false)
+    harness.controller.stop()
+  })
+
   it('propagates permission loss from a delta response', async () => {
     let operator = {
       can_read: true,

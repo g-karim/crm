@@ -243,6 +243,42 @@ describe('message footer metadata', () => {
     expect(tooltip.title).not.toContain('unsupported format')
   })
 
+  it('shows an unknown VK image separately and updates when late delivery is confirmed', async () => {
+    let outbound = reactive(
+      message({
+        provider: 'vk_direct',
+        direction: 'outbound',
+        message_type: 'image',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        failure_reason: 'VK photo upload failed: timeout',
+        external_message_id: '',
+      }),
+    )
+    let root = mountComponent(MessageFooterMetadata, { message: outbound })
+    let delivery = root.querySelector('[data-message-delivery]')
+    let tooltip = delivery.closest('[data-test-tooltip]')
+
+    expect(tooltip.title).toBe(
+      'Result unknown: VK message result is unknown. Automatic resend is disabled.',
+    )
+    expect(tooltip.title).not.toContain('Delivery failed')
+    expect(tooltip.title).not.toContain('Try sending')
+    expect(delivery.querySelector('.lucide-check')).toBeNull()
+
+    Object.assign(outbound, {
+      status: 'sent',
+      delivery_status: 'sent',
+      external_message_id: 'VK-LATE-1',
+      failure_reason: '',
+    })
+    await nextTick()
+
+    expect(tooltip.title).toBe('Sent')
+    expect(delivery.querySelector('.lucide-check')).not.toBeNull()
+    expect(delivery.className).not.toContain('text-ink-red-8')
+  })
+
   it('hides the edited marker for unedited and deleted messages', () => {
     let unedited = mountComponent(MessageFooterMetadata, {
       message: message({ is_edited: 0 }),

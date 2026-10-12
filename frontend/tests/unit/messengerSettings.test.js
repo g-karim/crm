@@ -393,6 +393,17 @@ describe('messengerSettings', () => {
       })
       expect(legacy.avito_import_to_date).toBe('2026-09-04')
       expect(buildMessengerChannelPayload(legacy).avito_import_to_date).toBe('')
+      legacy.custom_display_name = 'Renamed channel'
+      expect(buildMessengerChannelPayload(legacy).avito_import_to_date).toBe('')
+      legacy.avito_import_from_date = '2026-08-01'
+      expect(buildMessengerChannelPayload(legacy).avito_import_to_date).toBe(
+        '2026-09-04',
+      )
+      expect(buildMessengerChannelPayload(legacy)).not.toHaveProperty(
+        'original_avito_import_selection',
+      )
+      legacy.avito_import_from_date = '2026-09-01'
+      expect(buildMessengerChannelPayload(legacy).avito_import_to_date).toBe('')
       legacy.avito_import_to_date = '2026-09-10'
       expect(buildMessengerChannelPayload(legacy).avito_import_to_date).toBe(
         '2026-09-10',

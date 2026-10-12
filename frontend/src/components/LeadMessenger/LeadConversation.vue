@@ -20,7 +20,7 @@
     </div>
 
     <div
-      v-if="loading && !messages.length"
+      v-if="loading && !messages.length && !isComposerDirty()"
       class="flex flex-1 flex-col items-center justify-center gap-3 text-xl font-medium text-ink-gray-4"
     >
       <LoadingIndicator class="h-6 w-6" />
@@ -170,7 +170,11 @@
                   />
                   <MessageMetadata
                     :constrain-intrinsic-width="
-                      isGenericFileOnlyMessage(item.message)
+                      Boolean(
+                        item.message.attachments?.length ||
+                        item.message.reply_context ||
+                        item.message.forward_context,
+                      )
                     "
                     :message="item.message"
                     :sender="messageSender(item.message)"
@@ -604,7 +608,6 @@ import {
   getMessengerDeliveryState,
   getMessengerFailureReason,
   getMessengerPlatformLabel,
-  isGenericFileOnlyMessage,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 import {

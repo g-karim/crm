@@ -52,6 +52,92 @@ describe('messenger message presentation', () => {
     expect(root.querySelector('[data-provider-chat-action]')).toBeNull()
   })
 
+  it.each([
+    'avito_direct',
+    'telegram_bot',
+    'vk_direct',
+    'max_direct',
+    'wazzup',
+  ])('renders safe message and caption URLs for %s', (provider) => {
+    let url = 'https://example.com/каталог?item=1&src=chat#заказ'
+    let message = {
+      provider,
+      message_type: 'image',
+      text: `Подпись\nСсылка: ${url}`,
+      attachments: [{ type: 'image', url: '/private/image.png' }],
+    }
+
+    let root = mountMessage(message)
+    let text = root.querySelector('[data-message-text]')
+    let link = text.querySelector('a')
+
+    expect(text.textContent).toBe(message.text)
+    expect(link.textContent).toBe(url)
+    expect(link.getAttribute('href')).toBe(url)
+    expect(link.target).toBe('_blank')
+    expect(link.rel).toBe('noopener noreferrer')
+  })
+
+  it('escapes HTML and attribute injection while rendering safe links', () => {
+    let message = {
+      message_type: 'text',
+      text: '<img src=x onerror=alert(1)> <script>alert(1)</script> javascript:alert(1) data:text/html,x https://example.com/?q="onmouseover=alert(1)"',
+    }
+    let root = mountMessage(message)
+    let text = root.querySelector('[data-message-text]')
+
+    expect(text.textContent).toBe(message.text)
+    expect(root.querySelector('img, script')).toBeNull()
+    expect(root.querySelectorAll('a')).toHaveLength(1)
+    expect(root.querySelector('a').hasAttribute('onmouseover')).toBe(false)
+    expect(root.querySelector('a').protocol).toBe('https:')
+  })
+
+  it('does not show a deleted message URL or attachment placeholder', () => {
+    let root = mountMessage({
+      status: 'deleted',
+      message_type: 'text',
+      text: 'https://example.com/deleted',
+    })
+
+    expect(root.textContent.trim()).toBe('Message deleted')
+    expect(root.querySelector('a')).toBeNull()
+  })
+
+  it('opening a message URL does not select the surrounding chat bubble', () => {
+    let root = mountMessage({
+      message_type: 'text',
+      text: 'https://example.com/',
+    })
+    let selectMessage = vi.fn()
+    root.addEventListener('click', selectMessage)
+
+    root
+      .querySelector('a')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(selectMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps the native link context menu without opening the parent reaction picker', () => {
+    let root = mountMessage({
+      provider: 'vk_direct',
+      can_react: true,
+      message_type: 'text',
+      text: 'https://example.com/',
+    })
+    let openReactionPicker = vi.fn((event) => event.preventDefault())
+    root.addEventListener('contextmenu', openReactionPicker)
+    let event = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+    })
+
+    expect(root.querySelector('a').dispatchEvent(event)).toBe(true)
+    expect(openReactionPicker).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(false)
+  })
+
   it('hides an image placeholder while its attachment is still loading', () => {
     let message = {
       message_type: 'image',

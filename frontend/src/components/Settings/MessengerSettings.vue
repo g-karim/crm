@@ -662,42 +662,91 @@
                 />
               </div>
             </div>
-            <p v-if="avitoImportStatus" class="mt-2 text-p-sm text-ink-gray-6">
+            <p
+              v-if="avitoImportStatus"
+              data-testid="avito-import-status"
+              class="mt-2 text-p-sm text-ink-gray-6"
+            >
               {{ __(avitoImportStatusLabel(avitoImportStatus.status)) }}
-              <span v-if="avitoImportStatus.counts?.chat_created">
-                ·
-                {{
-                  __('New chats in last scan: {0}', [
-                    avitoImportStatus.counts.chat_created,
-                  ])
-                }}</span
+              <span
+                v-if="
+                  avitoImportActive && hasAvitoImportCounts(avitoImportStatus)
+                "
               >
-              <span v-if="avitoImportStatus.counts?.chat_skipped">
                 ·
                 {{
-                  __('Skipped chats: {0}', [
-                    avitoImportStatus.counts.chat_skipped,
-                  ])
-                }}</span
-              >
-              <span v-if="avitoImportStatus.counts?.chat_unverified">
-                ·
-                {{
-                  __('Chats awaiting verification: {0}', [
-                    avitoImportStatus.counts.chat_unverified,
+                  __('Chats checked in current scan: {0}', [
+                    avitoImportCheckedCount(avitoImportStatus),
                   ])
                 }}</span
               >
             </p>
             <p
-              v-if="avitoImportStatus?.incomplete"
-              class="mt-2 text-p-sm text-ink-orange-7"
+              v-if="avitoImportStatus?.last_completed_at"
+              data-testid="avito-import-completed"
+              class="mt-2 text-p-sm text-ink-gray-5"
+            >
+              {{ __('Last completed scan') }}:
+              {{ avitoImportStatus.last_completed_at }}
+              <span v-if="avitoImportActive && avitoImportSummary">
+                · {{ __(avitoImportStatusLabel(avitoImportSummary.status)) }}
+              </span>
+            </p>
+            <p
+              v-if="hasAvitoImportCounts(avitoImportSummary)"
+              data-testid="avito-import-counts"
+              class="mt-2 text-p-sm text-ink-gray-6"
             >
               {{
-                __(
-                  'The scan is incomplete. Some chats could not be verified or are unavailable through the Avito API.',
-                )
+                __('Chats checked: {0}', [
+                  avitoImportCheckedCount(avitoImportSummary),
+                ])
               }}
+              <span>
+                ·
+                {{
+                  __('New chats in last scan: {0}', [
+                    avitoImportSummary.counts.chat_created || 0,
+                  ])
+                }}</span
+              >
+              <span v-if="avitoImportSummary.counts?.chat_unchanged">
+                ·
+                {{
+                  __('Unchanged chats: {0}', [
+                    avitoImportSummary.counts.chat_unchanged,
+                  ])
+                }}</span
+              >
+              <span v-if="avitoImportSummary.counts?.chat_skipped">
+                ·
+                {{
+                  __('Skipped chats: {0}', [
+                    avitoImportSummary.counts.chat_skipped,
+                  ])
+                }}</span
+              >
+              <span v-if="avitoImportSummary.counts?.chat_unverified">
+                ·
+                {{
+                  __('Chats awaiting verification: {0}', [
+                    avitoImportSummary.counts.chat_unverified,
+                  ])
+                }}</span
+              >
+            </p>
+            <p
+              v-if="avitoImportSummary?.incomplete"
+              class="mt-2 text-p-sm text-ink-orange-7"
+            >
+              {{ __(avitoImportIncompleteMessage(avitoImportSummary)) }}
+            </p>
+            <p
+              v-if="avitoImportRefreshError"
+              data-testid="avito-import-refresh-error"
+              class="mt-2 text-p-sm text-ink-orange-7"
+            >
+              {{ __('Could not refresh the Avito chat scan status.') }}
             </p>
           </div>
         </section>
@@ -812,7 +861,7 @@ import {
   call,
   toast,
 } from 'frappe-ui'
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 
 const defaultSettings = () => ({
   enabled: false,
@@ -860,6 +909,19 @@ const loadingWazzupChannels = ref(false)
 const avitoImportStatus = ref(null)
 const loadingAvitoImport = ref(false)
 const scanningAvitoImport = ref(false)
+const avitoImportRefreshError = ref(false)
+const avitoImportActive = computed(() =>
+  ['queued', 'running'].includes(avitoImportStatus.value?.status),
+)
+const avitoImportSummary = computed(
+  () =>
+    avitoImportStatus.value?.last_completed ||
+    (avitoImportActive.value ? null : avitoImportStatus.value),
+)
+const AVITO_IMPORT_POLL_INTERVAL_MS = 5000
+let avitoImportPollTimer = null
+let avitoImportRequest = null
+let avitoImportGeneration = 0
 const avitoImportOptions = [
   {
     value: 'all',
@@ -1081,7 +1143,7 @@ async function saveGlobalSettings() {
 }
 
 function openNewChannel() {
-  avitoImportStatus.value = null
+  resetAvitoImportTracking()
   wazzupConnection.value = null
   wazzupOperations.value = null
   resetWazzupChannels()
@@ -1100,7 +1162,7 @@ function openChannel(channel) {
     !settings.wazzup_legacy_ui_enabled
   )
     return
-  avitoImportStatus.value = null
+  resetAvitoImportTracking()
   wazzupConnection.value = channel.integration?.wazzup_connection || null
   wazzupOperations.value = null
   resetWazzupChannels()
@@ -1304,6 +1366,8 @@ async function saveChannel() {
 
   savingChannel.value = true
   channelError.value = ''
+  const draft = channelDraft.value
+  const snapshot = channelState()
   let wasNew = !channelDraft.value.channel
   try {
     const isWazzup = channelDraft.value.provider === 'wazzup'
@@ -1317,12 +1381,20 @@ async function saveChannel() {
       isWazzup && !reloaded
         ? result
         : channels.value.find((row) => row.name === result.name) || result
-    openChannel(fresh)
+    if (
+      channelDraft.value === draft &&
+      showChannelDialog.value &&
+      channelState() === snapshot
+    ) {
+      openChannel(fresh)
+    }
     toast.success(wasNew ? __('Channel created.') : __('Channel saved.'))
   } catch (saveError) {
-    channelError.value = channelProviderMessage(
-      saveError?.messages?.[0] || 'Could not save the channel.',
-    )
+    if (channelDraft.value === draft && showChannelDialog.value) {
+      channelError.value = channelProviderMessage(
+        saveError?.messages?.[0] || 'Could not save the channel.',
+      )
+    }
   } finally {
     savingChannel.value = false
   }
@@ -1381,48 +1453,146 @@ async function runChannelAction(action) {
   }
 }
 
-async function loadAvitoImportStatus() {
-  if (!channelDraft.value.channel) return
-  const channel = channelDraft.value.channel
+function avitoImportDialogActive(draft = channelDraft.value) {
+  return (
+    showChannelDialog.value &&
+    channelDraft.value === draft &&
+    draft.provider === 'avito_direct' &&
+    draft.channel &&
+    draft.enabled &&
+    ['connected', 'degraded'].includes(draft.state)
+  )
+}
+
+function clearAvitoImportPoll() {
+  clearTimeout(avitoImportPollTimer)
+  avitoImportPollTimer = null
+}
+
+function resetAvitoImportTracking() {
+  clearAvitoImportPoll()
+  avitoImportGeneration += 1
+  avitoImportRequest = null
+  avitoImportStatus.value = null
+  avitoImportRefreshError.value = false
+  loadingAvitoImport.value = false
+  scanningAvitoImport.value = false
+}
+
+function scheduleAvitoImportPoll() {
+  clearAvitoImportPoll()
+  if (!avitoImportDialogActive() || !avitoImportActive.value) return
+  avitoImportPollTimer = setTimeout(() => {
+    avitoImportPollTimer = null
+    loadAvitoImportStatus()
+  }, AVITO_IMPORT_POLL_INTERVAL_MS)
+}
+
+function loadAvitoImportStatus() {
+  const draft = channelDraft.value
+  if (!avitoImportDialogActive(draft)) return Promise.resolve()
+  if (avitoImportRequest) return avitoImportRequest.promise
+  clearAvitoImportPoll()
+  const request = { draft, generation: avitoImportGeneration }
+  avitoImportRequest = request
   loadingAvitoImport.value = true
-  try {
-    const result = await call(
-      'crm_messenger.api.provider_sync.get_channel_sync_status',
-      { channel },
-    )
-    if (channelDraft.value.channel === channel && result?.ok)
+  const current = () =>
+    request.generation === avitoImportGeneration &&
+    avitoImportDialogActive(draft)
+  request.promise = (async () => {
+    try {
+      const result = await call(
+        'crm_messenger.api.provider_sync.get_channel_sync_status',
+        { channel: draft.channel },
+      )
+      if (!current()) return
+      if (!result?.ok) throw new Error('status_unavailable')
       avitoImportStatus.value = result
-  } catch {
-    if (channelDraft.value.channel === channel) avitoImportStatus.value = null
-  } finally {
-    loadingAvitoImport.value = false
-  }
+      avitoImportRefreshError.value = false
+    } catch {
+      if (current()) avitoImportRefreshError.value = true
+    } finally {
+      if (avitoImportRequest === request) {
+        avitoImportRequest = null
+        loadingAvitoImport.value = false
+        scheduleAvitoImportPoll()
+      }
+    }
+  })()
+  return request.promise
 }
 
 async function scanAvitoChats() {
-  if (channelBusy.value || channelDirty.value || !channelDraft.value.channel)
+  if (
+    channelBusy.value ||
+    scanningAvitoImport.value ||
+    channelDirty.value ||
+    !avitoImportDialogActive()
+  )
     return
+  const draft = channelDraft.value
+  const generation = avitoImportGeneration
   scanningAvitoImport.value = true
   try {
     const result = await call(
       'crm_messenger.api.provider_sync.enqueue_channel_sync',
       {
-        channel: channelDraft.value.channel,
+        channel: draft.channel,
       },
     )
     if (!result?.ok)
       throw new Error(result?.message || 'Could not start the Avito chat scan.')
+    if (!avitoImportDialogActive(draft) || generation !== avitoImportGeneration)
+      return
+    // A status request started before enqueue may still report the old run.
+    // Discard that response, then read the new run without overlapping reads.
+    avitoImportGeneration += 1
+    clearAvitoImportPoll()
+    avitoImportStatus.value = {
+      ...avitoImportStatus.value,
+      status: result.status || 'queued',
+      counts: {},
+      incomplete: false,
+    }
     toast.success(__('Avito chat scan started.'))
+    if (avitoImportRequest) await avitoImportRequest.promise
+    if (!avitoImportDialogActive(draft)) return
     await loadAvitoImportStatus()
   } catch (error) {
-    toast.error(
-      clientProviderMessage(
-        error?.message || 'Could not start the Avito chat scan.',
-      ),
-    )
+    if (avitoImportDialogActive(draft)) {
+      toast.error(
+        clientProviderMessage(
+          error?.message || 'Could not start the Avito chat scan.',
+        ),
+      )
+    }
   } finally {
-    scanningAvitoImport.value = false
+    if (channelDraft.value === draft) scanningAvitoImport.value = false
   }
+}
+
+function hasAvitoImportCounts(status) {
+  return Boolean(status?.counts && Object.keys(status.counts).length)
+}
+
+function avitoImportCheckedCount(status) {
+  return [
+    'chat_created',
+    'chat_changed',
+    'chat_unchanged',
+    'chat_skipped',
+    'chat_unverified',
+  ].reduce((total, key) => total + (Number(status?.counts?.[key]) || 0), 0)
+}
+
+function avitoImportIncompleteMessage(status) {
+  if (
+    status.truncated ||
+    (status.incomplete_reason || status.reason) === 'max_offset_reached'
+  ) {
+    return 'The Avito API pagination limit was reached. Chats beyond this limit may not have been checked.'
+  }
+  return 'The scan is incomplete. Some chats could not be verified or are unavailable through the Avito API.'
 }
 
 function avitoImportStatusLabel(status) {
@@ -1515,4 +1685,12 @@ function providerActionFailureMessage(result = {}) {
 }
 
 onMounted(() => loadSettings())
+watch(
+  showChannelDialog,
+  (open) => {
+    if (!open) resetAvitoImportTracking()
+  },
+  { flush: 'sync' },
+)
+onUnmounted(resetAvitoImportTracking)
 </script>

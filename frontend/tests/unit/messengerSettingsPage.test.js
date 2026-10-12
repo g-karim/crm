@@ -109,6 +109,7 @@ afterEach(() => {
   mocks.toast.success.mockReset()
   mocks.deferPartnerConnection = false
   mocks.finishPartnerConnection = null
+  vi.useRealTimers()
 })
 
 async function mountSettings() {
@@ -885,6 +886,305 @@ describe('MessengerSettings Wazzup connection', () => {
   })
 })
 
+describe('MessengerSettings Avito chat scan status', () => {
+  const statusMethod = 'crm_messenger.api.provider_sync.get_channel_sync_status'
+  const scanMethod = 'crm_messenger.api.provider_sync.enqueue_channel_sync'
+  const savedChannel = (overrides = {}) => ({
+    name: 'avito-1',
+    provider: 'avito_direct',
+    platform: 'avito',
+    auth_type: 'client_credentials',
+    custom_display_name: 'Avito Sales',
+    client_id: 'saved-id',
+    client_secret_configured: true,
+    enabled: true,
+    state: 'connected',
+    avito_import_mode: 'all',
+    ...overrides,
+  })
+  const completed = {
+    status: 'succeeded',
+    counts: { chat_unchanged: 359 },
+    incomplete: false,
+  }
+  function setup(extra, channels = [savedChannel()]) {
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels })
+      }
+      return extra(method, params)
+    })
+  }
+  const statusCalls = () =>
+    mocks.call.mock.calls.filter(([method]) => method === statusMethod)
+  async function timedMount() {
+    vi.useFakeTimers()
+    const mounting = mountSettings()
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(0)
+    return mounting
+  }
+  async function timedClick(root, label) {
+    const clicking = clickButton(root, label)
+    await vi.advanceTimersByTimeAsync(0)
+    return clicking
+  }
+
+  it('polls an active scan to completion and keeps the last completed result visible', async () => {
+    const statuses = [
+      {
+        status: 'queued',
+        counts: {},
+        last_completed_at: '2026-10-12 09:00:00',
+        last_completed: completed,
+      },
+      {
+        status: 'running',
+        counts: { chat_unchanged: 100 },
+        last_completed_at: '2026-10-12 09:00:00',
+        last_completed: completed,
+      },
+      {
+        ...completed,
+        last_completed_at: '2026-10-12 09:05:00',
+        last_completed: completed,
+      },
+    ]
+    setup((method) => {
+      expect(method).toBe(statusMethod)
+      return Promise.resolve({ ok: true, ...statuses.shift() })
+    })
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    expect(
+      root.querySelector('[data-testid="avito-import-status"]').textContent,
+    ).toContain('Chat scan queued')
+    expect(
+      root.querySelector('[data-testid="avito-import-completed"]').textContent,
+    ).toContain('2026-10-12 09:00:00')
+    expect(
+      root.querySelector('[data-testid="avito-import-counts"]').textContent,
+    ).toContain('Chats checked: 359')
+    expect(root.textContent).toContain('New chats in last scan: 0')
+    expect(root.textContent).toContain('Unchanged chats: 359')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(
+      root.querySelector('[data-testid="avito-import-status"]').textContent,
+    ).toContain('Chats checked in current scan: 100')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(
+      root.querySelector('[data-testid="avito-import-status"]').textContent,
+    ).toContain('Chat scan completed')
+    expect(
+      root.querySelector('[data-testid="avito-import-completed"]').textContent,
+    ).toContain('2026-10-12 09:05:00')
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(statusCalls()).toHaveLength(3)
+  })
+
+  it('coalesces status reads and schedules the next poll only after the current read finishes', async () => {
+    let finishStatus
+    setup(
+      () =>
+        new Promise((resolve) => {
+          finishStatus = resolve
+        }),
+    )
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    const state = mounted[0].app._instance.setupState
+    const first = state.loadAvitoImportStatus()
+    expect(state.loadAvitoImportStatus()).toBe(first)
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(statusCalls()).toHaveLength(1)
+    finishStatus({ ok: true, status: 'running', counts: {} })
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(statusCalls()).toHaveLength(2)
+    state.loadAvitoImportStatus()
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(statusCalls()).toHaveLength(2)
+    finishStatus({ ok: true, ...completed })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(state.loadingAvitoImport).toBe(false)
+  })
+
+  it('retains the known status on a refresh failure and recovers on the next poll', async () => {
+    let reads = 0
+    setup(() => {
+      reads += 1
+      if (reads === 2) return Promise.reject(new Error('offline'))
+      return Promise.resolve({
+        ok: true,
+        status: reads === 1 ? 'running' : 'succeeded',
+        counts: {},
+      })
+    })
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(root.textContent).toContain('Scanning chats')
+    expect(root.textContent).toContain(
+      'Could not refresh the Avito chat scan status.',
+    )
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(root.textContent).toContain('Chat scan completed')
+    expect(
+      root.querySelector('[data-testid="avito-import-refresh-error"]'),
+    ).toBeNull()
+  })
+
+  it('stops polling on close and ignores a delayed response after the same channel reopens', async () => {
+    const finishes = []
+    setup(
+      () =>
+        new Promise((resolve) => {
+          finishes.push(resolve)
+        }),
+    )
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    await timedClick(root, 'Close')
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(statusCalls()).toHaveLength(1)
+    await timedClick(root, 'Avito Sales')
+    finishes[0]({ ok: true, status: 'failed', counts: {} })
+    await vi.advanceTimersByTimeAsync(0)
+    const state = mounted[0].app._instance.setupState
+    expect(state.avitoImportStatus).toBeNull()
+    expect(state.loadingAvitoImport).toBe(true)
+    finishes[1]({ ok: true, status: 'queued', counts: {} })
+    await vi.advanceTimersByTimeAsync(0)
+    await timedClick(root, 'Close')
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(statusCalls()).toHaveLength(2)
+  })
+
+  it('keeps a different channel status and loading state isolated from old responses', async () => {
+    const finishes = []
+    setup(
+      () =>
+        new Promise((resolve) => {
+          finishes.push(resolve)
+        }),
+      [
+        savedChannel(),
+        savedChannel({ name: 'avito-2', custom_display_name: 'Avito Support' }),
+      ],
+    )
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    await timedClick(root, 'Avito Support')
+    finishes[0]({
+      ok: true,
+      status: 'incomplete',
+      counts: { chat_unverified: 50 },
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    const state = mounted[0].app._instance.setupState
+    expect(state.avitoImportStatus).toBeNull()
+    expect(state.loadingAvitoImport).toBe(true)
+    finishes[1]({ ok: true, ...completed })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(root.textContent).toContain('Chat scan completed')
+    expect(root.textContent).not.toContain('Chats awaiting verification: 50')
+    expect(statusCalls().map(([, params]) => params.channel)).toEqual([
+      'avito-1',
+      'avito-2',
+    ])
+  })
+
+  it('clears the scheduled poll when the settings page unmounts', async () => {
+    setup(() => Promise.resolve({ ok: true, status: 'running', counts: {} }))
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    const current = mounted.pop()
+    current.app.unmount()
+    current.root.remove()
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(statusCalls()).toHaveLength(1)
+  })
+
+  it('refreshes the new run after enqueue and discards an older in-flight status', async () => {
+    let finishOldStatus
+    let reads = 0
+    setup((method) => {
+      if (method === scanMethod)
+        return Promise.resolve({ ok: true, status: 'queued' })
+      expect(method).toBe(statusMethod)
+      reads += 1
+      if (reads === 1)
+        return new Promise((resolve) => {
+          finishOldStatus = resolve
+        })
+      return Promise.resolve({
+        ok: true,
+        status: 'queued',
+        counts: {},
+        last_completed: completed,
+      })
+    })
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    await timedClick(root, 'Scan chats now')
+    expect(root.textContent).toContain('Chat scan queued')
+    finishOldStatus({ ok: true, status: 'succeeded', counts: {} })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(statusCalls()).toHaveLength(2)
+    expect(
+      root.querySelector('[data-testid="avito-import-status"]').textContent,
+    ).toContain('Chat scan queued')
+    expect(mounted[0].app._instance.setupState.scanningAvitoImport).toBe(false)
+  })
+
+  it('refreshes status after saving and does not reopen a dialog closed during save', async () => {
+    let finishSave
+    setup((method) => {
+      if (method === statusMethod)
+        return Promise.resolve({ ok: true, ...completed })
+      if (method === 'crm_messenger.api.settings.save_channel') {
+        return new Promise((resolve) => {
+          finishSave = resolve
+        })
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    await timedClick(root, 'Save')
+    finishSave(savedChannel())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(statusCalls()).toHaveLength(2)
+    await timedClick(root, 'Save')
+    await timedClick(root, 'Close')
+    finishSave(savedChannel())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mounted[0].app._instance.setupState.showChannelDialog).toBe(false)
+    expect(statusCalls()).toHaveLength(2)
+  })
+
+  it('describes a pagination limit as an incomplete scan', async () => {
+    setup(() =>
+      Promise.resolve({
+        ok: true,
+        status: 'incomplete',
+        counts: { chat_unchanged: 1100 },
+        incomplete: true,
+        incomplete_reason: 'max_offset_reached',
+        truncated: true,
+      }),
+    )
+    const root = await timedMount()
+    await timedClick(root, 'Avito Sales')
+    expect(root.textContent).toContain('Chat scan incomplete')
+    expect(root.textContent).toContain(
+      'The Avito API pagination limit was reached. Chats beyond this limit may not have been checked.',
+    )
+    expect(root.textContent).toContain('Chats checked: 1100')
+    expect(root.textContent).not.toContain('Chat scan completed')
+  })
+})
+
 describe('MessengerSettings unsaved channel changes', () => {
   function avitoChannel() {
     return {
@@ -959,6 +1259,44 @@ describe('MessengerSettings unsaved channel changes', () => {
     expect(mocks.call).toHaveBeenCalledWith(
       'crm_messenger.api.settings.save_channel',
       expect.objectContaining({ avito_import_to_date: '2026-09-10' }),
+    )
+  })
+
+  it('preserves the visible legacy end date when only the start date changes', async () => {
+    let channel = {
+      ...avitoChannel(),
+      avito_import_mode: 'period',
+      avito_import_from_date: '2026-09-01',
+      avito_import_started_at: '2026-09-04 12:00:00',
+    }
+    mocks.call.mockImplementation((method, params) => {
+      if (method === 'crm_messenger.api.settings.get_settings') {
+        return Promise.resolve({ settings: {}, channels: [channel] })
+      }
+      if (method === 'crm_messenger.api.settings.save_channel') {
+        channel = {
+          ...channel,
+          avito_import_from_date: params.avito_import_from_date,
+          avito_import_to_date: params.avito_import_to_date,
+          avito_import_started_at: '2026-10-12 12:00:00',
+        }
+        return Promise.resolve(channel)
+      }
+      throw new Error(`Unexpected method ${method}`)
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Avito Sales')
+    await editField(root, 'From date', '2026-08-01')
+    await clickButton(root, 'Save')
+    expect(mocks.call).toHaveBeenCalledWith(
+      'crm_messenger.api.settings.save_channel',
+      expect.objectContaining({
+        avito_import_from_date: '2026-08-01',
+        avito_import_to_date: '2026-09-04',
+      }),
+    )
+    expect(root.querySelector('input[data-label="Through date"]').value).toBe(
+      '2026-09-04',
     )
   })
 

@@ -42,11 +42,13 @@
           __('Message deleted')
         }}</template>
         <template v-else>
-          {{
-            textPresentation.translate
-              ? __(textPresentation.text)
-              : textPresentation.text
-          }}
+          <MessageText
+            :text="
+              textPresentation.translate
+                ? __(textPresentation.text)
+                : textPresentation.text
+            "
+          />
           <a
             v-if="
               textPresentation.action === 'open_provider_chat' &&
@@ -81,6 +83,7 @@ import {
 import { getMessengerMessageTextPresentation } from '@/utils/messengerMessagePresentation'
 import { Button, Textarea } from 'frappe-ui'
 import { computed } from 'vue'
+import MessageText from './MessageText.vue'
 
 const props = defineProps({
   message: { type: Object, required: true },

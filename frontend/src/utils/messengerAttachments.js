@@ -219,7 +219,7 @@ export function isSingleAudioAttachmentSet(attachments = []) {
 }
 
 export function getSingleImageBubbleWidthClass(image = {}) {
-  return 'w-fit max-w-full'
+  return 'w-fit'
 }
 
 export function getSingleImageMediaWidthClass(image = {}) {

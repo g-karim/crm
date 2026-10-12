@@ -181,6 +181,8 @@ export function getMessengerDeliveryState(message = {}) {
 }
 
 export function getMessengerFailureReason(message = {}) {
+  let unknownHint = getMessengerUnknownResultHint(message)
+  if (unknownHint) return unknownHint
   let reason = message?.failure_reason || message?.error || ''
   if (
     message?.provider === 'wazzup' &&
@@ -196,6 +198,16 @@ export function getMessengerFailureReason(message = {}) {
     return VK_PHOTO_UPLOAD_USER_REASON
   }
   return reason
+}
+
+export function getMessengerUnknownResultHint(message = {}) {
+  if (
+    message?.provider === 'vk_direct' &&
+    getMessengerDeliveryState(message) === 'unknown'
+  ) {
+    return 'VK message result is unknown. Automatic resend is disabled.'
+  }
+  return ''
 }
 
 export function shouldShowMessengerText(message = {}) {

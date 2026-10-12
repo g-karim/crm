@@ -8,7 +8,9 @@
       data-message-labels
       class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1"
     >
-      <span class="text-xs font-medium text-ink-gray-5">
+      <span
+        class="max-w-full break-words text-xs font-medium text-ink-gray-5 [overflow-wrap:anywhere]"
+      >
         {{ sender }}
       </span>
       <Badge class="max-w-full" variant="subtle" :label="source" />

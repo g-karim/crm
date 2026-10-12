@@ -4,10 +4,18 @@ const EDITOR_SCROLL_MARGIN = 16
 export function getMessengerMessageActions(message = {}) {
   let actions = []
   if (message.can_reply) actions.push('reply')
-  if (message.can_retry) actions.push('retry')
+  if (canRetryMessengerMessage(message)) actions.push('retry')
   if (message.can_edit) actions.push('edit')
   if (message.can_delete) actions.push('delete')
   return actions
+}
+
+function canRetryMessengerMessage(message = {}) {
+  if (!message?.can_retry) return false
+  return !(
+    message.provider === 'vk_direct' &&
+    (message.delivery_status || message.status) === 'unknown'
+  )
 }
 
 export function getMessengerMessageDisplay(message = {}) {
@@ -30,7 +38,7 @@ export function getMessengerRetryConfirmation(message = {}) {
     return {
       title: 'Retry sending?',
       message:
-        'VK may have already accepted the message. Retrying uses the same request ID.',
+        'VK may have already accepted the message. Retrying may create a duplicate.',
     }
   }
   return {
@@ -138,7 +146,7 @@ export function createMessengerMessageActions(options) {
   }
 
   async function retryMessage(message, confirmUnknown = false) {
-    if (!message?.can_retry) return false
+    if (!canRetryMessengerMessage(message)) return false
     return run('retry_outbound', message, {
       confirm_unknown: confirmUnknown ? 1 : 0,
     })

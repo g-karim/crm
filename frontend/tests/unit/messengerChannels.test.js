@@ -10,6 +10,7 @@ import {
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
   getMessengerFailureReason,
+  getMessengerUnknownResultHint,
   getMessengerConversationNotice,
   getMessengerCapabilities,
   getMessengerPlatformLabel,
@@ -166,7 +167,7 @@ describe('messengerChannels', () => {
     ).toBe('')
   })
 
-  it.each(['accepted', 'sent', 'delivered', 'read', 'failed'])(
+  it.each(['accepted', 'unknown', 'sent', 'delivered', 'read', 'failed'])(
     'uses canonical delivery_status for %s',
     (deliveryStatus) => {
       expect(
@@ -207,6 +208,37 @@ describe('messengerChannels', () => {
       }),
     ).toBe('Could not upload the image to VK. Try sending it again.')
   })
+
+  it.each([
+    '',
+    'VK photo upload failed: timeout',
+    'VK photo upload was rejected (HTTP 504).',
+    'VK image upload result is unknown. Automatic resend is disabled.',
+    'VK message delivery result is unknown. Automatic resend is disabled.',
+  ])(
+    'never suggests sending again for an unknown VK image result: %s',
+    (reason) => {
+      let message = {
+        provider: 'vk_direct',
+        direction: 'outbound',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        failure_reason: reason,
+      }
+
+      expect(getMessengerDeliveryLabel(message)).toBe('Result unknown')
+      expect(getMessengerFailureReason(message)).toBe(
+        'VK message result is unknown. Automatic resend is disabled.',
+      )
+      expect(getMessengerFailureReason(message)).not.toContain('Try sending')
+      expect(getMessengerUnknownResultHint(message)).toBe(
+        getMessengerFailureReason(message),
+      )
+      expect(
+        getMessengerUnknownResultHint({ ...message, provider: 'telegram_bot' }),
+      ).toBe('')
+    },
+  )
 
   it('shows text only for content or a deleted placeholder', () => {
     expect(shouldShowMessengerText({ text: null })).toBe(false)

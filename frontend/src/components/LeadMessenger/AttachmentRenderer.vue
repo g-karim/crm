@@ -2,19 +2,19 @@
   <div
     v-if="attachments.length"
     data-attachment-renderer
-    class="mt-2 grid max-w-full gap-2"
+    class="mt-2 grid min-w-0 grid-cols-1 gap-2"
     :class="
       compactPreview
         ? singleSticker
           ? 'w-fit min-w-0 max-w-full'
-          : 'w-full min-w-0'
+          : 'w-full max-w-full'
         : singleImage
-          ? 'w-fit'
+          ? 'w-fit max-w-full'
           : singleLocation
-            ? 'w-full'
+            ? 'w-full max-w-full'
             : singleAudio
-              ? 'w-full min-w-0'
-              : 'w-fit max-w-[20rem]'
+              ? 'w-full max-w-full'
+              : 'max-w-[20rem]'
     "
   >
     <template v-for="segment in segments" :key="segment.key">
