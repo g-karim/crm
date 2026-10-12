@@ -350,13 +350,13 @@ async function resolveSelectionRequests(requests, first) {
 }
 
 describe('Avito subscription restriction', () => {
-  function restrictedChannel() {
+  function restrictedChannel(name = 'AVITO') {
     return {
-      ...channel('AVITO'),
+      ...channel(name),
       provider: 'avito_direct',
       platform: 'avito',
       capabilities: {
-        ...channel('AVITO').capabilities,
+        ...channel(name).capabilities,
         messenger_access: 'subscription_required',
         supports_text: false,
         supports_attachments: false,
@@ -366,57 +366,92 @@ describe('Avito subscription restriction', () => {
     }
   }
 
-  it('shows the real chat link, hides old messages and removes the composer', async () => {
+  it.each([
+    ['no source', {}],
+    ['VK source', { source: 'VK' }],
+    ['Telegram source', { source: 'Telegram bot' }],
+  ])('shows an empty conversation for a lead with %s', async (_, lead) => {
     permissions = { ...permissions, can_operate: true }
-    channelRows = [restrictedChannel()]
-    conversationRows = [
-      {
-        name: 'AVITO-CHAT',
-        provider: 'avito_direct',
-        channel: 'AVITO',
-        external_chat_id: 'A'.repeat(26),
-        status: 'Open',
-      },
-    ]
-    conversationRows[0].avito_item = {
-      id: '123',
-      title: 'Balancing machine',
-      price_string: '1 615 680 ₽',
-      url: 'https://www.avito.ru/item_123',
-    }
-    snapshotMessages = [
-      {
-        name: 'OLD-AVITO-MESSAGE',
-        conversation: 'AVITO-CHAT',
-        channel: 'AVITO',
-        provider: 'avito_direct',
-        direction: 'inbound',
-        text: 'old content',
-        message_datetime: '2026-08-23 10:00:00',
-      },
-    ]
-    let root = await mountConversation()
-    let notice = root.querySelector('[data-testid="avito-subscription-notice"]')
-    expect(notice?.textContent).toContain(
-      'The lead is synchronized automatically',
-    )
-    expect(notice?.querySelector('[data-testid="avito-open-chat"]').href).toBe(
-      `https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`,
+    channelRows = [restrictedChannel(), channel('TELEGRAM')]
+    conversationRows = []
+
+    let root = await mountConversation({ lead })
+
+    expect(root.querySelector('input[placeholder="Platform"]')?.value).toBe(
+      'AVITO',
     )
     expect(
-      root.querySelector('[data-message-id="OLD-AVITO-MESSAGE"]'),
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
     ).toBeNull()
+    expect(root.querySelector('[data-testid="avito-open-chat"]')).toBeNull()
+    expect(root.textContent).toContain('No messages yet')
     expect(
       root.querySelector('input[placeholder="Enter a message..."]'),
     ).toBeNull()
-    expect(root.querySelector('[data-testid="avito-item-card"]')).toBeNull()
     expect(
-      root.querySelectorAll('[data-testid="avito-subscription-notice"]'),
-    ).toHaveLength(1)
-    expect(root.textContent.match(/Balancing machine/g)).toHaveLength(1)
-    expect(notice.textContent).toContain('1 615 680 ₽')
-    expect(root.textContent).not.toContain('No messages yet')
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
   })
+
+  it.each([
+    ['Avito source', { source: 'Avito' }],
+    ['no source', {}],
+  ])(
+    'shows the real chat link and restricts a linked Avito chat with %s',
+    async (_, lead) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [restrictedChannel()]
+      conversationRows = [
+        {
+          name: 'AVITO-CHAT',
+          provider: 'avito_direct',
+          channel: 'AVITO',
+          external_chat_id: 'A'.repeat(26),
+          status: 'Open',
+        },
+      ]
+      conversationRows[0].avito_item = {
+        id: '123',
+        title: 'Balancing machine',
+        price_string: '1 615 680 ₽',
+        url: 'https://www.avito.ru/item_123',
+      }
+      snapshotMessages = [
+        {
+          name: 'OLD-AVITO-MESSAGE',
+          conversation: 'AVITO-CHAT',
+          channel: 'AVITO',
+          provider: 'avito_direct',
+          direction: 'inbound',
+          text: 'old content',
+          message_datetime: '2026-08-23 10:00:00',
+        },
+      ]
+      let root = await mountConversation({ lead })
+      let notice = root.querySelector(
+        '[data-testid="avito-subscription-notice"]',
+      )
+      expect(notice?.textContent).toContain(
+        'The lead is synchronized automatically',
+      )
+      expect(
+        notice?.querySelector('[data-testid="avito-open-chat"]').href,
+      ).toBe(`https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`)
+      expect(
+        root.querySelector('[data-message-id="OLD-AVITO-MESSAGE"]'),
+      ).toBeNull()
+      expect(
+        root.querySelector('input[placeholder="Enter a message..."]'),
+      ).toBeNull()
+      expect(root.querySelector('[data-testid="avito-item-card"]')).toBeNull()
+      expect(
+        root.querySelectorAll('[data-testid="avito-subscription-notice"]'),
+      ).toHaveLength(1)
+      expect(root.textContent.match(/Balancing machine/g)).toHaveLength(1)
+      expect(notice.textContent).toContain('1 615 680 ₽')
+      expect(root.textContent).not.toContain('No messages yet')
+    },
+  )
 
   it('reloads channel access when an open conversation is invalidated', async () => {
     permissions = { ...permissions, can_operate: true }
@@ -456,9 +491,51 @@ describe('Avito subscription restriction', () => {
     ).not.toBeNull()
   })
 
-  it('keeps another messenger available in the same lead', async () => {
+  it.each([
+    ['Telegram', 'telegram_bot', 'telegram'],
+    ['VK', 'vk_direct', 'vk'],
+  ])(
+    'keeps %s available in a lead with a restricted Avito channel',
+    async (_, provider, platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        restrictedChannel(),
+        { ...channel('OTHER'), provider, platform, channel_type: platform },
+      ]
+      conversationRows = [
+        {
+          name: 'OTHER-CHAT',
+          channel: 'OTHER',
+          provider,
+          external_chat_id: 'chat-1',
+          status: 'Open',
+        },
+        {
+          name: 'AVITO-CHAT',
+          channel: 'AVITO',
+          provider: 'avito_direct',
+          external_chat_id: 'A'.repeat(26),
+          status: 'Open',
+        },
+      ]
+      latestInbound = { conversation: 'OTHER-CHAT', channel: 'OTHER' }
+      let root = await mountConversation()
+      expect(
+        root.querySelector('[data-testid="avito-subscription-notice"]'),
+      ).toBeNull()
+      expect(
+        root.querySelector('input[placeholder="Enter a message..."]')?.disabled,
+      ).toBe(false)
+    },
+  )
+
+  it('shows the notice only for the selected chat while switching channels and conversations', async () => {
     permissions = { ...permissions, can_operate: true }
-    channelRows = [channel('TELEGRAM'), restrictedChannel()]
+    channelRows = [
+      restrictedChannel(),
+      restrictedChannel('UNRELATED-AVITO'),
+      channel('TELEGRAM'),
+    ]
     conversationRows = [
       {
         name: 'TELEGRAM-CHAT',
@@ -467,22 +544,101 @@ describe('Avito subscription restriction', () => {
         external_chat_id: 'chat-1',
         status: 'Open',
       },
-      {
-        name: 'AVITO-CHAT',
+      ...['A', 'B'].map((id) => ({
+        name: `AVITO-CHAT-${id}`,
         channel: 'AVITO',
         provider: 'avito_direct',
-        external_chat_id: 'A'.repeat(26),
+        external_chat_id: id.repeat(26),
         status: 'Open',
-      },
+      })),
     ]
     latestInbound = { conversation: 'TELEGRAM-CHAT', channel: 'TELEGRAM' }
     let root = await mountConversation()
+    let platform = root.querySelector('input[placeholder="Platform"]')
+    platform.value = 'AVITO'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    expect(
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
+    ).toBeNull()
+    let externalChat = root.querySelector('input[placeholder="External Chat"]')
+    expect(externalChat?.value).toBe('')
+    for (let id of ['A', 'B']) {
+      externalChat.value = `AVITO-CHAT-${id}`
+      externalChat.dispatchEvent(new Event('input'))
+      await nextTick()
+      expect(root.querySelector('[data-testid="avito-open-chat"]')?.href).toBe(
+        `https://www.avito.ru/profile/messenger/channel/${id.repeat(26)}`,
+      )
+    }
+
+    platform.value = 'UNRELATED-AVITO'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+    expect(
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
+    ).toBeNull()
+    expect(root.querySelector('[data-testid="avito-open-chat"]')).toBeNull()
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]'),
+    ).toBeNull()
+    expect(
+      mocks.call.mock.calls.some(([method]) =>
+        ['send_message', 'send_typing'].some((name) => method.endsWith(name)),
+      ),
+    ).toBe(false)
+
+    platform.value = 'TELEGRAM'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
     expect(
       root.querySelector('[data-testid="avito-subscription-notice"]'),
     ).toBeNull()
     expect(
       root.querySelector('input[placeholder="Enter a message..."]')?.disabled,
     ).toBe(false)
+  })
+
+  it('clears the notice for a different lead and restores it for the linked chat', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [restrictedChannel()]
+    conversationRows = [
+      {
+        name: 'AVITO-CHAT',
+        provider: 'avito_direct',
+        channel: 'AVITO',
+        external_chat_id: 'A'.repeat(26),
+        status: 'Open',
+      },
+    ]
+    let linkedConversations = conversationRows
+    let root = await mountConversation({ lead: { source: 'Avito' } })
+    expect(root.querySelector('[data-testid="avito-open-chat"]')?.href).toBe(
+      `https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`,
+    )
+
+    conversationRows = []
+    mounted.at(-1).props.leadName = 'LEAD-2'
+    mounted.at(-1).props.lead = { source: 'VK' }
+    await nextTick()
+    await vi.waitFor(() =>
+      expect(root.textContent).toContain('No messages yet'),
+    )
+    expect(
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
+    ).toBeNull()
+    expect(root.querySelector('[data-testid="avito-open-chat"]')).toBeNull()
+
+    conversationRows = linkedConversations
+    mounted.at(-1).props.leadName = 'LEAD-1'
+    mounted.at(-1).props.lead = {}
+    await nextTick()
+    await vi.waitFor(() =>
+      expect(root.querySelector('[data-testid="avito-open-chat"]')?.href).toBe(
+        `https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`,
+      ),
+    )
   })
 })
 

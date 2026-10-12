@@ -75,13 +75,13 @@
       </div>
 
       <AvitoItemCard
-        v-if="!selectedAvitoRestricted"
+        v-if="!selectedAvitoConversationRestricted"
         :conversation="selectedConversation"
       />
 
       <div class="relative min-h-0 flex-1">
         <div
-          v-if="selectedAvitoRestricted"
+          v-if="selectedAvitoConversationRestricted"
           class="flex h-full flex-col items-center overflow-y-auto px-4 py-6 sm:px-10"
           data-testid="avito-restricted-panel"
         >
@@ -785,6 +785,11 @@ const selectedChannelDoc = computed(
 )
 const restrictedAvitoConversations = computed(() =>
   restrictedAvitoChats(conversations.value, channels.value),
+)
+const selectedAvitoConversationRestricted = computed(() =>
+  restrictedAvitoConversations.value.some(
+    (conversation) => conversation.name === selectedConversation.value?.name,
+  ),
 )
 const selectedAvitoRestricted = computed(() =>
   isAvitoChatRestricted(
