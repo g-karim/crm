@@ -97,6 +97,9 @@ class TestCRMTranslations(TestCase):
 			"Could not submit the password. Refresh the connection status.",
 			"Could not delete the channel. Refresh its status.",
 			"Could not update the connection. Refresh its status and try again.",
+			"Connection diagnostics", "Check connection", "Provider channel status",
+			"Account connection", "Account webhook subscription", "Configured", "Channel Disabled",
+			"The channel status is checked in its connected account. A successful check does not confirm webhook or message delivery.",
 		}
 		translations = get_crm_translations("ru")
 		self.assertEqual(user_facing - translations.keys(), set())

@@ -358,6 +358,90 @@ describe('embedded Partner connection state and actions', () => {
     expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
   })
 
+  it('checks Partner diagnostics and recovers the channel without a status webhook', async () => {
+    mocks.call.mockImplementation(async (method) =>
+      method === 'check_channel'
+        ? result('active', {
+            simulator: false,
+            integration: {
+              wazzup_partner: {
+                status: 'active',
+                last_checked_at: '2026-10-07 12:00:01',
+                reconciliation: { status: 'verified' },
+                account: { status: 'ready', enabled: true },
+                webhook_subscription: { status: 'configured' },
+                delivery: { status: 'unverified' },
+              },
+            },
+          })
+        : result('waiting_qr', { simulator: false }),
+    )
+    const { root, updated } = await mount({
+      name: 'PARTNER-1',
+      wazzup_status: 'waiting_qr',
+    })
+    expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
+    await click(root, 'Check connection')
+    expect(mocks.call).toHaveBeenLastCalledWith('check_channel', {
+      channel: 'PARTNER-1',
+    })
+    const diagnostics = root.querySelector('[data-wazzup-partner-diagnostics]')
+    expect(
+      diagnostics.querySelector('[data-diagnostic="remote_channel"]')
+        .textContent,
+    ).toContain('Channel Connected')
+    expect(
+      diagnostics.querySelector('[data-diagnostic="subscription"]').textContent,
+    ).toContain('Configured')
+    expect(
+      diagnostics.querySelector('[data-diagnostic="delivery"]').textContent,
+    ).toContain('No event observed')
+    expect(root.querySelector('[data-wazzup-qr]')).toBeNull()
+    expect(root.textContent).not.toContain('Wazzup')
+    expect(root.textContent).not.toContain('API key')
+    expect(updated.mock.lastCall[0]).toMatchObject({
+      wazzup_status: 'active',
+      integration: { wazzup_partner: { status: 'active' } },
+    })
+    expect(mocks.call.mock.calls.map(([method]) => method)).toEqual([
+      'get_onboarding_state',
+      'check_channel',
+    ])
+  })
+
+  it('keeps lifecycle state visible when the provider read fails and recovers on refresh', async () => {
+    let reads = 0
+    mocks.call.mockImplementation(async () =>
+      result('disabled', {
+        onboarding: { can_reconnect: true },
+        integration: {
+          wazzup_partner: {
+            status: 'disabled',
+            reconciliation: { status: ++reads === 1 ? 'error' : 'verified' },
+            account: { status: 'ready', enabled: true },
+            webhook_subscription: { status: 'configured' },
+          },
+        },
+      }),
+    )
+    const { root } = await mount({ name: 'PARTNER-1', wazzup_status: 'active' })
+    expect(root.querySelector('[role="status"]').textContent).toContain(
+      'Channel Disabled',
+    )
+    expect(
+      root.querySelector('[data-diagnostic="remote_channel"]').textContent,
+    ).toContain('Could not verify')
+    expect(
+      [...root.querySelectorAll('button')].some(
+        (button) => button.textContent === 'Reconnect',
+      ),
+    ).toBe(true)
+    await click(root, 'Refresh Status')
+    expect(
+      root.querySelector('[data-diagnostic="remote_channel"]').textContent,
+    ).toContain('Channel Disabled')
+  })
+
   it('rejects a stale polling response after reconnect and cancels polling on unmount', async () => {
     let resolvePoll
     let reads = 0

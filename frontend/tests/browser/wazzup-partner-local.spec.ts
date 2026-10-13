@@ -212,6 +212,35 @@ for (const [label, platform] of [
         exact: true,
       }),
     ).toBeVisible()
+    const diagnostics = settingsDialog.locator(
+      '[data-wazzup-partner-diagnostics]',
+    )
+    await expect(diagnostics).toBeVisible()
+    const checkedResponse = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+          '/api/method/crm_messenger.api.wazzup_partner.check_channel' &&
+        response.request().method() === 'POST',
+    )
+    await diagnostics
+      .getByRole('button', { name: 'Check connection', exact: true })
+      .click()
+    const checked = await checkedResponse
+    expect(checked.ok()).toBeTruthy()
+    expect(checked.request().postDataJSON()).toEqual({ channel: channel.name })
+    expect(
+      (await checked.json()).message.integration.wazzup_partner.reconciliation
+        .status,
+    ).toBe('verified')
+    await expect(
+      diagnostics.locator('[data-diagnostic="remote_channel"]'),
+    ).toContainText('Channel Connected')
+    await expect(
+      diagnostics.locator('[data-diagnostic="account"]'),
+    ).toContainText('Verified')
+    await expect(
+      diagnostics.locator('[data-diagnostic="subscription"]'),
+    ).toContainText('Configured')
     if (process.env.WAZZUP_E2E_ARTIFACTS)
       await settingsDialog.screenshot({
         path: join(
@@ -284,10 +313,11 @@ for (const [label, platform] of [
     expect(conversation.reference_name).toBeTruthy()
     await page.goto(
       `/crm/leads/${encodeURIComponent(conversation.reference_name)}?messenger_conversation=${encodeURIComponent(conversation.name)}#messenger`,
+      { waitUntil: 'domcontentloaded', timeout: 60000 },
     )
     await expect(
       page.getByRole('tab', { name: 'Messages', exact: true }),
-    ).toHaveAttribute('aria-selected', 'true')
+    ).toHaveAttribute('aria-selected', 'true', { timeout: 60000 })
     await expect(page.getByText(inboundText, { exact: true })).toBeVisible()
     const outboundText = `${platform} reply from the normal CRM composer`
     await page

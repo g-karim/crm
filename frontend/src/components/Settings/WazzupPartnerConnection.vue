@@ -104,7 +104,11 @@
         {{ __('The messenger account is connected.') }}
       </p>
       <p
-        v-if="['unauthorized', 'error', 'unknown'].includes(onboarding.status)"
+        v-if="
+          ['unauthorized', 'disabled', 'error', 'unknown'].includes(
+            onboarding.status,
+          )
+        "
         class="text-p-sm text-ink-orange-7"
       >
         {{ __('Refresh the channel status or reconnect to restore access.') }}
@@ -150,6 +154,61 @@
           @click="confirmDelete = true"
         />
       </div>
+      <section
+        class="rounded-lg border border-outline-gray-1 p-4"
+        data-wazzup-partner-diagnostics
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="text-base-medium text-ink-gray-8">
+            {{ __('Connection diagnostics') }}
+          </div>
+          <Button
+            :label="__('Check connection')"
+            variant="subtle"
+            :loading="action === 'check_channel'"
+            :disabled="busy"
+            @click="checkConnection"
+          />
+        </div>
+        <p
+          v-if="diagnostics?.last_checked_at"
+          class="mt-2 text-p-sm text-ink-gray-5"
+        >
+          {{ __('Last checked') }}: {{ diagnostics.last_checked_at }}
+        </p>
+        <dl class="mt-3 flex flex-col gap-2">
+          <div
+            v-for="row in diagnosticRows"
+            :key="row.key"
+            :data-diagnostic="row.key"
+            class="flex flex-wrap items-center justify-between gap-2"
+          >
+            <dt class="text-p-sm text-ink-gray-7">{{ __(row.title) }}</dt>
+            <dd
+              class="flex flex-wrap items-center gap-2 text-p-sm text-ink-gray-5"
+            >
+              <span v-if="row.received_at"
+                >{{ row.received_at
+                }}<template v-if="row.event_label">
+                  · {{ __(row.event_label) }}</template
+                ></span
+              >
+              <Badge
+                :label="__(row.label)"
+                :theme="row.theme"
+                variant="outline"
+              />
+            </dd>
+          </div>
+        </dl>
+        <p class="mt-3 text-p-sm text-ink-gray-5">
+          {{
+            __(
+              'The channel status is checked in its connected account. A successful check does not confirm webhook or message delivery.',
+            )
+          }}
+        </p>
+      </section>
       <div
         v-if="confirmDelete"
         class="flex flex-col gap-3 rounded-lg border border-outline-red-2 p-3"
@@ -187,11 +246,12 @@
   </div>
 </template>
 <script setup>
-import { Button, FormControl, LoadingIndicator } from 'frappe-ui'
+import { Badge, Button, FormControl, LoadingIndicator } from 'frappe-ui'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   callWazzupPartner,
   normalizePartnerConnection,
+  wazzupPartnerDiagnosticRows,
   wazzupPartnerError,
   wazzupPartnerStatus,
 } from '@/utils/wazzupPartnerConnection'
@@ -206,6 +266,7 @@ const emit = defineEmits(['updated', 'deleted', 'busy'])
 const initial = normalizePartnerConnection({ channel: props.channel || {} })
 const currentChannel = ref(initial.channel)
 const onboarding = ref(initial.onboarding)
+const diagnostics = ref(initial.integration?.wazzup_partner || null)
 const simulator = ref(false)
 const password = ref('')
 const action = ref('')
@@ -221,6 +282,9 @@ const busy = computed(() => Boolean(action.value))
 watch(busy, (value) => emit('busy', value), { flush: 'sync' })
 const presentation = computed(() =>
   wazzupPartnerStatus(onboarding.value.status),
+)
+const diagnosticRows = computed(() =>
+  wazzupPartnerDiagnosticRows(diagnostics.value),
 )
 const preparing = computed(
   () =>
@@ -275,6 +339,8 @@ async function operate(method, args, polling = false) {
     }
     currentChannel.value = result.channel
     onboarding.value = result.onboarding
+    if (result.integration?.wazzup_partner)
+      diagnostics.value = result.integration.wazzup_partner
     simulator.value = result.simulator
     if (result.onboarding.has_error) {
       error.value = wazzupPartnerError(
@@ -327,6 +393,10 @@ function reconnect() {
   password.value = ''
   confirmDelete.value = false
   return operate('reconnect', { channel: currentChannel.value.name })
+}
+
+function checkConnection() {
+  return operate('check_channel', { channel: currentChannel.value.name })
 }
 
 async function submitTwoFactor() {

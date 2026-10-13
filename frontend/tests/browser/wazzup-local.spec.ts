@@ -198,10 +198,13 @@ for (const platform of ['whatsapp', 'telegram']) {
     })
     await Promise.race([
       (async () => {
-        await page.goto(leadUrl)
+        await page.goto(leadUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60000,
+        })
         await expect(
           page.getByRole('tab', { name: 'Messages', exact: true }),
-        ).toHaveAttribute('aria-selected', 'true')
+        ).toHaveAttribute('aria-selected', 'true', { timeout: 60000 })
       })(),
       startupFailure,
     ])

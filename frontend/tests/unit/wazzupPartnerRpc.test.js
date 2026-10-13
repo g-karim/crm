@@ -2,6 +2,7 @@ import {
   callWazzupPartner,
   normalizePartnerConnection,
   safeWazzupQrImage,
+  wazzupPartnerDiagnosticRows,
   wazzupPartnerStatus,
 } from '@/utils/wazzupPartnerConnection'
 
@@ -103,6 +104,109 @@ describe('Wazzup Partner onboarding RPC privacy', () => {
     expect(result.onboarding.has_error).toBe(true)
   })
 
+  it('checks only the selected Partner channel and keeps safe account diagnostics', async () => {
+    fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        message: response({
+          integration: {
+            wazzup_connection: { api_token: 'legacy-secret' },
+            wazzup_partner: {
+              status: 'waiting_2fa',
+              last_checked_at: '2026-10-13 12:00:00',
+              reconciliation: { status: 'verified', reason: 'private-error' },
+              account: {
+                status: 'ready',
+                enabled: true,
+                name: 'private-tenant',
+              },
+              webhook_subscription: {
+                status: 'configured',
+                url: 'private-url',
+              },
+              delivery: { status: 'unverified', raw_data: 'private-payload' },
+              client_access_token: 'private-token',
+            },
+          },
+        }),
+      }),
+    })
+    const result = await callWazzupPartner('check_channel', {
+      channel: 'PARTNER-1',
+      account: 'untrusted-tenant',
+      api_token: 'untrusted-token',
+    })
+    expect(fetch.mock.calls[0][0]).toBe(
+      '/api/method/crm_messenger.api.wazzup_partner.check_channel',
+    )
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      channel: 'PARTNER-1',
+    })
+    expect(result.channel.integration).toEqual(result.integration)
+    expect(JSON.stringify(result)).not.toMatch(/private-|legacy-secret/)
+    const rows = wazzupPartnerDiagnosticRows(result.integration.wazzup_partner)
+    expect(rows.find((row) => row.key === 'remote_channel').label).toBe(
+      'Two-factor authentication required',
+    )
+    expect(rows.find((row) => row.key === 'subscription').label).toBe(
+      'Configured',
+    )
+    expect(rows.find((row) => row.key === 'delivery').label).toBe(
+      'No event observed',
+    )
+  })
+
+  it.each([
+    ['disabled', 'Channel Disabled'],
+    ['deleted', 'Channel Deleted'],
+    ['reconnecting', 'Reconnecting'],
+    ['provisioning', 'Preparing connection'],
+    ['provider-state-unrecognized', 'Result unknown'],
+  ])(
+    'keeps %s visible without claiming that the channel is connected',
+    (status, label) => {
+      const normalized = normalizePartnerConnection(
+        response({
+          onboarding: { status },
+          channel: { name: 'PARTNER-1', wazzup_status: status },
+        }),
+      )
+      expect(wazzupPartnerStatus(normalized.onboarding.status).label).toBe(
+        label,
+      )
+      expect(normalized.onboarding.qr_code).toBe('')
+    },
+  )
+
+  it('reports failed verification separately from observed delivery', () => {
+    const normalized = normalizePartnerConnection(
+      response({
+        integration: {
+          wazzup_partner: {
+            status: 'active',
+            reconciliation: { status: 'error' },
+            account: { status: 'ready', enabled: true },
+            delivery: {
+              status: 'received',
+              last_received_at: '2026-10-13 12:00:00',
+              event_type: 'message.add',
+            },
+          },
+        },
+      }),
+    )
+    const rows = wazzupPartnerDiagnosticRows(
+      normalized.integration.wazzup_partner,
+    )
+    expect(rows.find((row) => row.key === 'remote_channel').label).toBe(
+      'Could not verify',
+    )
+    expect(rows.find((row) => row.key === 'delivery')).toMatchObject({
+      label: 'Event received',
+      event_label: 'Incoming message',
+    })
+  })
+
   it.each([
     {
       ok: false,
@@ -165,6 +269,6 @@ describe('Wazzup Partner onboarding RPC privacy', () => {
     expect(normalizePartnerConnection(value).onboarding.qr_code).toBe(PNG)
     value.onboarding.status = 'active'
     expect(normalizePartnerConnection(value).onboarding.qr_code).toBe('')
-    expect(wazzupPartnerStatus('__proto__').label).toBe('Channel Not Connected')
+    expect(wazzupPartnerStatus('__proto__').label).toBe('Result unknown')
   })
 })

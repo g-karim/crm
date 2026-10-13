@@ -2,6 +2,7 @@ const API_PREFIX = 'crm_messenger.api.wazzup_partner'
 const REQUEST_FIELDS = {
   start_connection: ['platform', 'custom_display_name', 'client_request_id'],
   get_onboarding_state: ['channel'],
+  check_channel: ['channel'],
   submit_2fa: ['channel', 'password'],
   reconnect: ['channel'],
   delete_channel: ['channel'],
@@ -18,6 +19,7 @@ const STATUS_PRESENTATION = {
   error: { label: 'Needs Attention', theme: 'red' },
   unknown: { label: 'Result unknown', theme: 'orange' },
   reconnecting: { label: 'Reconnecting', theme: 'gray' },
+  disabled: { label: 'Channel Disabled', theme: 'gray' },
   deleted: { label: 'Channel Deleted', theme: 'gray' },
 }
 
@@ -31,7 +33,119 @@ export function isWazzupPartnerChannel(channel) {
 export function wazzupPartnerStatus(status) {
   return Object.hasOwn(STATUS_PRESENTATION, status)
     ? STATUS_PRESENTATION[status]
-    : STATUS_PRESENTATION.not_connected
+    : status
+      ? STATUS_PRESENTATION.unknown
+      : STATUS_PRESENTATION.not_connected
+}
+
+export function normalizePartnerDiagnostics(integration) {
+  const value = integration?.wazzup_partner
+  if (!value || typeof value !== 'object') return null
+  const status = (candidate, allowed, fallback) =>
+    allowed.includes(candidate) ? candidate : fallback
+  const timestamp = (candidate) =>
+    typeof candidate === 'string' &&
+    candidate.length <= 40 &&
+    Number.isFinite(Date.parse(candidate))
+      ? candidate
+      : ''
+  return {
+    status: Object.hasOwn(STATUS_PRESENTATION, value.status)
+      ? value.status
+      : 'unknown',
+    last_checked_at: timestamp(value.last_checked_at),
+    reconciliation: {
+      status: status(
+        value.reconciliation?.status,
+        ['verified', 'error', 'unverified', 'stale'],
+        'unverified',
+      ),
+    },
+    account: {
+      status: status(
+        value.account?.status,
+        ['ready', 'pending', 'provisioning', 'unknown', 'failed'],
+        'unknown',
+      ),
+      enabled: value.account?.enabled === true,
+    },
+    webhook_subscription: {
+      status:
+        value.webhook_subscription?.status === 'configured'
+          ? 'configured'
+          : 'unverified',
+    },
+    delivery: {
+      status: value.delivery?.status === 'received' ? 'received' : 'unverified',
+      last_received_at: timestamp(value.delivery?.last_received_at),
+      event_type: status(
+        value.delivery?.event_type,
+        [
+          'message.add',
+          'message.status_update',
+          'channel.status_update',
+          'channel.qr_update',
+        ],
+        '',
+      ),
+    },
+  }
+}
+
+export function wazzupPartnerDiagnosticRows(diagnostics) {
+  const value = diagnostics || {}
+  const reconciliation = value.reconciliation?.status
+  const received =
+    value.delivery?.status === 'received' && value.delivery.last_received_at
+  return [
+    {
+      key: 'remote_channel',
+      title: 'Provider channel status',
+      ...(reconciliation === 'verified'
+        ? wazzupPartnerStatus(value.status)
+        : reconciliation === 'error'
+          ? { label: 'Could not verify', theme: 'orange' }
+          : { label: 'Not checked', theme: 'gray' }),
+    },
+    {
+      key: 'account',
+      title: 'Account connection',
+      ...(value.account?.status === 'ready' && value.account.enabled
+        ? { label: 'Verified', theme: 'green' }
+        : value.account?.status === 'ready'
+          ? { label: 'Channel Disabled', theme: 'gray' }
+          : ['pending', 'provisioning'].includes(value.account?.status)
+            ? { label: 'Preparing connection', theme: 'gray' }
+            : !value.account
+              ? { label: 'Not checked', theme: 'gray' }
+              : { label: 'Could not verify', theme: 'orange' }),
+    },
+    {
+      key: 'subscription',
+      title: 'Account webhook subscription',
+      label:
+        value.webhook_subscription?.status === 'configured'
+          ? 'Configured'
+          : 'Not checked',
+      theme:
+        value.webhook_subscription?.status === 'configured' ? 'green' : 'gray',
+    },
+    {
+      key: 'delivery',
+      title: 'Actual incoming event',
+      label: received ? 'Event received' : 'No event observed',
+      theme: received ? 'green' : 'gray',
+      received_at: received ? value.delivery.last_received_at : '',
+      event_label: received
+        ? {
+            'message.add': 'Incoming message',
+            'message.status_update': 'Message status',
+            'channel.status_update': 'Channel update',
+            'channel.qr_update': 'Channel update',
+          }[value.delivery.event_type] || ''
+        : '',
+    },
+  ]
 }
 
 export function safeWazzupQrImage(value) {
@@ -45,11 +159,16 @@ export function safeWazzupQrImage(value) {
 export function normalizePartnerConnection(value = {}) {
   const channel = value.channel || {}
   const onboarding = value.onboarding || {}
-  const status = Object.hasOwn(STATUS_PRESENTATION, onboarding.status)
-    ? onboarding.status
-    : Object.hasOwn(STATUS_PRESENTATION, channel.wazzup_status)
-      ? channel.wazzup_status
+  const candidate = onboarding.status || channel.wazzup_status
+  const status = Object.hasOwn(STATUS_PRESENTATION, candidate)
+    ? candidate
+    : candidate
+      ? 'unknown'
       : 'not_connected'
+  const diagnostics = normalizePartnerDiagnostics(
+    value.integration || channel.integration,
+  )
+  const integration = diagnostics ? { wazzup_partner: diagnostics } : null
   const expiry = Date.parse(onboarding.qr_expires_at || '')
   return {
     ok: value.ok === true,
@@ -83,6 +202,7 @@ export function normalizePartnerConnection(value = {}) {
       )
         ? channel.state
         : 'unchecked',
+      ...(integration ? { integration } : {}),
     },
     onboarding: {
       status,
@@ -99,6 +219,7 @@ export function normalizePartnerConnection(value = {}) {
       can_reconnect: Boolean(onboarding.can_reconnect),
     },
     simulator: value.simulator === true,
+    integration,
   }
 }
 
