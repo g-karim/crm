@@ -369,7 +369,10 @@ describe('embedded Partner connection state and actions', () => {
                 last_checked_at: '2026-10-07 12:00:01',
                 reconciliation: { status: 'verified' },
                 account: { status: 'ready', enabled: true },
-                webhook_subscription: { status: 'configured' },
+                webhook_subscription: {
+                  status: 'configured',
+                  last_checked_at: '2026-10-07 12:00:00',
+                },
                 delivery: { status: 'unverified' },
               },
             },
@@ -394,6 +397,9 @@ describe('embedded Partner connection state and actions', () => {
       diagnostics.querySelector('[data-diagnostic="subscription"]').textContent,
     ).toContain('Configured')
     expect(
+      diagnostics.querySelector('[data-diagnostic="subscription"]').textContent,
+    ).toContain('Last checked: 2026-10-07 12:00:00')
+    expect(
       diagnostics.querySelector('[data-diagnostic="delivery"]').textContent,
     ).toContain('No event observed')
     expect(root.querySelector('[data-wazzup-qr]')).toBeNull()
@@ -407,6 +413,37 @@ describe('embedded Partner connection state and actions', () => {
       'get_onboarding_state',
       'check_channel',
     ])
+  })
+
+  it('replaces confirmed webhook evidence after an unresolved check and clears missing diagnostics', async () => {
+    let reads = 0
+    mocks.call.mockImplementation(async () =>
+      result('active', {
+        ...(++reads < 3
+          ? {
+              integration: {
+                wazzup_partner: {
+                  status: 'active',
+                  webhook_subscription: {
+                    status: reads === 1 ? 'configured' : 'unknown',
+                    last_checked_at: '2026-10-07 12:00:00',
+                  },
+                },
+              },
+            }
+          : {}),
+      }),
+    )
+    const { root } = await mount({ name: 'PARTNER-1', wazzup_status: 'active' })
+    const subscription = () =>
+      root.querySelector('[data-diagnostic="subscription"]').textContent
+    expect(subscription()).toContain('Configured')
+    await click(root, 'Check connection')
+    expect(subscription()).toContain('Result unknown')
+    expect(subscription()).not.toContain('Configured')
+    await click(root, 'Refresh Status')
+    expect(subscription()).toContain('Not checked')
+    expect(subscription()).not.toContain('Last checked')
   })
 
   it('keeps lifecycle state visible when the provider read fails and recovers on refresh', async () => {

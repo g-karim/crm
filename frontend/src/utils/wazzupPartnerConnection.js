@@ -23,6 +23,14 @@ const STATUS_PRESENTATION = {
   deleted: { label: 'Channel Deleted', theme: 'gray' },
 }
 
+const WEBHOOK_SUBSCRIPTION_PRESENTATION = {
+  configured: { label: 'Configured', theme: 'green' },
+  stale: { label: 'Needs Attention', theme: 'orange' },
+  unknown: { label: 'Result unknown', theme: 'orange' },
+  error: { label: 'Could not verify', theme: 'orange' },
+  unverified: { label: 'Not checked', theme: 'gray' },
+}
+
 export function isWazzupPartnerChannel(channel) {
   return (
     channel?.provider === 'wazzup' &&
@@ -70,10 +78,12 @@ export function normalizePartnerDiagnostics(integration) {
       enabled: value.account?.enabled === true,
     },
     webhook_subscription: {
-      status:
-        value.webhook_subscription?.status === 'configured'
-          ? 'configured'
-          : 'unverified',
+      status: status(
+        value.webhook_subscription?.status,
+        ['configured', 'stale', 'unknown', 'error', 'unverified'],
+        'unverified',
+      ),
+      last_checked_at: timestamp(value.webhook_subscription?.last_checked_at),
     },
     delivery: {
       status: value.delivery?.status === 'received' ? 'received' : 'unverified',
@@ -95,6 +105,7 @@ export function normalizePartnerDiagnostics(integration) {
 export function wazzupPartnerDiagnosticRows(diagnostics) {
   const value = diagnostics || {}
   const reconciliation = value.reconciliation?.status
+  const subscription = value.webhook_subscription?.status
   const received =
     value.delivery?.status === 'received' && value.delivery.last_received_at
   return [
@@ -123,12 +134,10 @@ export function wazzupPartnerDiagnosticRows(diagnostics) {
     {
       key: 'subscription',
       title: 'Account webhook subscription',
-      label:
-        value.webhook_subscription?.status === 'configured'
-          ? 'Configured'
-          : 'Not checked',
-      theme:
-        value.webhook_subscription?.status === 'configured' ? 'green' : 'gray',
+      ...(Object.hasOwn(WEBHOOK_SUBSCRIPTION_PRESENTATION, subscription)
+        ? WEBHOOK_SUBSCRIPTION_PRESENTATION[subscription]
+        : WEBHOOK_SUBSCRIPTION_PRESENTATION.unverified),
+      checked_at: value.webhook_subscription?.last_checked_at || '',
     },
     {
       key: 'delivery',

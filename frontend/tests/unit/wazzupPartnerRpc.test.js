@@ -122,7 +122,9 @@ describe('Wazzup Partner onboarding RPC privacy', () => {
               },
               webhook_subscription: {
                 status: 'configured',
+                last_checked_at: '2026-10-13 11:59:00',
                 url: 'private-url',
+                access_token: 'private-webhook-token',
               },
               delivery: { status: 'unverified', raw_data: 'private-payload' },
               client_access_token: 'private-token',
@@ -151,10 +153,60 @@ describe('Wazzup Partner onboarding RPC privacy', () => {
     expect(rows.find((row) => row.key === 'subscription').label).toBe(
       'Configured',
     )
+    expect(rows.find((row) => row.key === 'subscription').checked_at).toBe(
+      '2026-10-13 11:59:00',
+    )
     expect(rows.find((row) => row.key === 'delivery').label).toBe(
       'No event observed',
     )
   })
+
+  it.each([
+    ['configured', 'Configured', 'green'],
+    ['stale', 'Needs Attention', 'orange'],
+    ['unknown', 'Result unknown', 'orange'],
+    ['error', 'Could not verify', 'orange'],
+    ['unverified', 'Not checked', 'gray'],
+    ['__proto__', 'Not checked', 'gray'],
+  ])(
+    'keeps %s webhook evidence separate from channel authorization and incoming delivery',
+    (status, label, theme) => {
+      const normalized = normalizePartnerConnection(
+        response({
+          integration: {
+            wazzup_partner: {
+              status: 'active',
+              account: { status: 'ready', enabled: true },
+              webhook_subscription: {
+                status,
+                last_checked_at: 'private-invalid-timestamp',
+                callback_url: 'private-url',
+                refresh_token: 'private-token',
+              },
+              delivery: {
+                status: 'received',
+                last_received_at: '2026-10-13 12:00:00',
+                event_type: 'message.add',
+              },
+            },
+          },
+        }),
+      )
+      const rows = wazzupPartnerDiagnosticRows(
+        normalized.integration.wazzup_partner,
+      )
+      expect(rows.find((row) => row.key === 'subscription')).toMatchObject({
+        label,
+        theme,
+        checked_at: '',
+      })
+      expect(rows.find((row) => row.key === 'account').label).toBe('Verified')
+      expect(rows.find((row) => row.key === 'delivery').label).toBe(
+        'Event received',
+      )
+      expect(JSON.stringify(normalized)).not.toContain('private-')
+    },
+  )
 
   it.each([
     ['disabled', 'Channel Disabled'],

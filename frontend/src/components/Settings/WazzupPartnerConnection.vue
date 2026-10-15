@@ -187,6 +187,9 @@
             <dd
               class="flex flex-wrap items-center gap-2 text-p-sm text-ink-gray-5"
             >
+              <span v-if="row.checked_at"
+                >{{ __('Last checked') }}: {{ row.checked_at }}</span
+              >
               <span v-if="row.received_at"
                 >{{ row.received_at
                 }}<template v-if="row.event_label">
@@ -339,8 +342,7 @@ async function operate(method, args, polling = false) {
     }
     currentChannel.value = result.channel
     onboarding.value = result.onboarding
-    if (result.integration?.wazzup_partner)
-      diagnostics.value = result.integration.wazzup_partner
+    diagnostics.value = result.integration?.wazzup_partner || null
     simulator.value = result.simulator
     if (result.onboarding.has_error) {
       error.value = wazzupPartnerError(
