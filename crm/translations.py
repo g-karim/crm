@@ -308,6 +308,7 @@ RUSSIAN_TRANSLATIONS = {
 	"Could not cancel the handoff.": "Не удалось отменить переход.",
 	"The Avito integration is not configured. Enter the Client ID and Client Secret in the Avito channel settings, then connect the channel. The message was saved locally with an error status.": "Интеграция Avito не настроена. Укажите Client ID и Client Secret в настройках канала Avito, затем подключите канал. Сообщение сохранено локально со статусом ошибки.",
 	"The WhatsApp or Telegram channel is not configured. Enable the integration and enter an API token. The message was saved locally with an error status.": "Канал WhatsApp или Telegram не настроен: включите интеграцию и укажите API-токен. Сообщение сохранено локально со статусом ошибки.",
+	"The WhatsApp or Telegram channel is not configured. Ask your system administrator to check the connection in the channel settings. The message was saved locally with an error status.": "Канал WhatsApp или Telegram не настроен. Попросите системного администратора проверить подключение в настройках канала. Сообщение сохранено локально со статусом ошибки.",
 	"The messaging integration is not configured. The message was saved locally with an error status.": "Интеграция сообщений не настроена. Сообщение сохранено локально со статусом ошибки.",
 	"This lead has no phone number.": "У лида не указан телефон.",
 	"Could not create the conversation.": "Не удалось создать переписку.",

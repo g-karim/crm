@@ -634,6 +634,7 @@ import {
 import { createMessengerReadController } from '@/utils/messengerRead'
 import { createMessengerTypingController } from '@/utils/messengerTyping'
 import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
+import { isWazzupPartnerChannel } from '@/utils/wazzupPartnerConnection'
 import {
   createMessengerMessageActions,
   getMessengerRetryConfirmation,
@@ -1872,6 +1873,12 @@ function integrationWarningMessage(result = {}) {
   ) {
     return __(
       'The Avito integration is not configured. Enter the Client ID and Client Secret in the Avito channel settings, then connect the channel. The message was saved locally with an error status.',
+    )
+  }
+
+  if (isWazzupPartnerChannel(channel)) {
+    return __(
+      'The WhatsApp or Telegram channel is not configured. Ask your system administrator to check the connection in the channel settings. The message was saved locally with an error status.',
     )
   }
 

@@ -950,6 +950,57 @@ describe('messenger initial selection', () => {
   })
 })
 
+describe('Wazzup configuration warnings', () => {
+  it.each([
+    ['partner_api_v2', 'Ask your system administrator to check the connection'],
+    ['user_api_v3', 'Enable the integration and enter an API token'],
+  ])(
+    'uses the connection model for %s send failures',
+    async (mode, warning) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        {
+          ...channel('CHANNEL-1'),
+          provider: 'wazzup',
+          platform: 'whatsapp',
+          channel_type: 'whatsapp',
+          wazzup_api_mode: mode,
+        },
+      ]
+      conversationRows[0].provider = 'wazzup'
+      const defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((method, args) =>
+        method.endsWith('send_message')
+          ? Promise.resolve({
+              ok: false,
+              name: 'MESSAGE-FAILED',
+              channel: 'CHANNEL-1',
+              reason: 'not_configured',
+            })
+          : defaultCall(method, args),
+      )
+      const root = await mountConversation()
+      const composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Check connection'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      const send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      send.click()
+      await vi.waitFor(() => expect(root.textContent).toContain(warning))
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        expect.stringContaining(warning),
+      )
+      if (mode === 'partner_api_v2') {
+        expect(root.textContent).not.toContain('enter an API token')
+      }
+    },
+  )
+})
+
 describe('VK image outbound composer', () => {
   async function mountVKImageComposer() {
     permissions = { ...permissions, can_operate: true }
