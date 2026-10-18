@@ -454,17 +454,28 @@ describe('messengerSettings', () => {
     ['unknown', 'Result unknown', 'orange'],
     ['reconnecting', 'Reconnecting', 'gray'],
     ['deleted', 'Channel Deleted', 'gray'],
-  ])(
-    'shows Partner lifecycle %s before the local enable flag',
-    (status, label, theme) => {
+  ])('shows Partner lifecycle %s while enabled', (status, label, theme) => {
+    expect(
+      messengerChannelState({
+        provider: 'wazzup',
+        wazzup_api_mode: 'partner_api_v2',
+        wazzup_status: status,
+        enabled: true,
+      }),
+    ).toEqual({ label, theme })
+  })
+
+  it.each([0, false])(
+    'shows a locally disconnected Partner channel as disabled for enabled=%s',
+    (enabled) => {
       expect(
         messengerChannelState({
           provider: 'wazzup',
           wazzup_api_mode: 'partner_api_v2',
-          wazzup_status: status,
-          enabled: false,
+          wazzup_status: 'active',
+          enabled,
         }),
-      ).toEqual({ label, theme })
+      ).toEqual({ label: 'Channel Disabled', theme: 'gray' })
     },
   )
 

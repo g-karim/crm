@@ -1,11 +1,5 @@
 <template>
   <div class="flex flex-col gap-4" data-wazzup-partner-connection>
-    <div class="flex items-center justify-between gap-3 text-p-sm">
-      <span class="text-ink-gray-6">{{ __('Connection status') }}</span>
-      <span class="text-ink-gray-8" role="status">
-        {{ __(presentation.label) }}
-      </span>
-    </div>
     <div
       v-if="preparing"
       class="flex items-center gap-2 text-p-sm text-ink-gray-6"
@@ -22,13 +16,6 @@
           )
         }}
       </p>
-      <Button
-        :label="__('Connect')"
-        variant="solid"
-        :loading="action === 'start_connection'"
-        :disabled="busy || !available"
-        @click="startConnection"
-      />
     </div>
 
     <template v-else>
@@ -98,20 +85,28 @@
       </form>
 
       <p
-        v-if="onboarding.status === 'active'"
-        class="text-p-sm text-ink-green-7"
-      >
-        {{ __('The messenger account is connected.') }}
-      </p>
-      <p
         v-if="
+          !connectionWarning &&
           ['unauthorized', 'disabled', 'error', 'unknown'].includes(
             onboarding.status,
           )
         "
         class="text-p-sm text-ink-orange-7"
       >
-        {{ __('Refresh the channel status or reconnect to restore access.') }}
+        {{
+          __(
+            'Refresh the channel status or restore the connection to regain access.',
+          )
+        }}
+      </p>
+
+      <p
+        v-if="connectionWarning"
+        class="text-p-sm text-ink-orange-7"
+        role="status"
+        data-wazzup-connection-warning
+      >
+        {{ __(connectionWarning) }}
       </p>
 
       <div
@@ -132,6 +127,20 @@
 
       <div class="flex flex-wrap gap-2 border-t border-outline-gray-1 pt-4">
         <Button
+          :label="__('Test')"
+          variant="subtle"
+          :disabled="busy"
+          :loading="action === 'check_channel'"
+          @click="checkConnection"
+        />
+        <Button
+          :label="__('Connect / Restore')"
+          variant="solid"
+          :disabled="busy"
+          :loading="action === 'connect_channel'"
+          @click="connectChannel"
+        />
+        <Button
           :label="__('Refresh Status')"
           variant="subtle"
           :disabled="busy"
@@ -139,42 +148,28 @@
           @click="refresh"
         />
         <Button
-          v-if="onboarding.can_reconnect && !qrExpired"
-          :label="__('Reconnect')"
-          variant="subtle"
-          :disabled="busy"
-          :loading="action === 'reconnect'"
-          @click="reconnect"
-        />
-        <Button
-          :label="__('Delete Channel')"
+          v-if="currentChannel.enabled"
+          :label="__('Disconnect')"
           variant="subtle"
           theme="red"
           :disabled="busy"
-          @click="confirmDelete = true"
+          :loading="action === 'disconnect'"
+          @click="disconnect"
         />
       </div>
-      <section
+      <details
         class="rounded-lg border border-outline-gray-1 p-4"
         data-wazzup-partner-diagnostics
       >
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="text-base-medium text-ink-gray-8">
-            {{ __('Connection diagnostics') }}
-          </div>
-          <Button
-            :label="__('Check connection')"
-            variant="subtle"
-            :loading="action === 'check_channel'"
-            :disabled="busy"
-            @click="checkConnection"
-          />
-        </div>
+        <summary class="cursor-pointer text-base-medium text-ink-gray-8">
+          {{ __('Connection details') }}
+        </summary>
         <p
           v-if="diagnostics?.last_checked_at"
           class="mt-2 text-p-sm text-ink-gray-5"
         >
-          {{ __('Last checked') }}: {{ diagnostics.last_checked_at }}
+          {{ __('Last checked') }}:
+          {{ diagnosticDate(diagnostics.last_checked_at) }}
         </p>
         <dl class="mt-3 flex flex-col gap-2">
           <div
@@ -188,10 +183,11 @@
               class="flex flex-wrap items-center gap-2 text-p-sm text-ink-gray-5"
             >
               <span v-if="row.checked_at"
-                >{{ __('Last checked') }}: {{ row.checked_at }}</span
+                >{{ __('Last checked') }}:
+                {{ diagnosticDate(row.checked_at) }}</span
               >
               <span v-if="row.received_at"
-                >{{ row.received_at
+                >{{ diagnosticDate(row.received_at)
                 }}<template v-if="row.event_label">
                   · {{ __(row.event_label) }}</template
                 ></span
@@ -211,32 +207,82 @@
             )
           }}
         </p>
-      </section>
-      <div
-        v-if="confirmDelete"
-        class="flex flex-col gap-3 rounded-lg border border-outline-red-2 p-3"
-      >
-        <p class="text-p-sm text-ink-gray-7">
-          {{ __('Delete this channel? Existing messages will remain in CRM.') }}
-        </p>
-        <div class="flex gap-2">
+        <div
+          class="mt-4 flex flex-wrap gap-2 border-t border-outline-gray-1 pt-4"
+        >
           <Button
-            :label="__('Delete Channel')"
-            variant="solid"
-            theme="red"
-            :loading="action === 'delete_channel'"
-            :disabled="busy"
-            data-wazzup-confirm-delete
-            @click="deleteChannel"
-          />
-          <Button
-            :label="__('Cancel')"
+            v-if="onboarding.can_reconnect"
+            :label="__('Reauthorize account')"
             variant="subtle"
             :disabled="busy"
-            @click="confirmDelete = false"
+            @click="showConfirmation('reauthorize')"
+          />
+          <Button
+            :label="__('Delete Channel')"
+            variant="subtle"
+            theme="red"
+            :disabled="busy"
+            @click="showConfirmation('delete')"
           />
         </div>
-      </div>
+        <div
+          v-if="confirmReauthorize"
+          class="mt-3 flex flex-col gap-3 rounded-lg border border-outline-gray-1 p-3"
+        >
+          <p class="text-p-sm text-ink-gray-7">
+            {{
+              __(
+                'Start authorization again? You may need to scan a new QR code.',
+              )
+            }}
+          </p>
+          <div class="flex gap-2">
+            <Button
+              :label="__('Reauthorize account')"
+              variant="solid"
+              :disabled="busy"
+              :loading="action === 'reconnect'"
+              data-wazzup-confirm-reauthorize
+              @click="reconnect"
+            />
+            <Button
+              :label="__('Cancel')"
+              variant="subtle"
+              :disabled="busy"
+              @click="confirmReauthorize = false"
+            />
+          </div>
+        </div>
+        <div
+          v-if="confirmDelete"
+          class="flex flex-col gap-3 rounded-lg border border-outline-red-2 p-3"
+        >
+          <p class="text-p-sm text-ink-gray-7">
+            {{
+              __(
+                'Delete this channel from the provider? Existing messages will remain in CRM. Connecting it again will require authorization.',
+              )
+            }}
+          </p>
+          <div class="flex gap-2">
+            <Button
+              :label="__('Delete Channel')"
+              variant="solid"
+              theme="red"
+              :loading="action === 'delete_channel'"
+              :disabled="busy"
+              data-wazzup-confirm-delete
+              @click="deleteChannel"
+            />
+            <Button
+              :label="__('Cancel')"
+              variant="subtle"
+              :disabled="busy"
+              @click="confirmDelete = false"
+            />
+          </div>
+        </div>
+      </details>
     </template>
 
     <p
@@ -249,14 +295,21 @@
   </div>
 </template>
 <script setup>
-import { Badge, Button, FormControl, LoadingIndicator } from 'frappe-ui'
+import {
+  Badge,
+  Button,
+  FormControl,
+  LoadingIndicator,
+  dayjsLocal,
+  toast,
+} from 'frappe-ui'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   callWazzupPartner,
   normalizePartnerConnection,
   wazzupPartnerDiagnosticRows,
+  wazzupPartnerConnectionWarning,
   wazzupPartnerError,
-  wazzupPartnerStatus,
 } from '@/utils/wazzupPartnerConnection'
 
 const props = defineProps({
@@ -275,6 +328,8 @@ const password = ref('')
 const action = ref('')
 const error = ref('')
 const confirmDelete = ref(false)
+const confirmReauthorize = ref(false)
+const checkedConnection = ref(false)
 const clock = ref(Date.now())
 const requestId = globalThis.crypto.randomUUID()
 let generation = 0
@@ -283,8 +338,10 @@ let pollTimer = null
 
 const busy = computed(() => Boolean(action.value))
 watch(busy, (value) => emit('busy', value), { flush: 'sync' })
-const presentation = computed(() =>
-  wazzupPartnerStatus(onboarding.value.status),
+const connectionWarning = computed(() =>
+  checkedConnection.value || diagnostics.value?.last_checked_at
+    ? wazzupPartnerConnectionWarning(diagnostics.value)
+    : '',
 )
 const diagnosticRows = computed(() =>
   wazzupPartnerDiagnosticRows(diagnostics.value),
@@ -323,7 +380,7 @@ function schedulePoll() {
 }
 
 async function operate(method, args, polling = false) {
-  if (disposed || (!polling && busy.value)) return false
+  if (disposed || busy.value) return false
   const token = ++generation
   cancelPoll()
   clock.value = Date.now()
@@ -358,7 +415,7 @@ async function operate(method, args, polling = false) {
     if (result.onboarding.status === 'deleted') {
       emit('deleted', result.channel.name)
     } else {
-      emit('updated', result.channel)
+      emit('updated', result.channel, { method })
     }
     return true
   } catch {
@@ -391,14 +448,49 @@ function refresh(polling = false) {
   )
 }
 
+function showConfirmation(action) {
+  confirmReauthorize.value = action === 'reauthorize'
+  confirmDelete.value = action === 'delete'
+}
+
 function reconnect() {
   password.value = ''
   confirmDelete.value = false
+  confirmReauthorize.value = false
   return operate('reconnect', { channel: currentChannel.value.name })
 }
 
-function checkConnection() {
-  return operate('check_channel', { channel: currentChannel.value.name })
+function saveSettings() {
+  if (!currentChannel.value.name) return false
+  return operate('save_channel_settings', {
+    channel: currentChannel.value.name,
+    custom_display_name: props.displayName.trim(),
+  })
+}
+
+function connectChannel() {
+  password.value = ''
+  return operate('connect_channel', { channel: currentChannel.value.name })
+}
+
+function disconnect() {
+  password.value = ''
+  return operate('disconnect', { channel: currentChannel.value.name })
+}
+
+function diagnosticDate(value) {
+  return value ? dayjsLocal(value).format('DD.MM.YYYY HH:mm') : ''
+}
+
+async function checkConnection() {
+  const checked = await operate('check_channel', {
+    channel: currentChannel.value.name,
+  })
+  if (disposed || !checked) return false
+  checkedConnection.value = true
+  if (!connectionWarning.value && !error.value)
+    toast.success(__('Connection settings verified.'))
+  return true
 }
 
 async function submitTwoFactor() {
@@ -427,6 +519,8 @@ function deleteChannel() {
   password.value = ''
   return operate('delete_channel', { channel: currentChannel.value.name })
 }
+
+defineExpose({ startConnection, saveSettings })
 
 onMounted(() => {
   if (currentChannel.value.name) refresh()

@@ -257,7 +257,9 @@ export function validateMessengerChannelDraft(draft) {
 
 export function messengerChannelState(channel = {}) {
   if (isWazzupPartnerChannel(channel)) {
-    return wazzupPartnerStatus(channel.wazzup_status)
+    return channel.enabled === false || channel.enabled === 0
+      ? { label: 'Channel Disabled', theme: 'gray' }
+      : wazzupPartnerStatus(channel.wazzup_status)
   }
   if (!channel.enabled) {
     return { label: 'Channel Disabled', theme: 'gray' }

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   toast: { error: vi.fn(), success: vi.fn() },
   deferPartnerConnection: false,
   finishPartnerConnection: null,
+  partnerController: null,
 }))
 
 const components = vi.hoisted(() => ({
@@ -61,27 +62,47 @@ vi.mock('@/components/Settings/WazzupPartnerConnection.vue', () => ({
   default: {
     props: ['channel', 'platform', 'displayName', 'available'],
     emits: ['updated', 'deleted', 'busy'],
+    expose: ['startConnection', 'saveSettings'],
+    mounted() {
+      mocks.partnerController = this
+    },
     methods: {
-      connected() {
+      startConnection() {
         this.$emit('busy', true)
-        const finish = () => {
-          this.$emit('updated', {
-            name: 'created-partner',
-            provider: 'wazzup',
-            platform: this.platform,
-            custom_display_name: this.displayName,
-            wazzup_api_mode: 'partner_api_v2',
-            wazzup_status: 'active',
-            enabled: true,
-            state: 'connected',
-          })
-          this.$emit('busy', false)
-        }
-        if (mocks.deferPartnerConnection) mocks.finishPartnerConnection = finish
-        else finish()
+        return new Promise((resolve) => {
+          const finish = () => {
+            this.$emit(
+              'updated',
+              {
+                name: 'created-partner',
+                provider: 'wazzup',
+                platform: this.platform,
+                custom_display_name: this.displayName,
+                wazzup_api_mode: 'partner_api_v2',
+                wazzup_status: 'active',
+                enabled: true,
+                state: 'connected',
+              },
+              { method: 'start_connection' },
+            )
+            this.$emit('busy', false)
+            resolve(true)
+          }
+          if (mocks.deferPartnerConnection)
+            mocks.finishPartnerConnection = finish
+          else finish()
+        })
+      },
+      saveSettings() {
+        this.$emit(
+          'updated',
+          { ...this.channel, custom_display_name: this.displayName },
+          { method: 'save_channel_settings' },
+        )
+        return Promise.resolve(true)
       },
     },
-    template: `<div data-wazzup-partner-management :data-platform="platform" :data-name="displayName" :data-available="available">{{ channel?.name || 'new-partner' }}<button v-if="!channel?.name" @click="connected">Connect</button><button v-else @click="$emit('deleted', channel.name)">Delete Channel</button></div>`,
+    template: `<div data-wazzup-partner-management :data-platform="platform" :data-name="displayName" :data-available="available">{{ channel?.name || 'new-partner' }}<button v-if="channel?.name" @click="$emit('deleted', channel.name)">Delete Channel</button></div>`,
   },
 }))
 
@@ -126,7 +147,7 @@ async function mountSettings() {
 }
 
 async function clickButton(root, label) {
-  const buttons = [...root.querySelectorAll('button')]
+  const buttons = [...root.querySelectorAll('button')].reverse()
   const button =
     buttons.find((button) => button.textContent.trim() === label) ||
     buttons.find((button) => button.textContent.includes(label))
@@ -212,7 +233,7 @@ describe('MessengerSettings Wazzup connection', () => {
           wazzup_api_mode: 'partner_api_v2',
           wazzup_status: 'waiting_qr',
           api_token_configured: false,
-          enabled: false,
+          enabled: true,
         }),
       ],
     })
@@ -517,7 +538,7 @@ describe('MessengerSettings Wazzup connection', () => {
     ).toContain('No event observed')
     expect(root.textContent).toContain('Connection Not Checked')
     expect(root.textContent).not.toContain('Channel Connected')
-    expect(button(root, 'Connect / Repair')).toBeUndefined()
+    expect(button(root, 'Connect / Restore')).toBeUndefined()
     expect(
       root.querySelector('[data-testid="wazzup-queue-diagnostics"]')
         .textContent,
@@ -1200,7 +1221,7 @@ describe('MessengerSettings unsaved channel changes', () => {
     }
   }
 
-  it.each(['Test', 'Connect / Repair', 'Refresh Status', 'Disconnect'])(
+  it.each(['Test', 'Connect / Restore', 'Refresh Status', 'Disconnect'])(
     '%s keeps unsaved credentials and asks to save without calling the provider',
     async (action) => {
       mocks.call.mockResolvedValue({ settings: {}, channels: [avitoChannel()] })
@@ -1377,7 +1398,7 @@ describe('MessengerSettings unsaved channel changes', () => {
     await clickButton(root, 'Avito Sales')
     await clickButton(root, 'Test')
     await editField(root, 'Client Secret', 'typed-during-request')
-    await clickButton(root, 'Connect / Repair')
+    await clickButton(root, 'Connect / Restore')
     await clickButton(root, 'Save')
     expect(mocks.call).toHaveBeenCalledTimes(2)
     resolveTest({ ok: true })
@@ -1573,7 +1594,7 @@ describe('MessengerSettings ordinary channel creation', () => {
     expect(
       root.querySelector('[data-wazzup-partner-management]').dataset.name,
     ).toBe('Support WhatsApp')
-    await clickButton(root, 'Connect')
+    await clickButton(root, 'Create Channel')
     expect(root.querySelectorAll('[data-dialog]')).toHaveLength(1)
     expect(root.querySelector('[data-dialog]')).toBe(dialog)
     expect(dialog.dataset.title).toBe('Channel Settings')
@@ -1582,7 +1603,7 @@ describe('MessengerSettings ordinary channel creation', () => {
     expect(dialog.textContent).toContain('Channel Connected')
     expect(root.querySelector('[data-label="Provider"]').disabled).toBe(true)
     expect(root.querySelector('[data-label="Channel Name"]').disabled).toBe(
-      true,
+      false,
     )
     expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
     expect(root.querySelector('[data-label="Channel ID"]')).toBeNull()
@@ -1600,6 +1621,63 @@ describe('MessengerSettings ordinary channel creation', () => {
     expect(root.textContent).not.toContain('Support WhatsApp')
   })
 
+  it('preserves an unsaved Partner name across polling and resets dirty state only after saving', async () => {
+    const channel = {
+      name: 'partner-name-test',
+      provider: 'wazzup',
+      platform: 'whatsapp',
+      custom_display_name: 'Original',
+      wazzup_api_mode: 'partner_api_v2',
+      wazzup_status: 'active',
+      enabled: true,
+      state: 'connected',
+    }
+    mocks.call.mockResolvedValue({
+      settings: { wazzup_partner_available: true },
+      channels: [channel],
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Original')
+    const state = mounted[0].app._instance.setupState
+    expect(state.channelDirty).toBe(false)
+    const snapshot = state.channelSnapshot
+    await editField(root, 'Channel Name', 'Draft name')
+    for (const method of [
+      'get_onboarding_state',
+      'check_channel',
+      'disconnect',
+      'connect_channel',
+    ]) {
+      mocks.partnerController.$emit(
+        'updated',
+        { ...channel, enabled: method !== 'disconnect' },
+        { method },
+      )
+      await nextTick()
+      expect(root.querySelector('[data-label="Channel Name"]').value).toBe(
+        'Draft name',
+      )
+      expect(state.channelDirty).toBe(true)
+      expect(state.channelSnapshot).toBe(snapshot)
+    }
+    await clickButton(root, 'Save')
+    expect(state.channelDirty).toBe(false)
+    expect(state.channelSnapshot).not.toBe(snapshot)
+    expect(state.partnerChannel.custom_display_name).toBe('Draft name')
+    expect(mocks.call).toHaveBeenCalledTimes(1)
+    await editField(root, 'Channel Name', 'Next draft')
+    mocks.partnerController.$emit(
+      'updated',
+      { ...channel, custom_display_name: 'Draft name' },
+      { method: 'get_onboarding_state' },
+    )
+    await nextTick()
+    expect(root.querySelector('[data-label="Channel Name"]').value).toBe(
+      'Next draft',
+    )
+    expect(state.channelDirty).toBe(true)
+  })
+
   it('protects a pending Partner creation from provider changes and modal dismissal, then restores closing', async () => {
     mocks.call.mockResolvedValue({
       settings: { wazzup_partner_available: true },
@@ -1610,7 +1688,7 @@ describe('MessengerSettings ordinary channel creation', () => {
     await clickButton(root, 'New Channel')
     await editField(root, 'Channel Name', 'Pending WhatsApp')
     const dialog = root.querySelector('[data-dialog]')
-    await clickButton(root, 'Connect')
+    await clickButton(root, 'Create Channel')
     expect(root.querySelector('[data-label="Provider"]').disabled).toBe(true)
     expect(root.querySelector('[data-label="Channel Name"]').disabled).toBe(
       true,
@@ -1731,7 +1809,7 @@ describe('MessengerSettings page loading', () => {
     channelButton.click()
     await nextTick()
     let connectButton = [...root.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Connect / Repair',
+      (button) => button.textContent === 'Connect / Restore',
     )
     connectButton.click()
     await new Promise((resolve) => setTimeout(resolve, 0))

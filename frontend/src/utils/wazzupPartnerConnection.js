@@ -3,6 +3,9 @@ const REQUEST_FIELDS = {
   start_connection: ['platform', 'custom_display_name', 'client_request_id'],
   get_onboarding_state: ['channel'],
   check_channel: ['channel'],
+  save_channel_settings: ['channel', 'custom_display_name'],
+  connect_channel: ['channel'],
+  disconnect: ['channel'],
   submit_2fa: ['channel', 'password'],
   reconnect: ['channel'],
   delete_channel: ['channel'],
@@ -157,6 +160,18 @@ export function wazzupPartnerDiagnosticRows(diagnostics) {
   ]
 }
 
+export function wazzupPartnerConnectionWarning(diagnostics) {
+  if (diagnostics?.reconciliation?.status !== 'verified')
+    return 'The channel could not be verified. Test the connection again.'
+  if (!['active', 'waiting_qr', 'waiting_2fa'].includes(diagnostics.status))
+    return 'Refresh the channel status or restore the connection to regain access.'
+  if (diagnostics.account?.status !== 'ready' || !diagnostics.account.enabled)
+    return 'The connected account could not be verified. Test the connection again.'
+  if (diagnostics.webhook_subscription?.status !== 'configured')
+    return 'Incoming events are not configured or could not be verified. Test the connection again.'
+  return ''
+}
+
 export function safeWazzupQrImage(value) {
   return typeof value === 'string' &&
     value.length <= 1024 * 1024 &&
@@ -241,6 +256,9 @@ export function wazzupPartnerError(reason, action = '') {
   }
   if (action === 'submit_2fa')
     return 'Could not submit the password. Refresh the connection status.'
+  if (action === 'save_channel_settings') return 'Could not save the channel.'
+  if (action === 'disconnect')
+    return 'Could not disconnect the channel. Refresh its status.'
   if (action === 'delete_channel')
     return 'Could not delete the channel. Refresh its status.'
   return 'Could not update the connection. Refresh its status and try again.'

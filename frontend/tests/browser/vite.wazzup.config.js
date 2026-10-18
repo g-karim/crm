@@ -42,10 +42,17 @@ export default defineConfig(async (environment) => {
       ).dependencies,
     ),
   ]
-  config.resolve.dedupe = [...config.resolve.dedupe, ...editorDependencies]
+  config.resolve.dedupe = [
+    ...config.resolve.dedupe,
+    ...editorDependencies,
+    'vue-sonner',
+  ]
   config.optimizeDeps.include = [
     ...config.optimizeDeps.include,
     'frappe-ui/editor',
+    // The optimized toast API and source ToastProvider.vue must share the same
+    // notification state, just as the editor modules share their registries.
+    'vue-sonner',
     'lottie-web/build/player/lottie_light',
     'mime',
     ...editorDependencies,

@@ -1097,6 +1097,153 @@ describe('VK image outbound composer', () => {
   })
 })
 
+describe('locally disconnected conversation channels', () => {
+  it.each([
+    ['wazzup', 0],
+    ['wazzup', false],
+    ['telegram_bot', 0],
+    ['telegram_bot', false],
+  ])(
+    'blocks the selected %s channel for enabled=%s while preserving history, sibling routing and resume',
+    async (provider, disabled) => {
+      permissions = { ...permissions, can_operate: true }
+      const primary = { ...channel('CHANNEL-1'), provider, enabled: 1 }
+      const sibling = { ...channel('CHANNEL-2'), provider, enabled: 1 }
+      channelRows = [primary, sibling]
+      conversationRows = [
+        { ...conversationRows[0], provider, channel_info: primary },
+        {
+          name: 'CONVERSATION-2',
+          channel: 'CHANNEL-2',
+          provider,
+          status: 'Open',
+          external_chat_id: 'chat-2',
+          channel_info: sibling,
+        },
+      ]
+      snapshotMessages = [
+        {
+          name: 'PAUSED-CHANNEL-HISTORY',
+          conversation: 'CONVERSATION-1',
+          channel: 'CHANNEL-1',
+          provider,
+          direction: 'inbound',
+          text: 'Saved history',
+          message_datetime: '2026-08-23 10:00:00',
+        },
+      ]
+      const root = await mountConversation()
+      const composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      const platform = root.querySelector('input[placeholder="Platform"]')
+      const send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      composer.value = 'Keep this draft'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      expect(composer.disabled).toBe(false)
+      expect(send.disabled).toBe(false)
+
+      // The active-channel endpoint omits the paused channel; its known local
+      // enable flag still arrives with the existing conversation's channel_info.
+      channelRows = [sibling]
+      conversationRows = conversationRows.map((conversation) =>
+        conversation.channel === primary.name
+          ? {
+              ...conversation,
+              channel_info: {
+                ...primary,
+                enabled: disabled,
+                state: 'connected',
+                wazzup_status: 'active',
+              },
+            }
+          : conversation,
+      )
+      const refresh = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Refresh',
+      )
+      refresh.click()
+      await vi.waitFor(() => expect(composer.disabled).toBe(true))
+      expect(send.disabled).toBe(true)
+      expect(composer.value).toBe('Keep this draft')
+      expect(
+        root.querySelector('[data-message-id="PAUSED-CHANNEL-HISTORY"]'),
+      ).not.toBeNull()
+      expect(platform.disabled).toBe(false)
+
+      platform.value = sibling.name
+      platform.dispatchEvent(new Event('input'))
+      await vi.waitFor(() => expect(composer.disabled).toBe(false))
+      expect(send.disabled).toBe(false)
+      expect(composer.value).toBe('Keep this draft')
+
+      channelRows = [primary, sibling]
+      conversationRows = conversationRows.map((conversation) =>
+        conversation.channel === primary.name
+          ? { ...conversation, channel_info: primary }
+          : conversation,
+      )
+      const previousLoads = mocks.call.mock.calls.filter(([method]) =>
+        method.endsWith('get_channels'),
+      ).length
+      refresh.click()
+      await vi.waitFor(() =>
+        expect(
+          mocks.call.mock.calls.filter(([method]) =>
+            method.endsWith('get_channels'),
+          ).length,
+        ).toBeGreaterThan(previousLoads),
+      )
+      platform.value = primary.name
+      platform.dispatchEvent(new Event('input'))
+      await vi.waitFor(() => expect(platform.value).toBe(primary.name))
+      await nextTick()
+      expect(composer.disabled).toBe(false)
+      expect(send.disabled).toBe(false)
+      expect(composer.value).toBe('Keep this draft')
+      expect(
+        root.querySelector('[data-message-id="PAUSED-CHANNEL-HISTORY"]'),
+      ).not.toBeNull()
+      expect(
+        mocks.call.mock.calls.some(([method]) =>
+          method.endsWith('send_message'),
+        ),
+      ).toBe(false)
+    },
+  )
+
+  it('keeps older partial channel DTOs without enabled usable even when can_send is not authoritative', async () => {
+    permissions = { ...permissions, can_operate: true }
+    const partial = {
+      ...channel('CHANNEL-1'),
+      provider: 'wazzup',
+      can_send: false,
+    }
+    channelRows = [partial, { ...channel('CHANNEL-2'), enabled: 1 }]
+    conversationRows[0] = {
+      ...conversationRows[0],
+      provider: 'wazzup',
+      channel_info: partial,
+    }
+    const root = await mountConversation()
+    const composer = root.querySelector(
+      'input[placeholder="Enter a message..."]',
+    )
+    expect(composer.disabled).toBe(false)
+    composer.value = 'A partial DTO still permits composing'
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    expect(
+      [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      ).disabled,
+    ).toBe(false)
+  })
+})
+
 describe('Wazzup native text replies', () => {
   function wazzupChannel(platform) {
     return {

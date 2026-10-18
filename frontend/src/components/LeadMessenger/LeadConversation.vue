@@ -885,6 +885,8 @@ const baseSendDisabled = computed(
     !permissions.value.can_operate ||
     sendingMessage.value ||
     selectedAvitoRestricted.value ||
+    selectedChannelDoc.value?.enabled === false ||
+    selectedChannelDoc.value?.enabled === 0 ||
     missingPhone.value ||
     selectedRequiresInbound.value ||
     needsConversationChoice.value ||

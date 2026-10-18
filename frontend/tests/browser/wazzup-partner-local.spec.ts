@@ -10,6 +10,59 @@ const fixture = loadWazzupFixture()
 const execute = promisify(execFile)
 const sendMethod = 'crm_messenger.api.messages.send_message'
 
+type PartnerChannel = {
+  name: string
+  custom_display_name: string
+  provider_channel_id: string
+  enabled: number
+  wazzup_status: string
+}
+
+async function channels(page: Page): Promise<PartnerChannel[]> {
+  const response = await page.request.get(
+    '/api/method/crm_messenger.api.settings.get_settings',
+  )
+  expect(response.ok()).toBeTruthy()
+  return (await response.json()).message.channels
+}
+
+async function openMessageChannels(page: Page) {
+  await page.goto('/crm', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  })
+  const administrator = page
+    .getByRole('button')
+    .filter({ hasText: 'Administrator' })
+    .first()
+  await expect(administrator).toBeVisible({ timeout: 30000 })
+  await administrator.click()
+  await page.getByText('Settings', { exact: true }).click()
+  await page.getByText('Message Channels', { exact: true }).first().click()
+}
+
+async function completeQr(page: Page, platform: string) {
+  const dialog = page.getByRole('dialog', {
+    name: 'Channel Settings',
+    exact: true,
+  })
+  await dialog
+    .getByRole('button', { name: 'Simulate QR scan', exact: true })
+    .click()
+  if (platform === 'telegram') {
+    await dialog
+      .getByLabel('Two-factor authentication password', { exact: true })
+      .fill('simulator-2fa-password')
+    await dialog
+      .getByRole('button', { name: 'Submit password', exact: true })
+      .click()
+  }
+  await expect(
+    dialog.getByText('Channel Connected', { exact: true }).first(),
+  ).toBeVisible()
+  await expect(dialog.locator('[data-wazzup-qr]')).toHaveCount(0)
+}
+
 async function incoming(
   channel: string,
   platform: string,
@@ -428,18 +481,7 @@ for (const [label, platform] of [
     expect(login.ok()).toBeTruthy()
     // The first complete CRM visit compiles the Vite module graph. Readiness
     // is the actual navigation control, not completion of every page asset.
-    await page.goto('/crm', {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000,
-    })
-    const administrator = page
-      .getByRole('button')
-      .filter({ hasText: 'Administrator' })
-      .first()
-    await expect(administrator).toBeVisible({ timeout: 30000 })
-    await administrator.click()
-    await page.getByText('Settings', { exact: true }).click()
-    await page.getByText('Message Channels', { exact: true }).first().click()
+    await openMessageChannels(page)
     await page.getByRole('button', { name: 'New Channel', exact: true }).click()
     await expect(
       page.getByRole('option', {
@@ -481,9 +523,15 @@ for (const [label, platform] of [
       }),
     ).toHaveCount(0)
     await expect(dialog).not.toContainText('Wazzup')
-    const name = `Manual Partner ${platform}`
-    await page.getByLabel('Channel Name', { exact: true }).fill(name)
-    await page.getByRole('button', { name: 'Connect', exact: true }).click()
+    const initialName = `Manual Partner ${platform}`
+    const name = `${initialName} renamed`
+    await page.getByLabel('Channel Name', { exact: true }).fill(initialName)
+    await expect(
+      dialog.getByRole('button', { name: 'Connect / Restore', exact: true }),
+    ).toHaveCount(0)
+    await dialog
+      .getByRole('button', { name: 'Create Channel', exact: true })
+      .click()
     const settingsDialog = page.getByRole('dialog', {
       name: 'Channel Settings',
       exact: true,
@@ -495,10 +543,32 @@ for (const [label, platform] of [
     await expect(settingsDialog.locator('[data-wazzup-qr]')).toBeVisible()
     await expect(
       settingsDialog.getByLabel('Channel Name', { exact: true }),
-    ).toBeDisabled()
+    ).toBeEnabled()
     await expect(
       settingsDialog.getByRole('combobox', { name: /^Provider/ }),
     ).toBeDisabled()
+    const nameInput = settingsDialog.getByLabel('Channel Name', { exact: true })
+    await nameInput.fill(name)
+    const polled = await page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+        '/api/method/crm_messenger.api.wazzup_partner.get_onboarding_state',
+      { timeout: 15000 },
+    )
+    expect(polled.ok()).toBeTruthy()
+    await polled.finished()
+    await expect(nameInput).toHaveValue(name)
+    expect(
+      (await channels(page)).find(
+        (channel) => channel.custom_display_name === initialName,
+      ),
+    ).toBeTruthy()
+    expect(
+      (await channels(page)).some(
+        (channel) => channel.custom_display_name === name,
+      ),
+    ).toBe(false)
+    await expect(nameInput).toHaveValue(name)
     if (process.env.WAZZUP_E2E_ARTIFACTS)
       await settingsDialog.screenshot({
         path: join(
@@ -506,28 +576,24 @@ for (const [label, platform] of [
           `partner-${platform}-qr.png`,
         ),
       })
-    await page
-      .getByRole('button', { name: 'Simulate QR scan', exact: true })
+    await completeQr(page, platform)
+    await expect(nameInput).toHaveValue(name)
+    await settingsDialog
+      .getByRole('button', { name: 'Save', exact: true })
       .click()
-    if (platform === 'telegram') {
-      await page
-        .getByLabel('Two-factor authentication password', { exact: true })
-        .fill('simulator-2fa-password')
-      await page
-        .getByRole('button', { name: 'Submit password', exact: true })
-        .click()
-    }
-    await expect(
-      page.getByText('The messenger account is connected.', { exact: true }),
-    ).toBeVisible()
-    const response = await page.request.get(
-      '/api/method/crm_messenger.api.settings.get_settings',
-    )
-    expect(response.ok()).toBeTruthy()
-    const { message } = await response.json()
-    const channel = message.channels.find(
-      (row: { custom_display_name: string }) =>
-        row.custom_display_name === name,
+    await expect
+      .poll(async () =>
+        (await channels(page)).some(
+          (channel) => channel.custom_display_name === name,
+        ),
+      )
+      .toBe(true)
+    await settingsDialog
+      .getByRole('button', { name: 'Close', exact: true })
+      .last()
+      .click()
+    const channel = (await channels(page)).find(
+      (row) => row.custom_display_name === name,
     )
     expect(channel).toMatchObject({
       provider: 'wazzup',
@@ -537,13 +603,11 @@ for (const [label, platform] of [
       enabled: 1,
       api_token_configured: false,
     })
+    expect(channel).toBeTruthy()
+    if (!channel) throw new Error('The renamed Partner channel was not saved.')
     expect(channel.provider_channel_id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     )
-    await settingsDialog
-      .getByRole('button', { name: 'Close', exact: true })
-      .last()
-      .click()
     await expect(
       page.getByRole('button').filter({ hasText: name }),
     ).toBeVisible()
@@ -559,40 +623,64 @@ for (const [label, platform] of [
       }),
     ).toBeVisible()
     await expect(
-      settingsDialog.getByRole('button', { name: 'Reconnect', exact: true }),
+      settingsDialog.getByRole('button', { name: 'Test', exact: true }),
     ).toBeVisible()
     await expect(
       settingsDialog.getByRole('button', {
-        name: 'Delete Channel',
+        name: 'Connect / Restore',
         exact: true,
       }),
     ).toBeVisible()
+    await expect(
+      settingsDialog.getByRole('button', { name: 'Disconnect', exact: true }),
+    ).toBeVisible()
+    await expect(nameInput).toHaveValue(name)
+    await expect(
+      settingsDialog
+        .getByText('Channel Connected', { exact: true })
+        .and(settingsDialog.locator(':visible')),
+    ).toHaveCount(1)
+    await expect(
+      settingsDialog.getByText('The messenger account is connected.', {
+        exact: true,
+      }),
+    ).toHaveCount(0)
+    await expect(
+      settingsDialog.getByText('Connection status', { exact: true }),
+    ).toHaveCount(0)
     await expect(settingsDialog.locator('[data-wazzup-qr]')).toHaveCount(0)
     await expect(settingsDialog.locator('[data-wazzup-2fa]')).toHaveCount(0)
     await expect(
-      settingsDialog.getByRole('button', { name: 'Save Channel', exact: true }),
-    ).toHaveCount(0)
+      settingsDialog.getByRole('button', { name: 'Save', exact: true }),
+    ).toBeVisible()
     await expect(settingsDialog).not.toContainText('Wazzup')
     await settingsDialog
       .getByRole('button', { name: 'Refresh Status', exact: true })
       .click()
     await expect(
-      settingsDialog.getByText('The messenger account is connected.', {
-        exact: true,
-      }),
-    ).toBeVisible()
+      settingsDialog
+        .getByText('Channel Connected', { exact: true })
+        .and(settingsDialog.locator(':visible')),
+    ).toHaveCount(1)
     const diagnostics = settingsDialog.locator(
       '[data-wazzup-partner-diagnostics]',
     )
-    await expect(diagnostics).toBeVisible()
+    await expect(diagnostics).toHaveJSProperty('open', false)
+    await expect(diagnostics.locator('dl')).not.toBeVisible()
+    await expect(
+      settingsDialog.getByRole('button', {
+        name: 'Delete Channel',
+        exact: true,
+      }),
+    ).not.toBeVisible()
     const checkedResponse = page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname ===
           '/api/method/crm_messenger.api.wazzup_partner.check_channel' &&
         response.request().method() === 'POST',
     )
-    await diagnostics
-      .getByRole('button', { name: 'Check connection', exact: true })
+    await settingsDialog
+      .getByRole('button', { name: 'Test', exact: true })
       .click()
     const checked = await checkedResponse
     expect(checked.ok()).toBeTruthy()
@@ -602,14 +690,12 @@ for (const [label, platform] of [
         .status,
     ).toBe('verified')
     await expect(
-      diagnostics.locator('[data-diagnostic="remote_channel"]'),
-    ).toContainText('Channel Connected')
+      page.getByText('Connection settings verified.', { exact: true }),
+    ).toBeVisible()
+    await expect(diagnostics).toHaveJSProperty('open', false)
     await expect(
-      diagnostics.locator('[data-diagnostic="account"]'),
-    ).toContainText('Verified')
-    await expect(
-      diagnostics.locator('[data-diagnostic="subscription"]'),
-    ).toContainText('Configured')
+      settingsDialog.locator('[data-wazzup-connection-warning]'),
+    ).toHaveCount(0)
     if (process.env.WAZZUP_E2E_ARTIFACTS)
       await settingsDialog.screenshot({
         path: join(
@@ -618,30 +704,40 @@ for (const [label, platform] of [
         ),
       })
     await settingsDialog
-      .getByRole('button', { name: 'Reconnect', exact: true })
+      .getByText('Connection details', { exact: true })
       .click()
+    await expect(diagnostics).toHaveJSProperty('open', true)
+    await expect(diagnostics.locator('dl')).toBeVisible()
+    await expect(
+      diagnostics.locator('[data-diagnostic="remote_channel"]'),
+    ).toContainText('Channel Connected')
+    await expect(
+      diagnostics.locator('[data-diagnostic="account"]'),
+    ).toContainText('Verified')
+    await expect(
+      diagnostics.locator('[data-diagnostic="subscription"]'),
+    ).toContainText('Configured')
+    await expect(diagnostics).toContainText(/\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}/)
+    await expect(diagnostics).not.toContainText(/\d{2}:\d{2}:\d{2}\.\d+/)
+    if (process.env.WAZZUP_E2E_ARTIFACTS)
+      await settingsDialog.screenshot({
+        path: join(
+          process.env.WAZZUP_E2E_ARTIFACTS,
+          `partner-${platform}-details.png`,
+        ),
+      })
+    await settingsDialog
+      .getByRole('button', { name: 'Reauthorize account', exact: true })
+      .click()
+    await expect(settingsDialog.locator('[data-wazzup-qr]')).toHaveCount(0)
+    await settingsDialog.locator('[data-wazzup-confirm-reauthorize]').click()
     await expect(settingsDialog.locator('[data-wazzup-qr]')).toBeVisible()
     await expect(
       page
         .getByRole('dialog')
         .filter({ has: page.locator('[data-wazzup-partner-connection]') }),
     ).toHaveCount(1)
-    await settingsDialog
-      .getByRole('button', { name: 'Simulate QR scan', exact: true })
-      .click()
-    if (platform === 'telegram') {
-      await settingsDialog
-        .getByLabel('Two-factor authentication password', { exact: true })
-        .fill('simulator-2fa-password')
-      await settingsDialog
-        .getByRole('button', { name: 'Submit password', exact: true })
-        .click()
-    }
-    await expect(
-      settingsDialog.getByText('The messenger account is connected.', {
-        exact: true,
-      }),
-    ).toBeVisible()
+    await completeQr(page, platform)
     await settingsDialog
       .getByRole('button', { name: 'Close', exact: true })
       .last()
@@ -751,6 +847,218 @@ for (const [label, platform] of [
         ['echo', 'status', 'http'],
         true,
       )
+    })
+
+    await test.step('Disconnect preserves history and the other channel; restore keeps authorization', async () => {
+      async function history() {
+        const response = await page.request.get(
+          '/api/resource/Messenger Message',
+          {
+            params: {
+              fields: JSON.stringify([
+                'name',
+                'conversation',
+                'direction',
+                'text',
+              ]),
+              filters: JSON.stringify([['channel', '=', channel.name]]),
+              order_by: 'name asc',
+              limit_page_length: '100',
+            },
+          },
+        )
+        expect(response.ok()).toBeTruthy()
+        return (await response.json()).data
+      }
+
+      const historyBefore = await history()
+      const conversationsBefore = await conversations()
+      expect(historyBefore.length).toBeGreaterThanOrEqual(3)
+      await openMessageChannels(page)
+      await page
+        .getByRole('button', { name: 'New Channel', exact: true })
+        .click()
+      await dialog.getByRole('combobox', { name: /^Provider/ }).click()
+      await page.getByRole('option', { name: label, exact: true }).click()
+      const siblingName = `Manual Partner ${platform} sibling`
+      await dialog.getByLabel('Channel Name', { exact: true }).fill(siblingName)
+      await dialog
+        .getByRole('button', { name: 'Create Channel', exact: true })
+        .click()
+      await expect(settingsDialog.locator('[data-wazzup-qr]')).toBeVisible()
+      await completeQr(page, platform)
+      await settingsDialog
+        .getByRole('button', { name: 'Close', exact: true })
+        .last()
+        .click()
+      const sibling = (await channels(page)).find(
+        (row) => row.custom_display_name === siblingName,
+      )
+      expect(sibling).toMatchObject({ enabled: 1, wazzup_status: 'active' })
+      if (!sibling)
+        throw new Error('The independent second channel was not created.')
+
+      await page.getByRole('button').filter({ hasText: name }).click()
+      await settingsDialog
+        .getByRole('button', { name: 'Disconnect', exact: true })
+        .click()
+      await expect(
+        settingsDialog.getByText('Channel Disabled', { exact: true }),
+      ).toBeVisible()
+      await expect(settingsDialog.locator('[data-wazzup-qr]')).toHaveCount(0)
+      expect(
+        (await channels(page)).find((row) => row.name === channel.name),
+      ).toMatchObject({
+        enabled: 0,
+        wazzup_status: 'active',
+        provider_channel_id: channel.provider_channel_id,
+      })
+      expect(
+        (await channels(page)).find((row) => row.name === sibling.name),
+      ).toMatchObject({
+        enabled: 1,
+        wazzup_status: 'active',
+        provider_channel_id: sibling.provider_channel_id,
+      })
+      await settingsDialog
+        .getByRole('button', { name: 'Close', exact: true })
+        .last()
+        .click()
+
+      const conversationUrl = `/crm/leads/${encodeURIComponent(conversation.reference_name)}?messenger_conversation=${encodeURIComponent(conversation.name)}#messenger`
+      await page.goto(conversationUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000,
+      })
+      await expect(page.getByText(inboundText, { exact: true })).toBeVisible()
+      await expect(page.getByText(outboundText, { exact: true })).toBeVisible()
+      await expect(
+        page.locator('textarea[placeholder="Enter a message..."]'),
+      ).toBeDisabled()
+      await expect(
+        page.getByRole('button', { name: 'Send', exact: true }),
+      ).toBeDisabled()
+      expect(await history()).toEqual(historyBefore)
+      expect(await conversations()).toEqual(conversationsBefore)
+
+      // Account subscriptions must stay active when one local channel is paused.
+      const siblingText = `${platform} independent channel remains connected`
+      await incoming(siblingName, platform, siblingText)
+      await expect
+        .poll(
+          async () => {
+            const response = await page.request.get(
+              '/api/resource/Messenger Message',
+              {
+                params: {
+                  fields: JSON.stringify(['name']),
+                  filters: JSON.stringify([
+                    ['channel', '=', sibling.name],
+                    ['text', '=', siblingText],
+                  ]),
+                },
+              },
+            )
+            expect(response.ok()).toBeTruthy()
+            return (await response.json()).data.length
+          },
+          { timeout: 45000 },
+        )
+        .toBe(1)
+
+      await openMessageChannels(page)
+      await page.getByRole('button').filter({ hasText: name }).click()
+      await expect(
+        settingsDialog.getByText('Channel Disabled', { exact: true }),
+      ).toBeVisible()
+      await settingsDialog
+        .getByRole('button', { name: 'Refresh Status', exact: true })
+        .click()
+      await expect(
+        settingsDialog.getByText('Channel Disabled', { exact: true }),
+      ).toBeVisible()
+      await settingsDialog
+        .getByRole('button', { name: 'Connect / Restore', exact: true })
+        .click()
+      await expect(
+        settingsDialog
+          .getByText('Channel Connected', { exact: true })
+          .and(settingsDialog.locator(':visible')),
+      ).toHaveCount(1)
+      await expect(settingsDialog.locator('[data-wazzup-qr]')).toHaveCount(0)
+      await expect(settingsDialog.locator('[data-wazzup-2fa]')).toHaveCount(0)
+      expect(
+        (await channels(page)).find((row) => row.name === channel.name),
+      ).toMatchObject({
+        enabled: 1,
+        wazzup_status: 'active',
+        provider_channel_id: channel.provider_channel_id,
+      })
+      expect(await history()).toEqual(historyBefore)
+      expect(await conversations()).toEqual(conversationsBefore)
+      await settingsDialog
+        .getByRole('button', { name: 'Close', exact: true })
+        .last()
+        .click()
+      await page.goto(conversationUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000,
+      })
+      await expect(
+        page.locator('textarea[placeholder="Enter a message..."]'),
+      ).toBeEnabled()
+      const resumedText = `${platform} incoming after restore without a new QR`
+      await incoming(name, platform, resumedText)
+      await expect(page.getByText(resumedText, { exact: true })).toBeVisible({
+        timeout: 30000,
+      })
+      await expect(page.getByText(inboundText, { exact: true })).toHaveCount(1)
+      await expect(page.getByText(outboundText, { exact: true })).toHaveCount(1)
+
+      // Destructive provider removal stays behind the collapsed details and a
+      // separate confirmation. Cancel must preserve the channel and history.
+      const historyBeforeDelete = await history()
+      await openMessageChannels(page)
+      await page.getByRole('button').filter({ hasText: name }).click()
+      await expect(
+        settingsDialog.locator('[data-wazzup-partner-diagnostics]'),
+      ).toHaveJSProperty('open', false)
+      await settingsDialog
+        .getByText('Connection details', { exact: true })
+        .click()
+      await settingsDialog
+        .getByRole('button', { name: 'Delete Channel', exact: true })
+        .click()
+      await expect(
+        settingsDialog.locator('[data-wazzup-confirm-delete]'),
+      ).toBeVisible()
+      await settingsDialog
+        .getByRole('button', { name: 'Cancel', exact: true })
+        .click()
+      await expect(
+        settingsDialog.locator('[data-wazzup-confirm-delete]'),
+      ).toHaveCount(0)
+      expect(
+        (await channels(page)).some((row) => row.name === channel.name),
+      ).toBe(true)
+      expect(await history()).toEqual(historyBeforeDelete)
+      await settingsDialog
+        .getByRole('button', { name: 'Delete Channel', exact: true })
+        .click()
+      await settingsDialog.locator('[data-wazzup-confirm-delete]').click()
+      await expect(settingsDialog).not.toBeVisible()
+      await expect
+        .poll(async () =>
+          (await channels(page)).some((row) => row.name === channel.name),
+        )
+        .toBe(false)
+      expect(await history()).toEqual(historyBeforeDelete)
+      expect(
+        (await channels(page)).find((row) => row.name === sibling.name),
+      ).toMatchObject({
+        enabled: 1,
+        wazzup_status: 'active',
+      })
     })
   })
 }

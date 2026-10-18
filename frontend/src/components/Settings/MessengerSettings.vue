@@ -260,9 +260,7 @@
             type="text"
             :label="__('Channel Name')"
             :placeholder="__('For example, Sales')"
-            :disabled="
-              isPartnerDraft && (partnerBusy || Boolean(channelDraft.channel))
-            "
+            :disabled="isPartnerDraft && partnerBusy"
           />
 
           <FormControl
@@ -351,6 +349,7 @@
         <WazzupPartnerConnection
           v-if="showChannelDialog && isPartnerDraft"
           :key="channelDraft.provider"
+          ref="partnerConnection"
           :channel="partnerChannel"
           :platform="partnerPlatform"
           :display-name="channelDraft.custom_display_name"
@@ -785,7 +784,7 @@
           />
           <Button
             v-if="usesCommonConnectionActions"
-            :label="__('Connect / Repair')"
+            :label="__('Connect / Restore')"
             variant="solid"
             :loading="channelAction === 'connect'"
             :disabled="channelBusy"
@@ -820,12 +819,16 @@
           @click="showChannelDialog = false"
         />
         <Button
-          v-if="!isPartnerDraft"
           :label="channelDraft.channel ? __('Save') : __('Create Channel')"
           variant="solid"
-          :loading="savingChannel"
-          :disabled="Boolean(channelAction)"
-          @click="saveChannel"
+          :loading="isPartnerDraft ? partnerBusy : savingChannel"
+          :disabled="
+            Boolean(channelAction) ||
+            (isPartnerDraft &&
+              (partnerBusy ||
+                (!channelDraft.channel && !settings.wazzup_partner_available)))
+          "
+          @click="isPartnerDraft ? savePartnerChannel() : saveChannel()"
         />
       </div>
     </template>
@@ -887,6 +890,7 @@ const showAdvanced = ref(false)
 
 const showChannelDialog = ref(false)
 const partnerChannel = ref(null)
+const partnerConnection = ref(null)
 const partnerBusy = ref(false)
 const visibleChannels = computed(() =>
   channels.value.filter(
@@ -944,7 +948,8 @@ const channelBusy = computed(
   () =>
     savingChannel.value ||
     Boolean(channelAction.value) ||
-    loadingWazzupChannels.value,
+    loadingWazzupChannels.value ||
+    partnerBusy.value,
 )
 const channelDirty = computed(() => channelState() !== channelSnapshot.value)
 const isPartnerDraft = computed(() =>
@@ -1193,12 +1198,16 @@ function openChannel(channel) {
   }
 }
 
-function updatePartnerChannel(channel) {
+function updatePartnerChannel(channel, { method } = {}) {
+  const isNew = !channelDraft.value.channel
+  const saved = method === 'save_channel_settings'
   partnerChannel.value = channel
   Object.assign(channelDraft.value, {
     channel: channel.name,
     platform: channel.platform,
-    custom_display_name: channel.custom_display_name,
+    ...(isNew || saved
+      ? { custom_display_name: channel.custom_display_name }
+      : {}),
     provider_display_name: channel.provider_display_name,
     state: channel.state,
     enabled: channel.enabled,
@@ -1206,6 +1215,17 @@ function updatePartnerChannel(channel) {
   const index = channels.value.findIndex((row) => row.name === channel.name)
   if (index < 0) channels.value.push(channel)
   else channels.value[index] = { ...channels.value[index], ...channel }
+  if (isNew || saved) channelSnapshot.value = channelState()
+}
+
+async function savePartnerChannel() {
+  if (channelBusy.value || !partnerConnection.value) return
+  const wasNew = !channelDraft.value.channel
+  const saved = await (wasNew
+    ? partnerConnection.value.startConnection()
+    : partnerConnection.value.saveSettings())
+  if (saved)
+    toast.success(wasNew ? __('Channel created.') : __('Channel saved.'))
 }
 
 function deletePartnerChannel(name) {
@@ -1609,6 +1629,13 @@ function avitoImportStatusLabel(status) {
 }
 
 function channelState() {
+  if (isPartnerDraft.value) {
+    return JSON.stringify({
+      channel: channelDraft.value.channel,
+      provider: channelDraft.value.provider,
+      custom_display_name: channelDraft.value.custom_display_name,
+    })
+  }
   return JSON.stringify(buildMessengerChannelPayload(channelDraft.value))
 }
 

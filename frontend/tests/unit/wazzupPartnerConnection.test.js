@@ -1,9 +1,10 @@
 import { createApp, nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ call: vi.fn() }))
+const mocks = vi.hoisted(() => ({ call: vi.fn(), success: vi.fn() }))
 
 vi.mock('frappe-ui', () => ({
+  toast: { success: mocks.success },
   Badge: { props: ['label'], template: '<span>{{ label }}</span>' },
   Button: {
     props: ['label', 'disabled', 'loading'],
@@ -22,6 +23,13 @@ vi.mock('frappe-ui', () => ({
     template: `<label>{{ label }}<select v-if="type === 'select'" :data-label="label" :value="modelValue" :disabled="disabled" @change="$emit('update:modelValue', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select><input v-else :data-label="label" :type="type || 'text'" :value="modelValue" :disabled="disabled" @input="$emit('update:modelValue', $event.target.value)" /></label>`,
   },
   LoadingIndicator: { template: '<span>Loading</span>' },
+  dayjsLocal: (value) => ({
+    format: (format) => {
+      expect(format).toBe('DD.MM.YYYY HH:mm')
+      const [date, time] = value.split(/[T ]/)
+      return `${date.split('-').reverse().join('.')} ${time.slice(0, 5)}`
+    },
+  }),
 }))
 
 vi.mock('@/utils/wazzupPartnerConnection', async (original) => ({
@@ -47,6 +55,7 @@ afterEach(() => {
   })
   mounted = []
   mocks.call.mockReset()
+  mocks.success.mockReset()
   vi.useRealTimers()
 })
 
@@ -57,7 +66,7 @@ function result(status = 'waiting_qr', overrides = {}) {
     channel: {
       name: 'PARTNER-1',
       platform: 'whatsapp',
-      enabled: status === 'active',
+      enabled: !['disabled', 'deleted'].includes(status),
       wazzup_status: status,
       state: status === 'active' ? 'connected' : 'unchecked',
       ...overrides.channel,
@@ -95,11 +104,16 @@ async function mount(channel = null, props = {}) {
     onBusy: busy,
   })
   app.config.globalProperties.__ = globalThis.__
-  app.mount(root)
-  const entry = { root, app, updated, deleted, busy }
+  const controller = app.mount(root)
+  const entry = { root, app, controller, updated, deleted, busy }
   mounted.push(entry)
   await settle()
   return entry
+}
+
+async function start(root) {
+  mounted.find((entry) => entry.root === root).controller.startConnection()
+  await settle()
 }
 
 async function click(root, label) {
@@ -133,11 +147,8 @@ describe('embedded Partner connection state and actions', () => {
     expect(root.querySelector('[data-label="Platform"]')).toBeNull()
     expect(root.querySelector('[data-label="Channel Name"]')).toBeNull()
     expect(root.textContent).toContain('Connection is not configured.')
-    expect(
-      [...root.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Connect',
-      ).disabled,
-    ).toBe(true)
+    expect(root.querySelector('button')).toBeNull()
+    await start(root)
     expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
     expect(root.querySelector('[data-label="Channel ID"]')).toBeNull()
     expect(mocks.call).not.toHaveBeenCalled()
@@ -153,7 +164,7 @@ describe('embedded Partner connection state and actions', () => {
         platform,
         displayName: '  Support  ',
       })
-      await click(root, 'Connect')
+      await start(root)
       expect(mocks.call).toHaveBeenCalledWith('start_connection', {
         platform,
         custom_display_name: 'Support',
@@ -177,16 +188,17 @@ describe('embedded Partner connection state and actions', () => {
       platform: 'whatsapp',
       displayName: 'Support',
     })
-    await click(root, 'Connect')
+    await start(root)
     expect(busy).toHaveBeenLastCalledWith(true)
-    expect(root.querySelector('button').disabled).toBe(true)
-    await click(root, 'Connect')
+    expect(root.querySelector('button')).toBeNull()
+    await start(root)
     expect(mocks.call).toHaveBeenCalledTimes(1)
     finish(result('waiting_qr'))
     await settle()
     expect(busy.mock.calls.map(([value]) => value)).toEqual([true, false])
     expect(updated).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'PARTNER-1' }),
+      { method: 'start_connection' },
     )
     expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
   })
@@ -195,7 +207,7 @@ describe('embedded Partner connection state and actions', () => {
       method === 'simulator_scan' ? result('active') : result(),
     )
     const { root, updated } = await mount()
-    await click(root, 'Connect')
+    await start(root)
     expect(mocks.call.mock.calls[0]).toEqual([
       'start_connection',
       {
@@ -205,7 +217,7 @@ describe('embedded Partner connection state and actions', () => {
       },
     ])
     expect(root.querySelector('[data-wazzup-qr]').getAttribute('src')).toBe(PNG)
-    expect(root.textContent).toContain('Waiting for QR scan')
+    expect(updated.mock.lastCall[0].wazzup_status).toBe('waiting_qr')
     expect(root.textContent).toContain('Use the simulator button below')
     expect(root.textContent).not.toContain(
       'Scan this QR code in the messenger app.',
@@ -216,7 +228,9 @@ describe('embedded Partner connection state and actions', () => {
       channel: 'PARTNER-1',
       require_2fa: false,
     })
-    expect(root.textContent).toContain('Channel Connected')
+    expect(root.textContent).not.toContain(
+      'The messenger account is connected.',
+    )
     expect(root.querySelector('[data-wazzup-qr]')).toBeNull()
     expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
   })
@@ -242,7 +256,7 @@ describe('embedded Partner connection state and actions', () => {
       })
     })
     const { root } = await mount(null, { platform: 'telegram' })
-    await click(root, 'Connect')
+    await start(root)
     await click(root, 'Simulate QR scan')
     expect(mocks.call).toHaveBeenCalledWith('simulator_scan', {
       channel: 'PARTNER-1',
@@ -265,7 +279,9 @@ describe('embedded Partner connection state and actions', () => {
       'correct-private-password',
     )
     await click(root, 'Submit password')
-    expect(root.textContent).toContain('Channel Connected')
+    expect(root.textContent).not.toContain(
+      'The messenger account is connected.',
+    )
     expect(root.querySelector('[data-wazzup-2fa]')).toBeNull()
     expect(root.textContent).not.toContain('correct-private-password')
   })
@@ -345,16 +361,20 @@ describe('embedded Partner connection state and actions', () => {
   it('polls active state, displays unauthorized and permits explicit reconnect', async () => {
     let reads = 0
     mocks.call.mockImplementation(async (method) =>
-      method === 'reconnect'
+      method === 'connect_channel'
         ? result()
         : result(++reads === 1 ? 'active' : 'unauthorized'),
     )
     const { root } = await mount({ name: 'PARTNER-1', wazzup_status: 'active' })
-    expect(root.textContent).toContain('Channel Connected')
+    expect(root.textContent).not.toContain(
+      'The messenger account is connected.',
+    )
     await vi.advanceTimersByTimeAsync(2500)
     await settle()
-    expect(root.textContent).toContain('Authorization expired')
-    await click(root, 'Reconnect')
+    expect(root.textContent).toContain(
+      'restore the connection to regain access',
+    )
+    await click(root, 'Connect / Restore')
     expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
   })
 
@@ -384,7 +404,7 @@ describe('embedded Partner connection state and actions', () => {
       wazzup_status: 'waiting_qr',
     })
     expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
-    await click(root, 'Check connection')
+    await click(root, 'Test')
     expect(mocks.call).toHaveBeenLastCalledWith('check_channel', {
       channel: 'PARTNER-1',
     })
@@ -398,7 +418,7 @@ describe('embedded Partner connection state and actions', () => {
     ).toContain('Configured')
     expect(
       diagnostics.querySelector('[data-diagnostic="subscription"]').textContent,
-    ).toContain('Last checked: 2026-10-07 12:00:00')
+    ).toContain('Last checked: 07.10.2026 12:00')
     expect(
       diagnostics.querySelector('[data-diagnostic="delivery"]').textContent,
     ).toContain('No event observed')
@@ -438,7 +458,7 @@ describe('embedded Partner connection state and actions', () => {
     const subscription = () =>
       root.querySelector('[data-diagnostic="subscription"]').textContent
     expect(subscription()).toContain('Configured')
-    await click(root, 'Check connection')
+    await click(root, 'Test')
     expect(subscription()).toContain('Result unknown')
     expect(subscription()).not.toContain('Configured')
     await click(root, 'Refresh Status')
@@ -462,15 +482,15 @@ describe('embedded Partner connection state and actions', () => {
       }),
     )
     const { root } = await mount({ name: 'PARTNER-1', wazzup_status: 'active' })
-    expect(root.querySelector('[role="status"]').textContent).toContain(
-      'Channel Disabled',
-    )
+    expect(
+      root.querySelector('[data-wazzup-partner-connection]'),
+    ).not.toBeNull()
     expect(
       root.querySelector('[data-diagnostic="remote_channel"]').textContent,
     ).toContain('Could not verify')
     expect(
       [...root.querySelectorAll('button')].some(
-        (button) => button.textContent === 'Reconnect',
+        (button) => button.textContent === 'Connect / Restore',
       ),
     ).toBe(true)
     await click(root, 'Refresh Status')
@@ -488,7 +508,7 @@ describe('embedded Partner connection state and actions', () => {
           resolvePoll = resolve
         })
       return Promise.resolve(
-        method === 'reconnect' ? result('active') : result(),
+        method === 'connect_channel' ? result('active') : result(),
       )
     })
     const entry = await mount({
@@ -496,10 +516,10 @@ describe('embedded Partner connection state and actions', () => {
       wazzup_status: 'waiting_qr',
     })
     await vi.advanceTimersByTimeAsync(2500)
-    await click(entry.root, 'Reconnect')
+    await click(entry.root, 'Connect / Restore')
     resolvePoll(result('waiting_2fa'))
     await settle()
-    expect(entry.root.textContent).toContain('Channel Connected')
+    expect(entry.updated.mock.lastCall[0].wazzup_status).toBe('active')
     expect(entry.root.querySelector('[data-wazzup-2fa]')).toBeNull()
     const calls = mocks.call.mock.calls.length
     entry.app.unmount()
@@ -533,5 +553,289 @@ describe('embedded Partner connection state and actions', () => {
     const calls = mocks.call.mock.calls.length
     await vi.advanceTimersByTimeAsync(10000)
     expect(mocks.call).toHaveBeenCalledTimes(calls)
+  })
+
+  it('shows the common actions, keeps diagnostics collapsed and disconnects without deleting remotely', async () => {
+    mocks.call.mockImplementation(async (method) =>
+      result('active', { channel: { enabled: method !== 'disconnect' } }),
+    )
+    const { root, updated } = await mount({
+      name: 'PARTNER-1',
+      wazzup_status: 'active',
+      enabled: true,
+    })
+    const details = root.querySelector('[data-wazzup-partner-diagnostics]')
+    expect(details.tagName).toBe('DETAILS')
+    expect(details.open).toBe(false)
+    expect(details.querySelector('summary').textContent.trim()).toBe(
+      'Connection details',
+    )
+    const actions = [
+      ...details.previousElementSibling.querySelectorAll('button'),
+    ].map((button) => button.textContent)
+    expect(actions).toEqual([
+      'Test',
+      'Connect / Restore',
+      'Refresh Status',
+      'Disconnect',
+    ])
+    expect(root.textContent).not.toContain(
+      'The messenger account is connected.',
+    )
+    await click(root, 'Connect / Restore')
+    expect(mocks.call).toHaveBeenLastCalledWith('connect_channel', {
+      channel: 'PARTNER-1',
+    })
+    expect(
+      mocks.call.mock.calls.some(([method]) => method === 'reconnect'),
+    ).toBe(false)
+    await click(root, 'Disconnect')
+    expect(mocks.call).toHaveBeenLastCalledWith('disconnect', {
+      channel: 'PARTNER-1',
+    })
+    expect(updated.mock.lastCall[0]).toMatchObject({
+      enabled: false,
+      wazzup_status: 'active',
+    })
+    expect(
+      mocks.call.mock.calls.some(([method]) => method === 'delete_channel'),
+    ).toBe(false)
+    expect(
+      [...root.querySelectorAll('button')].some(
+        (button) => button.textContent === 'Disconnect',
+      ),
+    ).toBe(false)
+  })
+
+  it('requires explicit confirmation before starting account authorization again', async () => {
+    mocks.call.mockResolvedValue(result('active'))
+    const { root } = await mount({
+      name: 'PARTNER-1',
+      wazzup_status: 'active',
+      enabled: true,
+    })
+    await click(root, 'Reauthorize account')
+    expect(
+      mocks.call.mock.calls.some(([method]) => method === 'reconnect'),
+    ).toBe(false)
+    expect(root.textContent).toContain('Start authorization again?')
+    root.querySelector('[data-wazzup-confirm-reauthorize]').click()
+    await settle()
+    expect(mocks.call).toHaveBeenLastCalledWith('reconnect', {
+      channel: 'PARTNER-1',
+    })
+  })
+
+  it('keeps subscription failure visible outside collapsed details and reports a complete healthy check', async () => {
+    let configured = false
+    mocks.call.mockImplementation(async () =>
+      result('active', {
+        integration: {
+          wazzup_partner: {
+            status: 'active',
+            last_checked_at: '2026-10-07 12:00:01.123456',
+            reconciliation: { status: 'verified' },
+            account: { status: 'ready', enabled: true },
+            webhook_subscription: {
+              status: configured ? 'configured' : 'unverified',
+              last_checked_at: '2026-10-07 12:00:01.123456',
+            },
+          },
+        },
+      }),
+    )
+    const { root } = await mount({
+      name: 'PARTNER-1',
+      wazzup_status: 'active',
+      enabled: true,
+    })
+    const details = root.querySelector('[data-wazzup-partner-diagnostics]')
+    await click(root, 'Test')
+    expect(details.open).toBe(false)
+    const warning = root.querySelector('[data-wazzup-connection-warning]')
+    expect(warning).not.toBeNull()
+    expect(details.contains(warning)).toBe(false)
+    expect(warning.textContent).toContain(
+      'Incoming events are not configured or could not be verified.',
+    )
+    expect(mocks.success).not.toHaveBeenCalled()
+    expect(details.textContent).toContain('07.10.2026 12:00')
+    expect(details.textContent).not.toContain('.123456')
+    configured = true
+    await click(root, 'Test')
+    expect(root.querySelector('[data-wazzup-connection-warning]')).toBeNull()
+    expect(mocks.success).toHaveBeenCalledWith('Connection settings verified.')
+  })
+
+  it('ignores an older poll when saving a new channel name', async () => {
+    let resolvePoll
+    let reads = 0
+    mocks.call.mockImplementation((method) => {
+      if (method === 'get_onboarding_state' && ++reads === 2)
+        return new Promise((resolve) => {
+          resolvePoll = resolve
+        })
+      return Promise.resolve(
+        result('active', {
+          channel: {
+            custom_display_name:
+              method === 'save_channel_settings' ? 'Renamed' : 'Old',
+          },
+        }),
+      )
+    })
+    const { controller, updated } = await mount(
+      { name: 'PARTNER-1', wazzup_status: 'active', enabled: true },
+      { displayName: '  Renamed  ' },
+    )
+    await vi.advanceTimersByTimeAsync(2500)
+    await controller.saveSettings()
+    resolvePoll(result('active', { channel: { custom_display_name: 'Old' } }))
+    await settle()
+    expect(mocks.call).toHaveBeenCalledWith('save_channel_settings', {
+      channel: 'PARTNER-1',
+      custom_display_name: 'Renamed',
+    })
+    expect(updated.mock.lastCall).toEqual([
+      expect.objectContaining({ custom_display_name: 'Renamed' }),
+      { method: 'save_channel_settings' },
+    ])
+  })
+
+  it.each(['disabled', 'blocked', 'error', 'unknown', 'unauthorized'])(
+    'does not claim a successful check for remote lifecycle %s even with verified settings',
+    async (status) => {
+      mocks.call.mockResolvedValue(
+        result(status, {
+          onboarding: { error: 'private-provider-error' },
+          integration: {
+            wazzup_partner: {
+              status,
+              last_checked_at: '2026-10-07 12:00:01',
+              reconciliation: { status: 'verified' },
+              account: { status: 'ready', enabled: true },
+              webhook_subscription: { status: 'configured' },
+            },
+          },
+        }),
+      )
+      const { root } = await mount({
+        name: 'PARTNER-1',
+        wazzup_status: 'active',
+        enabled: true,
+      })
+      await click(root, 'Test')
+      expect(mocks.success).not.toHaveBeenCalled()
+      expect(
+        root.querySelector('[data-wazzup-connection-warning]').textContent,
+      ).toContain(
+        'Refresh the channel status or restore the connection to regain access.',
+      )
+      expect(root.querySelector('[role="alert"]')).not.toBeNull()
+      expect(
+        root.textContent.split(
+          'Refresh the channel status or restore the connection to regain access.',
+        ),
+      ).toHaveLength(2)
+      expect(root.querySelector('[data-wazzup-partner-diagnostics]').open).toBe(
+        false,
+      )
+      expect(root.textContent).not.toContain('private-provider-error')
+    },
+  )
+
+  it('does not show a success toast when onboarding reports an error alongside active diagnostics', async () => {
+    mocks.call.mockResolvedValue(
+      result('active', {
+        onboarding: { error: 'private-error' },
+        integration: {
+          wazzup_partner: {
+            status: 'active',
+            reconciliation: { status: 'verified' },
+            account: { status: 'ready', enabled: true },
+            webhook_subscription: { status: 'configured' },
+          },
+        },
+      }),
+    )
+    const { root } = await mount({
+      name: 'PARTNER-1',
+      wazzup_status: 'active',
+      enabled: true,
+    })
+    await click(root, 'Test')
+    expect(root.querySelector('[role="alert"]')).not.toBeNull()
+    expect(mocks.success).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['active', false],
+    ['waiting_qr', true],
+    ['waiting_2fa', true],
+  ])(
+    'can verify configuration in remote state %s without changing the local enable flag',
+    async (status, enabled) => {
+      mocks.call.mockResolvedValue(
+        result(status, {
+          channel: { enabled },
+          integration: {
+            wazzup_partner: {
+              status,
+              reconciliation: { status: 'verified' },
+              account: { status: 'ready', enabled: true },
+              webhook_subscription: { status: 'configured' },
+            },
+          },
+        }),
+      )
+      const { root, updated } = await mount({
+        name: 'PARTNER-1',
+        wazzup_status: status,
+        enabled,
+      })
+      await click(root, 'Test')
+      expect(mocks.success).toHaveBeenCalledWith(
+        'Connection settings verified.',
+      )
+      expect(root.querySelector('[data-wazzup-connection-warning]')).toBeNull()
+      expect(updated.mock.lastCall[0].enabled).toBe(enabled)
+      expect(root.textContent).not.toContain(
+        'The messenger account is connected.',
+      )
+    },
+  )
+
+  it('shows only the specific verification warning when an unauthorized channel cannot be checked', async () => {
+    mocks.call.mockResolvedValue(
+      result('unauthorized', {
+        integration: {
+          wazzup_partner: {
+            status: 'unauthorized',
+            last_checked_at: '2026-10-07 12:00:01',
+            reconciliation: { status: 'error' },
+            account: { status: 'ready', enabled: true },
+            webhook_subscription: { status: 'configured' },
+          },
+        },
+      }),
+    )
+    const { root } = await mount({
+      name: 'PARTNER-1',
+      wazzup_status: 'unauthorized',
+      enabled: true,
+    })
+    await click(root, 'Test')
+    expect(
+      root.querySelector('[data-wazzup-connection-warning]').textContent,
+    ).toContain('The channel could not be verified. Test the connection again.')
+    expect(root.textContent).not.toContain(
+      'Refresh the channel status or restore the connection to regain access.',
+    )
+    expect(
+      root.textContent.split(
+        'The channel could not be verified. Test the connection again.',
+      ),
+    ).toHaveLength(2)
+    expect(mocks.success).not.toHaveBeenCalled()
   })
 })

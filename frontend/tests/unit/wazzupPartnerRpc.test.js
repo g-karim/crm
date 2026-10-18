@@ -69,6 +69,32 @@ describe('Wazzup Partner onboarding RPC privacy', () => {
     expect(store).not.toHaveBeenCalled()
   })
 
+  it.each([
+    [
+      'save_channel_settings',
+      { channel: 'PARTNER-1', custom_display_name: 'Support' },
+    ],
+    ['connect_channel', { channel: 'PARTNER-1' }],
+    ['disconnect', { channel: 'PARTNER-1' }],
+  ])('allows only local channel fields for %s', async (action, payload) => {
+    fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: response() }),
+    })
+    await callWazzupPartner(action, {
+      ...payload,
+      provider_channel_id: 'private-uuid',
+      enabled: true,
+      api_token: 'private-token',
+      account: 'wrong-tenant',
+      password: 'private-password',
+    })
+    expect(fetch.mock.calls[0][0]).toBe(
+      `/api/method/crm_messenger.api.wazzup_partner.${action}`,
+    )
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(payload)
+  })
+
   it('drops credential fields and arbitrary provider errors from a successful response', async () => {
     fetch.mockResolvedValue({
       ok: true,
