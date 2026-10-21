@@ -5631,7 +5631,7 @@ msgstr "Организатор"
 #: frontend/src/pages/PersonaForm.vue:65 frontend/src/pages/PersonaForm.vue:82
 #: frontend/src/pages/PersonaForm.vue:103
 msgid "Other"
-msgstr "Другие"
+msgstr "Другое"
 
 #: frontend/src/components/Layouts/AppSidebar.vue:605
 msgid "Other Features"
@@ -9881,3 +9881,72 @@ msgstr "Загрузить заново"
 #: frontend/src/components/Settings/TouchSettings.vue
 msgid "Retry"
 msgstr "Повторить"
+
+#. The same neutral instruction applies to leads and deals.
+#: frontend/src/components/Modals/LostReasonModal.vue
+msgid "Please provide a reason for marking this {0} as lost"
+msgstr "Укажите причину потери."
+
+#: crm/install.py
+msgid "Pricing"
+msgstr "Высокая цена"
+
+#: crm/install.py
+msgid "Competition"
+msgstr "Выбран конкурент"
+
+#: crm/install.py
+msgid "Budget Constraints"
+msgstr "Ограниченный бюджет"
+
+#: crm/install.py
+msgid "Missing Features"
+msgstr "Не хватает нужных функций"
+
+#: crm/install.py
+msgid "Long Sales Cycle"
+msgstr "Долгий процесс продажи"
+
+#: crm/install.py
+msgid "No Decision-Maker"
+msgstr "Нет лица, принимающего решение"
+
+#: crm/install.py
+msgid "Unresponsive Prospect"
+msgstr "Клиент не отвечает"
+
+#: crm/install.py
+msgid "Poor Fit"
+msgstr "Продукт не подходит"
+
+#: crm/install.py
+msgid "The prospect found the pricing to be too high or not competitive."
+msgstr "Клиент счёл цену слишком высокой или неконкурентной."
+
+#: crm/install.py
+msgid "The prospect chose a competitor's product or service."
+msgstr "Клиент выбрал продукт или услугу конкурента."
+
+#: crm/install.py
+msgid "The prospect did not have the budget to proceed with the purchase."
+msgstr "У клиента недостаточно средств для покупки."
+
+#: crm/install.py
+msgid "The prospect felt that the product or service was missing key features they needed."
+msgstr "Клиенту не хватает необходимых функций продукта или услуги."
+
+#: crm/install.py
+msgid "The sales process took too long, leading to loss of interest."
+msgstr "Процесс продажи затянулся, и клиент потерял интерес."
+
+#: crm/install.py
+msgid "The prospect was not the decision-maker and could not proceed."
+msgstr "Контактное лицо не принимает решение о покупке и не может её согласовать."
+
+#: crm/install.py
+msgid "The prospect did not respond to follow-ups."
+msgstr "Клиент не отвечает на повторные обращения."
+
+#: crm/install.py
+msgid "The prospect was not a good fit for the product or service."
+msgstr "Продукт или услуга не подходят клиенту."
