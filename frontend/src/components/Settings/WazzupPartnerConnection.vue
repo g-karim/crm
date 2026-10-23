@@ -30,7 +30,7 @@
           <Button
             :label="__('Refresh QR code')"
             variant="solid"
-            :disabled="busy"
+            :disabled="busy || !onboarding.can_reconnect"
             :loading="action === 'reconnect'"
             @click="reconnect"
           />

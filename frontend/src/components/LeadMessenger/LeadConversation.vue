@@ -636,6 +636,7 @@ import { createMessengerTypingController } from '@/utils/messengerTyping'
 import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
 import { isWazzupPartnerChannel } from '@/utils/wazzupPartnerConnection'
 import {
+  canRetryMessengerMessage,
   createMessengerMessageActions,
   getMessengerRetryConfirmation,
   openMessengerMessageEditor,
@@ -2103,7 +2104,7 @@ function selectLocation(location) {
 function retryMessage(message) {
   if (
     !permissions.value.can_operate ||
-    !message?.can_retry ||
+    !canRetryMessengerMessage(message) ||
     messageActionState.value.pendingMessage
   )
     return

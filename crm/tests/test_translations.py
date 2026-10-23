@@ -4,6 +4,13 @@ from crm.translations import get_crm_translations
 
 
 class TestCRMTranslations(TestCase):
+	def test_empty_and_template_messages_are_translated(self):
+		translations = get_crm_translations("ru")
+		self.assertEqual(translations["Content unavailable"], "Содержимое недоступно")
+		self.assertEqual(translations["Template message"], "Шаблонное сообщение")
+		self.assertEqual(translations["Template values"], "Параметры шаблона")
+		self.assertIn("The provider did not include the template text.", translations)
+
 	def test_crm_runtime_translations_are_russian_only(self):
 		self.assertEqual(get_crm_translations("en"), {})
 		self.assertEqual(get_crm_translations(None), {})
@@ -104,6 +111,8 @@ class TestCRMTranslations(TestCase):
 			"Refresh the channel status or restore the connection to regain access.",
 			"Could not disconnect the channel. Refresh its status.",
 			"The channel could not be verified. Test the connection again.",
+			"The provider returned no channel information. Refresh the status and test the connection again.",
+			"No channel data",
 			"The connected account could not be verified. Test the connection again.",
 			"Incoming events are not configured or could not be verified. Test the connection again.",
 			"Connection settings verified.",

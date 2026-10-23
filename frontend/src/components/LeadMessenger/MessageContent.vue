@@ -34,6 +34,35 @@
 
     <template v-else>
       <div
+        v-if="message.template_context && !display.tombstone"
+        data-message-template
+        class="mb-2 space-y-1 break-words [overflow-wrap:anywhere]"
+      >
+        <div class="text-sm font-medium">{{ __('Template message') }}</div>
+        <div v-if="!message.text?.trim()" class="text-xs text-ink-gray-5">
+          {{ __('The provider did not include the template text.') }}
+        </div>
+        <div v-if="message.template_context.values?.length" class="space-y-1">
+          <div class="text-xs text-ink-gray-5">{{ __('Template values') }}</div>
+          <MessageText
+            v-for="(value, index) in message.template_context.values"
+            :key="`value:${index}`"
+            :text="value"
+          />
+        </div>
+        <div
+          v-if="message.template_context.buttons?.length"
+          class="flex flex-wrap gap-1"
+        >
+          <span
+            v-for="(button, index) in message.template_context.buttons"
+            :key="`button:${index}`"
+            class="rounded border border-outline-gray-2 px-2 py-1 text-sm"
+            >{{ button.text }}</span
+          >
+        </div>
+      </div>
+      <div
         v-if="display.tombstone || shouldShowText"
         class="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
         :class="display.tombstone ? 'italic text-ink-gray-5' : ''"

@@ -170,6 +170,27 @@ describe('messenger message actions', () => {
     expect(call).not.toHaveBeenCalled()
   })
 
+  it.each(['whatsapp', 'telegram'])(
+    'blocks an unknown Wazzup %s send even when retry eligibility is stale',
+    async (platform) => {
+      let message = {
+        name: 'WAZZUP-UNKNOWN',
+        provider: 'wazzup',
+        platform,
+        direction: 'outbound',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        can_retry: true,
+      }
+      let { controller, call } = harness()
+
+      expect(getMessengerMessageActions(message)).toEqual([])
+      expect(await controller.retryMessage(message)).toBe(false)
+      expect(await controller.retryMessage(message, true)).toBe(false)
+      expect(call).not.toHaveBeenCalled()
+    },
+  )
+
   it('exposes tombstone and edited marker display states', () => {
     expect(getMessengerMessageDisplay(editable({ is_edited: 1 }))).toEqual({
       tombstone: false,

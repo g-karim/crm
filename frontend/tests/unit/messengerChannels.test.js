@@ -240,9 +240,9 @@ describe('messengerChannels', () => {
     },
   )
 
-  it('shows text only for content or a deleted placeholder', () => {
-    expect(shouldShowMessengerText({ text: null })).toBe(false)
-    expect(shouldShowMessengerText({ text: '   ' })).toBe(false)
+  it('shows content, unavailable-content and deleted placeholders', () => {
+    expect(shouldShowMessengerText({ text: null })).toBe(true)
+    expect(shouldShowMessengerText({ text: '   ' })).toBe(true)
     expect(shouldShowMessengerText({ text: 'caption' })).toBe(true)
     expect(shouldShowMessengerText({ status: 'deleted', text: null })).toBe(
       true,

@@ -2,6 +2,7 @@ import {
   callWazzupPartner,
   normalizePartnerConnection,
   safeWazzupQrImage,
+  wazzupPartnerConnectionWarning,
   wazzupPartnerDiagnosticRows,
   wazzupPartnerStatus,
 } from '@/utils/wazzupPartnerConnection'
@@ -67,6 +68,39 @@ describe('Wazzup Partner onboarding RPC privacy', () => {
       },
     ])
     expect(store).not.toHaveBeenCalled()
+  })
+
+  it('keeps an empty provider observation unverified with a precise safe explanation', () => {
+    const result = normalizePartnerConnection(
+      response({
+        integration: {
+          wazzup_partner: {
+            status: 'waiting_qr',
+            reconciliation: {
+              status: 'unverified',
+              reason: 'channel_not_returned',
+              response: 'private-provider-body',
+              token: 'private-token',
+            },
+            account: { status: 'ready', enabled: true },
+            webhook_subscription: { status: 'configured' },
+          },
+        },
+      }),
+    )
+    const diagnostics = result.integration.wazzup_partner
+    expect(diagnostics.reconciliation).toEqual({
+      status: 'unverified',
+      reason: 'channel_not_returned',
+    })
+    expect(wazzupPartnerDiagnosticRows(diagnostics)[0]).toMatchObject({
+      label: 'No channel data',
+      theme: 'gray',
+    })
+    expect(wazzupPartnerConnectionWarning(diagnostics)).toBe(
+      'The provider returned no channel information. Refresh the status and test the connection again.',
+    )
+    expect(JSON.stringify(result)).not.toContain('private-')
   })
 
   it.each([

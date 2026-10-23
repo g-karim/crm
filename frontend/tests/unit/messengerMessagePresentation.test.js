@@ -36,6 +36,83 @@ function mountMessage(message) {
 }
 
 describe('messenger message presentation', () => {
+  it.each([
+    'wazzup',
+    'telegram_bot',
+    'vk_direct',
+    'max_direct',
+    'avito_direct',
+  ])(
+    'shows unavailable content for existing empty %s messages without changing them',
+    (provider) => {
+      let message = {
+        provider,
+        message_type: 'text',
+        text: '   ',
+        attachments: [],
+      }
+      let original = structuredClone(message)
+      expect(getMessengerMessageTextPresentation(message)).toEqual({
+        text: 'Content unavailable',
+        translate: true,
+      })
+      expect(mountMessage(message).textContent).toContain('Content unavailable')
+      expect(message).toEqual(original)
+    },
+  )
+
+  it.each(['pending', 'available', 'failed', 'unsupported'])(
+    'keeps attachment-only %s messages free of a redundant unavailable-content label',
+    (status) => {
+      let message = {
+        provider: 'wazzup',
+        message_type: 'image',
+        text: '',
+        attachments: [{ type: 'image', status }],
+      }
+      expect(shouldShowMessengerMessageText(message)).toBe(false)
+      expect(mountMessage(message).textContent).not.toContain(
+        'Content unavailable',
+      )
+    },
+  )
+
+  it('keeps forward-only messages free of an unavailable-content label', () => {
+    let message = {
+      provider: 'max_direct',
+      text: '',
+      forward_context: { items: [{ text: 'Forwarded' }] },
+    }
+    expect(shouldShowMessengerMessageText(message)).toBe(false)
+  })
+
+  it('renders supplied template values and inert button labels without inventing its body', () => {
+    let message = {
+      provider: 'wazzup',
+      message_type: 'other',
+      text: null,
+      template_context: {
+        values: ['<b>Parameter</b>'],
+        buttons: [{ text: '<script>Button</script>' }],
+      },
+    }
+    let root = mountMessage(message)
+    expect(root.querySelector('[data-message-template]')).not.toBeNull()
+    expect(root.textContent).toContain('Template message')
+    expect(root.textContent).toContain(
+      'The provider did not include the template text.',
+    )
+    expect(root.textContent).toContain('<b>Parameter</b>')
+    expect(root.textContent).toContain('<script>Button</script>')
+    expect(root.textContent).not.toContain('Content unavailable')
+    expect(root.querySelector('script, b, button')).toBeNull()
+    expect(
+      mountMessage({ ...message, status: 'deleted' }).querySelector(
+        '[data-message-template]',
+      ),
+    ).toBeNull()
+  })
+
   it('renders normalized Wazzup incoming text literally in the native chat', () => {
     let message = {
       provider: 'wazzup',

@@ -286,6 +286,51 @@ describe('embedded Partner connection state and actions', () => {
     expect(root.textContent).not.toContain('correct-private-password')
   })
 
+  it('uses server capabilities for real Telegram 2FA and hides simulator controls', async () => {
+    mocks.call.mockImplementation(async (method) =>
+      result(method === 'submit_2fa' ? 'active' : 'waiting_2fa', {
+        simulator: false,
+        channel: { platform: 'telegram' },
+      }),
+    )
+    const { root } = await mount({
+      name: 'PARTNER-1',
+      platform: 'telegram',
+      wazzup_status: 'waiting_2fa',
+    })
+    expect(root.textContent).not.toContain('Local simulator')
+    await edit(root, 'Two-factor authentication password', 'fixture-2fa')
+    await click(root, 'Submit password')
+    expect(mocks.call).toHaveBeenCalledWith('submit_2fa', {
+      channel: 'PARTNER-1',
+      password: 'fixture-2fa',
+    })
+    expect(root.querySelector('[data-wazzup-2fa]')).toBeNull()
+    expect(root.textContent).not.toContain('fixture-2fa')
+  })
+
+  it('disables expired QR renewal when real mutations are not authorized', async () => {
+    mocks.call.mockResolvedValue(
+      result('waiting_qr', {
+        simulator: false,
+        onboarding: { qr_expired: true, can_reconnect: false },
+      }),
+    )
+    const { root } = await mount({
+      name: 'PARTNER-1',
+      wazzup_status: 'waiting_qr',
+    })
+    const refresh = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent.trim() === 'Refresh QR code',
+    )
+    expect(refresh.disabled).toBe(true)
+    refresh.click()
+    await settle()
+    expect(
+      mocks.call.mock.calls.some(([method]) => method === 'reconnect'),
+    ).toBe(false)
+  })
+
   it('expires QR locally, hides the old image and refreshes using reconnect', async () => {
     let reconnected = false
     mocks.call.mockImplementation(async (method) => {
@@ -429,6 +474,51 @@ describe('embedded Partner connection state and actions', () => {
       wazzup_status: 'active',
       integration: { wazzup_partner: { status: 'active' } },
     })
+    expect(mocks.call.mock.calls.map(([method]) => method)).toEqual([
+      'get_onboarding_state',
+      'check_channel',
+    ])
+  })
+
+  it('keeps the existing QR and explains an empty real channel GET without claiming success', async () => {
+    mocks.call.mockResolvedValue(
+      result('waiting_qr', {
+        simulator: false,
+        integration: {
+          wazzup_partner: {
+            status: 'waiting_qr',
+            last_checked_at: '2026-10-07 12:00:01',
+            reconciliation: {
+              status: 'unverified',
+              reason: 'channel_not_returned',
+            },
+            account: { status: 'ready', enabled: true },
+            webhook_subscription: { status: 'configured' },
+            delivery: {
+              status: 'received',
+              last_received_at: '2026-10-07 12:00:00',
+              event_type: 'channel.qr_update',
+            },
+          },
+        },
+      }),
+    )
+    const { root } = await mount({
+      name: 'PARTNER-1',
+      wazzup_status: 'waiting_qr',
+    })
+    await click(root, 'Test')
+    expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
+    expect(
+      root.querySelector('[data-diagnostic="remote_channel"]').textContent,
+    ).toContain('No channel data')
+    expect(
+      root.querySelector('[data-wazzup-connection-warning]').textContent,
+    ).toContain(
+      'The provider returned no channel information. Refresh the status and test the connection again.',
+    )
+    expect(root.textContent).not.toContain('The channel could not be verified.')
+    expect(mocks.success).not.toHaveBeenCalled()
     expect(mocks.call.mock.calls.map(([method]) => method)).toEqual([
       'get_onboarding_state',
       'check_channel',

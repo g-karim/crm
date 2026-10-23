@@ -1097,6 +1097,43 @@ describe('VK image outbound composer', () => {
   })
 })
 
+describe('Wazzup ambiguous sends', () => {
+  it.each([false, true])(
+    'ignores stale Wazzup unknown retry events with confirmation=%s',
+    async (requiresConfirmation) => {
+      permissions = { ...permissions, can_operate: true }
+      snapshotMessages = [
+        {
+          name: 'WAZZUP-UNKNOWN',
+          provider: 'wazzup',
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'outbound',
+          status: 'unknown',
+          delivery_status: 'unknown',
+          message_type: 'text',
+          text: 'проверка',
+          attachments: [],
+          can_retry: true,
+          retry_requires_confirmation: requiresConfirmation,
+          message_datetime: '2026-10-22 10:56:00',
+        },
+      ]
+      let root = await mountConversation()
+
+      root.querySelector('[data-testid="mock-message-retry"]').click()
+      await nextTick()
+
+      expect(mocks.dialog).not.toHaveBeenCalled()
+      expect(
+        mocks.call.mock.calls.some(([method]) =>
+          method.endsWith('retry_outbound_message'),
+        ),
+      ).toBe(false)
+    },
+  )
+})
+
 describe('locally disconnected conversation channels', () => {
   it.each([
     ['wazzup', 0],

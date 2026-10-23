@@ -10,10 +10,10 @@ export function getMessengerMessageActions(message = {}) {
   return actions
 }
 
-function canRetryMessengerMessage(message = {}) {
+export function canRetryMessengerMessage(message = {}) {
   if (!message?.can_retry) return false
   return !(
-    message.provider === 'vk_direct' &&
+    ['vk_direct', 'wazzup'].includes(message.provider) &&
     (message.delivery_status || message.status) === 'unknown'
   )
 }

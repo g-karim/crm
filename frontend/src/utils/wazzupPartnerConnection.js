@@ -71,6 +71,9 @@ export function normalizePartnerDiagnostics(integration) {
         ['verified', 'error', 'unverified', 'stale'],
         'unverified',
       ),
+      ...(value.reconciliation?.reason === 'channel_not_returned'
+        ? { reason: 'channel_not_returned' }
+        : {}),
     },
     account: {
       status: status(
@@ -117,9 +120,12 @@ export function wazzupPartnerDiagnosticRows(diagnostics) {
       title: 'Provider channel status',
       ...(reconciliation === 'verified'
         ? wazzupPartnerStatus(value.status)
-        : reconciliation === 'error'
-          ? { label: 'Could not verify', theme: 'orange' }
-          : { label: 'Not checked', theme: 'gray' }),
+        : reconciliation === 'unverified' &&
+            value.reconciliation?.reason === 'channel_not_returned'
+          ? { label: 'No channel data', theme: 'gray' }
+          : reconciliation === 'error'
+            ? { label: 'Could not verify', theme: 'orange' }
+            : { label: 'Not checked', theme: 'gray' }),
     },
     {
       key: 'account',
@@ -161,6 +167,11 @@ export function wazzupPartnerDiagnosticRows(diagnostics) {
 }
 
 export function wazzupPartnerConnectionWarning(diagnostics) {
+  if (
+    diagnostics?.reconciliation?.status === 'unverified' &&
+    diagnostics.reconciliation.reason === 'channel_not_returned'
+  )
+    return 'The provider returned no channel information. Refresh the status and test the connection again.'
   if (diagnostics?.reconciliation?.status !== 'verified')
     return 'The channel could not be verified. Test the connection again.'
   if (!['active', 'waiting_qr', 'waiting_2fa'].includes(diagnostics.status))

@@ -30,6 +30,16 @@ export function getMessengerMessageTextPresentation(message = {}) {
     }
   }
 
+  if (
+    !text.trim() &&
+    message?.status !== 'deleted' &&
+    !attachments.length &&
+    !message?.template_context &&
+    !message?.forward_context?.items?.length
+  ) {
+    return { text: 'Content unavailable', translate: true }
+  }
+
   return { text, translate: false }
 }
 
