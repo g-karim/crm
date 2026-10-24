@@ -1,5 +1,5 @@
 // Real message renderers and production Tailwind CSS; no site or provider I/O.
-import { createApp, h } from 'vue'
+import { createApp, h, reactive } from 'vue'
 import conversationSource from '@/components/LeadMessenger/LeadConversation.vue?raw'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
 import MessageContent from '@/components/LeadMessenger/MessageContent.vue'
@@ -11,9 +11,11 @@ import * as attachments from '@/utils/messengerAttachments'
 import {
   getMessengerDeliveryState,
   getMessengerFailureReason,
+  getMessengerPlatformLabel,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 import { isStickerOnlyForwardContext } from '@/utils/messengerForwarding'
+import { createMessengerSyncController } from '@/utils/messengerSync'
 import '@/index.css'
 
 globalThis.__ = (message, args = []) =>
@@ -247,27 +249,175 @@ const cases = [
   },
   { key: 'deleted', text: 'Hidden deleted text', status: 'deleted' },
 ]
+const params = new URLSearchParams(location.search)
+const wazzupMedia = params.has('wazzupMedia')
+const platform = params.get('platform') || 'whatsapp'
 const provider =
-  new URLSearchParams(location.search).get('provider') || 'vk_direct'
+  params.get('provider') || (wazzupMedia ? 'wazzup' : 'vk_direct')
 const direction =
   new URLSearchParams(location.search).get('direction') || 'outbound'
 const longLabels = new URLSearchParams(location.search).has('longLabels')
 const contentOnly = new URLSearchParams(location.search).get('case')
-const messages = cases
-  .filter((item) => !contentOnly || item.key === contentOnly)
-  .map((item) => ({
-    name: item.key,
-    provider,
-    direction,
-    status: 'sent',
-    can_reply: true,
-    can_delete: true,
-    can_edit: true,
-    message_datetime: '2026-10-12 19:14:00',
-    attachments: [],
-    text: '',
-    ...item,
-  }))
+const wazzupCases = [
+  {
+    key: 'document',
+    display_text: 'Договор.pdf',
+    attachments: [file('Договор.pdf')],
+  },
+  {
+    key: 'document-caption',
+    text: 'Реальная подпись '.repeat(12),
+    attachments: [file('Договор.pdf')],
+  },
+  {
+    key: 'opaque-file',
+    attachments: [
+      {
+        ...file(),
+        display_title: '0123456789abcdef0123456789abcdef.pdf',
+        file_name: '0123456789abcdef0123456789abcdef.pdf',
+      },
+    ],
+  },
+  {
+    key: 'opus-voice',
+    attachments: [
+      {
+        id: 'OPUS',
+        type: 'audio',
+        status: 'available',
+        is_voice: true,
+        mime_type: 'audio/ogg',
+        waveform: Array.from({ length: 64 }, (_, i) => (i % 8) * 12 + 8),
+        duration_ms: 1000,
+        url: '/tests/browser/fixtures/messenger-voice.ogg',
+      },
+    ],
+  },
+  {
+    key: 'portrait-video',
+    attachments: [
+      {
+        id: 'VIDEO',
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        video_source: 'local_file',
+        width: 160,
+        height: 240,
+        duration_ms: 1000,
+        playback_url: '/tests/browser/fixtures/messenger-portrait.mp4',
+        preview_url: picture,
+      },
+    ],
+  },
+  {
+    key: 'image-sticker',
+    attachments: [
+      image('STICKER', { type: 'sticker', mime_type: 'image/png' }),
+    ],
+  },
+  {
+    key: 'gif',
+    attachments: [
+      image('GIF', {
+        mime_type: 'image/gif',
+        is_animated: true,
+        url: '/tests/browser/fixtures/messenger-animation.gif',
+        width: 48,
+        height: 48,
+      }),
+    ],
+  },
+  {
+    key: 'tgs',
+    attachments: [
+      {
+        id: 'TGS',
+        type: 'sticker',
+        status: 'available',
+        mime_type: 'application/json',
+        is_animated: true,
+        url: '/tests/browser/fixtures/messenger-sticker.json',
+      },
+    ],
+  },
+  {
+    key: 'failed-file',
+    attachments: [
+      {
+        ...file('Документ.pdf'),
+        status: 'failed',
+        download_url: null,
+        error: 'https://secret.invalid/private?token=hidden',
+      },
+    ],
+  },
+  {
+    key: 'unsupported-file',
+    attachments: [
+      {
+        id: 'UNSUPPORTED',
+        type: 'unsupported',
+        status: 'unsupported',
+        error: 'private response body',
+      },
+    ],
+  },
+]
+const messages = reactive(
+  (wazzupMedia ? wazzupCases : cases)
+    .filter((item) => !contentOnly || item.key === contentOnly)
+    .map((item) => ({
+      name: item.key,
+      provider,
+      channel_info: { platform, api_mode: 'partner_api_v2' },
+      direction,
+      status: 'sent',
+      can_reply: true,
+      can_delete: true,
+      can_edit: true,
+      message_datetime: '2026-10-12 19:14:00',
+      attachments: [],
+      text: '',
+      creation: '2026-10-12 19:14:00.123456',
+      modified: '2026-10-12 19:14:01.000001',
+      ...item,
+    })),
+)
+let storedMessages = JSON.parse(JSON.stringify(messages))
+let fixtureRevision = 1
+const sync = createMessengerSyncController({
+  call: async (method) => ({
+    contract_version: 1,
+    sync_cursor: `fixture-${fixtureRevision}`,
+    next_cursor: `fixture-${fixtureRevision}`,
+    has_more: false,
+    page: { has_more: false },
+    [method.endsWith('get_message_changes') ? 'changes' : 'messages']:
+      JSON.parse(JSON.stringify(storedMessages)),
+  }),
+  onChange: (state) => messages.splice(0, messages.length, ...state.messages),
+})
+if (wazzupMedia) {
+  window.messengerMediaFixture = {
+    async delta(status = 'available') {
+      fixtureRevision += 1
+      storedMessages = storedMessages.map((message) => ({
+        ...message,
+        modified: `2026-10-12 19:14:01.${String(fixtureRevision).padStart(6, '0')}`,
+        attachments: message.attachments.map((attachment) =>
+          ['failed-file', 'unsupported-file'].includes(message.key)
+            ? attachment
+            : { ...attachment, status },
+        ),
+      }))
+      await sync.syncDelta()
+    },
+    refresh: () => sync.loadSnapshot(),
+  }
+  await sync.start('SYNTHETIC-LEAD')
+}
 const app = createApp({
   render: () =>
     h(
@@ -299,7 +449,9 @@ const app = createApp({
                       : 'Administrator',
                     source: longLabels
                       ? 'VeryLongProviderChannelName'.repeat(3)
-                      : 'VK - Test 1',
+                      : wazzupMedia
+                        ? getMessengerPlatformLabel(message.channel_info)
+                        : 'VK - Test 1',
                     failed: getMessengerDeliveryState(message) === 'failed',
                     constrainIntrinsicWidth: constrainMetadata({ message }),
                   }),
@@ -340,4 +492,6 @@ const app = createApp({
     ),
 })
 app.config.globalProperties.__ = globalThis.__
+if (wazzupMedia)
+  app.provide('refreshMessengerAttachments', () => sync.loadSnapshot())
 app.mount('#app')

@@ -15,6 +15,7 @@ import {
   getSingleImageMediaWidthClass,
   groupMessengerAttachments,
   isSingleImageAttachmentSet,
+  isSingleFileAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
   visibleImageAttachments,
@@ -22,6 +23,84 @@ import {
 import { describe, expect, it } from 'vitest'
 
 describe('messenger attachment contract v1', () => {
+  it('routes explicit voice DTOs to the common audio player', () => {
+    expect(
+      buildMessengerAttachmentSegments([{ id: 'VOICE', type: 'voice' }])[0]
+        .type,
+    ).toBe('audio')
+  })
+
+  it('lets a single document fill the content width without widening mixed media', () => {
+    expect(isSingleFileAttachmentSet([{ type: 'file' }])).toBe(true)
+    expect(
+      isSingleFileAttachmentSet([{ type: 'file' }, { type: 'image' }]),
+    ).toBe(false)
+  })
+
+  it('uses the original display filename and hides opaque storage names', () => {
+    let hash = '0123456789abcdef0123456789abcdef.pdf'
+    expect(
+      getMessengerAttachmentTitle({
+        provider: 'wazzup',
+        type: 'file',
+        display_title: 'Договор.pdf',
+        file_name: hash,
+      }),
+    ).toBe('Договор.pdf')
+    expect(
+      getMessengerAttachmentTitle({
+        provider: 'wazzup',
+        type: 'file',
+        display_title: hash,
+        file_name: hash,
+      }),
+    ).toBe('File')
+    expect(
+      getMessengerAttachmentTitle({
+        provider: 'wazzup',
+        type: 'file',
+        file_name: 'f46113a6-fb8f-4d5d-9887-e6fd1e704477.pdf',
+      }),
+    ).toBe('File')
+    // A suffix resembling a Frappe storage hash is not proof of a lost name.
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'file',
+        file_name: 'reportabc123.pdf',
+      }),
+    ).toBe('reportabc123.pdf')
+  })
+
+  it.each(['max_direct', 'vk_direct', 'telegram_bot', 'avito_direct'])(
+    'preserves explicitly named opaque documents for %s',
+    (provider) => {
+      let file_name = '0123456789abcdef0123456789abcdef.pdf'
+      expect(
+        getMessengerAttachmentTitle({
+          provider,
+          type: 'file',
+          file_name,
+          display_title: file_name,
+        }),
+      ).toBe(file_name)
+    },
+  )
+
+  it('does not render arbitrary status diagnostics or expose unavailable actions', () => {
+    let state = getAttachmentState({
+      status: 'https://provider.test/?secret=private',
+      error: 'private provider body',
+    })
+    expect(state).toMatchObject({
+      status: 'unsupported',
+      label: 'Unsupported',
+      busy: false,
+      active: false,
+    })
+    expect(getAttachmentState({ status: 'failed' }).label).toBe(
+      'Attachment unavailable',
+    )
+  })
   it('groups only adjacent images and preserves provider order', () => {
     let segments = buildMessengerAttachmentSegments([
       { id: 'V-1', type: 'video' },
@@ -264,6 +343,12 @@ describe('messenger attachment contract v1', () => {
       expect(getAttachmentState({ status }).label).toBeTruthy()
     }
     expect(getAttachmentAction({ status: 'pending', url: '/stream' })).toBe('')
+    expect(
+      getAttachmentAction({
+        status: 'available',
+        download_url: '/protected/download',
+      }),
+    ).toBe('/protected/download')
     expect(
       getAttachmentAction({
         status: 'failed',

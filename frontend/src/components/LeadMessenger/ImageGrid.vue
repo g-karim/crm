@@ -1,56 +1,91 @@
 <template>
-  <button
-    v-if="singleImage"
-    data-single-image
-    type="button"
-    class="relative inline-flex max-w-full justify-self-start overflow-hidden rounded-md bg-surface-gray-2 text-left"
-    :class="getSingleImageMediaWidthClass(singleImage)"
-    :style="singleImageStyle"
-    :disabled="!singleImage.url || !getAttachmentState(singleImage).active"
-    @click="open(singleImage)"
-  >
-    <img
-      v-if="canDisplayLocalImage(singleImage) && showSingleImageBackdrop"
-      data-media-backdrop
-      :src="singleImage.url"
-      alt=""
-      aria-hidden="true"
-      class="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl"
-    />
-    <span
-      v-if="showSingleImageBackdrop"
-      aria-hidden="true"
-      class="pointer-events-none absolute inset-0 bg-black/30"
-    />
-    <img
-      v-if="canDisplayLocalImage(singleImage)"
-      :src="singleImage.url"
-      :alt="singleImage.file_name || __('Image')"
-      :width="imageDimension(singleImage.width)"
-      :height="imageDimension(singleImage.height)"
-      class="relative z-10 block size-full max-w-full object-contain"
-      loading="lazy"
-      @load="handleSingleImageLoad"
-    />
-    <div
-      v-else
-      class="flex min-h-28 w-full max-w-full flex-col items-center justify-center gap-2 p-3 text-center text-xs text-ink-gray-5"
+  <div v-if="singleImage" class="w-fit min-w-0 max-w-full">
+    <button
+      data-single-image
+      type="button"
+      class="relative inline-flex max-w-full justify-self-start overflow-hidden rounded-md bg-surface-gray-2 text-left"
+      :class="getSingleImageMediaWidthClass(singleImage)"
+      :style="singleImageStyle"
+      :disabled="
+        !canDisplayLocalImage(singleImage) ||
+        !getAttachmentState(singleImage).active
+      "
+      :aria-label="__('Open Image')"
+      @click="open(singleImage)"
     >
-      <LoadingIndicator
-        v-if="getAttachmentState(singleImage).busy"
-        class="size-5"
+      <img
+        v-if="canDisplayLocalImage(singleImage) && showSingleImageBackdrop"
+        data-media-backdrop
+        :src="singleImage.url"
+        alt=""
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl"
       />
-      <ImageOffIcon v-else class="size-5" />
-      <span>{{ __(getAttachmentState(singleImage).label) }}</span>
-    </div>
+      <span
+        v-if="showSingleImageBackdrop"
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 bg-black/30"
+      />
+      <img
+        v-if="canDisplayLocalImage(singleImage)"
+        :src="singleImage.url"
+        :alt="__(getMessengerAttachmentTitle(singleImage))"
+        :width="imageDimension(singleImage.width)"
+        :height="imageDimension(singleImage.height)"
+        class="relative z-10 block size-full max-w-full object-contain"
+        loading="lazy"
+        @load="handleSingleImageLoad"
+        @error="markImageFailed(singleImage)"
+      />
+      <div
+        v-else
+        class="flex min-h-28 w-full max-w-full flex-col items-center justify-center gap-2 p-3 text-center text-xs text-ink-gray-5"
+        role="status"
+      >
+        <LoadingIndicator
+          v-if="getAttachmentState(singleImage).busy && !waitingForUpdate"
+          class="size-5"
+          data-image-loading
+        />
+        <ImageOffIcon v-else class="size-5" />
+        <span>{{ __(imageStatusLabel(singleImage)) }}</span>
+      </div>
+      <div
+        v-if="isVkProviderUploadFailure(singleImage)"
+        data-vk-image-send-failed
+        class="absolute inset-x-0 bottom-0 z-20 bg-red-700/90 px-3 py-2 text-center text-xs font-medium text-white"
+      >
+        {{ __('Failed to send image to VK') }}
+      </div>
+    </button>
     <div
-      v-if="isVkProviderUploadFailure(singleImage)"
-      data-vk-image-send-failed
-      class="absolute inset-x-0 bottom-0 z-20 bg-red-700/90 px-3 py-2 text-center text-xs font-medium text-white"
+      v-if="canRetryImage(singleImage) || canRefreshImage(singleImage)"
+      class="flex flex-wrap gap-2"
     >
-      {{ __('Failed to send image to VK') }}
+      <button
+        v-if="canRetryImage(singleImage)"
+        type="button"
+        data-image-retry
+        class="min-h-10 rounded px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
+        @click="retryImage(singleImage)"
+      >
+        {{ __('Try Again') }}
+      </button>
+      <button
+        v-if="canRefreshImage(singleImage)"
+        type="button"
+        data-image-refresh
+        :disabled="refreshing"
+        class="min-h-10 rounded px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
+        @click="refresh"
+      >
+        {{ __('Refresh') }}
+      </button>
     </div>
-  </button>
+    <p v-if="refreshError" class="mt-1 text-xs text-ink-red-8" role="status">
+      {{ refreshError }}
+    </p>
+  </div>
 
   <div
     v-else-if="images.length"
@@ -59,47 +94,88 @@
     :class="compactPreview ? compactGridRowsClass : ''"
     :style="compactGridStyle"
   >
-    <button
+    <div
       v-for="(image, index) in visibleImages"
       :key="image.id"
-      type="button"
       class="relative min-h-28 overflow-hidden bg-surface-gray-2 text-left"
       :class="imageGridCellClass(images.length, index)"
-      :disabled="!image.url || !getAttachmentState(image).active"
-      @click="open(image)"
     >
-      <img
-        v-if="canDisplayLocalImage(image)"
-        :src="image.url"
-        :alt="image.file_name || __('Image')"
-        class="size-full object-cover"
-        loading="lazy"
-      />
-      <div
-        v-else
-        class="flex size-full min-h-28 flex-col items-center justify-center gap-2 p-3 text-center text-xs text-ink-gray-5"
+      <button
+        type="button"
+        class="relative block size-full min-h-28 text-left"
+        :disabled="
+          !canDisplayLocalImage(image) || !getAttachmentState(image).active
+        "
+        :aria-label="__('Open Image')"
+        @click="open(image)"
       >
-        <LoadingIndicator
-          v-if="getAttachmentState(image).busy"
-          class="size-5"
+        <img
+          v-if="canDisplayLocalImage(image)"
+          :src="image.url"
+          :alt="__(getMessengerAttachmentTitle(image))"
+          class="size-full object-cover"
+          loading="lazy"
+          @error="markImageFailed(image)"
         />
-        <ImageOffIcon v-else class="size-5" />
-        <span>{{ __(getAttachmentState(image).label) }}</span>
-      </div>
+        <div
+          v-else
+          class="flex size-full min-h-28 flex-col items-center justify-center gap-2 p-3 text-center text-xs text-ink-gray-5"
+          role="status"
+        >
+          <LoadingIndicator
+            v-if="getAttachmentState(image).busy && !waitingForUpdate"
+            class="size-5"
+            data-image-loading
+          />
+          <ImageOffIcon v-else class="size-5" />
+          <span>{{ __(imageStatusLabel(image)) }}</span>
+        </div>
+        <div
+          v-if="isVkProviderUploadFailure(image)"
+          data-vk-image-send-failed
+          class="absolute inset-x-0 bottom-0 z-10 bg-red-700/90 px-2 py-1.5 text-center text-xs font-medium text-white"
+        >
+          {{ __('Failed to send image to VK') }}
+        </div>
+        <div
+          v-if="index === 3 && images.length > 4"
+          class="absolute inset-0 flex items-center justify-center bg-black/55 text-2xl font-semibold text-white"
+        >
+          +{{ images.length - 4 }}
+        </div>
+      </button>
       <div
-        v-if="isVkProviderUploadFailure(image)"
-        data-vk-image-send-failed
-        class="absolute inset-x-0 bottom-0 z-10 bg-red-700/90 px-2 py-1.5 text-center text-xs font-medium text-white"
+        v-if="canRetryImage(image) || canRefreshImage(image)"
+        class="absolute inset-x-0 bottom-0 z-30 flex flex-wrap justify-center gap-2 bg-surface-base/95"
       >
-        {{ __('Failed to send image to VK') }}
+        <button
+          v-if="canRetryImage(image)"
+          type="button"
+          data-image-retry
+          class="min-h-10 rounded px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
+          @click="retryImage(image)"
+        >
+          {{ __('Try Again') }}
+        </button>
+        <button
+          v-if="canRefreshImage(image)"
+          type="button"
+          data-image-refresh
+          :disabled="refreshing"
+          class="min-h-10 rounded px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
+          @click="refresh"
+        >
+          {{ __('Refresh') }}
+        </button>
       </div>
-      <div
-        v-if="index === 3 && images.length > 4"
-        class="absolute inset-0 flex items-center justify-center bg-black/55 text-2xl font-semibold text-white"
-      >
-        +{{ images.length - 4 }}
-      </div>
-    </button>
+    </div>
+    <p
+      v-if="refreshError"
+      class="col-span-2 p-2 text-xs text-ink-red-8"
+      role="status"
+    >
+      {{ refreshError }}
+    </p>
   </div>
 </template>
 
@@ -107,13 +183,14 @@
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import {
   getAttachmentState,
+  getMessengerAttachmentTitle,
   getCompactMediaDimensions,
   getCompactPreviewDimensions,
   getImageGridCellClass,
   getSingleImageMediaWidthClass,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
 import ImageOffIcon from '~icons/lucide/image-off'
 
 const props = defineProps({
@@ -123,6 +200,12 @@ const props = defineProps({
   outbound: { type: Boolean, default: false },
 })
 const emit = defineEmits(['open-image'])
+const refreshAttachments = inject('refreshMessengerAttachments', null)
+const failedImages = ref(new Set())
+const waitingForUpdate = ref(false)
+const refreshing = ref(false)
+const refreshError = ref('')
+let waitingTimer = null
 const actualWidth = ref(0)
 const actualHeight = ref(0)
 const singleImage = computed(() =>
@@ -143,10 +226,11 @@ const singleImageStyle = computed(() => {
   }
   return style
 })
-const singleImageMedia = computed(() => ({
-  width: actualWidth.value || singleImage.value?.width,
-  height: actualHeight.value || singleImage.value?.height,
-}))
+const singleImageMedia = computed(() =>
+  hasDimensions(singleImage.value)
+    ? singleImage.value
+    : { width: actualWidth.value, height: actualHeight.value },
+)
 const singleImageDimensions = computed(() =>
   props.compactPreview
     ? getCompactPreviewDimensions(singleImageMedia.value)
@@ -171,7 +255,7 @@ const compactGridStyle = computed(() =>
 )
 
 function open(image) {
-  if (!image.url || !getAttachmentState(image).active) return
+  if (!canDisplayLocalImage(image) || !getAttachmentState(image).active) return
   emit('open-image', image)
 }
 
@@ -187,8 +271,53 @@ function isVkProviderUploadFailure(image) {
 function canDisplayLocalImage(image) {
   return (
     Boolean(image?.url) &&
+    !failedImages.value.has(imageSourceKey(image)) &&
     (getAttachmentState(image).active || isVkProviderUploadFailure(image))
   )
+}
+
+function imageSourceKey(image = {}) {
+  return JSON.stringify([image.id, image.url])
+}
+
+function markImageFailed(image) {
+  failedImages.value.add(imageSourceKey(image))
+}
+
+function canRetryImage(image) {
+  return (
+    failedImages.value.has(imageSourceKey(image)) &&
+    Boolean(image.url) &&
+    (getAttachmentState(image).active || isVkProviderUploadFailure(image))
+  )
+}
+
+function retryImage(image) {
+  failedImages.value.delete(imageSourceKey(image))
+}
+
+function canRefreshImage(image) {
+  let state = getAttachmentState(image)
+  return Boolean(refreshAttachments && (state.busy || state.failed))
+}
+
+function imageStatusLabel(image) {
+  if (failedImages.value.has(imageSourceKey(image))) return 'Image unavailable'
+  let state = getAttachmentState(image)
+  return state.active ? 'Attachment unavailable' : state.label
+}
+
+async function refresh() {
+  if (!refreshAttachments || refreshing.value) return
+  refreshing.value = true
+  refreshError.value = ''
+  try {
+    await refreshAttachments()
+  } catch {
+    refreshError.value = __('Could not refresh messages.')
+  } finally {
+    refreshing.value = false
+  }
 }
 
 function imageDimension(value) {
@@ -202,7 +331,9 @@ function handleSingleImageLoad(event) {
 }
 
 function hasDimensions(image) {
-  return Number(image?.width) > 0 && Number(image?.height) > 0
+  return [image?.width, image?.height].every(
+    (value) => Number.isFinite(Number(value)) && Number(value) > 0,
+  )
 }
 
 function imageGridCellClass(count, index) {
@@ -211,10 +342,47 @@ function imageGridCellClass(count, index) {
 }
 
 watch(
-  () => singleImage.value?.id,
+  () => [singleImage.value?.id, singleImage.value?.url],
   () => {
     actualWidth.value = 0
     actualHeight.value = 0
   },
 )
+
+watch(
+  () =>
+    JSON.stringify(
+      props.images.map((image) => [image.id, image.url, image.status]),
+    ),
+  () => {
+    let currentKeys = new Set(
+      props.images
+        .filter(
+          (image) =>
+            getAttachmentState(image).active ||
+            isVkProviderUploadFailure(image),
+        )
+        .map(imageSourceKey),
+    )
+    failedImages.value = new Set(
+      [...failedImages.value].filter((key) => currentKeys.has(key)),
+    )
+    refreshError.value = ''
+    if (props.images.some((image) => getAttachmentState(image).busy)) {
+      if (waitingTimer === null && !waitingForUpdate.value) {
+        waitingTimer = setTimeout(() => {
+          waitingTimer = null
+          waitingForUpdate.value = true
+        }, 30000)
+      }
+    } else {
+      clearTimeout(waitingTimer)
+      waitingTimer = null
+      waitingForUpdate.value = false
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => clearTimeout(waitingTimer))
 </script>

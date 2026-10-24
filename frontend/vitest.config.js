@@ -79,6 +79,19 @@ export default defineConfig({
         import.meta.dirname,
         'tests/stubs/IconStub.vue',
       ),
+      ...Object.fromEntries(
+        [
+          'circle-help',
+          'external-link',
+          'file',
+          'link',
+          'sticker',
+          'video',
+        ].map((name) => [
+          `~icons/lucide/${name}`,
+          path.resolve(import.meta.dirname, 'tests/stubs/IconStub.vue'),
+        ]),
+      ),
     },
   },
 })

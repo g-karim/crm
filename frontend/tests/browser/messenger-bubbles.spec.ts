@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
 
+declare global {
+  interface Window {
+    messengerMediaFixture: {
+      delta(status?: string): Promise<void>
+      refresh(): Promise<void>
+    }
+  }
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url())
@@ -113,7 +122,13 @@ for (const viewport of [320, 360, 840]) {
   }
 }
 
-for (const provider of ['vk_direct', 'telegram_bot', 'max_direct', 'wazzup']) {
+for (const provider of [
+  'vk_direct',
+  'telegram_bot',
+  'max_direct',
+  'avito_direct',
+  'wazzup',
+]) {
   for (const direction of ['inbound', 'outbound']) {
     test(`${provider} ${direction} bubbles stay compact on mobile`, async ({
       page,
@@ -127,6 +142,114 @@ for (const provider of ['vk_direct', 'telegram_bot', 'max_direct', 'wazzup']) {
         .locator('[data-case="file-only-short"] [data-message-bubble]')
         .evaluate((bubble) => bubble.getBoundingClientRect().width)
       expect(width).toBeLessThan(220)
+    })
+  }
+}
+
+for (const platform of ['whatsapp', 'telegram']) {
+  for (const width of [320, 840]) {
+    test(`Wazzup ${platform} media survives initial/delta/refresh/reload at ${width}px`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width, height: 900 })
+      const errors: string[] = []
+      page.on('pageerror', (error) => errors.push(error.message))
+      await page.goto(
+        `/tests/browser/messenger-bubbles.html?wazzupMedia=1&platform=${platform}`,
+      )
+      const document = page.locator('[data-case="document"]')
+      await expect(document.locator('[data-attachment-card-title]')).toHaveText(
+        'Договор.pdf',
+      )
+      await expect(document.locator('[data-message-text]')).toHaveCount(0)
+      await expect(
+        page.locator('[data-case="opaque-file"] [data-attachment-card-title]'),
+      ).toHaveText('File')
+      await expect(
+        page.locator('[data-case="document-caption"] [data-message-text]'),
+      ).toContainText('Реальная подпись')
+      const voice = page.locator('[data-case="opus-voice"]')
+      await expect(voice).toContainText('Voice message')
+      await expect(voice.locator('[role="slider"]')).toHaveAttribute(
+        'aria-label',
+        'Playback Position',
+      )
+      await expect(voice).toContainText('0:00 / 0:01')
+      await expect(
+        page.locator('[data-case="gif"] [data-animated-image]'),
+      ).toBeVisible()
+      await expect(
+        page.locator(
+          '[data-case="tgs"] [data-sticker-attachment] svg[viewBox="0 0 64 64"]',
+        ),
+      ).toBeVisible()
+      await expect(page.locator('[data-case="failed-file"]')).toContainText(
+        'Attachment unavailable',
+      )
+      await expect(page.locator('[data-case="failed-file"]')).not.toContainText(
+        'hidden',
+      )
+      await expect(
+        page.locator('[data-case="unsupported-file"]'),
+      ).toContainText('Unsupported')
+      const frame = page.locator(
+        '[data-case="portrait-video"] [data-video-frame]',
+      )
+      const geometry = () =>
+        frame.evaluate((node) => ({
+          width: node.getBoundingClientRect().width,
+          height: node.getBoundingClientRect().height,
+          ratio: getComputedStyle(node).aspectRatio,
+        }))
+      const initial = await geometry()
+      await frame.click()
+      const video = page.locator('[data-case="portrait-video"] video[controls]')
+      await expect(video).toBeVisible()
+      await expect
+        .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
+        .toBeGreaterThanOrEqual(2)
+      expect(await geometry()).toEqual(initial)
+      await page.evaluate(() => window.messengerMediaFixture.delta('retrying'))
+      await expect(page.locator('[data-case="document"]')).toContainText(
+        'Retrying download',
+      )
+      await page.evaluate(() => window.messengerMediaFixture.delta('available'))
+      await expect(document.locator('[data-attachment-card-title]')).toHaveText(
+        'Договор.pdf',
+      )
+      expect(await geometry()).toEqual(initial)
+      await page.evaluate(() => window.messengerMediaFixture.refresh())
+      expect(await geometry()).toEqual(initial)
+      await page.reload()
+      await expect(frame).toBeVisible()
+      expect(await geometry()).toEqual(initial)
+
+      const issues = await page
+        .locator('[data-message-bubble]')
+        .evaluateAll((bubbles) =>
+          bubbles.flatMap((bubble) => {
+            const bounds = bubble.getBoundingClientRect()
+            const problems = []
+            if (bubble.scrollWidth > bubble.clientWidth + 1)
+              problems.push('bubble overflow')
+            if (bounds.left < 0 || bounds.right > innerWidth)
+              problems.push('bubble outside viewport')
+            const card = bubble.querySelector('[data-attachment-card]')
+            if (
+              card &&
+              bubble.closest('[data-case="document-caption"]') &&
+              bounds.width - card.getBoundingClientRect().width > 28
+            )
+              problems.push('document does not fill bubble')
+            return problems
+          }),
+        )
+      expect(issues).toEqual([])
+      expect(errors).toEqual([])
+      await page.screenshot({
+        path: testInfo.outputPath(`wazzup-${platform}-${width}.png`),
+        fullPage: true,
+      })
     })
   }
 }

@@ -12,7 +12,7 @@
           ? 'w-fit max-w-full'
           : singleLocation
             ? 'w-full max-w-full'
-            : singleAudio
+            : singleAudio || singleFile
               ? 'w-full max-w-full'
               : 'max-w-[20rem]'
     "
@@ -32,44 +32,10 @@
         :compact-preview="compactPreview"
         @open-media="openMedia"
       />
-      <div
+      <StickerAttachment
         v-else-if="segment.type === 'sticker'"
-        class="flex size-52 max-w-full items-center justify-center justify-self-start"
-      >
-        <VkLottieSticker
-          v-if="isLottieSticker(segment.attachment)"
-          :attachment="segment.attachment"
-        />
-        <video
-          v-else-if="
-            isVideoSticker(segment.attachment) &&
-            segment.attachment.url &&
-            state(segment.attachment).active
-          "
-          :src="segment.attachment.url"
-          class="size-full object-contain"
-          autoplay
-          loop
-          muted
-          playsinline
-        />
-        <img
-          v-else-if="
-            isImageSticker(segment.attachment) &&
-            segment.attachment.url &&
-            state(segment.attachment).active
-          "
-          :src="segment.attachment.url"
-          :alt="__(getMessengerAttachmentTitle(segment.attachment))"
-          class="size-full object-contain"
-          loading="lazy"
-        />
-        <AttachmentCard
-          v-else
-          :attachment="segment.attachment"
-          icon="sticker"
-        />
-      </div>
+        :attachment="segment.attachment"
+      />
       <MessengerAudioPlayer
         v-else-if="segment.type === 'audio'"
         :attachment="segment.attachment"
@@ -105,8 +71,8 @@
 import {
   buildMessengerAttachmentSegments,
   getAttachmentState,
-  getMessengerAttachmentTitle,
   isSingleAudioAttachmentSet,
+  isSingleFileAttachmentSet,
   isSingleImageAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
@@ -119,8 +85,8 @@ import ImageGrid from './ImageGrid.vue'
 import MediaLightbox from './MediaLightbox.vue'
 import MessengerAudioPlayer from './MessengerAudioPlayer.vue'
 import LocationAttachment from './LocationAttachment.vue'
+import StickerAttachment from './StickerAttachment.vue'
 import VideoAttachment from './VideoAttachment.vue'
-import VkLottieSticker from './VkLottieSticker.vue'
 
 const props = defineProps({
   attachments: { type: Array, default: () => [] },
@@ -130,7 +96,13 @@ const props = defineProps({
   compactPreview: { type: Boolean, default: false },
 })
 const segments = computed(() =>
-  buildMessengerAttachmentSegments(props.attachments),
+  buildMessengerAttachmentSegments(
+    props.attachments.map((attachment) =>
+      props.provider === 'wazzup'
+        ? { ...attachment, provider: props.provider }
+        : attachment,
+    ),
+  ),
 )
 const singleImage = computed(() =>
   isSingleImageAttachmentSet(props.attachments),
@@ -144,6 +116,7 @@ const singleLocation = computed(() =>
 const singleAudio = computed(() =>
   isSingleAudioAttachmentSet(props.attachments),
 )
+const singleFile = computed(() => isSingleFileAttachmentSet(props.attachments))
 const availableMedia = computed(() =>
   props.attachments.flatMap((attachment) => {
     if (!getAttachmentState(attachment).active) return []
@@ -188,21 +161,5 @@ function openMedia(attachment) {
   if (index < 0) return
   lightboxIndex.value = index
   lightboxOpen.value = true
-}
-
-function state(attachment) {
-  return getAttachmentState(attachment)
-}
-
-function isVideoSticker(attachment) {
-  return attachment.mime_type?.startsWith('video/')
-}
-
-function isImageSticker(attachment) {
-  return attachment.mime_type?.startsWith('image/')
-}
-
-function isLottieSticker(attachment) {
-  return attachment.mime_type === 'application/json' && attachment.is_animated
 }
 </script>

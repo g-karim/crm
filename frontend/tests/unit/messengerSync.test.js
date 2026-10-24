@@ -81,6 +81,147 @@ const delta = (changes = [], overrides = {}) => ({
 })
 
 describe('messenger sync', () => {
+  it.each([
+    ['wazzup', 'whatsapp'],
+    ['wazzup', 'telegram'],
+    ['max_direct', 'max'],
+    ['vk_direct', 'vk'],
+    ['telegram_bot', 'telegram'],
+    ['avito_direct', 'avito'],
+  ])(
+    'keeps %s %s millisecond chronology and ties identical across snapshot, delta and reload',
+    async (provider, platform) => {
+      let rows = [
+        {
+          name: 'OUTBOUND-FIRST',
+          direction: 'outbound',
+          message_datetime: '2026-10-23 09:00:00.005000',
+          creation: '2026-10-23 09:00:03.000000',
+        },
+        {
+          name: 'INBOUND-SECOND',
+          direction: 'inbound',
+          message_datetime: '2026-10-23 09:00:00.006000',
+          creation: '2026-10-23 09:00:01.000000',
+        },
+        {
+          name: 'OUTBOUND-THIRD',
+          direction: 'outbound',
+          message_datetime: '2026-10-23 09:00:00.010000',
+          creation: '2026-10-23 09:00:02.001001',
+        },
+        {
+          name: 'INBOUND-TIE-A',
+          direction: 'inbound',
+          message_datetime: '2026-10-23 09:00:00.010000',
+          creation: '2026-10-23 09:00:02.001002',
+        },
+        {
+          name: 'INBOUND-TIE-B',
+          direction: 'inbound',
+          message_datetime: '2026-10-23 09:00:00.010000',
+          creation: '2026-10-23 09:00:02.001002',
+        },
+      ].map((row) => ({
+        ...row,
+        provider,
+        platform,
+        modified: '2026-10-23 09:01:00.000001',
+      }))
+      let expected = rows.map((row) => row.name)
+      let snapshotCount = 0
+      let harness = createHarness({
+        get_message_page: () =>
+          snapshotCount++
+            ? snapshot([...rows].reverse())
+            : snapshot([rows[4], rows[2], rows[0]]),
+        get_message_changes: delta([rows[3], rows[1], rows[2]]),
+      })
+
+      await harness.controller.start('LEAD-1')
+      expect(harness.controller.getMessages().map((row) => row.name)).toEqual([
+        expected[0],
+        expected[2],
+        expected[4],
+      ])
+      await harness.controller.syncDelta()
+      expect(harness.controller.getMessages()).toEqual(rows)
+      await harness.controller.loadSnapshot()
+      expect(harness.controller.getMessages()).toEqual(rows)
+      harness.controller.stop()
+    },
+  )
+
+  it.each(['whatsapp', 'telegram'])(
+    'applies only authoritative Wazzup %s timestamp corrections without guessing legacy order',
+    async (platform) => {
+      let legacy = {
+        name: 'LEGACY-OUTBOUND',
+        provider: 'wazzup',
+        platform,
+        direction: 'outbound',
+        message_datetime: '2026-10-23 09:00:30.100000',
+        creation: '2026-10-23 09:00:00.000001',
+        sent_at: '2026-10-23 09:00:00.000002',
+        modified: '2026-10-23 09:01:00.000001',
+      }
+      let inbound = {
+        ...legacy,
+        name: 'INBOUND',
+        direction: 'inbound',
+        message_datetime: '2026-10-23 09:00:00.006000',
+        creation: '2026-10-23 09:00:02.000001',
+      }
+      let current = {
+        ...legacy,
+        name: 'CURRENT-OUTBOUND',
+        message_datetime: '2026-10-23 09:00:30.200000',
+        creation: '2026-10-23 09:00:01.000001',
+      }
+      let corrected = {
+        ...current,
+        message_datetime: '2026-10-23 09:00:00.005000',
+        modified: '2026-10-23 09:01:00.000002',
+      }
+      let snapshotCount = 0
+      let harness = createHarness({
+        get_message_page: () =>
+          snapshot(
+            snapshotCount++
+              ? [legacy, corrected, inbound]
+              : [legacy, current, inbound],
+          ),
+        get_message_changes: delta([corrected]),
+      })
+
+      await harness.controller.start('LEAD-1')
+      expect(harness.controller.getMessages()).toEqual([
+        inbound,
+        legacy,
+        current,
+      ])
+      await harness.controller.syncDelta()
+      expect(harness.controller.getMessages()).toEqual([
+        corrected,
+        inbound,
+        legacy,
+      ])
+      expect(harness.changes.at(-1).inserted).toEqual([])
+      expect(harness.changes.at(-1).updated).toEqual(['CURRENT-OUTBOUND'])
+      await harness.controller.loadSnapshot()
+      expect(harness.controller.getMessages()).toEqual([
+        corrected,
+        inbound,
+        legacy,
+      ])
+      expect(legacy.message_datetime).toBe('2026-10-23 09:00:30.100000')
+      expect(
+        harness.calls.every(([method]) => /get_message_/.test(method)),
+      ).toBe(true)
+      harness.controller.stop()
+    },
+  )
+
   it('merges an exact unloaded reply target through the shared ordering path', () => {
     let harness = createHarness()
     let older = {

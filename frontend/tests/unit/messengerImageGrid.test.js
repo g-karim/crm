@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file */
-import { createApp, nextTick } from 'vue'
+import { createApp, h, nextTick, reactive } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/LeadMessenger/MediaLightbox.vue', () => ({
@@ -75,6 +75,7 @@ afterEach(() => {
     root.remove()
   })
   mounted = []
+  vi.useRealTimers()
 })
 
 function image(id, overrides = {}) {
@@ -89,13 +90,16 @@ function image(id, overrides = {}) {
   }
 }
 
-function mountGrid(images, props = {}) {
+function mountGrid(images, props = {}, refreshAttachments = null) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(ImageGrid, { images, ...props })
+  let liveProps = reactive({ images, ...props })
+  let app = createApp({ render: () => h(ImageGrid, liveProps) })
+  if (refreshAttachments)
+    app.provide('refreshMessengerAttachments', refreshAttachments)
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
-  mounted.push({ app, root })
+  mounted.push({ app, root, props: liveProps })
   return root
 }
 
@@ -110,6 +114,176 @@ function mountRenderer(attachments, props = {}) {
 }
 
 describe('messenger image layout', () => {
+  it.each(['pending', 'processing', 'downloading', 'retrying'])(
+    'bounds the %s indicator and provides a read-only refresh action',
+    async (status) => {
+      vi.useFakeTimers()
+      let refresh = vi.fn(async () => {})
+      let root = mountGrid(
+        [image('WAITING', { status, url: null })],
+        {},
+        refresh,
+      )
+      expect(root.querySelector('[data-image-loading]')).not.toBeNull()
+      expect(root.querySelector('[data-image-refresh]')).not.toBeNull()
+
+      await vi.advanceTimersByTimeAsync(29999)
+      expect(root.querySelector('[data-image-loading]')).not.toBeNull()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(root.querySelector('[data-image-loading]')).toBeNull()
+      expect(root.querySelector('[role="status"]').textContent).not.toBe('')
+      root.querySelector('[data-image-refresh]').click()
+      await nextTick()
+      expect(refresh).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('does not extend a pending image spinner when other album metadata updates', async () => {
+    vi.useFakeTimers()
+    let waiting = image('WAITING', { status: 'pending', url: null })
+    let root = mountGrid([waiting, image('READY')])
+    let liveProps = mounted.at(-1).props
+
+    await vi.advanceTimersByTimeAsync(20000)
+    liveProps.images = [waiting, image('READY', { width: 1280 })]
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(root.querySelector('[data-image-loading]')).toBeNull()
+    expect(root.textContent).toContain('Pending download')
+  })
+
+  it('shows a safe local image failure and retries only its existing media GET', async () => {
+    let opened = vi.fn()
+    let refresh = vi.fn()
+    let root = mountGrid(
+      [image('BROKEN', { error: 'https://secret.invalid/token=private' })],
+      { onOpenImage: opened },
+      refresh,
+    )
+    root.querySelector('img').dispatchEvent(new Event('error'))
+    await nextTick()
+
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.textContent).toContain('Image unavailable')
+    expect(root.textContent).not.toContain('secret.invalid')
+    expect(root.querySelector('[data-single-image]').disabled).toBe(true)
+    expect(root.querySelector('button button')).toBeNull()
+    root.querySelector('[data-single-image]').click()
+    expect(opened).not.toHaveBeenCalled()
+    root.querySelector('[data-image-retry]').click()
+    await nextTick()
+
+    expect(root.querySelector('img').getAttribute('src')).toBe(
+      '/media/BROKEN.jpg',
+    )
+    expect(root.querySelector('[data-image-retry]')).toBeNull()
+    expect(refresh).not.toHaveBeenCalled()
+    root.querySelector('[data-single-image]').click()
+    expect(opened).toHaveBeenCalledOnce()
+  })
+
+  it('clears a local image failure when delta replaces the source for the same id', async () => {
+    let root = mountGrid([image('IMAGE')])
+    let liveProps = mounted.at(-1).props
+    root.querySelector('img').dispatchEvent(new Event('error'))
+    await nextTick()
+    expect(root.querySelector('[data-image-retry]')).not.toBeNull()
+
+    liveProps.images = [image('IMAGE', { url: '/api/refreshed-image' })]
+    await nextTick()
+
+    expect(root.querySelector('img').getAttribute('src')).toBe(
+      '/api/refreshed-image',
+    )
+    expect(root.querySelector('[data-image-retry]')).toBeNull()
+    expect(root.querySelector('[data-single-image]').disabled).toBe(false)
+  })
+
+  it('isolates an album image failure while preserving available image selection', async () => {
+    let opened = vi.fn()
+    let root = mountGrid([image('FIRST'), image('SECOND')], {
+      onOpenImage: opened,
+    })
+    let media = root.querySelectorAll('img')
+    media[1].dispatchEvent(new Event('error'))
+    await nextTick()
+
+    expect(root.querySelectorAll('img')).toHaveLength(1)
+    expect(root.querySelector('[data-image-retry]')).not.toBeNull()
+    root.querySelector('img').closest('button').click()
+    expect(opened.mock.calls[0][0].id).toBe('FIRST')
+    root.querySelector('[data-image-retry]').click()
+    await nextTick()
+    expect(root.querySelectorAll('img')).toHaveLength(2)
+    expect(root.querySelector('button button')).toBeNull()
+  })
+
+  it('sanitizes refresh errors and keeps unsupported images terminal', async () => {
+    let refresh = vi.fn(async () => {
+      throw new Error('https://secret.invalid/provider-token')
+    })
+    let root = mountGrid(
+      [image('FAILED', { status: 'failed', url: null })],
+      {},
+      refresh,
+    )
+    root.querySelector('[data-image-refresh]').click()
+    await nextTick()
+    await nextTick()
+    expect(root.textContent).toContain('Could not refresh messages.')
+    expect(root.textContent).not.toContain('secret.invalid')
+    expect(root.querySelector('[data-image-refresh]').disabled).toBe(false)
+
+    let unsupported = mountGrid(
+      [image('UNSUPPORTED', { status: 'unsupported', url: null })],
+      {},
+      refresh,
+    )
+    expect(unsupported.textContent).toContain('Unsupported')
+    expect(unsupported.querySelector('[data-image-refresh]')).toBeNull()
+    expect(unsupported.querySelector('[data-image-retry]')).toBeNull()
+    expect(unsupported.querySelector('[data-image-loading]')).toBeNull()
+  })
+
+  it.each([
+    ['wazzup', 'whatsapp'],
+    ['wazzup', 'telegram'],
+    ['max_direct', 'max'],
+    ['vk_direct', 'vk'],
+    ['telegram_bot', 'telegram'],
+    ['avito_direct', 'avito'],
+  ])(
+    'keeps %s %s image metadata stable through initial, delta and reload',
+    async (provider, platform) => {
+      let canonical = image('IMAGE', { width: 1080, height: 1920, platform })
+      let root = mountGrid([canonical], { provider })
+      let liveProps = mounted.at(-1).props
+      let initialStyle = root
+        .querySelector('[data-single-image]')
+        .getAttribute('style')
+      let media = root.querySelector('img:not([data-media-backdrop])')
+      Object.defineProperties(media, {
+        naturalWidth: { value: 400, configurable: true },
+        naturalHeight: { value: 400, configurable: true },
+      })
+      media.dispatchEvent(new Event('load'))
+      await nextTick()
+      expect(
+        root.querySelector('[data-single-image]').getAttribute('style'),
+      ).toBe(initialStyle)
+
+      liveProps.images = [{ ...canonical }]
+      await nextTick()
+      expect(
+        root.querySelector('[data-single-image]').getAttribute('style'),
+      ).toBe(initialStyle)
+      let reloaded = mountGrid([{ ...canonical }], { provider })
+      expect(
+        reloaded.querySelector('[data-single-image]').getAttribute('style'),
+      ).toBe(initialStyle)
+    },
+  )
+
   it.each(['pending', 'available'])(
     'renders a canonical Wazzup image with %s download status',
     async (status) => {
@@ -367,7 +541,7 @@ describe('messenger image layout', () => {
       outbound: true,
     })
     expect(otherProvider.querySelector('img')).toBeNull()
-    expect(otherProvider.textContent).toContain('Upload failed')
+    expect(otherProvider.textContent).toContain('Attachment unavailable')
     expect(
       otherProvider.querySelector('[data-vk-image-send-failed]'),
     ).toBeNull()

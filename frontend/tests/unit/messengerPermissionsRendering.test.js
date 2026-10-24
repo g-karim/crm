@@ -1298,7 +1298,9 @@ describe('Wazzup native text replies', () => {
       channelRows = [wazzupChannel(platform)]
       conversationRows[0].provider = 'wazzup'
       let root = await mountConversation()
-      let composer = root.querySelector('input[placeholder="Enter a message..."]')
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
 
       expect(composer.disabled).toBe(false)
       composer.value = 'Ответ в существующий чат'
@@ -1347,13 +1349,17 @@ describe('Wazzup native text replies', () => {
       permissions = { ...permissions, can_operate: true }
       channelRows = [
         {
-          ...channel('CHANNEL-1', { supports_attachments: supportsAttachments }),
+          ...channel('CHANNEL-1', {
+            supports_attachments: supportsAttachments,
+          }),
           provider,
         },
       ]
       let root = await mountConversation()
       let event = new Event('dragover', { bubbles: true, cancelable: true })
-      Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'] } })
+      Object.defineProperty(event, 'dataTransfer', {
+        value: { types: ['Files'] },
+      })
 
       root
         .querySelector('input[placeholder="Enter a message..."]')
@@ -1391,7 +1397,10 @@ describe('Wazzup native text replies', () => {
       permissions = { ...permissions, can_operate: true }
       channelRows = [mediaChannel(platform)]
       let root = await mountConversation()
-      expect(root.querySelector('[aria-label="Record a Voice Message"]')).toBeNull()
+      expect(
+        root.querySelector('[aria-label="Record a Voice Message"]'),
+      ).toBeNull()
+      expect(root.querySelector('[aria-label="Add Location"]')).toBeNull()
       let policy = root.querySelector('[data-attachment-policy]')
       expect(policy.dataset.maxSize).toBe('10000000')
       expect(policy.dataset.maxFiles).toBe('1')
@@ -1418,6 +1427,7 @@ describe('Wazzup native text replies', () => {
       )
       expect(root.textContent).not.toContain('Avito API')
       composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+      send.click()
       await nextTick()
       expect(
         mocks.call.mock.calls.some(([method]) =>
@@ -1450,6 +1460,78 @@ describe('Wazzup native text replies', () => {
           }),
         ),
       )
+      let sends = mocks.call.mock.calls.filter(([method]) =>
+        method.endsWith('send_message'),
+      )
+      expect(sends).toHaveLength(1)
+      expect(sends[0][1].location).toBeUndefined()
+      expect(
+        mocks.call.mock.calls.some(([method]) =>
+          method.endsWith('send_voice_message'),
+        ),
+      ).toBe(false)
+    },
+  )
+
+  it.each([
+    ['max_direct', 'max'],
+    ['vk_direct', 'vk'],
+    ['telegram_bot', 'telegram'],
+  ])(
+    'preserves supported captions, recorder and location for %s',
+    async (provider, platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        {
+          ...channel('CHANNEL-1', {
+            supports_attachments: true,
+            supported_attachment_types: ['image', 'file', 'audio', 'video'],
+            supports_attachment_captions: true,
+            supports_image_caption: true,
+            voice: { send: true },
+            location: { send: true },
+          }),
+          provider,
+          platform,
+          channel_type: platform,
+        },
+      ]
+      let root = await mountConversation()
+      expect(
+        root.querySelector('[aria-label="Record a Voice Message"]'),
+      ).not.toBeNull()
+      expect(root.querySelector('[aria-label="Add Location"]')).not.toBeNull()
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'An attachment caption'
+      composer.dispatchEvent(new Event('input'))
+      root.querySelector('[data-testid="mock-attachment-draft"]').click()
+      await nextTick()
+      let send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+
+      expect(send.disabled).toBe(false)
+      expect(
+        root.querySelector('[data-testid="image-caption-warning"]'),
+      ).toBeNull()
+      send.click()
+
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            text: 'An attachment caption',
+            attachments: ['FILE-draft.pdf'],
+          }),
+        ),
+      )
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('send_message'),
+        ),
+      ).toHaveLength(1)
     },
   )
 

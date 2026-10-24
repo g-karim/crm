@@ -53,8 +53,20 @@ export function prepareWaveform(values = [], target = 64) {
 }
 
 export function formatAudioTime(seconds) {
-  seconds = Math.max(Math.floor(Number(seconds) || 0), 0)
+  seconds = Number(seconds)
+  seconds = Number.isFinite(seconds) ? Math.max(Math.floor(seconds), 0) : 0
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+export function getAudioDuration(metadataDuration, durationMs) {
+  let browserDuration = Number(metadataDuration)
+  if (Number.isFinite(browserDuration) && browserDuration > 0) {
+    return browserDuration
+  }
+  let providerDuration = Number(durationMs) / 1000
+  return Number.isFinite(providerDuration) && providerDuration > 0
+    ? providerDuration
+    : 0
 }
 
 export function clampAudioFraction(value) {

@@ -20,6 +20,16 @@ export default {
   optimizeDeps: {
     ...config.optimizeDeps,
     entries: ['tests/browser/messenger-bubbles.html'],
+    // The real frappe-ui Button imports reka-ui's barrel. Prebundle it so a
+    // cold layout test does not request hundreds of individual modules.
+    include: [
+      ...config.optimizeDeps.include,
+      'reka-ui',
+      'vue-router',
+      'dayjs',
+      'lottie-web/build/player/lottie_light',
+      'linkifyjs',
+    ],
   },
   server: { host: '127.0.0.1', port: 4187, strictPort: true },
 }

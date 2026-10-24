@@ -36,6 +36,44 @@ function mountMessage(message) {
 }
 
 describe('messenger message presentation', () => {
+  it.each(['whatsapp', 'telegram'])(
+    'keeps %s filenames separate from actual captions across canonical DTO updates',
+    (platform) => {
+      let message = {
+        provider: 'wazzup',
+        channel_info: { platform, api_mode: 'partner_api_v2' },
+        message_type: 'file',
+        text: null,
+        display_text: 'Договор.pdf',
+        attachments: [
+          {
+            id: 'FILE',
+            type: 'file',
+            status: 'pending',
+            file_name: 'Договор.pdf',
+          },
+        ],
+      }
+      for (let status of ['pending', 'available', 'failed', 'unsupported']) {
+        let dto = {
+          ...message,
+          attachments: [{ ...message.attachments[0], status }],
+        }
+        expect(shouldShowMessengerMessageText(dto)).toBe(false)
+        expect(mountMessage(dto).textContent.trim()).toBe('')
+      }
+      // Even text equal to a filename is retained when it is real message text.
+      expect(
+        mountMessage({ ...message, text: 'Договор.pdf' }).textContent.trim(),
+      ).toBe('Договор.pdf')
+      expect(
+        mountMessage({
+          ...message,
+          text: 'Подпись к документу',
+        }).textContent.trim(),
+      ).toBe('Подпись к документу')
+    },
+  )
   it.each([
     'wazzup',
     'telegram_bot',

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="max-w-full overflow-hidden rounded-lg bg-surface-gray-2"
+    class="min-w-0 max-w-full overflow-hidden rounded-lg bg-surface-gray-2"
     :style="mediaContainerStyle"
   >
     <div
@@ -39,16 +39,20 @@
         ref="videoElement"
         :src="playbackUrl"
         :poster="attachment.preview_url || undefined"
+        :aria-label="__('Video')"
         class="absolute inset-0 z-10 size-full object-contain"
         controls
         preload="none"
         playsinline
         @loadstart="startLoading"
         @waiting="startLoading"
+        @stalled="startLoading"
         @seeking="startLoading"
         @canplay="finishLoading"
         @playing="finishLoading"
         @seeked="finishLoading"
+        @pause="finishLoading"
+        @ended="finishLoading"
         @loadedmetadata="handleLoadedMetadata"
         @loadeddata="captureBackdropFrame"
         @play="announcePlayback"
@@ -164,11 +168,24 @@
         <button
           v-if="localFailed && playbackUrl"
           type="button"
-          class="text-xs text-ink-blue-6 hover:underline"
+          class="min-h-8 rounded px-2 text-sm text-ink-blue-6 hover:underline focus-visible:ring-2"
           @click="retryLocal"
         >
-          {{ __('Replay') }}
+          {{ __('Try Again') }}
         </button>
+      </div>
+      <button
+        v-if="canRefreshPreview"
+        type="button"
+        data-video-refresh
+        class="min-h-8 rounded border border-outline-gray-2 px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
+        :disabled="refreshing"
+        @click="refreshPreview"
+      >
+        {{ __('Refresh') }}
+      </button>
+      <div v-if="refreshError" class="text-xs text-ink-red-8" role="status">
+        {{ refreshError }}
       </div>
       <a
         v-if="action"
@@ -197,7 +214,7 @@ import {
 } from '@/utils/messengerAttachments'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import ExternalLinkIcon from '@/components/Icons/ExternalLinkIcon.vue'
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import PlayIcon from '~icons/lucide/play'
 import AttachmentCard from './AttachmentCard.vue'
 
@@ -209,6 +226,8 @@ const props = defineProps({
 })
 
 const instanceId = `messenger-video-${Math.random().toString(36).slice(2)}`
+const loadingTimeoutMs = 20000
+let loadingTimeout = null
 const videoElement = ref(null)
 const mode = ref('')
 const loading = ref(false)
@@ -217,8 +236,13 @@ const previewFailed = ref(false)
 const actualDurationMs = ref(0)
 const actualWidth = ref(0)
 const actualHeight = ref(0)
+const previewWidth = ref(0)
+const previewHeight = ref(0)
 const generatedBackdropUrl = ref('')
 const state = computed(() => getAttachmentState(props.attachment))
+const refreshAttachments = inject('refreshMessengerAttachments', null)
+const refreshing = ref(false)
+const refreshError = ref('')
 const playbackUrl = computed(() => {
   if (
     props.provider === 'vk_direct' &&
@@ -234,6 +258,15 @@ const previewPlaybackUrl = computed(() => {
 const playable = computed(() =>
   Boolean(playbackUrl.value && !localFailed.value),
 )
+const canRefreshPreview = computed(() =>
+  Boolean(
+    refreshAttachments &&
+    props.attachment.preview_url &&
+    !playable.value &&
+    !immediateExternalFallback.value &&
+    (state.value.busy || state.value.failed),
+  ),
+)
 const action = computed(() =>
   props.provider === 'max_direct' || playable.value
     ? ''
@@ -242,8 +275,8 @@ const action = computed(() =>
 const immediateExternalFallback = computed(() =>
   Boolean(
     props.provider === 'vk_direct' &&
-      action.value &&
-      ['external', 'provider_embed'].includes(props.attachment.video_source),
+    action.value &&
+    ['external', 'provider_embed'].includes(props.attachment.video_source),
   ),
 )
 const cardAttachment = computed(() => ({
@@ -261,10 +294,14 @@ const duration = computed(() =>
   ),
 )
 const mediaDimensions = computed(() => {
-  let media = {
-    width: actualWidth.value || props.attachment.width,
-    height: actualHeight.value || props.attachment.height,
-  }
+  // A thumbnail can have a different crop or ratio from the video. Prefer
+  // the same persisted pair on every projection; decoded metadata is a
+  // fallback for older attachments without dimensions.
+  let media = validDimensions(props.attachment.width, props.attachment.height)
+    ? props.attachment
+    : validDimensions(actualWidth.value, actualHeight.value)
+      ? { width: actualWidth.value, height: actualHeight.value }
+      : { width: previewWidth.value, height: previewHeight.value }
   return props.compactPreview
     ? getCompactPreviewDimensions(media)
     : getCompactMediaDimensions(media)
@@ -289,6 +326,7 @@ const statusLabel = computed(() => {
   if (immediateExternalFallback.value) return __('Available only on VK')
   if (state.value.busy) return __(state.value.label)
   if (state.value.unsupported) return __('Video format is not supported')
+  if (localFailed.value) return __('Video unavailable')
   if (props.provider === 'vk_direct' && !playable.value && action.value)
     return __('Available only on VK')
   if (!playable.value && !action.value) return __('Video unavailable')
@@ -301,14 +339,23 @@ const showFooter = computed(
 
 async function activate() {
   if (!playbackUrl.value || localFailed.value) return
+  const source = playbackUrl.value
   mode.value = 'local'
-  loading.value = true
+  startLoading()
   announcePlayback()
   if (mode.value === 'local') {
     await nextTick()
-    videoElement.value?.play?.().catch(() => {
-      loading.value = false
-    })
+    const video = videoElement.value
+    try {
+      await video?.play?.()
+    } catch (error) {
+      if (videoElement.value !== video || playbackUrl.value !== source) return
+      // Browsers can block autoplay after an async tick. Leave native controls
+      // available in that case; codec/network failures get a visible retry.
+      if (error?.name === 'NotAllowedError' || error?.name === 'AbortError')
+        finishLoading()
+      else handleLocalError()
+    }
   }
 }
 
@@ -319,17 +366,21 @@ function announcePlayback() {
 }
 
 function startLoading() {
+  if (loadingTimeout !== null) return
   loading.value = true
+  loadingTimeout = setTimeout(handleLocalError, loadingTimeoutMs)
 }
 
 function finishLoading() {
+  clearTimeout(loadingTimeout)
+  loadingTimeout = null
   loading.value = false
 }
 
 function stopPlayback() {
   videoElement.value?.pause?.()
   mode.value = ''
-  loading.value = false
+  finishLoading()
 }
 
 function handleOtherPlayback(event) {
@@ -337,22 +388,31 @@ function handleOtherPlayback(event) {
 }
 
 function handleLocalError() {
+  stopPlayback()
   localFailed.value = true
-  loading.value = false
-  mode.value = ''
+}
+
+function validDimensions(width, height) {
+  return [width, height].every(
+    (value) => Number.isFinite(Number(value)) && Number(value) > 0,
+  )
 }
 
 function handleLoadedMetadata(event) {
   const seconds = Number(event.currentTarget?.duration)
-  actualWidth.value = Number(event.currentTarget?.videoWidth || 0)
-  actualHeight.value = Number(event.currentTarget?.videoHeight || 0)
+  const width = Number(event.currentTarget?.videoWidth || 0)
+  const height = Number(event.currentTarget?.videoHeight || 0)
+  if (validDimensions(width, height)) {
+    actualWidth.value = width
+    actualHeight.value = height
+  }
   actualDurationMs.value =
     Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0
 }
 
 function handlePreviewImageLoad(event) {
-  actualWidth.value = Number(event.currentTarget?.naturalWidth || 0)
-  actualHeight.value = Number(event.currentTarget?.naturalHeight || 0)
+  previewWidth.value = Number(event.currentTarget?.naturalWidth || 0)
+  previewHeight.value = Number(event.currentTarget?.naturalHeight || 0)
 }
 
 function handlePreviewMetadata(event) {
@@ -392,17 +452,43 @@ function retryLocal() {
   activate()
 }
 
+async function refreshPreview() {
+  if (!canRefreshPreview.value || refreshing.value) return
+  refreshing.value = true
+  refreshError.value = ''
+  try {
+    await refreshAttachments()
+  } catch {
+    refreshError.value = __('Could not refresh messages.')
+  } finally {
+    refreshing.value = false
+  }
+}
+
 window.addEventListener('crm-messenger-video-play', handleOtherPlayback)
 watch(() => props.playbackScope, stopPlayback)
 watch(
-  () => [props.attachment.id, playbackUrl.value],
+  () => props.attachment.id,
   () => {
+    stopPlayback()
+    localFailed.value = false
     actualDurationMs.value = 0
     actualWidth.value = 0
     actualHeight.value = 0
+    previewWidth.value = 0
+    previewHeight.value = 0
     generatedBackdropUrl.value = ''
     previewFailed.value = false
   },
+)
+watch(playbackUrl, () => {
+  stopPlayback()
+  localFailed.value = false
+  previewFailed.value = false
+})
+watch(
+  () => [props.attachment.id, state.value.status],
+  () => (refreshError.value = ''),
 )
 onBeforeUnmount(() => {
   stopPlayback()

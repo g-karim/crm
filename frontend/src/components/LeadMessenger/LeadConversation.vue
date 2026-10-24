@@ -414,7 +414,9 @@
           :maxFiles="attachmentPolicy.maxAttachmentCount"
           :supportedAttachmentTypes="attachmentPolicy.supportedAttachmentTypes"
           :maxAttachmentSizeBytes="attachmentPolicy.maxAttachmentSizeBytes"
-          :maxAttachmentSizeBytesByType="attachmentPolicy.maxAttachmentSizeBytesByType"
+          :maxAttachmentSizeBytesByType="
+            attachmentPolicy.maxAttachmentSizeBytesByType
+          "
           :acceptedFileTypes="attachmentPolicy.acceptedFileTypes"
           :acceptedFileTypesByType="attachmentPolicy.acceptedFileTypesByType"
           :unsupportedFileMessage="attachmentPolicy.unsupportedFileMessage"
@@ -539,6 +541,7 @@
               "
               variant="ghost"
               icon="paperclip"
+              :aria-label="__('Attachments')"
               :disabled="
                 baseSendDisabled ||
                 voiceActive ||
@@ -653,7 +656,15 @@ import {
   shouldFollowMessengerTyping,
 } from '@/utils/messengerViewport'
 import { Button, FormControl, Textarea, call, toast } from 'frappe-ui'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  provide,
+  ref,
+  watch,
+} from 'vue'
 import { useRoute } from 'vue-router'
 
 const props = defineProps({
@@ -662,6 +673,10 @@ const props = defineProps({
   phone: { type: String, default: '' },
   active: { type: Boolean, default: true },
 })
+
+// Refresh the authorized DTO only; this never retries an outbound send or
+// resets the provider's bounded attachment download attempts.
+provide('refreshMessengerAttachments', loadAll)
 
 const loadingConversation = ref(false)
 const loadingMessages = ref(false)
@@ -2009,12 +2024,12 @@ function eventTargetsInteractiveElement(event) {
 function isComposerDirty() {
   return Boolean(
     draftText.value ||
-      pendingAttachments.value.length ||
-      pendingLocation.value ||
-      voiceActive.value ||
-      replyTarget.value ||
-      preparedHandoff.value ||
-      messageActionState.value.editingMessage,
+    pendingAttachments.value.length ||
+    pendingLocation.value ||
+    voiceActive.value ||
+    replyTarget.value ||
+    preparedHandoff.value ||
+    messageActionState.value.editingMessage,
   )
 }
 
