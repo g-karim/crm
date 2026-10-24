@@ -1,6 +1,6 @@
 <template>
   <div
-    class="relative flex size-52 max-h-52 max-w-52 items-center justify-center overflow-hidden"
+    class="relative flex size-full max-h-full max-w-full items-center justify-center overflow-hidden"
     :aria-label="__(title)"
   >
     <div
@@ -15,7 +15,7 @@
       "
       :src="attachment.preview_url"
       :alt="__(title)"
-      class="max-h-52 max-w-52 object-contain"
+      class="size-full object-contain"
       loading="lazy"
       @error="previewFailed = true"
     />

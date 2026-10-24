@@ -47,8 +47,9 @@ function mountVideo(attachment, provider = '', props = {}, refreshAttachments) {
 
 describe('external messenger video', () => {
   it.each(['pending', 'failed'])(
-    'exposes a read-only refresh for a %s video with a saved poster',
+    'waits for a %s video snapshot without per-media refresh controls',
     async (status) => {
+      vi.useFakeTimers()
       let refresh = vi.fn().mockResolvedValue(undefined)
       let attachment = reactive({
         id: 'PARTNER-POSTER-ONLY',
@@ -61,10 +62,12 @@ describe('external messenger video', () => {
       let root = mountVideo(attachment, 'wazzup', {}, refresh)
       expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
       expect(root.querySelector('video[controls]')).toBeNull()
-      root.querySelector('[data-video-refresh]').click()
-      await nextTick()
-      await Promise.resolve()
-      expect(refresh).toHaveBeenCalledTimes(1)
+      if (status === 'pending') {
+        expect(root.querySelector('[data-video-refresh]')).toBeNull()
+        await vi.advanceTimersByTimeAsync(30000)
+      }
+      expect(root.querySelector('[data-video-refresh]')).toBeNull()
+      expect(refresh).not.toHaveBeenCalled()
       expect(root.querySelector('[data-video-loading]')).toBeNull()
 
       Object.assign(attachment, {
@@ -82,7 +85,7 @@ describe('external messenger video', () => {
     },
   )
 
-  it('shows a safe refresh error for poster-only video without leaking diagnostics', async () => {
+  it('keeps poster-only failure safe without adding a refresh action', async () => {
     let refresh = vi
       .fn()
       .mockRejectedValue(new Error('https://provider.test/?secret=private'))
@@ -97,13 +100,9 @@ describe('external messenger video', () => {
       {},
       refresh,
     )
-    root.querySelector('[data-video-refresh]').click()
-    await nextTick()
-    await Promise.resolve()
-    await nextTick()
-    expect(root.textContent).toContain('Could not refresh messages.')
+    expect(root.querySelector('[data-video-refresh]')).toBeNull()
+    expect(refresh).not.toHaveBeenCalled()
     expect(root.textContent).not.toContain('secret=private')
-    expect(root.querySelector('[data-video-refresh]').disabled).toBe(false)
   })
 
   it('keeps pending VK external-only video on its existing source action', () => {

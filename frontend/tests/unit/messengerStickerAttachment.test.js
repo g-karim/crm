@@ -1,13 +1,6 @@
-import { createApp, nextTick, reactive } from 'vue'
+import { createApp, h, nextTick, reactive, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
-  default: {
-    props: ['attachment'],
-    template:
-      '<div data-sticker-fallback :data-status="attachment.status">{{ attachment.display_title || attachment.status }}</div>',
-  },
-}))
 vi.mock('@/components/LeadMessenger/VkLottieSticker.vue', () => ({
   default: {
     props: ['attachment'],
@@ -28,16 +21,20 @@ afterEach(() => {
     root.remove()
   })
   mounted = []
+  vi.restoreAllMocks()
   vi.useRealTimers()
 })
 
 function mountSticker(attachment) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(StickerAttachment, { attachment })
+  let currentAttachment = ref(attachment)
+  let app = createApp({
+    render: () => h(StickerAttachment, { attachment: currentAttachment.value }),
+  })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
-  mounted.push({ app, root })
+  mounted.push({ app, root, currentAttachment })
   return root
 }
 
@@ -65,7 +62,7 @@ describe('common messenger sticker', () => {
       vi.useFakeTimers()
       let attachment = reactive(sticker({ provider, platform }))
       let root = mountSticker(attachment)
-      expect(root.firstElementChild.className).toContain('size-52')
+      expect(root.firstElementChild.className).toContain('size-40')
       expect(root.firstElementChild.className).toContain('max-w-full')
       let image = root.querySelector('[data-sticker-image]')
       expect(image.className).toContain('object-contain')
@@ -101,7 +98,7 @@ describe('common messenger sticker', () => {
     },
   )
 
-  it('retains animation on video stickers and bounds stalled local loading', async () => {
+  it('keeps a slow sticker playable and fails only on an actual media error', async () => {
     vi.useFakeTimers()
     let root = mountSticker(sticker({ mime_type: 'video/webm' }))
     let video = root.querySelector('[data-sticker-video]')
@@ -112,8 +109,11 @@ describe('common messenger sticker', () => {
     expect(video.getAttribute('aria-label')).toBe('Sticker')
 
     await vi.advanceTimersByTimeAsync(20000)
-    expect(root.querySelector('[data-sticker-loading]')).toBeNull()
-    expect(root.querySelector('[data-sticker-video]')).toBeNull()
+    expect(root.querySelector('[data-sticker-loading]')).not.toBeNull()
+    expect(root.querySelector('[data-sticker-video]')).toBe(video)
+    expect(root.textContent).not.toContain('Try Again')
+    video.dispatchEvent(new Event('error'))
+    await nextTick()
     expect(root.textContent).toContain('Try Again')
     root.querySelector('button').click()
     await nextTick()
@@ -121,6 +121,41 @@ describe('common messenger sticker', () => {
     video.dispatchEvent(new Event('loadeddata'))
     await vi.advanceTimersByTimeAsync(20000)
     expect(root.querySelector('[data-sticker-video]')).not.toBeNull()
+    expect(root.querySelector('[data-sticker-loading]')).toBeNull()
+  })
+
+  it('keeps a loaded static sticker ready when realtime refresh replaces its DTO', async () => {
+    vi.useFakeTimers()
+    let attachment = sticker({ provider: 'wazzup' })
+    let root = mountSticker(attachment)
+    let image = root.querySelector('[data-sticker-image]')
+    image.dispatchEvent(new Event('load'))
+    await nextTick()
+    expect(root.querySelector('[data-sticker-loading]')).toBeNull()
+
+    let currentAttachment = mounted.find(
+      (entry) => entry.root === root,
+    ).currentAttachment
+    currentAttachment.value = { ...attachment, size_bytes: 8192 }
+    await nextTick()
+    expect(root.querySelector('[data-sticker-image]')).toBe(image)
+    expect(root.querySelector('[data-sticker-loading]')).toBeNull()
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(root.querySelector('[data-sticker-image]')).toBe(image)
+    expect(root.querySelector('[data-sticker-fallback]')).toBeNull()
+  })
+
+  it('recognizes an image already decoded from the browser cache without a load event', async () => {
+    vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(
+      true,
+    )
+    vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(
+      128,
+    )
+    let root = mountSticker(sticker())
+    await nextTick()
+    await nextTick()
+    expect(root.querySelector('[data-sticker-image]')).not.toBeNull()
     expect(root.querySelector('[data-sticker-loading]')).toBeNull()
   })
 
@@ -134,9 +169,9 @@ describe('common messenger sticker', () => {
       expect(root.querySelector('[data-sticker-video]')).toBeNull()
       expect(root.querySelector('[data-sticker-loading]')).toBeNull()
       expect(root.querySelector('button')).toBeNull()
-      expect(root.querySelector('[data-sticker-fallback]').dataset.status).toBe(
-        status,
-      )
+      let fallback = root.querySelector('[data-sticker-fallback]')
+      expect(fallback.parentElement.className).toContain('size-40')
+      expect(fallback.dataset.status).toBe(status)
       await vi.advanceTimersByTimeAsync(60000)
       expect(root.querySelector('button')).toBeNull()
 

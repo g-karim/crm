@@ -5,6 +5,16 @@ export function getMessengerMessageTextPresentation(message = {}) {
     ? message.attachments
     : []
 
+  if (
+    message?.provider === 'wazzup' &&
+    message.text_is_attachment_filename &&
+    attachments.length === 1 &&
+    attachments[0].type === 'file' &&
+    text.trim() === attachments[0].file_name
+  ) {
+    return { text: '', translate: false }
+  }
+
   if (message?.message_type === 'image' && normalizedText === '[image]') {
     return { text: '', translate: false }
   }

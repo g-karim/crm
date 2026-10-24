@@ -46,24 +46,9 @@
         <span v-if="size">{{ size }}</span>
         <span>{{ __(state.label) }}</span>
       </div>
-      <div
-        v-if="refreshError"
-        class="mt-1 text-xs text-ink-red-8"
-        role="status"
-      >
-        {{ refreshError }}
-      </div>
     </div>
-    <Button
-      v-if="canRefresh"
-      :label="__('Refresh')"
-      :disabled="refreshing"
-      variant="outline"
-      class="shrink-0"
-      @click="refresh"
-    />
     <ExternalLinkIcon
-      v-else-if="cardAction && attachment.type !== 'file'"
+      v-if="cardAction && attachment.type !== 'file'"
       class="size-4 shrink-0 text-ink-gray-5"
     />
   </component>
@@ -77,8 +62,7 @@ import {
   getAttachmentAction,
   getAttachmentState,
 } from '@/utils/messengerAttachments'
-import { Button } from 'frappe-ui'
-import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import CircleHelpIcon from '~icons/lucide/circle-help'
 import ClockIcon from '~icons/lucide/clock-3'
 import ExternalLinkIcon from '~icons/lucide/external-link'
@@ -93,15 +77,8 @@ const props = defineProps({
   icon: { type: String, default: '' },
 })
 const state = computed(() => getAttachmentState(props.attachment))
-const action = computed(() => getAttachmentAction(props.attachment))
-const refreshAttachments = inject('refreshMessengerAttachments', null)
-const canRefresh = computed(() =>
-  Boolean(refreshAttachments && (state.value.busy || state.value.failed)),
-)
-const cardAction = computed(() => (canRefresh.value ? '' : action.value))
+const cardAction = computed(() => getAttachmentAction(props.attachment))
 const waitingForUpdate = ref(false)
-const refreshing = ref(false)
-const refreshError = ref('')
 let waitingTimer = null
 const size = computed(() => formatAttachmentSize(props.attachment.size_bytes))
 const title = computed(() => getMessengerAttachmentTitle(props.attachment))
@@ -113,25 +90,11 @@ const cardIcon = computed(() => {
   return FileIcon
 })
 
-async function refresh() {
-  if (!canRefresh.value || refreshing.value) return
-  refreshing.value = true
-  refreshError.value = ''
-  try {
-    await refreshAttachments()
-  } catch {
-    refreshError.value = __('Could not refresh messages.')
-  } finally {
-    refreshing.value = false
-  }
-}
-
 watch(
-  () => [props.attachment.id, state.value.status],
+  [() => props.attachment.id, () => state.value.status],
   () => {
     clearTimeout(waitingTimer)
     waitingForUpdate.value = false
-    refreshError.value = ''
     if (state.value.busy) {
       waitingTimer = setTimeout(() => (waitingForUpdate.value = true), 30000)
     }

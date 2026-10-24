@@ -246,12 +246,9 @@ describe('shared attachment card states', () => {
     )
   })
 
-  it('refreshes a pending snapshot without starting a provider download and stops long spinners', async () => {
+  it('stops long spinners without adding per-file refresh actions', async () => {
     vi.useFakeTimers()
-    let resolveRefresh
-    let refresh = vi.fn(
-      () => new Promise((resolve) => (resolveRefresh = resolve)),
-    )
+    let refresh = vi.fn()
     let { root, props } = mountAttachment(
       AttachmentCard,
       {
@@ -262,22 +259,17 @@ describe('shared attachment card states', () => {
       },
       refresh,
     )
-    let button = root.querySelector('button')
+    expect(root.querySelector('button')).toBeNull()
     expect(root.querySelector('[data-loading-indicator]')).not.toBeNull()
-    button.click()
-    button.click()
-    await nextTick()
-    expect(refresh).toHaveBeenCalledOnce()
-    expect(button.disabled).toBe(true)
-    expect(root.querySelector('a')).toBeNull()
-    resolveRefresh()
-    await Promise.resolve()
-    await nextTick()
-    expect(button.disabled).toBe(false)
-    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(29999)
+    expect(root.querySelector('button')).toBeNull()
+    await vi.advanceTimersByTimeAsync(1)
     expect(root.querySelector('[data-loading-indicator]')).toBeNull()
+    expect(root.querySelector('button')).toBeNull()
+    expect(refresh).not.toHaveBeenCalled()
+    expect(root.querySelector('a')).toBeNull()
     expect(root.textContent).toContain('Pending download')
-    expect(root.textContent).toContain('Refresh')
+    expect(root.textContent).not.toContain('Refresh')
 
     props.attachment = {
       ...props.attachment,
@@ -291,7 +283,7 @@ describe('shared attachment card states', () => {
     )
   })
 
-  it('shows a fixed safe refresh error and keeps failed downloads terminal', async () => {
+  it('keeps failed downloads terminal without exposing a refresh action or provider errors', async () => {
     let refresh = vi.fn(async () => {
       throw new Error('secret provider token')
     })
@@ -305,14 +297,12 @@ describe('shared attachment card states', () => {
       },
       refresh,
     )
-    root.querySelector('button').click()
-    await nextTick()
-    await nextTick()
-    expect(root.textContent).toContain('Could not refresh messages.')
+    expect(root.textContent).toContain('Attachment unavailable')
     expect(root.textContent).not.toContain('secret')
     expect(root.querySelector('[data-loading-indicator]')).toBeNull()
     expect(root.querySelector('a')).toBeNull()
-    expect(root.querySelector('button').disabled).toBe(false)
+    expect(root.querySelector('button')).toBeNull()
+    expect(refresh).not.toHaveBeenCalled()
   })
 
   it('does not expose raw status/error values or a fake retry for unsupported media', () => {

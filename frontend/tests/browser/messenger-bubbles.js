@@ -30,19 +30,32 @@ window.timezone = { system: 'UTC' }
 const bubbleClasses = conversationSource.match(
   /data-message-bubble\s+class="([^"]+)"/,
 )[1]
-const widthPolicy = conversationSource.match(
-  /^function messageBubbleWidthClass\(message\) \{[\s\S]*?^\}/m,
-)[0]
-const sizingBindings = { ...attachments, isStickerOnlyForwardContext }
-const bubbleWidth = new Function(
-  ...Object.keys(sizingBindings),
-  `return (${widthPolicy})`,
-)(...Object.values(sizingBindings))
+const sizingBindings = {
+  ...attachments,
+  isStickerOnlyForwardContext,
+}
+function productionFunction(name) {
+  const policy = conversationSource.match(
+    new RegExp(`^function ${name}\\([\\s\\S]*?^\\}`, 'm'),
+  )[0]
+  return new Function(...Object.keys(sizingBindings), `return (${policy})`)(
+    ...Object.values(sizingBindings),
+  )
+}
+const bubbleWidth = productionFunction('messageBubbleWidthClass')
+const surfacePolicy = conversationSource.match(
+  /:class="\[\s*([\s\S]*?),\s*messageBubbleWidthClass\(/,
+)[1]
+const bubbleSurface = new Function('item', `return (${surfacePolicy})`)
 const metadataPolicy = conversationSource.match(
   /:constrain-intrinsic-width="([^"]+)"/,
 )[1]
-const constrainMetadata = new Function('item', `return (${metadataPolicy})`)
+const constrainMetadata = new Function(
+  ...Object.keys(sizingBindings),
+  `return (item) => (${metadataPolicy})`,
+)(...Object.values(sizingBindings))
 const picture = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="380" height="380"><rect width="380" height="380" fill="#334155"/><rect x="24" y="30" width="332" height="28" fill="#64748b"/><rect x="24" y="80" width="240" height="18" fill="#94a3b8"/><rect x="24" y="120" width="300" height="200" fill="#475569"/></svg>')}`
+const portraitPicture = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="900"><rect width="100" height="900" fill="#334155"/></svg>')}`
 const file = (
   title = 'ТПР-1-23_Хайруллин_Ильназ_Документ_с_длинным_названием_для_проверки.pdf',
 ) => ({
@@ -260,9 +273,17 @@ const longLabels = new URLSearchParams(location.search).has('longLabels')
 const contentOnly = new URLSearchParams(location.search).get('case')
 const wazzupCases = [
   {
+    key: 'portrait-image',
+    attachments: [
+      image('PORTRAIT', { url: portraitPicture, width: null, height: null }),
+    ],
+  },
+  {
     key: 'document',
+    text: 'Договор.pdf',
+    text_is_attachment_filename: true,
     display_text: 'Договор.pdf',
-    attachments: [file('Договор.pdf')],
+    attachments: [{ ...file('Договор.pdf'), display_title: 'Файл' }],
   },
   {
     key: 'document-caption',
@@ -318,6 +339,28 @@ const wazzupCases = [
     ],
   },
   {
+    key: 'image-sticker-inferred',
+    attachments: [
+      image('STICKER-INFERRED', {
+        mime_type: 'image/webp',
+        is_sticker_candidate: true,
+      }),
+    ],
+  },
+  {
+    key: 'image-sticker-pending',
+    attachments: [
+      image('STICKER-PENDING', {
+        status: 'pending',
+        url: null,
+        width: null,
+        height: null,
+        mime_type: 'image/webp',
+        is_sticker_candidate: true,
+      }),
+    ],
+  },
+  {
     key: 'gif',
     attachments: [
       image('GIF', {
@@ -368,10 +411,24 @@ const wazzupCases = [
 const messages = reactive(
   (wazzupMedia ? wazzupCases : cases)
     .filter((item) => !contentOnly || item.key === contentOnly)
+    .map((item) =>
+      params.has('shortReply') && item.key === 'long-reply'
+        ? { ...item, text: 'Ответ', reply_context: reply('Изображение') }
+        : item,
+    )
     .map((item) => ({
       name: item.key,
       provider,
-      channel_info: { platform, api_mode: 'partner_api_v2' },
+      channel_info: {
+        platform,
+        api_mode: 'partner_api_v2',
+        label: wazzupMedia
+          ? params.get('channelLabel') ||
+            (platform === 'telegram'
+              ? 'Telegram Personal Test 2'
+              : 'WhatsApp Live Test 2')
+          : undefined,
+      },
       direction,
       status: 'sent',
       can_reply: true,
@@ -407,7 +464,9 @@ if (wazzupMedia) {
         ...message,
         modified: `2026-10-12 19:14:01.${String(fixtureRevision).padStart(6, '0')}`,
         attachments: message.attachments.map((attachment) =>
-          ['failed-file', 'unsupported-file'].includes(message.key)
+          ['failed-file', 'unsupported-file', 'image-sticker-pending'].includes(
+            message.key,
+          )
             ? attachment
             : { ...attachment, status },
         ),
@@ -439,7 +498,7 @@ const app = createApp({
                 'div',
                 {
                   'data-message-bubble': '',
-                  class: `${bubbleClasses} ${bubbleWidth(message)} bg-surface-blue-1 text-ink-gray-9`,
+                  class: `${bubbleClasses} ${bubbleWidth(message)} ${bubbleSurface({ message })}`,
                 },
                 [
                   h(MessageMetadata, {
@@ -454,6 +513,10 @@ const app = createApp({
                         : 'VK - Test 1',
                     failed: getMessengerDeliveryState(message) === 'failed',
                     constrainIntrinsicWidth: constrainMetadata({ message }),
+                    wrapSource: attachments.isSingleStickerAttachmentSet(
+                      message.attachments,
+                      message.provider,
+                    ),
                   }),
                   message.reply_context &&
                     h(MessageReplyQuote, {

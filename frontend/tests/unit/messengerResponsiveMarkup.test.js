@@ -55,9 +55,7 @@ describe('messenger responsive markup', () => {
   })
 
   it('keeps direct and forwarded sticker bubbles at their media widths', () => {
-    expect(conversationSource).toContain(
-      "return 'w-[14.5rem] !max-w-[94%] sm:!max-w-[14.5rem]'",
-    )
+    expect(conversationSource).toContain("return 'w-[11.5rem] !max-w-[94%]'")
     expect(conversationSource).toContain(
       "return 'w-64 !max-w-[94%] sm:!max-w-64'",
     )

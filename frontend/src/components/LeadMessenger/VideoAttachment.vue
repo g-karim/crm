@@ -174,19 +174,6 @@
           {{ __('Try Again') }}
         </button>
       </div>
-      <button
-        v-if="canRefreshPreview"
-        type="button"
-        data-video-refresh
-        class="min-h-8 rounded border border-outline-gray-2 px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
-        :disabled="refreshing"
-        @click="refreshPreview"
-      >
-        {{ __('Refresh') }}
-      </button>
-      <div v-if="refreshError" class="text-xs text-ink-red-8" role="status">
-        {{ refreshError }}
-      </div>
       <a
         v-if="action"
         :href="action"
@@ -214,7 +201,7 @@ import {
 } from '@/utils/messengerAttachments'
 import LoadingIndicator from '@/components/Icons/LoadingIndicator.vue'
 import ExternalLinkIcon from '@/components/Icons/ExternalLinkIcon.vue'
-import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import PlayIcon from '~icons/lucide/play'
 import AttachmentCard from './AttachmentCard.vue'
 
@@ -240,9 +227,8 @@ const previewWidth = ref(0)
 const previewHeight = ref(0)
 const generatedBackdropUrl = ref('')
 const state = computed(() => getAttachmentState(props.attachment))
-const refreshAttachments = inject('refreshMessengerAttachments', null)
-const refreshing = ref(false)
-const refreshError = ref('')
+const waitingForUpdate = ref(false)
+let waitingTimer = null
 const playbackUrl = computed(() => {
   if (
     props.provider === 'vk_direct' &&
@@ -257,15 +243,6 @@ const previewPlaybackUrl = computed(() => {
 })
 const playable = computed(() =>
   Boolean(playbackUrl.value && !localFailed.value),
-)
-const canRefreshPreview = computed(() =>
-  Boolean(
-    refreshAttachments &&
-    props.attachment.preview_url &&
-    !playable.value &&
-    !immediateExternalFallback.value &&
-    (state.value.busy || state.value.failed),
-  ),
 )
 const action = computed(() =>
   props.provider === 'max_direct' || playable.value
@@ -452,19 +429,6 @@ function retryLocal() {
   activate()
 }
 
-async function refreshPreview() {
-  if (!canRefreshPreview.value || refreshing.value) return
-  refreshing.value = true
-  refreshError.value = ''
-  try {
-    await refreshAttachments()
-  } catch {
-    refreshError.value = __('Could not refresh messages.')
-  } finally {
-    refreshing.value = false
-  }
-}
-
 window.addEventListener('crm-messenger-video-play', handleOtherPlayback)
 watch(() => props.playbackScope, stopPlayback)
 watch(
@@ -487,10 +451,18 @@ watch(playbackUrl, () => {
   previewFailed.value = false
 })
 watch(
-  () => [props.attachment.id, state.value.status],
-  () => (refreshError.value = ''),
+  [() => props.attachment.id, () => state.value.status],
+  () => {
+    clearTimeout(waitingTimer)
+    waitingForUpdate.value = false
+    if (state.value.busy) {
+      waitingTimer = setTimeout(() => (waitingForUpdate.value = true), 30000)
+    }
+  },
+  { immediate: true },
 )
 onBeforeUnmount(() => {
+  clearTimeout(waitingTimer)
   stopPlayback()
   window.removeEventListener('crm-messenger-video-play', handleOtherPlayback)
 })

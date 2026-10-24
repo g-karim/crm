@@ -95,6 +95,39 @@ describe('message metadata layout', () => {
     expect(root.textContent).toContain('WhatsApp Business')
   })
 
+  it('gives a sticker channel the full second row below sender and menu', () => {
+    let source = 'Канал'.repeat(28)
+    let regular = mountMetadata({ source })
+    let sticker = mountMetadata({ source, wrapSource: true })
+    let label = sticker.querySelector('[data-message-source]')
+
+    expect(label.textContent).toBe(source)
+    expect(source).toHaveLength(140)
+    expect(label.className.split(/\s+/)).toEqual(
+      expect.arrayContaining([
+        'col-span-full',
+        'row-start-2',
+        '!h-auto',
+        '!whitespace-normal',
+        '!overflow-visible',
+        '[overflow-wrap:anywhere]',
+      ]),
+    )
+    expect(
+      regular.querySelector('[data-message-source]').className,
+    ).not.toContain('!whitespace-normal')
+    expect(sticker.querySelector('[data-message-actions]')).not.toBeNull()
+    expect(
+      sticker.querySelector('[data-message-metadata]').className,
+    ).toContain('grid-cols-[minmax(0,1fr)_auto]')
+    expect(sticker.querySelector('[data-message-labels]').className).toBe(
+      'contents',
+    )
+    expect(sticker.querySelector('[data-message-actions]').className).toContain(
+      'row-start-1',
+    )
+  })
+
   it('shows the existing edit action for a backend-eligible photo message', () => {
     let root = mountMetadata({
       message: {

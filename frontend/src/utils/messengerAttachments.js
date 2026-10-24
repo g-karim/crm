@@ -100,8 +100,14 @@ export function getMessengerReplyAttachmentLabel(snapshot = {}) {
 
 export function getMessengerAttachmentTitle(attachment = {}) {
   let provider = attachment.provider || ''
+  let genericFileTitle =
+    attachment.type === 'file' &&
+    /^(?:file|файл|document|документ|attachment|вложение)$/iu.test(
+      String(attachment.display_title || '').trim(),
+    )
   if (
     attachment.display_title &&
+    !genericFileTitle &&
     (provider !== 'wazzup' ||
       !isTechnicalAttachmentName(attachment.display_title, provider))
   ) {
@@ -182,6 +188,14 @@ export function groupMessengerAttachments(attachments = []) {
 export function buildMessengerAttachmentSegments(attachments = []) {
   let segments = []
   attachments.forEach((attachment, index) => {
+    if (isCompactWazzupStickerImage(attachment)) {
+      segments.push({
+        type: 'sticker',
+        key: `${attachment.id || 'sticker-image'}-${index}`,
+        attachment,
+      })
+      return
+    }
     if (
       attachment?.is_animated &&
       ['image', 'video'].includes(attachment?.type)
@@ -220,8 +234,25 @@ export function isSingleImageAttachmentSet(attachments = []) {
   return attachments.length === 1 && attachments[0]?.type === 'image'
 }
 
-export function isSingleStickerAttachmentSet(attachments = []) {
-  return attachments.length === 1 && attachments[0]?.type === 'sticker'
+export function isCompactWazzupStickerImage(attachment = {}, provider = '') {
+  // This media hint changes presentation only: Wazzup does not
+  // distinguish static WhatsApp stickers from ordinary images in its DTO.
+  if (!attachment) return false
+  return Boolean(
+    (provider || attachment.provider) === 'wazzup' &&
+    attachment.type === 'image' &&
+    attachment.mime_type === 'image/webp' &&
+    attachment.is_sticker_candidate &&
+    !attachment.is_animated,
+  )
+}
+
+export function isSingleStickerAttachmentSet(attachments = [], provider = '') {
+  return (
+    attachments.length === 1 &&
+    (attachments[0]?.type === 'sticker' ||
+      isCompactWazzupStickerImage(attachments[0], provider))
+  )
 }
 
 export function isSingleLocationAttachmentSet(attachments = []) {

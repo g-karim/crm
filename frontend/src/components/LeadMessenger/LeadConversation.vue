@@ -169,11 +169,20 @@
                     aria-hidden="true"
                   />
                   <MessageMetadata
+                    :wrap-source="
+                      isSingleStickerAttachmentSet(
+                        item.message.attachments,
+                        item.message.provider,
+                      )
+                    "
                     :constrain-intrinsic-width="
                       Boolean(
-                        item.message.attachments?.length ||
-                        item.message.reply_context ||
-                        item.message.forward_context,
+                        (item.message.attachments?.length ||
+                          item.message.forward_context) &&
+                        !isSingleStickerAttachmentSet(
+                          item.message.attachments,
+                          item.message.provider,
+                        ),
                       )
                     "
                     :message="item.message"
@@ -2284,8 +2293,8 @@ function messageSource(message) {
 }
 
 function messageBubbleWidthClass(message) {
-  if (isSingleStickerAttachmentSet(message.attachments)) {
-    return 'w-[14.5rem] !max-w-[94%] sm:!max-w-[14.5rem]'
+  if (isSingleStickerAttachmentSet(message.attachments, message.provider)) {
+    return 'w-[11.5rem] !max-w-[94%]'
   }
   if (isStickerOnlyForwardContext(message.forward_context)) {
     return 'w-64 !max-w-[94%] sm:!max-w-64'
@@ -2295,6 +2304,9 @@ function messageBubbleWidthClass(message) {
   }
   if (isSingleAudioAttachmentSet(message.attachments)) {
     return 'w-[24rem] !max-w-[94%] sm:!max-w-[24rem]'
+  }
+  if (message.reply_context) {
+    return 'w-fit min-w-[min(18rem,94%)] sm:min-w-[min(18rem,78%)]'
   }
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
   return getSingleImageBubbleWidthClass(message.attachments[0])

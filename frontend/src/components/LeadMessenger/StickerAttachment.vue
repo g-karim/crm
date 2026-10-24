@@ -1,7 +1,7 @@
 <template>
   <div
     data-sticker-attachment
-    class="relative flex size-52 max-w-full flex-col items-center justify-center justify-self-start gap-2"
+    class="relative flex size-40 max-w-full flex-col items-center justify-center justify-self-start gap-2"
   >
     <VkLottieSticker
       v-if="lottieSticker && state.active"
@@ -9,6 +9,7 @@
     />
     <video
       v-else-if="videoSticker && playable"
+      ref="mediaElement"
       data-sticker-video
       :src="attachment.url"
       :aria-label="__(title)"
@@ -23,6 +24,7 @@
     />
     <img
       v-else-if="imageSticker && playable"
+      ref="mediaElement"
       data-sticker-image
       :src="attachment.url"
       :alt="__(title)"
@@ -30,8 +32,27 @@
       @load="finishLoading"
       @error="failLocal"
     />
-    <template v-else>
-      <AttachmentCard :attachment="fallbackAttachment" icon="sticker" />
+    <div
+      v-else
+      data-sticker-fallback
+      :data-status="
+        localFailed ? 'failed' : state.active ? 'unsupported' : state.status
+      "
+      class="flex size-full flex-col items-center justify-center gap-2 rounded-lg bg-surface-gray-2 p-2 text-center text-xs text-ink-gray-5"
+    >
+      <LoadingIndicator v-if="state.busy" class="size-5" />
+      <span
+        class="max-w-full break-words"
+        :role="state.busy ? 'status' : undefined"
+      >
+        {{
+          __(
+            state.busy
+              ? state.label
+              : attachment.fallback_text || 'Sticker unavailable',
+          )
+        }}
+      </span>
       <button
         v-if="localFailed && state.active && attachment.url"
         type="button"
@@ -40,7 +61,7 @@
       >
         {{ __('Try Again') }}
       </button>
-    </template>
+    </div>
     <div
       v-if="localLoading"
       data-sticker-loading
@@ -59,8 +80,7 @@ import {
   getAttachmentState,
   getMessengerAttachmentTitle,
 } from '@/utils/messengerAttachments'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import AttachmentCard from './AttachmentCard.vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import VkLottieSticker from './VkLottieSticker.vue'
 
 const props = defineProps({
@@ -81,26 +101,11 @@ const imageSticker = computed(() =>
 )
 const localFailed = ref(false)
 const localLoading = ref(false)
-let loadingTimer = null
+const mediaElement = ref(null)
 const playable = computed(
   () => state.value.active && props.attachment.url && !localFailed.value,
 )
-const fallbackAttachment = computed(() =>
-  localFailed.value ||
-  (state.value.active &&
-    (!props.attachment.url ||
-      (!videoSticker.value && !imageSticker.value && !lottieSticker.value)))
-    ? {
-        ...props.attachment,
-        status: localFailed.value ? 'failed' : 'unsupported',
-        display_title: 'Sticker unavailable',
-      }
-    : props.attachment,
-)
-
 function finishLoading() {
-  clearTimeout(loadingTimer)
-  loadingTimer = null
   localLoading.value = false
 }
 
@@ -109,7 +114,7 @@ function failLocal() {
   localFailed.value = true
 }
 
-function retryLocal() {
+async function retryLocal() {
   finishLoading()
   localFailed.value = false
   if (
@@ -119,18 +124,26 @@ function retryLocal() {
   )
     return
   localLoading.value = true
-  loadingTimer = setTimeout(failLocal, 20000)
+  await nextTick()
+  // A cached image can finish before Vue attaches its load listener. A DTO
+  // refresh must also keep a successfully rendered sticker in its ready state.
+  let media = mediaElement.value
+  if (
+    (imageSticker.value && media?.complete && media.naturalWidth > 0) ||
+    (videoSticker.value && media?.readyState >= 2)
+  ) {
+    finishLoading()
+  }
 }
 
 watch(
-  () => [
-    props.attachment.id,
-    props.attachment.url,
-    state.value.status,
-    props.attachment.mime_type,
+  [
+    () => props.attachment.id,
+    () => props.attachment.url,
+    () => state.value.status,
+    () => props.attachment.mime_type,
   ],
   retryLocal,
   { immediate: true },
 )
-onBeforeUnmount(finishLoading)
 </script>

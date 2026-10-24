@@ -493,6 +493,73 @@ describe('messengerChannels', () => {
     ])
   })
 
+  function wazzupPhoto(index, overrides = {}) {
+    return {
+      name: `WAZZUP-${index}`,
+      provider: 'wazzup',
+      conversation: 'WAZZUP-CHAT',
+      channel: 'WAZZUP-CHANNEL',
+      direction: 'inbound',
+      sender_name: 'Клиент',
+      status: 'received',
+      message_type: 'image',
+      message_datetime: `2026-07-16 08:00:${String(index).padStart(2, '0')}`,
+      attachments: [{ id: `IMAGE-${index}`, type: 'image', status: 'pending' }],
+      can_reply: true,
+      ...overrides,
+    }
+  }
+
+  it.each(['whatsapp', 'telegram'])(
+    'keeps Wazzup %s photos separate without a provider album identity',
+    (platform) => {
+      let messages = [0, 1, 2].map((index) =>
+        wazzupPhoto(index, {
+          channel_info: { platform },
+          message_datetime: `2026-07-16 08:00:00.00${index + 1}`,
+          creation: `2026-07-16 08:00:${String(index * 9).padStart(2, '0')}`,
+        }),
+      )
+      let before = JSON.stringify(messages)
+      let items = buildMessengerMessageItems(messages, '2026-07-16 09:00:00')
+
+      expect(items).toHaveLength(3)
+      expect(items.map((item) => item.messages.length)).toEqual([1, 1, 1])
+      expect(items.map((item) => item.message)).toEqual(messages)
+      expect(items.every((item) => !item.kind && !item.attachments)).toBe(true)
+      expect(items[0].dateLabel).toBe('Today')
+      expect(JSON.stringify(messages)).toBe(before)
+    },
+  )
+
+  it('does not infer a Wazzup album from equal timestamps or nearby arrival times', () => {
+    let items = buildMessengerMessageItems(
+      [0, 1].map((index) =>
+        wazzupPhoto(index, {
+          message_datetime: '2026-07-16 08:00:00',
+          creation: `2026-07-16 08:00:00.${index ? '450' : '000'}`,
+        }),
+      ),
+    )
+
+    expect(items.map((item) => item.messages.length)).toEqual([1, 1])
+  })
+
+  it('retains an actual multi-image message for the shared image grid', () => {
+    let message = wazzupPhoto(0, {
+      attachments: [0, 1, 2].map((index) => ({
+        id: `IMAGE-${index}`,
+        type: 'image',
+        status: 'available',
+      })),
+    })
+    let items = buildMessengerMessageItems([message])
+
+    expect(items).toHaveLength(1)
+    expect(items[0].message.attachments).toBe(message.attachments)
+    expect(items[0].messages).toEqual([message])
+  })
+
   it('caps one visual MAX forwarding group at twenty provider messages', () => {
     let messages = Array.from({ length: 21 }, (_, index) => ({
       name: `MAX-${index}`,

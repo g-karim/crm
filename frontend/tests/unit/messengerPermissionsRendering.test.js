@@ -1994,6 +1994,37 @@ describe('messenger conversation routing guard', () => {
     },
   )
 
+  it.each(['wazzup', 'vk_direct', 'telegram_bot', 'max_direct'])(
+    'keeps sender and channel in the intrinsic width of a short %s reply',
+    async (provider) => {
+      snapshotMessages = [
+        {
+          name: 'SHORT-REPLY',
+          provider,
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'outbound',
+          status: 'sent',
+          text: 'Ок',
+          attachments: [],
+          reply_context: {
+            state: 'available',
+            message: 'ORIGINAL',
+            snapshot: { attachment_types: ['image'] },
+          },
+          message_datetime: '2026-09-14 10:56:00',
+        },
+      ]
+      let root = await mountConversation()
+      expect(
+        root.querySelector('[data-message-metadata]').classList.contains('w-0'),
+      ).toBe(false)
+      expect(root.querySelector('[data-message-bubble]').className).toContain(
+        'min-w-[min(18rem,94%)]',
+      )
+    },
+  )
+
   it('hides the technical VK photo upload reason below the message bubble', async () => {
     channelRows = [
       {

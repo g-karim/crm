@@ -15,6 +15,7 @@ import {
   getSingleImageMediaWidthClass,
   groupMessengerAttachments,
   isSingleImageAttachmentSet,
+  isCompactWazzupStickerImage,
   isSingleFileAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
@@ -23,6 +24,36 @@ import {
 import { describe, expect, it } from 'vitest'
 
 describe('messenger attachment contract v1', () => {
+  it('uses compact presentation only for decoded Wazzup sticker candidates', () => {
+    let candidate = {
+      id: 'TRANSPARENT-WEBP',
+      provider: 'wazzup',
+      type: 'image',
+      mime_type: 'image/webp',
+      width: 512,
+      height: 512,
+      is_sticker_candidate: true,
+    }
+    expect(isCompactWazzupStickerImage(candidate)).toBe(true)
+    expect(isSingleStickerAttachmentSet([candidate])).toBe(true)
+    expect(buildMessengerAttachmentSegments([candidate])[0]).toMatchObject({
+      type: 'sticker',
+      attachment: { type: 'image' },
+    })
+    for (let override of [
+      { is_sticker_candidate: false },
+      { is_sticker_candidate: undefined },
+      { provider: 'telegram_bot' },
+      { mime_type: 'image/jpeg' },
+      { type: 'file' },
+      { is_animated: true },
+    ]) {
+      expect(isCompactWazzupStickerImage({ ...candidate, ...override })).toBe(
+        false,
+      )
+    }
+  })
+
   it('routes explicit voice DTOs to the common audio player', () => {
     expect(
       buildMessengerAttachmentSegments([{ id: 'VOICE', type: 'voice' }])[0]
@@ -171,6 +202,13 @@ describe('messenger attachment contract v1', () => {
       getMessengerAttachmentTitle({
         type: 'file',
         file_name: 'contract.pdf',
+      }),
+    ).toBe('contract.pdf')
+    expect(
+      getMessengerAttachmentTitle({
+        type: 'file',
+        file_name: 'contract.pdf',
+        display_title: 'Файл',
       }),
     ).toBe('contract.pdf')
     expect(

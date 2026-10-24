@@ -108,6 +108,41 @@ async function expectBubblesFit(page: Page) {
   expect(overflow).toEqual([])
 }
 
+for (const viewport of [320, 840]) {
+  test(`a short reply keeps readable metadata at ${viewport}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport, height: 720 })
+    await page.goto(
+      '/tests/browser/messenger-bubbles.html?case=long-reply&shortReply=1',
+    )
+    const bubble = page.locator('[data-message-bubble]')
+    await expect(bubble).toBeVisible()
+    await page.evaluate(() => document.fonts.ready)
+    const geometry = await bubble.evaluate((element) => {
+      const metadata = element.querySelector('[data-message-metadata]')!
+      const sender = metadata.querySelector('[data-message-labels] > span')!
+      const source = metadata.querySelector(
+        '[data-message-labels] > :nth-child(2)',
+      )!
+      return {
+        width: element.getBoundingClientRect().width,
+        senderHeight: sender.getBoundingClientRect().height,
+        sourceHeight: source.getBoundingClientRect().height,
+        senderLineHeight: parseFloat(getComputedStyle(sender).lineHeight),
+        sourceLineHeight: parseFloat(getComputedStyle(source).lineHeight),
+      }
+    })
+    expect(geometry.width).toBeGreaterThan(240)
+    expect(geometry.senderHeight).toBeLessThanOrEqual(
+      geometry.senderLineHeight + 1,
+    )
+    expect(geometry.sourceHeight).toBeLessThanOrEqual(
+      geometry.sourceLineHeight + 8,
+    )
+  })
+}
+
 for (const viewport of [320, 360, 840]) {
   for (const longLabels of [false, true]) {
     test(`all bubbles fit at ${viewport}px with ${longLabels ? 'long' : 'normal'} labels`, async ({
@@ -147,6 +182,83 @@ for (const provider of [
 }
 
 for (const platform of ['whatsapp', 'telegram']) {
+  for (const direction of ['inbound', 'outbound']) {
+    test(`framed sticker fits full channel names in ${platform} ${direction}`, async ({
+      page,
+    }, testInfo) => {
+      await page.setViewportSize({ width: 400, height: 640 })
+      const source =
+        platform === 'whatsapp'
+          ? 'WhatsApp Live Test 2'
+          : `Личный Telegram — ${'ДлинноеНазваниеКанала'.repeat(8)}`.slice(
+              0,
+              140,
+            )
+      await page.goto(
+        `/tests/browser/messenger-bubbles.html?wazzupMedia=1&case=image-sticker-inferred&platform=${platform}&direction=${direction}&channelLabel=${encodeURIComponent(source)}`,
+      )
+      await page.evaluate(() => {
+        document.documentElement.style.zoom = '1.25'
+      })
+      const bubble = page.locator('[data-message-bubble]')
+      await expect(bubble.locator('[data-sticker-image]')).toBeVisible()
+      await expect(bubble).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+      const label = bubble.locator('[data-message-source]')
+      await expect(label).toHaveText(source)
+      await expect(label).toHaveCSS('white-space', 'normal')
+      const geometry = await bubble.evaluate((node) => {
+        const bounds = node.getBoundingClientRect()
+        const media = node
+          .querySelector('[data-sticker-attachment]')!
+          .getBoundingClientRect()
+        const renderer = node
+          .querySelector('[data-attachment-renderer]')!
+          .getBoundingClientRect()
+        const footer = node
+          .querySelector('[data-message-footer]')!
+          .getBoundingClientRect()
+        const label = node.querySelector('[data-message-source]')!
+        const labelBounds = label.getBoundingClientRect()
+        return {
+          bubble: { left: bounds.left, right: bounds.right },
+          media: { left: media.left, right: media.right, width: media.width },
+          rendererWidth: renderer.width,
+          footer: {
+            left: footer.left,
+            right: footer.right,
+            width: footer.width,
+          },
+          labelOverflow: label.scrollWidth - label.clientWidth,
+          label: {
+            left: labelBounds.left,
+            right: labelBounds.right,
+            height: labelBounds.height,
+          },
+        }
+      })
+      expect(geometry.media.width).toBeCloseTo(200, 0)
+      expect(geometry.rendererWidth).toBeCloseTo(geometry.media.width, 0)
+      expect(geometry.footer.left).toBeCloseTo(geometry.media.left, 0)
+      expect(geometry.footer.right).toBeCloseTo(geometry.media.right, 0)
+      expect(geometry.labelOverflow).toBeLessThanOrEqual(1)
+      expect(geometry.label.left).toBeGreaterThanOrEqual(
+        geometry.bubble.left + 14,
+      )
+      expect(geometry.label.right).toBeLessThanOrEqual(
+        geometry.bubble.right - 14,
+      )
+      if (platform === 'whatsapp')
+        expect(geometry.label.height).toBeLessThanOrEqual(30)
+      const inset =
+        direction === 'inbound'
+          ? geometry.media.left - geometry.bubble.left
+          : geometry.bubble.right - geometry.media.right
+      expect(inset).toBeCloseTo(15, 0)
+      await page.screenshot({
+        path: testInfo.outputPath(`sticker-${platform}-${direction}.png`),
+      })
+    })
+  }
   for (const width of [320, 840]) {
     test(`Wazzup ${platform} media survives initial/delta/refresh/reload at ${width}px`, async ({
       page,
@@ -192,6 +304,56 @@ for (const platform of ['whatsapp', 'telegram']) {
       await expect(
         page.locator('[data-case="unsupported-file"]'),
       ).toContainText('Unsupported')
+      const portraitFrame = page.locator(
+        '[data-case="portrait-image"] [data-single-image]',
+      )
+      const portraitGeometry = () =>
+        portraitFrame.evaluate((node) => ({
+          width: node.getBoundingClientRect().width,
+          height: node.getBoundingClientRect().height,
+        }))
+      const portraitInitial = await portraitGeometry()
+      expect(portraitInitial.height).toBeLessThanOrEqual(360)
+      await expect(portraitFrame.locator('[data-media-backdrop]')).toHaveCount(
+        1,
+      )
+      const pendingSticker = page.locator('[data-case="image-sticker-pending"]')
+      const pendingBounds = await pendingSticker
+        .locator('[data-sticker-attachment]')
+        .boundingBox()
+      expect(pendingBounds!.width).toBeLessThanOrEqual(160)
+      expect(pendingBounds!.height).toBeLessThanOrEqual(160)
+      expect(
+        (await pendingSticker.locator('[data-message-bubble]').boundingBox())!
+          .width,
+      ).toBeLessThanOrEqual(184)
+      for (const key of ['image-sticker', 'image-sticker-inferred']) {
+        const container = page.locator(`[data-case="${key}"]`)
+        await expect(container.locator('[data-sticker-image]')).toBeVisible()
+        await expect(container.locator('[data-sticker-loading]')).toHaveCount(0)
+        expect(
+          (await container.locator('[data-message-bubble]').boundingBox())!
+            .width,
+        ).toBeLessThanOrEqual(184)
+      }
+      await expect(
+        page.getByRole('button', { name: 'Refresh', exact: true }),
+      ).toHaveCount(0)
+      const sticker = page.locator(
+        '[data-case="image-sticker"] [data-sticker-attachment]',
+      )
+      expect(
+        await sticker.evaluate((node) => node.getBoundingClientRect().width),
+      ).toBeLessThanOrEqual(160)
+      const inferredSticker = page.locator(
+        '[data-case="image-sticker-inferred"] [data-sticker-attachment]',
+      )
+      await expect(inferredSticker).toBeVisible()
+      expect(
+        await inferredSticker.evaluate(
+          (node) => node.getBoundingClientRect().width,
+        ),
+      ).toBeLessThanOrEqual(160)
       const frame = page.locator(
         '[data-case="portrait-video"] [data-video-frame]',
       )
@@ -218,11 +380,25 @@ for (const platform of ['whatsapp', 'telegram']) {
         'Договор.pdf',
       )
       expect(await geometry()).toEqual(initial)
+      expect(await portraitGeometry()).toEqual(portraitInitial)
       await page.evaluate(() => window.messengerMediaFixture.refresh())
       expect(await geometry()).toEqual(initial)
+      expect(await portraitGeometry()).toEqual(portraitInitial)
+      await expect(portraitFrame.locator('[data-media-backdrop]')).toHaveCount(
+        1,
+      )
+      for (const key of ['image-sticker', 'image-sticker-inferred']) {
+        const container = page.locator(`[data-case="${key}"]`)
+        await expect(container.locator('[data-sticker-loading]')).toHaveCount(0)
+        await expect(container.locator('[data-sticker-fallback]')).toHaveCount(
+          0,
+        )
+        await expect(container.locator('img')).toBeVisible()
+      }
       await page.reload()
       await expect(frame).toBeVisible()
       expect(await geometry()).toEqual(initial)
+      expect(await portraitGeometry()).toEqual(portraitInitial)
 
       const issues = await page
         .locator('[data-message-bubble]')

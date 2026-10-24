@@ -36,6 +36,26 @@ function mountMessage(message) {
 }
 
 describe('messenger message presentation', () => {
+  it('shows a provider filename only in the document card when the API identifies filename text', () => {
+    const message = {
+      provider: 'wazzup',
+      message_type: 'file',
+      text: 'Договор.pdf',
+      text_is_attachment_filename: true,
+      attachments: [
+        {
+          type: 'file',
+          file_name: 'Договор.pdf',
+          display_title: 'Договор.pdf',
+        },
+      ],
+    }
+    expect(shouldShowMessengerMessageText(message)).toBe(false)
+    expect(mountMessage(message).textContent.trim()).toBe('')
+    expect(
+      shouldShowMessengerMessageText({ ...message, text: 'Настоящая подпись' }),
+    ).toBe(true)
+  })
   it.each(['whatsapp', 'telegram'])(
     'keeps %s filenames separate from actual captions across canonical DTO updates',
     (platform) => {

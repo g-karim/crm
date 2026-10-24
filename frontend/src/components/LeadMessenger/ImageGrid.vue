@@ -3,7 +3,7 @@
     <button
       data-single-image
       type="button"
-      class="relative inline-flex max-w-full justify-self-start overflow-hidden rounded-md bg-surface-gray-2 text-left"
+      class="relative block max-w-full justify-self-start overflow-hidden rounded-md bg-surface-gray-2 text-left"
       :class="getSingleImageMediaWidthClass(singleImage)"
       :style="singleImageStyle"
       :disabled="
@@ -32,7 +32,7 @@
         :alt="__(getMessengerAttachmentTitle(singleImage))"
         :width="imageDimension(singleImage.width)"
         :height="imageDimension(singleImage.height)"
-        class="relative z-10 block size-full max-w-full object-contain"
+        class="absolute inset-0 z-10 block size-full max-w-full object-contain"
         loading="lazy"
         @load="handleSingleImageLoad"
         @error="markImageFailed(singleImage)"
@@ -59,7 +59,7 @@
       </div>
     </button>
     <div
-      v-if="canRetryImage(singleImage) || canRefreshImage(singleImage)"
+      v-if="canRetryImage(singleImage)"
       class="flex flex-wrap gap-2"
     >
       <button
@@ -71,20 +71,7 @@
       >
         {{ __('Try Again') }}
       </button>
-      <button
-        v-if="canRefreshImage(singleImage)"
-        type="button"
-        data-image-refresh
-        :disabled="refreshing"
-        class="min-h-10 rounded px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
-        @click="refresh"
-      >
-        {{ __('Refresh') }}
-      </button>
     </div>
-    <p v-if="refreshError" class="mt-1 text-xs text-ink-red-8" role="status">
-      {{ refreshError }}
-    </p>
   </div>
 
   <div
@@ -145,7 +132,7 @@
         </div>
       </button>
       <div
-        v-if="canRetryImage(image) || canRefreshImage(image)"
+        v-if="canRetryImage(image)"
         class="absolute inset-x-0 bottom-0 z-30 flex flex-wrap justify-center gap-2 bg-surface-base/95"
       >
         <button
@@ -157,25 +144,8 @@
         >
           {{ __('Try Again') }}
         </button>
-        <button
-          v-if="canRefreshImage(image)"
-          type="button"
-          data-image-refresh
-          :disabled="refreshing"
-          class="min-h-10 rounded px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
-          @click="refresh"
-        >
-          {{ __('Refresh') }}
-        </button>
       </div>
     </div>
-    <p
-      v-if="refreshError"
-      class="col-span-2 p-2 text-xs text-ink-red-8"
-      role="status"
-    >
-      {{ refreshError }}
-    </p>
   </div>
 </template>
 
@@ -190,7 +160,7 @@ import {
   getSingleImageMediaWidthClass,
   visibleImageAttachments,
 } from '@/utils/messengerAttachments'
-import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import ImageOffIcon from '~icons/lucide/image-off'
 
 const props = defineProps({
@@ -200,11 +170,8 @@ const props = defineProps({
   outbound: { type: Boolean, default: false },
 })
 const emit = defineEmits(['open-image'])
-const refreshAttachments = inject('refreshMessengerAttachments', null)
 const failedImages = ref(new Set())
 const waitingForUpdate = ref(false)
-const refreshing = ref(false)
-const refreshError = ref('')
 let waitingTimer = null
 const actualWidth = ref(0)
 const actualHeight = ref(0)
@@ -213,24 +180,21 @@ const singleImage = computed(() =>
 )
 const singleImageStyle = computed(() => {
   if (!singleImage.value) return undefined
-  let style = {
+  return {
     width: `${singleImageDimensions.value.width}px`,
     maxWidth: '100%',
+    aspectRatio: String(singleImageDimensions.value.ratio),
   }
-  if (
-    props.compactPreview ||
-    actualWidth.value > 0 ||
-    hasDimensions(singleImage.value)
-  ) {
-    style.aspectRatio = String(singleImageDimensions.value.ratio)
-  }
-  return style
 })
-const singleImageMedia = computed(() =>
-  hasDimensions(singleImage.value)
-    ? singleImage.value
-    : { width: actualWidth.value, height: actualHeight.value },
-)
+const singleImageMedia = computed(() => {
+  if (hasDimensions(singleImage.value)) return singleImage.value
+  if (actualWidth.value > 0 && actualHeight.value > 0) {
+    return { width: actualWidth.value, height: actualHeight.value }
+  }
+  // Reserve a bounded frame before decoding an image without metadata.
+  // Portrait photos keep this frame once their natural size is available.
+  return { width: 320, height: props.compactPreview ? 280 : 360 }
+})
 const singleImageDimensions = computed(() =>
   props.compactPreview
     ? getCompactPreviewDimensions(singleImageMedia.value)
@@ -296,28 +260,10 @@ function retryImage(image) {
   failedImages.value.delete(imageSourceKey(image))
 }
 
-function canRefreshImage(image) {
-  let state = getAttachmentState(image)
-  return Boolean(refreshAttachments && (state.busy || state.failed))
-}
-
 function imageStatusLabel(image) {
   if (failedImages.value.has(imageSourceKey(image))) return 'Image unavailable'
   let state = getAttachmentState(image)
   return state.active ? 'Attachment unavailable' : state.label
-}
-
-async function refresh() {
-  if (!refreshAttachments || refreshing.value) return
-  refreshing.value = true
-  refreshError.value = ''
-  try {
-    await refreshAttachments()
-  } catch {
-    refreshError.value = __('Could not refresh messages.')
-  } finally {
-    refreshing.value = false
-  }
 }
 
 function imageDimension(value) {
@@ -342,7 +288,7 @@ function imageGridCellClass(count, index) {
 }
 
 watch(
-  () => [singleImage.value?.id, singleImage.value?.url],
+  () => imageSourceKey(singleImage.value || {}),
   () => {
     actualWidth.value = 0
     actualHeight.value = 0
@@ -367,7 +313,6 @@ watch(
     failedImages.value = new Set(
       [...failedImages.value].filter((key) => currentKeys.has(key)),
     )
-    refreshError.value = ''
     if (props.images.some((image) => getAttachmentState(image).busy)) {
       if (waitingTimer === null && !waitingForUpdate.value) {
         waitingTimer = setTimeout(() => {

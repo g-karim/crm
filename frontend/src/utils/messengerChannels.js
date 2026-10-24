@@ -81,6 +81,8 @@ export function buildMessengerMessageItems(messages = [], now = dayjsLocal()) {
         : ''
     previousDayKey = dayKey
 
+    // Wazzup timestamps can differ by milliseconds for separately sent photos.
+    // Keep messages independent without a provider album identity.
     let previous = result.at(-1)
     let previousMessage = previous?.messages?.at(-1)
     if (
