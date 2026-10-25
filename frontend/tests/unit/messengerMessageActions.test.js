@@ -611,8 +611,17 @@ describe('messenger message actions', () => {
   })
 
   it('allows an explicit delete after a lost RPC response resolves to a definite rejection', async () => {
-    let message = editable({ provider: 'wazzup' })
-    let canonical = { ...message, delete_state: 'failed', can_delete: true }
+    let message = editable({
+      provider: 'wazzup',
+      modified: '2026-10-25 13:51:00.000000',
+    })
+    let canonical = {
+      ...message,
+      modified: '2026-10-25 13:51:02.000000',
+      delete_requested_at: '2026-10-25 13:51:01.000000',
+      delete_state: 'failed',
+      can_delete: true,
+    }
     let { controller, call, sync, onError } = harness()
     call.mockRejectedValueOnce(new Error('RPC response lost'))
     sync.mockImplementation(async () => {

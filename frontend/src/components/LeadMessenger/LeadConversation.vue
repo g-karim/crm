@@ -214,6 +214,7 @@
                     "
                     @start-edit="startMessageEdit(item.message)"
                     @delete="confirmDeleteMessage(item.message)"
+                    @retry-delete="confirmRetryDeleteMessage(item.message)"
                     @retry="retryMessage(item.message)"
                     @reply="startReply(item.message)"
                   />
@@ -244,6 +245,10 @@
                       messageActionState.editingMessage === item.message.name
                     "
                     :draft="messageActionState.draft"
+                    :delete-unconfirmed="
+                      messageActionState.blockedDeletes[item.message.name] ===
+                      'unknown'
+                    "
                     :edit-blocked="
                       Boolean(
                         messageActionState.blockedEdits[item.message.name],
@@ -682,6 +687,7 @@ import {
   canRetryMessengerMessage,
   createMessengerMessageActions,
   getMessengerRetryConfirmation,
+  getMessengerDeleteRetryConfirmation,
   openMessengerMessageEditor,
 } from '@/utils/messengerMessageActions'
 import {
@@ -1185,6 +1191,8 @@ const readController = createMessengerReadController({
 const messageActions = createMessengerMessageActions({
   call,
   sync: () => messageSync.syncDelta(),
+  getMessage: (name) =>
+    messageSync.getMessages().find((item) => item.name === name),
   onChange(state) {
     messageActionState.value = state
   },
@@ -1301,7 +1309,66 @@ function confirmDeleteMessage(message) {
         theme: 'red',
         onClick: async (close) => {
           let deleted = await messageActions.deleteMessage(message)
-          if (deleted || messageActions.getState().blockedDeletes[message.name])
+          let current = messageSync
+            .getMessages()
+            .find((item) => item.name === message.name)
+          if (
+            deleted ||
+            messageActions.getState().blockedDeletes[message.name] ||
+            messageActions.canRetryDeleteMessage(current)
+          )
+            close()
+        },
+      },
+    ],
+  })
+}
+
+function confirmRetryDeleteMessage(message) {
+  if (
+    !permissions.value.can_operate ||
+    !messageActions.canRetryDeleteMessage(message) ||
+    messageActionState.value.pendingMessage
+  )
+    return
+  let remaining = messageActions.getDeleteRetryAfterSeconds(message)
+  if (remaining > 0) {
+    $dialog({
+      title: __('Retry deletion?'),
+      message: __(
+        'You can retry deletion in {0} seconds. No new request has been sent.',
+        [remaining],
+      ),
+      actions: [],
+    })
+    return
+  }
+  let context = captureLeadContext()
+  let conversation = selectedConversation.value?.name
+  let channel = selectedChannel.value
+  let expected = { ...message }
+  let confirmation = getMessengerDeleteRetryConfirmation(expected)
+  $dialog({
+    title: __(confirmation.title),
+    message: __(confirmation.message),
+    actions: [
+      {
+        label: __('Retry Deletion'),
+        variant: 'solid',
+        theme: 'red',
+        onClick: async (close) => {
+          if (
+            !context.isCurrent() ||
+            !permissions.value.can_operate ||
+            conversation !== selectedConversation.value?.name ||
+            channel !== selectedChannel.value
+          )
+            return close()
+          let deleted = await messageActions.retryDeleteMessage(expected, true)
+          if (
+            deleted ||
+            messageActions.getState().blockedDeletes[expected.name]
+          )
             close()
         },
       },

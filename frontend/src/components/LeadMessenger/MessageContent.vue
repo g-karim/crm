@@ -101,7 +101,13 @@
       </div>
     </template>
 
-    <div v-if="error && !display.tombstone" class="mt-2 text-xs text-ink-red-8">
+    <div v-if="shortDeleteNotice" class="mt-2 text-xs text-ink-gray-6">
+      {{ __(deleteNotice) }}
+    </div>
+    <div
+      v-else-if="error && !display.tombstone"
+      class="mt-2 text-xs text-ink-red-8"
+    >
       {{ __(error) }}
     </div>
     <div v-else-if="deleteNotice" class="mt-2 text-xs text-ink-gray-6">
@@ -121,6 +127,7 @@ import {
   getMessengerMessageDisplay,
   getMessengerMessageDeleteNotice,
   getMessengerMessageEditNotice,
+  isPartnerMessengerMessage,
 } from '@/utils/messengerMessageActions'
 import { getMessengerMessageTextPresentation } from '@/utils/messengerMessagePresentation'
 import { Button, Textarea } from 'frappe-ui'
@@ -134,6 +141,7 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   editBlocked: { type: Boolean, default: false },
   deleteBlocked: { type: Boolean, default: false },
+  deleteUnconfirmed: { type: Boolean, default: false },
   error: { type: String, default: '' },
   shouldShowText: { type: Boolean, default: false },
 })
@@ -151,7 +159,13 @@ function setEditorElement(element) {
 
 const display = computed(() => getMessengerMessageDisplay(props.message))
 const deleteNotice = computed(() =>
-  getMessengerMessageDeleteNotice(props.message),
+  getMessengerMessageDeleteNotice(props.message, props.deleteUnconfirmed),
+)
+const shortDeleteNotice = computed(
+  () =>
+    isPartnerMessengerMessage(props.message) &&
+    (props.message.delete_state === 'unknown' || props.deleteUnconfirmed) &&
+    Boolean(deleteNotice.value),
 )
 const editNotice = computed(() => getMessengerMessageEditNotice(props.message))
 const textPresentation = computed(() =>

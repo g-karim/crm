@@ -75,7 +75,13 @@ const props = defineProps({
   wrapSource: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['start-edit', 'delete', 'retry', 'reply'])
+const emit = defineEmits([
+  'start-edit',
+  'delete',
+  'retry-delete',
+  'retry',
+  'reply',
+])
 
 function capitalizeFirstLetter(label) {
   return label.replace(/^./u, (letter) => letter.toUpperCase())
@@ -105,6 +111,13 @@ const menuOptions = computed(() =>
         label: capitalizeFirstLetter(__('Edit')),
         icon: 'edit-3',
         onClick: () => emit('start-edit'),
+      }
+    }
+    if (action === 'retry_delete') {
+      return {
+        label: __('Retry Deletion'),
+        icon: 'trash-2',
+        onClick: () => emit('retry-delete'),
       }
     }
     return {

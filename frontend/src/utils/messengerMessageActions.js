@@ -4,6 +4,15 @@ const DELETE_UNKNOWN_MESSAGE =
   'The message deletion result is unknown. Automatic retry is disabled.'
 const EDIT_UNKNOWN_MESSAGE =
   'The message editing result is unknown. Automatic retry is disabled.'
+const DELETE_UNCONFIRMED_MESSAGE = 'Could not confirm deletion'
+const DELETE_IDENTITY_FIELDS = [
+  'name',
+  'provider',
+  'conversation',
+  'channel',
+  'external_message_id',
+  'external_chat_id',
+]
 
 export function getMessengerMessageActions(
   message = {},
@@ -14,7 +23,9 @@ export function getMessengerMessageActions(
   if (canRetryMessengerMessage(message)) actions.push('retry')
   if (canEditMessengerMessage(message, editBlocked, deleteBlocked))
     actions.push('edit')
-  if (canDeleteMessengerMessage(message, deleteBlocked, editBlocked))
+  if (canRetryDeleteMessengerMessage(message, deleteBlocked, editBlocked))
+    actions.push('retry_delete')
+  else if (canDeleteMessengerMessage(message, deleteBlocked, editBlocked))
     actions.push('delete')
   return actions
 }
@@ -47,12 +58,69 @@ export function canDeleteMessengerMessage(
     !editBlocked &&
     message.status !== 'deleted' &&
     !['pending', 'unknown', 'deleted'].includes(message.delete_state) &&
+    !(
+      isPartnerMessengerMessage(message) && message.delete_state === 'failed'
+    ) &&
     !['pending', 'unknown'].includes(message.edit_state),
   )
 }
 
-export function getMessengerMessageDeleteNotice(message = {}) {
+export function isPartnerMessengerMessage(message = {}) {
+  let mode =
+    message.channel_info?.wazzup_api_mode || message.channel_info?.api_mode
+  return message.provider === 'wazzup' && mode === 'partner_api_v2'
+}
+
+export function canRetryDeleteMessengerMessage(
+  message = {},
+  deleteBlocked = false,
+  editBlocked = false,
+) {
+  return Boolean(
+    isPartnerMessengerMessage(message) &&
+    message.can_retry_delete === true &&
+    Number(message.delete_retry_attempts_remaining) > 0 &&
+    message.modified &&
+    !deleteBlocked &&
+    !editBlocked &&
+    message.status !== 'deleted' &&
+    ['unknown', 'failed'].includes(message.delete_state) &&
+    !['pending', 'unknown'].includes(message.edit_state),
+  )
+}
+
+export function getMessengerDeleteRetryConfirmation(message = {}) {
+  return {
+    title: 'Retry deletion?',
+    message:
+      message.delete_state === 'unknown'
+        ? 'The previous attempt may already have deleted this message. Confirm to send another deletion request for the same message.'
+        : 'Retry deleting this message for all participants? CRM will keep a deletion marker if deletion is confirmed.',
+  }
+}
+
+export function makeMessengerDeleteRetryRequestId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  if (!globalThis.crypto?.getRandomValues) return ''
+  let bytes = globalThis.crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 15) | 64
+  bytes[8] = (bytes[8] & 63) | 128
+  let hex = [...bytes]
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+export function getMessengerMessageDeleteNotice(
+  message = {},
+  localUnknown = false,
+) {
   if (message.status === 'deleted') return ''
+  if (isPartnerMessengerMessage(message)) {
+    if (message.delete_state === 'unknown' || localUnknown)
+      return DELETE_UNCONFIRMED_MESSAGE
+    if (message.delete_state === 'pending') return 'Deleting message...'
+  }
   if (message.delete_state === 'unknown') return DELETE_UNKNOWN_MESSAGE
   if (message.delete_state === 'pending')
     return 'Message deletion is pending. Refresh messages to check its status.'
@@ -157,6 +225,8 @@ export function revealMessengerEditor(scrollContainer, editor, textarea) {
 
 export function createMessengerMessageActions(options) {
   let state = initialState()
+  let deleteAttempts = new Map()
+  let deleteCooldowns = new Map()
 
   function notify() {
     options.onChange?.(getState())
@@ -207,6 +277,56 @@ export function createMessengerMessageActions(options) {
     return run('delete', message)
   }
 
+  function canRetryDeleteMessage(message) {
+    return canRetryDeleteMessengerMessage(
+      message,
+      state.blockedDeletes[message?.name],
+      state.blockedEdits[message?.name],
+    )
+  }
+
+  function getDeleteRetryAfterSeconds(message) {
+    let now = (options.now || Date.now)()
+    let seconds = Math.max(0, Number(message.delete_retry_after_seconds) || 0)
+    let cooldown = deleteCooldowns.get(message.name)
+    if (
+      !cooldown ||
+      cooldown.modified !== message.modified ||
+      cooldown.seconds !== seconds
+    ) {
+      cooldown = {
+        modified: message.modified,
+        seconds,
+        until: now + seconds * 1000,
+      }
+      deleteCooldowns.set(message.name, cooldown)
+    }
+    return Math.max(0, Math.ceil((cooldown.until - now) / 1000))
+  }
+
+  async function retryDeleteMessage(message, confirmed = false) {
+    if (!confirmed || state.pendingMessage || !canRetryDeleteMessage(message))
+      return false
+    let current = options.getMessage
+      ? options.getMessage(message.name)
+      : message
+    if (
+      !current ||
+      !canRetryDeleteMessage(current) ||
+      !sameDeleteIdentity(message, current) ||
+      current.modified !== message.modified ||
+      getDeleteRetryAfterSeconds(current) > 0
+    )
+      return false
+    let requestId = makeMessengerDeleteRetryRequestId()
+    if (!requestId) return false
+    return run('delete', current, {
+      confirm_unknown_delete: current.delete_state === 'unknown' ? 1 : 0,
+      delete_retry_request_id: requestId,
+      expected_modified: current.modified,
+    })
+  }
+
   function canDeleteMessage(message) {
     return canDeleteMessengerMessage(
       message,
@@ -242,13 +362,29 @@ export function createMessengerMessageActions(options) {
   function reconcileDeleteStates(messages = []) {
     let changed = false
     for (let message of messages) {
+      if (canRetryDeleteMessengerMessage(message))
+        getDeleteRetryAfterSeconds(message)
+      let attempt = deleteAttempts.get(message.name)
+      let freshRetry =
+        canRetryDeleteMessengerMessage(message) &&
+        attempt?.modified &&
+        sameDeleteIdentity(attempt.message, message) &&
+        `${message.modified}`.localeCompare(`${attempt.modified}`) >= 0
+      let freshFailure =
+        message.delete_state === 'failed' &&
+        message.can_delete === true &&
+        attempt?.modified &&
+        message.delete_requested_at &&
+        message.delete_requested_at !== attempt.requestedAt &&
+        message.modified &&
+        `${message.modified}`.localeCompare(`${attempt.modified}`) > 0
       if (
         state.blockedDeletes[message.name] !== 'unknown' ||
-        message.delete_state !== 'failed' ||
-        message.can_delete !== true
+        (!freshRetry && !freshFailure)
       )
         continue
       delete state.blockedDeletes[message.name]
+      deleteAttempts.delete(message.name)
       clearError(message.name)
       changed = true
     }
@@ -269,6 +405,13 @@ export function createMessengerMessageActions(options) {
     clearError(message.name)
     notify()
     let wazzupDelete = action === 'delete' && message.provider === 'wazzup'
+    let deleteAttempt = {
+      modified: message.modified,
+      requestedAt: message.delete_requested_at,
+      message: Object.fromEntries(
+        DELETE_IDENTITY_FIELDS.map((field) => [field, message[field]]),
+      ),
+    }
     let wazzupEdit = action === 'edit' && message.provider === 'wazzup'
     let definitiveFailure = false
     let accepted = false
@@ -297,10 +440,14 @@ export function createMessengerMessageActions(options) {
       let unknownMutation =
         (wazzupDelete || wazzupEdit) && !accepted && !definitiveFailure
       if (unknownMutation) {
-        if (wazzupDelete) state.blockedDeletes[message.name] = 'unknown'
-        else state.blockedEdits[message.name] = 'unknown'
+        if (wazzupDelete) {
+          state.blockedDeletes[message.name] = 'unknown'
+          deleteAttempts.set(message.name, deleteAttempt)
+        } else state.blockedEdits[message.name] = 'unknown'
         state.errors[message.name] = wazzupDelete
-          ? DELETE_UNKNOWN_MESSAGE
+          ? isPartnerMessengerMessage(message)
+            ? DELETE_UNCONFIRMED_MESSAGE
+            : DELETE_UNKNOWN_MESSAGE
           : EDIT_UNKNOWN_MESSAGE
         // A lost RPC response may hide a durable pending/unknown state. Fetch
         // only the local delta; never dispatch another provider mutation.
@@ -312,6 +459,17 @@ export function createMessengerMessageActions(options) {
       } else {
         state.errors[message.name] =
           error?.messages?.[0] || error?.message || fallbackMessage(action)
+        if (
+          wazzupDelete &&
+          isPartnerMessengerMessage(message) &&
+          definitiveFailure
+        ) {
+          try {
+            await options.sync()
+          } catch {
+            // An explicit refresh can fetch the latest retry budget later.
+          }
+        }
       }
       if (state.errors[message.name])
         options.onError?.(state.errors[message.name], error)
@@ -347,11 +505,21 @@ export function createMessengerMessageActions(options) {
     canEditMessage,
     reconcileEditStates,
     canDeleteMessage,
+    canRetryDeleteMessage,
+    getDeleteRetryAfterSeconds,
     reconcileDeleteStates,
     deleteMessage,
+    retryDeleteMessage,
     retryMessage,
     getState,
   }
+}
+
+function sameDeleteIdentity(expected, current) {
+  if (!expected || !current) return false
+  return DELETE_IDENTITY_FIELDS.every(
+    (field) => expected[field] === current[field],
+  )
 }
 
 function initialState() {

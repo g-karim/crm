@@ -9588,3 +9588,36 @@ msgstr "Этот чат уже связан с другим лидом или и
 
 msgid "This lead has no valid phone number or Telegram username."
 msgstr "У лида не указан корректный телефон или Telegram username."
+
+msgid "The message deletion result is unknown. Automatic retry is disabled."
+msgstr "Результат удаления сообщения неизвестен. Автоматический повтор отключён."
+
+msgid "The message editing result is unknown. Automatic retry is disabled."
+msgstr "Результат изменения сообщения неизвестен. Автоматический повтор отключён."
+
+msgid "Message deletion is pending. Refresh messages to check its status."
+msgstr "Удаление сообщения ожидает подтверждения. Обновите сообщения, чтобы проверить состояние."
+
+msgid "Message editing is pending. Refresh messages to check its status."
+msgstr "Изменение сообщения ожидает подтверждения. Обновите сообщения, чтобы проверить состояние."
+
+msgid "Could not confirm deletion"
+msgstr "Не удалось подтвердить удаление"
+
+msgid "Deleting message..."
+msgstr "Удаление сообщения…"
+
+msgid "Retry Deletion"
+msgstr "Повторить удаление"
+
+msgid "Retry deletion?"
+msgstr "Повторить удаление?"
+
+msgid "The previous attempt may already have deleted this message. Confirm to send another deletion request for the same message."
+msgstr "Предыдущая попытка могла уже удалить это сообщение. Подтвердите отправку ещё одного запроса на удаление того же сообщения."
+
+msgid "Retry deleting this message for all participants? CRM will keep a deletion marker if deletion is confirmed."
+msgstr "Повторить удаление этого сообщения у всех участников? После подтверждения удаления в CRM останется отметка."
+
+msgid "You can retry deletion in {0} seconds. No new request has been sent."
+msgstr "Повторить удаление можно через {0} с. Новый запрос не отправлен."

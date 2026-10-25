@@ -114,6 +114,45 @@ describe('messenger message presentation', () => {
     },
   )
 
+  it.each([false, true])(
+    'keeps the Partner unknown bubble short after local lost RPC=%s',
+    (localUnknown) => {
+      let root = mountMessage(
+        {
+          provider: 'wazzup',
+          channel_info: { wazzup_api_mode: 'partner_api_v2' },
+          status: 'sent',
+          text: 'Original message',
+          delete_state: localUnknown ? '' : 'unknown',
+        },
+        { deleteUnconfirmed: localUnknown, error: 'Long provider error' },
+      )
+      expect(root.textContent).toContain('Original message')
+      expect(root.textContent).toContain('Could not confirm deletion')
+      expect(root.textContent).not.toContain('Long provider error')
+      expect(root.querySelector('button')).toBeNull()
+    },
+  )
+
+  it.each([
+    ['wazzup', 'user_api_v3'],
+    ['vk_direct', undefined],
+  ])('preserves the existing %s error priority', (provider, mode) => {
+    let root = mountMessage(
+      {
+        provider,
+        channel_info: { wazzup_api_mode: mode },
+        status: 'sent',
+        text: 'Original message',
+        delete_state: 'unknown',
+      },
+      { error: 'Existing error' },
+    )
+    expect(root.textContent).toContain('Existing error')
+    expect(root.textContent).not.toContain('Could not confirm deletion')
+    expect(root.textContent).not.toContain('Automatic retry is disabled')
+  })
+
   it('shows a provider filename only in the document card when the API identifies filename text', () => {
     const message = {
       provider: 'wazzup',
