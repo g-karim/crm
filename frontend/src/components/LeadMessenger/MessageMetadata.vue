@@ -69,6 +69,8 @@ const props = defineProps({
   failed: { type: Boolean, default: false },
   editing: { type: Boolean, default: false },
   loading: { type: Boolean, default: false },
+  deleteBlocked: { type: Boolean, default: false },
+  editBlocked: { type: Boolean, default: false },
   constrainIntrinsicWidth: { type: Boolean, default: false },
   wrapSource: { type: Boolean, default: false },
 })
@@ -80,7 +82,10 @@ function capitalizeFirstLetter(label) {
 }
 
 const menuOptions = computed(() =>
-  getMessengerMessageActions(props.message).map((action) => {
+  getMessengerMessageActions(props.message, {
+    deleteBlocked: props.deleteBlocked,
+    editBlocked: props.editBlocked,
+  }).map((action) => {
     if (action === 'reply') {
       return {
         label: __('Reply'),

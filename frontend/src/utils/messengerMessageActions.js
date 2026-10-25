@@ -1,13 +1,70 @@
 const API_PREFIX = 'crm_messenger.api.messages'
 const EDITOR_SCROLL_MARGIN = 16
+const DELETE_UNKNOWN_MESSAGE =
+  'The message deletion result is unknown. Automatic retry is disabled.'
+const EDIT_UNKNOWN_MESSAGE =
+  'The message editing result is unknown. Automatic retry is disabled.'
 
-export function getMessengerMessageActions(message = {}) {
+export function getMessengerMessageActions(
+  message = {},
+  { deleteBlocked = false, editBlocked = false } = {},
+) {
   let actions = []
   if (message.can_reply) actions.push('reply')
   if (canRetryMessengerMessage(message)) actions.push('retry')
-  if (message.can_edit) actions.push('edit')
-  if (message.can_delete) actions.push('delete')
+  if (canEditMessengerMessage(message, editBlocked, deleteBlocked))
+    actions.push('edit')
+  if (canDeleteMessengerMessage(message, deleteBlocked, editBlocked))
+    actions.push('delete')
   return actions
+}
+
+export function canEditMessengerMessage(
+  message = {},
+  editBlocked = false,
+  deleteBlocked = false,
+) {
+  return Boolean(
+    message?.can_edit &&
+    !editBlocked &&
+    !deleteBlocked &&
+    message.status !== 'deleted' &&
+    !['pending', 'unknown', 'deleted'].includes(message.delete_state) &&
+    !['pending', 'unknown'].includes(message.edit_state) &&
+    (message.provider !== 'wazzup' ||
+      (message.message_type === 'text' && !message.attachments?.length)),
+  )
+}
+
+export function canDeleteMessengerMessage(
+  message = {},
+  deleteBlocked = false,
+  editBlocked = false,
+) {
+  return Boolean(
+    message?.can_delete &&
+    !deleteBlocked &&
+    !editBlocked &&
+    message.status !== 'deleted' &&
+    !['pending', 'unknown', 'deleted'].includes(message.delete_state) &&
+    !['pending', 'unknown'].includes(message.edit_state),
+  )
+}
+
+export function getMessengerMessageDeleteNotice(message = {}) {
+  if (message.status === 'deleted') return ''
+  if (message.delete_state === 'unknown') return DELETE_UNKNOWN_MESSAGE
+  if (message.delete_state === 'pending')
+    return 'Message deletion is pending. Refresh messages to check its status.'
+  return ''
+}
+
+export function getMessengerMessageEditNotice(message = {}) {
+  if (message.status === 'deleted') return ''
+  if (message.edit_state === 'unknown') return EDIT_UNKNOWN_MESSAGE
+  if (message.edit_state === 'pending')
+    return 'Message editing is pending. Refresh messages to check its status.'
+  return ''
 }
 
 export function canRetryMessengerMessage(message = {}) {
@@ -48,8 +105,13 @@ export function getMessengerRetryConfirmation(message = {}) {
   }
 }
 
-export function canSaveMessengerMessageEdit(message = {}, draft = '') {
-  if (!message.can_edit) return false
+export function canSaveMessengerMessageEdit(
+  message = {},
+  draft = '',
+  { editBlocked = false, deleteBlocked = false } = {},
+) {
+  if (!canEditMessengerMessage(message, editBlocked, deleteBlocked))
+    return false
   let text = `${draft || ''}`.trim()
   if (text === `${message.text || ''}`.trim()) return false
   let maxLength = Number(message.edit_max_length || 0)
@@ -97,11 +159,11 @@ export function createMessengerMessageActions(options) {
   let state = initialState()
 
   function notify() {
-    options.onChange?.({ ...state, errors: { ...state.errors } })
+    options.onChange?.(getState())
   }
 
   function startEdit(message) {
-    if (!message?.can_edit || state.pendingMessage) return false
+    if (!canEditMessage(message) || state.pendingMessage) return false
     state.editingMessage = message.name
     state.draft = message.text || ''
     clearError(message.name)
@@ -124,7 +186,7 @@ export function createMessengerMessageActions(options) {
 
   async function saveEdit(message) {
     let text = state.draft.trim()
-    if (!message?.can_edit || state.editingMessage !== message.name)
+    if (!canEditMessage(message) || state.editingMessage !== message.name)
       return false
     if (text === `${message.text || ''}`.trim()) {
       cancelEdit()
@@ -141,8 +203,56 @@ export function createMessengerMessageActions(options) {
   }
 
   async function deleteMessage(message) {
-    if (!message?.can_delete) return false
+    if (!canDeleteMessage(message)) return false
     return run('delete', message)
+  }
+
+  function canDeleteMessage(message) {
+    return canDeleteMessengerMessage(
+      message,
+      state.blockedDeletes[message?.name],
+      state.blockedEdits[message?.name],
+    )
+  }
+
+  function canEditMessage(message) {
+    return canEditMessengerMessage(
+      message,
+      state.blockedEdits[message?.name],
+      state.blockedDeletes[message?.name],
+    )
+  }
+
+  function reconcileEditStates(messages = []) {
+    let changed = false
+    for (let message of messages) {
+      if (
+        !state.blockedEdits[message.name] ||
+        !['failed', 'succeeded'].includes(message.edit_state) ||
+        message.can_edit !== true
+      )
+        continue
+      delete state.blockedEdits[message.name]
+      clearError(message.name)
+      changed = true
+    }
+    if (changed) notify()
+  }
+
+  function reconcileDeleteStates(messages = []) {
+    let changed = false
+    for (let message of messages) {
+      if (
+        state.blockedDeletes[message.name] !== 'unknown' ||
+        message.delete_state !== 'failed' ||
+        message.can_delete !== true
+      )
+        continue
+      delete state.blockedDeletes[message.name]
+      clearError(message.name)
+      changed = true
+    }
+    if (changed) notify()
   }
 
   async function retryMessage(message, confirmUnknown = false) {
@@ -158,6 +268,10 @@ export function createMessengerMessageActions(options) {
     state.pendingAction = action
     clearError(message.name)
     notify()
+    let wazzupDelete = action === 'delete' && message.provider === 'wazzup'
+    let wazzupEdit = action === 'edit' && message.provider === 'wazzup'
+    let definitiveFailure = false
+    let accepted = false
     try {
       let method =
         action === 'retry_outbound'
@@ -167,18 +281,54 @@ export function createMessengerMessageActions(options) {
         message: message.name,
         ...extra,
       })
+      definitiveFailure = Boolean(
+        result?.ok === false &&
+        result.reason &&
+        result.reason !== 'unknown_result' &&
+        !result.unknown_result,
+      )
       if (!result?.ok) throw providerError(result, action)
+      accepted = true
+      if (wazzupDelete) state.blockedDeletes[message.name] = 'deleted'
+      if (wazzupEdit) state.blockedEdits[message.name] = 'succeeded'
       await options.sync()
       return true
     } catch (error) {
-      state.errors[message.name] =
-        error?.messages?.[0] || error?.message || fallbackMessage(action)
-      options.onError?.(state.errors[message.name], error)
+      let unknownMutation =
+        (wazzupDelete || wazzupEdit) && !accepted && !definitiveFailure
+      if (unknownMutation) {
+        if (wazzupDelete) state.blockedDeletes[message.name] = 'unknown'
+        else state.blockedEdits[message.name] = 'unknown'
+        state.errors[message.name] = wazzupDelete
+          ? DELETE_UNKNOWN_MESSAGE
+          : EDIT_UNKNOWN_MESSAGE
+        // A lost RPC response may hide a durable pending/unknown state. Fetch
+        // only the local delta; never dispatch another provider mutation.
+        try {
+          await options.sync()
+        } catch {
+          // Keep the original ambiguity notice when refresh also fails.
+        }
+      } else {
+        state.errors[message.name] =
+          error?.messages?.[0] || error?.message || fallbackMessage(action)
+      }
+      if (state.errors[message.name])
+        options.onError?.(state.errors[message.name], error)
       return false
     } finally {
       state.pendingMessage = ''
       state.pendingAction = ''
       notify()
+    }
+  }
+
+  function getState() {
+    return {
+      ...state,
+      errors: { ...state.errors },
+      blockedDeletes: { ...state.blockedDeletes },
+      blockedEdits: { ...state.blockedEdits },
     }
   }
 
@@ -194,9 +344,13 @@ export function createMessengerMessageActions(options) {
     setDraft,
     cancelEdit,
     saveEdit,
+    canEditMessage,
+    reconcileEditStates,
+    canDeleteMessage,
+    reconcileDeleteStates,
     deleteMessage,
     retryMessage,
-    getState: () => ({ ...state, errors: { ...state.errors } }),
+    getState,
   }
 }
 
@@ -207,6 +361,8 @@ function initialState() {
     pendingMessage: '',
     pendingAction: '',
     errors: {},
+    blockedDeletes: {},
+    blockedEdits: {},
   }
 }
 

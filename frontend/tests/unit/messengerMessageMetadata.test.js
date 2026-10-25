@@ -50,6 +50,60 @@ function mountMetadata(overrides = {}) {
 }
 
 describe('message metadata layout', () => {
+  it.each(['pending', 'unknown'])(
+    'hides edit and delete while a Wazzup edit is %s',
+    (editState) => {
+      let root = mountMetadata({
+        message: {
+          name: 'WZ-EDIT',
+          provider: 'wazzup',
+          message_type: 'text',
+          can_edit: true,
+          can_delete: true,
+          edit_state: editState,
+        },
+      })
+      expect(root.querySelector('[data-message-actions]')).toBeNull()
+    },
+  )
+
+  it('hides edit and delete after a locally lost Wazzup edit response', () => {
+    let root = mountMetadata({
+      message: {
+        name: 'WZ-EDIT',
+        provider: 'wazzup',
+        message_type: 'text',
+        can_edit: true,
+        can_delete: true,
+      },
+      editBlocked: true,
+    })
+    expect(root.querySelector('[data-message-actions]')).toBeNull()
+  })
+
+  it.each(['pending', 'unknown'])(
+    'hides a Wazzup delete action in durable %s state despite a stale flag',
+    (deleteState) => {
+      let root = mountMetadata({
+        message: {
+          name: 'WZ-1',
+          provider: 'wazzup',
+          can_delete: true,
+          delete_state: deleteState,
+        },
+      })
+      expect(root.querySelector('[data-message-actions]')).toBeNull()
+    },
+  )
+
+  it('hides a deletion blocked after a lost response in the current view', () => {
+    let root = mountMetadata({
+      message: { name: 'WZ-1', provider: 'wazzup', can_delete: true },
+      deleteBlocked: true,
+    })
+    expect(root.querySelector('[data-message-actions]')).toBeNull()
+  })
+
   it('excludes metadata from intrinsic width only when explicitly requested', () => {
     let regular = mountMetadata()
     let constrained = mountMetadata({ constrainIntrinsicWidth: true })

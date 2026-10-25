@@ -22,12 +22,13 @@ afterEach(() => {
   mounted = []
 })
 
-function mountMessage(message) {
+function mountMessage(message, overrides = {}) {
   let root = document.createElement('div')
   document.body.appendChild(root)
   let app = createApp(MessageContent, {
     message,
     shouldShowText: shouldShowMessengerMessageText(message),
+    ...overrides,
   })
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
@@ -36,6 +37,83 @@ function mountMessage(message) {
 }
 
 describe('messenger message presentation', () => {
+  it.each(['pending', 'unknown'])(
+    'keeps the original Wazzup text and an editing %s notice',
+    (editState) => {
+      let root = mountMessage({
+        provider: 'wazzup',
+        status: 'sent',
+        message_type: 'text',
+        text: 'Original message',
+        edit_state: editState,
+      })
+      expect(root.textContent).toContain('Original message')
+      expect(root.textContent).toContain(
+        editState === 'pending'
+          ? 'Message editing is pending'
+          : 'The message editing result is unknown',
+      )
+    },
+  )
+
+  it('keeps Cancel available but disables Save after a locally lost edit response', () => {
+    let root = mountMessage(
+      {
+        provider: 'wazzup',
+        status: 'sent',
+        message_type: 'text',
+        text: 'Original message',
+        can_edit: true,
+      },
+      {
+        editing: true,
+        draft: 'My changed draft',
+        editBlocked: true,
+      },
+    )
+    let buttons = root.querySelectorAll('button')
+    expect(buttons[0].disabled).toBe(false)
+    expect(buttons[1].disabled).toBe(true)
+  })
+
+  it('clears an earlier unknown deletion notice when a webhook confirms a tombstone', () => {
+    let root = mountMessage(
+      {
+        provider: 'wazzup',
+        status: 'deleted',
+        text: 'Old text',
+        delete_state: 'deleted',
+      },
+      {
+        error:
+          'The message deletion result is unknown. Automatic retry is disabled.',
+      },
+    )
+
+    expect(root.textContent.trim()).toBe('Message deleted')
+  })
+
+  it.each(['pending', 'unknown'])(
+    'renders durable Wazzup delete %s without hiding the original message',
+    (deleteState) => {
+      let message = {
+        provider: 'wazzup',
+        status: 'sent',
+        text: 'Original message',
+        delete_state: deleteState,
+      }
+      let root = mountMessage(message)
+
+      expect(root.textContent).toContain('Original message')
+      expect(root.textContent).toContain(
+        deleteState === 'pending'
+          ? 'Message deletion is pending'
+          : 'Automatic retry is disabled',
+      )
+      expect(root.textContent).not.toContain('Message deleted')
+    },
+  )
+
   it('shows a provider filename only in the document card when the API identifies filename text', () => {
     const message = {
       provider: 'wazzup',

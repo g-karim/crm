@@ -4,6 +4,27 @@ from crm.translations import get_crm_translations
 
 
 class TestCRMTranslations(TestCase):
+	def test_message_deletion_confirmation_and_unknown_are_translated(self):
+		translations = get_crm_translations("ru")
+		self.assertEqual(translations["Delete for Everyone"], "Удалить у всех")
+		for source in (
+			"The message deletion result is unknown. Automatic retry is disabled.",
+			"The message editing result is unknown. Automatic retry is disabled.",
+			"Message editing is pending. Refresh messages to check its status.",
+			"Message deletion is pending. Refresh messages to check its status.",
+			"Provider rejected the message deletion.",
+			"Provider rejected the message edit.",
+			"Only WhatsApp messages sent through CRM can be edited.",
+			"A newer message change was received while the edit was in progress.",
+			"The provider no longer allows this message to be edited.",
+			"The provider no longer allows this message to be deleted.",
+			"Provider message ID is required.",
+			"Message does not belong to this conversation channel.",
+		):
+			with self.subTest(source=source):
+				self.assertIn(source, translations)
+				self.assertNotEqual(translations[source], source)
+
 	def test_empty_and_template_messages_are_translated(self):
 		translations = get_crm_translations("ru")
 		self.assertEqual(translations["Content unavailable"], "Содержимое недоступно")

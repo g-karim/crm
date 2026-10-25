@@ -195,6 +195,16 @@
                     :loading="
                       messageActionState.pendingMessage === item.message.name
                     "
+                    :delete-blocked="
+                      Boolean(
+                        messageActionState.blockedDeletes[item.message.name],
+                      )
+                    "
+                    :edit-blocked="
+                      Boolean(
+                        messageActionState.blockedEdits[item.message.name],
+                      )
+                    "
                     @start-edit="startMessageEdit(item.message)"
                     @delete="confirmDeleteMessage(item.message)"
                     @retry="retryMessage(item.message)"
@@ -224,6 +234,16 @@
                       messageActionState.editingMessage === item.message.name
                     "
                     :draft="messageActionState.draft"
+                    :edit-blocked="
+                      Boolean(
+                        messageActionState.blockedEdits[item.message.name],
+                      )
+                    "
+                    :delete-blocked="
+                      Boolean(
+                        messageActionState.blockedDeletes[item.message.name],
+                      )
+                    "
                     :loading="
                       messageActionState.pendingMessage === item.message.name
                     "
@@ -734,6 +754,8 @@ const messageActionState = ref({
   pendingMessage: '',
   pendingAction: '',
   errors: {},
+  blockedDeletes: {},
+  blockedEdits: {},
 })
 const messageEditorElements = new Map()
 const reactionComponents = new Map()
@@ -1037,6 +1059,12 @@ const messageSync = createMessengerSyncController({
   },
   async onChange(change) {
     messages.value = change.messages
+    let refreshedNames = new Set([...change.inserted, ...change.updated])
+    let refreshed = change.messages.filter((message) =>
+      refreshedNames.has(message.name),
+    )
+    messageActions.reconcileDeleteStates(refreshed)
+    messageActions.reconcileEditStates(refreshed)
     await nextTick()
     if (change.kind === 'snapshot') {
       scrollToBottom()
@@ -1217,7 +1245,7 @@ async function initialize(leadChanged = false) {
 function confirmDeleteMessage(message) {
   if (
     !permissions.value.can_operate ||
-    !message?.can_delete ||
+    !messageActions.canDeleteMessage(message) ||
     messageActionState.value.pendingMessage
   )
     return
@@ -1232,7 +1260,9 @@ function confirmDeleteMessage(message) {
         variant: 'solid',
         theme: 'red',
         onClick: async (close) => {
-          if (await messageActions.deleteMessage(message)) close()
+          let deleted = await messageActions.deleteMessage(message)
+          if (deleted || messageActions.getState().blockedDeletes[message.name])
+            close()
         },
       },
     ],

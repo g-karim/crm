@@ -26,7 +26,12 @@
           :label="__('Save')"
           variant="solid"
           :loading="loading"
-          :disabled="!canSaveMessengerMessageEdit(message, draft)"
+          :disabled="
+            !canSaveMessengerMessageEdit(message, draft, {
+              editBlocked,
+              deleteBlocked,
+            })
+          "
           @click="$emit('save-edit')"
         />
       </div>
@@ -96,8 +101,14 @@
       </div>
     </template>
 
-    <div v-if="error" class="mt-2 text-xs text-ink-red-8">
+    <div v-if="error && !display.tombstone" class="mt-2 text-xs text-ink-red-8">
       {{ __(error) }}
+    </div>
+    <div v-else-if="deleteNotice" class="mt-2 text-xs text-ink-gray-6">
+      {{ __(deleteNotice) }}
+    </div>
+    <div v-else-if="editNotice" class="mt-2 text-xs text-ink-gray-6">
+      {{ __(editNotice) }}
     </div>
   </div>
 </template>
@@ -108,6 +119,8 @@ import { getProviderExternalChatUrl } from '@/utils/messengerExternalLinks'
 import {
   canSaveMessengerMessageEdit,
   getMessengerMessageDisplay,
+  getMessengerMessageDeleteNotice,
+  getMessengerMessageEditNotice,
 } from '@/utils/messengerMessageActions'
 import { getMessengerMessageTextPresentation } from '@/utils/messengerMessagePresentation'
 import { Button, Textarea } from 'frappe-ui'
@@ -119,6 +132,8 @@ const props = defineProps({
   editing: { type: Boolean, default: false },
   draft: { type: String, default: '' },
   loading: { type: Boolean, default: false },
+  editBlocked: { type: Boolean, default: false },
+  deleteBlocked: { type: Boolean, default: false },
   error: { type: String, default: '' },
   shouldShowText: { type: Boolean, default: false },
 })
@@ -135,6 +150,10 @@ function setEditorElement(element) {
 }
 
 const display = computed(() => getMessengerMessageDisplay(props.message))
+const deleteNotice = computed(() =>
+  getMessengerMessageDeleteNotice(props.message),
+)
+const editNotice = computed(() => getMessengerMessageEditNotice(props.message))
 const textPresentation = computed(() =>
   getMessengerMessageTextPresentation(props.message),
 )
