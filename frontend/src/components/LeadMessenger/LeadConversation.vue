@@ -211,7 +211,10 @@
                     @reply="startReply(item.message)"
                   />
                   <MessageReplyQuote
-                    v-if="item.message.reply_context"
+                    v-if="
+                      item.message.status !== 'deleted' &&
+                      item.message.reply_context
+                    "
                     class="mb-2"
                     :context="item.message.reply_context"
                     :client-name="clientDisplayName"
@@ -648,6 +651,7 @@ import {
   isSingleImageAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
+  isCompactWazzupStickerImage,
 } from '@/utils/messengerAttachments'
 import {
   countNewMessengerMessages,
@@ -1028,7 +1032,11 @@ const replyComposerContext = computed(() => {
       text: `${replyTarget.value.text || ''}`.slice(0, 500) || null,
       message_type: replyTarget.value.message_type || 'text',
       attachment_types: (replyTarget.value.attachments || []).map((item) =>
-        item.is_voice ? 'voice' : item.type,
+        isCompactWazzupStickerImage(item, replyTarget.value.provider)
+          ? 'sticker'
+          : item.is_voice
+            ? 'voice'
+            : item.type,
       ),
       forwarded_content_kind: replyTarget.value.forward_context
         ? getForwardedContentKind(replyTarget.value.forward_context)
@@ -2335,7 +2343,7 @@ function messageBubbleWidthClass(message) {
   if (isSingleAudioAttachmentSet(message.attachments)) {
     return 'w-[24rem] !max-w-[94%] sm:!max-w-[24rem]'
   }
-  if (message.reply_context) {
+  if (message.status !== 'deleted' && message.reply_context) {
     return 'w-fit min-w-[min(18rem,94%)] sm:min-w-[min(18rem,78%)]'
   }
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'

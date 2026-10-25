@@ -101,7 +101,6 @@ vi.mock('@/components/LeadMessenger/MessageMetadata.vue', () => ({
   },
 }))
 vi.mock('@/components/LeadMessenger/MessageReactions.vue', emptyComponent)
-vi.mock('@/components/LeadMessenger/MessageReplyQuote.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
   default: {
     props: [
@@ -1591,6 +1590,55 @@ describe('Wazzup native text replies', () => {
       )
     },
   )
+
+  it.each([
+    [
+      'static sticker',
+      { type: 'image', mime_type: 'image/webp', is_sticker_candidate: true },
+      'Sticker',
+    ],
+    [
+      'ordinary WebP image',
+      { type: 'image', mime_type: 'image/webp' },
+      'Image',
+    ],
+    [
+      'animated sticker',
+      {
+        type: 'sticker',
+        mime_type: 'application/x-tgsticker',
+        is_animated: true,
+      },
+      'Sticker',
+    ],
+  ])(
+    'labels a Wazzup %s correctly in the reply composer',
+    async (_kind, attachment, label) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [mediaChannel('telegram')]
+      snapshotMessages = [
+        {
+          name: 'WAZZUP-ORIGINAL',
+          provider: 'wazzup',
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'inbound',
+          status: 'received',
+          message_type: attachment.type,
+          text: '',
+          attachments: [{ id: 'MEDIA-1', status: 'available', ...attachment }],
+          can_reply: true,
+          message_datetime: '2026-10-25 10:00:00',
+        },
+      ]
+      let root = await mountConversation()
+      root.querySelector('[data-testid="mock-message-reply"]').click()
+      await nextTick()
+      expect(
+        root.querySelector('[data-message-reply-quote]').textContent,
+      ).toContain(label)
+    },
+  )
 })
 
 describe('Avito messenger UX', () => {
@@ -2016,12 +2064,43 @@ describe('messenger conversation routing guard', () => {
         },
       ]
       let root = await mountConversation()
+      expect(root.querySelector('[data-message-reply-quote]')).not.toBeNull()
       expect(
         root.querySelector('[data-message-metadata]').classList.contains('w-0'),
       ).toBe(false)
       expect(root.querySelector('[data-message-bubble]').className).toContain(
         'min-w-[min(18rem,94%)]',
       )
+    },
+  )
+
+  it.each(['wazzup', 'vk_direct', 'telegram_bot', 'max_direct'])(
+    'hides the original quote in a deleted %s reply bubble',
+    async (provider) => {
+      snapshotMessages = [
+        {
+          name: 'DELETED-REPLY',
+          provider,
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'outbound',
+          status: 'deleted',
+          text: null,
+          attachments: [],
+          reply_context: {
+            state: 'available',
+            message: 'ORIGINAL',
+            snapshot: { text: 'Original quoted text', direction: 'outbound' },
+          },
+          message_datetime: '2026-10-25 10:00:00',
+        },
+      ]
+      let root = await mountConversation()
+      expect(root.querySelector('[data-message-reply-quote]')).toBeNull()
+      expect(root.textContent).not.toContain('Original quoted text')
+      expect(
+        root.querySelector('[data-message-bubble]').className,
+      ).not.toContain('min-w-[min(18rem,94%)]')
     },
   )
 
