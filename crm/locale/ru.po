@@ -9576,3 +9576,15 @@ msgstr "X (Twitter)"
 
 msgid "YouTube"
 msgstr "YouTube"
+
+msgid "Open existing lead"
+msgstr "Открыть существующий лид"
+
+msgid "This chat is already linked to another lead."
+msgstr "Этот диалог уже привязан к другому лиду."
+
+msgid "This chat is already linked to another lead or has conflicting bindings."
+msgstr "Этот чат уже связан с другим лидом или имеет конфликт привязок."
+
+msgid "This lead has no valid phone number or Telegram username."
+msgstr "У лида не указан корректный телефон или Telegram username."

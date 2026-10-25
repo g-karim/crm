@@ -29,10 +29,17 @@
 
     <div v-else class="relative flex min-h-0 flex-1 flex-col">
       <div
-        v-if="genericError"
+        v-if="conversationError"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-red-6 sm:mx-10"
       >
-        {{ genericError }}
+        {{ conversationError }}
+        <RouterLink
+          v-if="conversationErrorTarget"
+          :to="conversationErrorTarget"
+          class="ml-2 underline"
+        >
+          {{ __('Open existing lead') }}
+        </RouterLink>
       </div>
       <div
         v-if="sendWarning"
@@ -679,6 +686,8 @@ import {
 } from '@/utils/messengerMessageActions'
 import {
   messengerConversationOption,
+  messengerConversationConflictTarget,
+  messengerPersistedConversationConflict,
   messengerConversationsForChannel,
   resolveMessengerHandoffAction,
   resolveMessengerConversationSelection,
@@ -698,7 +707,7 @@ import {
   ref,
   watch,
 } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 
 const props = defineProps({
   leadName: { type: String, required: true },
@@ -737,6 +746,7 @@ const voiceActive = ref(false)
 const voiceDraft = ref(null)
 const sendWarning = ref('')
 const genericError = ref('')
+const conversationConflictTarget = ref(null)
 const routingError = ref('')
 const permissions = ref({
   can_read: false,
@@ -837,6 +847,27 @@ const latestInboundConversation = computed(() => {
 })
 const selectedChannelDoc = computed(
   () => channelByName.value[selectedChannel.value] || null,
+)
+const persistedConversationConflict = computed(() =>
+  messengerPersistedConversationConflict({
+    messages: messages.value,
+    conversation: selectedConversation.value,
+    channel: selectedChannelDoc.value,
+    leadName: props.leadName,
+  }),
+)
+const conversationError = computed(() =>
+  persistedConversationConflict.value
+    ? __(
+        persistedConversationConflict.value.message ||
+          'This chat is already linked to another lead.',
+      )
+    : genericError.value,
+)
+const conversationErrorTarget = computed(() =>
+  persistedConversationConflict.value
+    ? messengerConversationConflictTarget(persistedConversationConflict.value)
+    : conversationConflictTarget.value,
 )
 const restrictedAvitoConversations = computed(() =>
   restrictedAvitoChats(conversations.value, channels.value),
@@ -1214,6 +1245,7 @@ async function initialize(leadChanged = false) {
   contextGeneration += 1
   let context = captureLeadContext()
   genericError.value = ''
+  conversationConflictTarget.value = null
   routingError.value = ''
   sendWarning.value = ''
   newMessageCount.value = 0
@@ -1679,6 +1711,15 @@ function requestVoiceSend(metadata) {
   else send()
 }
 
+function handleConversationLinkConflict(result) {
+  if (result?.reason !== 'conversation_link_conflict') return false
+  conversationConflictTarget.value = messengerConversationConflictTarget(result)
+  genericError.value = __(
+    result.message || 'This chat is already linked to another lead.',
+  )
+  return true
+}
+
 async function sendMessage() {
   if (!permissions.value.can_operate) return
   let context = captureLeadContext()
@@ -1703,6 +1744,7 @@ async function sendMessage() {
 
   genericError.value = ''
   sendWarning.value = ''
+  conversationConflictTarget.value = null
   sendingMessage.value = true
   let attachmentNames = composerAttachments.value?.freeze() || []
   let accepted = false
@@ -1751,7 +1793,10 @@ async function sendMessage() {
     }
 
     if (result?.name && handoff) preparedHandoff.value = null
-    if (result?.reason === 'not_configured') {
+    if (handleConversationLinkConflict(result)) {
+      clientRequestId.value = ''
+      clientRequestFingerprint.value = ''
+    } else if (result?.reason === 'not_configured') {
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
       cancelReply()
@@ -1797,6 +1842,7 @@ async function resolveConversationForSend(context) {
     },
   )
   if (!context.isCurrent()) return null
+  if (handleConversationLinkConflict(result)) return null
   if (result?.ok && result.conversation?.name) {
     preserveComposerDuringScopeChange(() => {
       selectedChannel.value =
@@ -1976,8 +2022,13 @@ async function createConversation(context) {
   )
   if (!context.isCurrent()) return null
 
+  if (handleConversationLinkConflict(result)) return null
   if (result?.reason === 'missing_phone') {
-    genericError.value = __('This lead has no phone number.')
+    genericError.value = __(
+      isWazzupPartnerChannel(selectedChannelDoc.value)
+        ? result.message || 'This lead has no phone number.'
+        : 'This lead has no phone number.',
+    )
     return null
   }
   if (!result?.ok) {
@@ -2272,6 +2323,8 @@ watch(
 watch(
   () => selectedConversation.value?.name,
   (conversationName, previousConversation) => {
+    if (conversationName !== previousConversation)
+      conversationConflictTarget.value = null
     if (
       previousConversation !== undefined &&
       conversationName !== previousConversation &&
@@ -2293,6 +2346,7 @@ watch(
 watch(
   () => selectedChannel.value,
   (channel, previousChannel) => {
+    if (channel !== previousChannel) conversationConflictTarget.value = null
     if (
       previousChannel !== undefined &&
       channel !== previousChannel &&
@@ -2418,6 +2472,7 @@ async function resetComposer() {
   draggingFiles.value = false
   sendWarning.value = ''
   routingError.value = ''
+  conversationConflictTarget.value = null
   cancelReply()
   clearTyping()
   composerTyping.reset()
