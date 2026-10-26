@@ -65,8 +65,8 @@ export function makeMessengerChannelDraft(channel = null) {
   let defaults = PROVIDER_DEFAULTS[provider] || {}
   let implicitAvitoEnd = Boolean(
     channel?.name &&
-    channel?.avito_import_mode === 'period' &&
-    !channel?.avito_import_to_date,
+      channel?.avito_import_mode === 'period' &&
+      !channel?.avito_import_to_date,
   )
   let avitoEnd =
     channel?.avito_import_to_date ||
@@ -169,8 +169,8 @@ export function buildMessengerChannelPayload(draft) {
     const original = draft.original_avito_import_selection
     const unchangedImplicitEnd = Boolean(
       original?.channel === draft.channel &&
-      original?.from_date === payload.avito_import_from_date &&
-      end === draft.avito_import_to_date_implicit,
+        original?.from_date === payload.avito_import_from_date &&
+        end === draft.avito_import_to_date_implicit,
     )
     payload.avito_import_to_date =
       draft.avito_import_mode === 'period' && !unchangedImplicitEnd ? end : ''
@@ -219,8 +219,8 @@ export function validateMessengerChannelDraft(draft) {
     const original = draft.original_wazzup_identity
     const unchangedSavedId = Boolean(
       draft.channel &&
-      original?.channel === draft.channel &&
-      clean(draft.provider_channel_id) === original.provider_channel_id,
+        original?.channel === draft.channel &&
+        clean(draft.provider_channel_id) === original.provider_channel_id,
     )
     if (
       !unchangedSavedId &&

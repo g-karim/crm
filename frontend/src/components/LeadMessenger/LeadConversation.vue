@@ -186,10 +186,10 @@
                       Boolean(
                         (item.message.attachments?.length ||
                           item.message.forward_context) &&
-                        !isSingleStickerAttachmentSet(
-                          item.message.attachments,
-                          item.message.provider,
-                        ),
+                          !isSingleStickerAttachmentSet(
+                            item.message.attachments,
+                            item.message.provider,
+                          ),
                       )
                     "
                     :message="item.message"
@@ -2189,12 +2189,12 @@ function eventTargetsInteractiveElement(event) {
 function isComposerDirty() {
   return Boolean(
     draftText.value ||
-    pendingAttachments.value.length ||
-    pendingLocation.value ||
-    voiceActive.value ||
-    replyTarget.value ||
-    preparedHandoff.value ||
-    messageActionState.value.editingMessage,
+      pendingAttachments.value.length ||
+      pendingLocation.value ||
+      voiceActive.value ||
+      replyTarget.value ||
+      preparedHandoff.value ||
+      messageActionState.value.editingMessage,
   )
 }
 

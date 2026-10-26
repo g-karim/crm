@@ -37,13 +37,13 @@ export function canEditMessengerMessage(
 ) {
   return Boolean(
     message?.can_edit &&
-    !editBlocked &&
-    !deleteBlocked &&
-    message.status !== 'deleted' &&
-    !['pending', 'unknown', 'deleted'].includes(message.delete_state) &&
-    !['pending', 'unknown'].includes(message.edit_state) &&
-    (message.provider !== 'wazzup' ||
-      (message.message_type === 'text' && !message.attachments?.length)),
+      !editBlocked &&
+      !deleteBlocked &&
+      message.status !== 'deleted' &&
+      !['pending', 'unknown', 'deleted'].includes(message.delete_state) &&
+      !['pending', 'unknown'].includes(message.edit_state) &&
+      (message.provider !== 'wazzup' ||
+        (message.message_type === 'text' && !message.attachments?.length)),
   )
 }
 
@@ -54,14 +54,14 @@ export function canDeleteMessengerMessage(
 ) {
   return Boolean(
     message?.can_delete &&
-    !deleteBlocked &&
-    !editBlocked &&
-    message.status !== 'deleted' &&
-    !['pending', 'unknown', 'deleted'].includes(message.delete_state) &&
-    !(
-      isPartnerMessengerMessage(message) && message.delete_state === 'failed'
-    ) &&
-    !['pending', 'unknown'].includes(message.edit_state),
+      !deleteBlocked &&
+      !editBlocked &&
+      message.status !== 'deleted' &&
+      !['pending', 'unknown', 'deleted'].includes(message.delete_state) &&
+      !(
+        isPartnerMessengerMessage(message) && message.delete_state === 'failed'
+      ) &&
+      !['pending', 'unknown'].includes(message.edit_state),
   )
 }
 
@@ -78,14 +78,14 @@ export function canRetryDeleteMessengerMessage(
 ) {
   return Boolean(
     isPartnerMessengerMessage(message) &&
-    message.can_retry_delete === true &&
-    Number(message.delete_retry_attempts_remaining) > 0 &&
-    message.modified &&
-    !deleteBlocked &&
-    !editBlocked &&
-    message.status !== 'deleted' &&
-    ['unknown', 'failed'].includes(message.delete_state) &&
-    !['pending', 'unknown'].includes(message.edit_state),
+      message.can_retry_delete === true &&
+      Number(message.delete_retry_attempts_remaining) > 0 &&
+      message.modified &&
+      !deleteBlocked &&
+      !editBlocked &&
+      message.status !== 'deleted' &&
+      ['unknown', 'failed'].includes(message.delete_state) &&
+      !['pending', 'unknown'].includes(message.edit_state),
   )
 }
 
@@ -426,9 +426,9 @@ export function createMessengerMessageActions(options) {
       })
       definitiveFailure = Boolean(
         result?.ok === false &&
-        result.reason &&
-        result.reason !== 'unknown_result' &&
-        !result.unknown_result,
+          result.reason &&
+          result.reason !== 'unknown_result' &&
+          !result.unknown_result,
       )
       if (!result?.ok) throw providerError(result, action)
       accepted = true

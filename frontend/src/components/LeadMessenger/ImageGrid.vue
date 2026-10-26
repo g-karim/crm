@@ -58,10 +58,7 @@
         {{ __('Failed to send image to VK') }}
       </div>
     </button>
-    <div
-      v-if="canRetryImage(singleImage)"
-      class="flex flex-wrap gap-2"
-    >
+    <div v-if="canRetryImage(singleImage)" class="flex flex-wrap gap-2">
       <button
         v-if="canRetryImage(singleImage)"
         type="button"

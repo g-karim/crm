@@ -989,8 +989,8 @@ const wazzupKeySources = computed(() => [
 const hasWazzupKey = computed(() =>
   Boolean(
     channelDraft.value.api_token.trim() ||
-    channelDraft.value.api_token_configured ||
-    channelDraft.value.api_token_source_channel,
+      channelDraft.value.api_token_configured ||
+      channelDraft.value.api_token_source_channel,
   ),
 )
 const wazzupRemoteChannelOptions = computed(() => [

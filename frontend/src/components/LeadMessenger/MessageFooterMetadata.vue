@@ -23,7 +23,9 @@
       >
         <ClockIcon
           v-if="
-            ['queued', 'sending', 'accepted', 'retrying'].includes(deliveryState)
+            ['queued', 'sending', 'accepted', 'retrying'].includes(
+              deliveryState,
+            )
           "
           class="size-4"
         />

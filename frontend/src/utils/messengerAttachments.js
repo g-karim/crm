@@ -240,10 +240,10 @@ export function isCompactWazzupStickerImage(attachment = {}, provider = '') {
   if (!attachment) return false
   return Boolean(
     (provider || attachment.provider) === 'wazzup' &&
-    attachment.type === 'image' &&
-    attachment.mime_type === 'image/webp' &&
-    attachment.is_sticker_candidate &&
-    !attachment.is_animated,
+      attachment.type === 'image' &&
+      attachment.mime_type === 'image/webp' &&
+      attachment.is_sticker_candidate &&
+      !attachment.is_animated,
   )
 }
 

@@ -30,9 +30,9 @@ function isSafeHttpUrl(value) {
     let url = new URL(value)
     return Boolean(
       ['http:', 'https:'].includes(url.protocol) &&
-      url.hostname &&
-      !url.username &&
-      !url.password,
+        url.hostname &&
+        !url.username &&
+        !url.password,
     )
   } catch {
     return false

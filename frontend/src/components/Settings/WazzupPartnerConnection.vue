@@ -356,7 +356,7 @@ const qrExpired = computed(
     onboarding.value.qr_expired ||
     Boolean(
       onboarding.value.qr_expires_at &&
-      Date.parse(onboarding.value.qr_expires_at) <= clock.value,
+        Date.parse(onboarding.value.qr_expires_at) <= clock.value,
     ),
 )
 const qrImage = computed(() =>
