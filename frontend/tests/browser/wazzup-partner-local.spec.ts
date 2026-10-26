@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { withWazzupCaseCleanup } from './wazzup-case-cleanup'
 import { loadWazzupFixture } from './wazzup-local-fixture'
 
 const fixture = loadWazzupFixture()
@@ -208,6 +209,54 @@ async function firstOutbound(
       temporary_null: temporaryNull,
     },
   )
+  return withWazzupCaseCleanup(
+    () =>
+      exerciseFirstOutbound(
+        page,
+        testInfo,
+        platform,
+        channelName,
+        order,
+        temporaryNull,
+        setup,
+      ),
+    async () => {
+      const cancelled = await partnerControl<{
+        ok: boolean
+        cancelled: boolean
+        http_released: boolean
+        http_completed: boolean
+        worker_settled: boolean
+      }>(page, 'partner-cancel', { case_id: setup.case_id })
+      expect(cancelled).toMatchObject({
+        ok: true,
+        cancelled: true,
+        http_released: true,
+        worker_settled: true,
+      })
+    },
+    async () => {
+      await testInfo.attach('first-outbound-cleanup-failure', {
+        body: JSON.stringify({
+          case_id: setup.case_id,
+          reason: 'The isolated held HTTP request could not be released.',
+        }),
+        contentType: 'application/json',
+      })
+    },
+  )
+}
+
+async function exerciseFirstOutbound(
+  page: Page,
+  testInfo: TestInfo,
+  platform: string,
+  channelName: string,
+  order: FirstPhase[],
+  temporaryNull: boolean,
+  setup: FirstCase,
+) {
+  const scenario = order.join('_')
   expect(setup.conversations).toEqual([])
   expect(setup.messages).toEqual([])
   const state = () =>
@@ -265,7 +314,17 @@ async function firstOutbound(
   let current = await state()
   expect(current.conversations).toHaveLength(1)
   expect(current.messages).toHaveLength(1)
-  expect(current.conversations[0].external_chat_id).toBeFalsy()
+  // WhatsApp chat IDs are numeric phone numbers and are already known when
+  // reserving the recipient. Telegram IDs must wait for provider evidence.
+  if (platform === 'whatsapp') {
+    expect(current.conversations[0].external_chat_id).toBe(
+      setup.expected_chat_id,
+    )
+    expect(current.messages[0].external_chat_id).toBe(setup.expected_chat_id)
+  } else {
+    expect(current.conversations[0].external_chat_id).toBeFalsy()
+    expect(current.messages[0].external_chat_id).toBeFalsy()
+  }
   expect(current.messages[0]).toMatchObject({
     name: message,
     channel: setup.channel,
@@ -295,7 +354,7 @@ async function firstOutbound(
         .toBeTruthy()
       if (!completed.has('echo')) {
         const accepted = await state()
-        if (platform === 'whatsapp' && !temporaryNull) {
+        if (platform === 'whatsapp') {
           expect(accepted.conversations[0].external_chat_id).toBe(
             setup.expected_chat_id,
           )
@@ -329,15 +388,27 @@ async function firstOutbound(
   }
   if (temporaryNull) {
     current = await state()
-    expect(current.conversations[0].external_chat_id).toBeFalsy()
-    await expect
-      .poll(async () =>
-        (await state()).webhooks.some(
-          (row) => row.status === 'retrying' && row.encrypted_payload_present,
-        ),
+    if (platform === 'telegram') {
+      expect(current.conversations[0].external_chat_id).toBeFalsy()
+      await expect
+        .poll(async () =>
+          (await state()).webhooks.some(
+            (row) => row.status === 'retrying' && row.encrypted_payload_present,
+          ),
+        )
+        .toBe(true)
+      expect((await state()).messages[0].external_chat_id).toBeFalsy()
+    } else {
+      expect(current.conversations[0].external_chat_id).toBe(
+        setup.expected_chat_id,
       )
-      .toBe(true)
-    expect((await state()).messages[0].external_chat_id).toBeFalsy()
+      await expect
+        .poll(async () => (await state()).messages[0]?.status)
+        .toBe('sent')
+      expect((await state()).messages[0].external_chat_id).toBe(
+        setup.expected_chat_id,
+      )
+    }
     await deliver('late_echo')
   }
   await expect
