@@ -9621,3 +9621,18 @@ msgstr "Повторить удаление этого сообщения у в�
 
 msgid "You can retry deletion in {0} seconds. No new request has been sent."
 msgstr "Повторить удаление можно через {0} с. Новый запрос не отправлен."
+
+msgid "Select an explicit Wazzup Account provisioning mode."
+msgstr "Выберите режим создания или привязки аккаунта Wazzup."
+
+msgid "Wazzup Account creation requires explicit site authorization."
+msgstr "Создание аккаунта Wazzup требует отдельного разрешения для этого сайта."
+
+msgid "Wazzup account provisioning requires administrator reconciliation before continuing."
+msgstr "Для продолжения администратор должен проверить результат создания аккаунта Wazzup."
+
+msgid "This site already owns a Wazzup Account under another tenant configuration."
+msgstr "За этим сайтом уже закреплён аккаунт Wazzup с другой конфигурацией клиента."
+
+msgid "This site has conflicting Wazzup Account assignments."
+msgstr "Обнаружены конфликтующие привязки аккаунтов Wazzup к этому сайту."
