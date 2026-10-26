@@ -184,18 +184,19 @@ QR, если авторизация всё ещё действительна. Д
 Рядом показывается время последней проверки подписки, если оно известно.
 При неизвестном результате прежнее подтверждение не считается актуальным.
 
-На текущем этапе разрешён локальный dev/test simulator. Настоящий транспорт
-подготовлен, но заблокирован до подтверждения Wazzup механизма аутентификации
-callback: production endpoint намеренно отвечает HTTP 503. Одних credentials
-недостаточно, чтобы включить подключение. Если оно не настроено или заблокировано,
-диалог сообщает об этом. Серверная подготовка, ограничения и checklist первого
-реального подключения описаны в [pre-production audit](../../crm_messenger/docs/wazzup_partner_readiness.md).
+Real Partner v2 по умолчанию выключен. Администратор может разрешить его для
+конкретного сайта с собственным подтверждённым дочерним Account, credentials,
+HTTPS origin и отдельным gateway. Developer mode не открывает real-доступ.
+Единая [инструкция развёртывания и проверки](../../crm_messenger/docs/wazzup_partner_real_e2e.md)
+содержит миграции, безопасную конфигурацию, привязку Account и отдельное включение
+реальных операций. Если конфигурация не готова, подключение блокируется.
 
-Для ручной проверки разработчик оставляет `bench start` работающим и запускает
-из `apps/crm_messenger`:
+Для ручной проверки используйте отдельный dev-сайт с `developer_mode=1`;
+launcher создаёт в нём тестовые записи. Оставьте `bench start` и workers работающими
+и запустите из `apps/crm_messenger`:
 
 ```bash
-python scripts/run_wazzup_partner_simulator.py --site test16.localhost
+python scripts/run_wazzup_partner_simulator.py --site YOUR-SITE
 ```
 
 После сообщения о готовности обновите CRM и пройдите тот же путь. Вместо
@@ -207,7 +208,7 @@ Telegram-сценарии используйте пароль `simulator-2fa-pas
 дождитесь статуса **Подключён** и закройте форму. В другом терминале:
 
 ```bash
-python scripts/run_wazzup_partner_simulator.py --site test16.localhost --incoming --channel "WhatsApp test" --text "Первое входящее"
+python scripts/run_wazzup_partner_simulator.py --site YOUR-SITE --incoming --channel "WhatsApp test" --text "Первое входящее"
 ```
 
 Откройте **Лиды → Partner simulator contact → Переписка**, выберите разговор
