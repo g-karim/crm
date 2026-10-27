@@ -5,7 +5,8 @@ import frappe
 from frappe.permissions import add_permission, update_permission_property
 from frappe.tests import IntegrationTestCase
 
-from crm.api.activities import get_activities
+from crm.api.activities import get_activities, get_readable_fields
+from crm.fcrm.doctype.crm_fields_layout.crm_fields_layout import get_permlevel_access
 
 RESTRICTED_FIELD = "permlevel_secret"
 RESTRICTED_VALUE = "salary is 100000"
@@ -67,6 +68,27 @@ class TestActivityPermlevel(IntegrationTestCase):
 	def activities_as(self, user, name):
 		frappe.set_user(user)
 		try:
+			if user == "mgr@permlevel.test":
+				self.assertIn(
+					RESTRICTED_FIELD,
+					get_readable_fields("CRM Lead"),
+					frappe.as_json(
+						{
+							"roles": frappe.get_roles(),
+							"read_permlevels": get_permlevel_access("read", "CRM Lead"),
+							"permissions": [
+								{
+									"role": p.role,
+									"permlevel": p.permlevel,
+									"read": p.read,
+									"write": p.write,
+								}
+								for p in frappe.get_meta("CRM Lead").permissions
+							],
+						},
+						indent=2,
+					),
+				)
 			activities, *_ = get_activities(name)
 		finally:
 			frappe.set_user("Administrator")

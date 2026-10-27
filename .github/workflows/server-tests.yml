@@ -108,6 +108,7 @@ jobs:
                   coverage-path: /home/runner/frappe-bench/sites/coverage.xml
 
             - name: Run Messenger server tests
+              if: ${{ !cancelled() }}
               uses: ./.github/actions/run-server-tests
               with:
                   bench-path: "/home/runner/frappe-bench"
