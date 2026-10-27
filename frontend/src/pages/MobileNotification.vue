@@ -10,8 +10,16 @@
     </template>
     <template #right-header>
       <Button
+        :tooltip="__('Notification delivery')"
+        :aria-label="__('Notification delivery')"
+        class="min-h-11 min-w-11"
+        icon="settings"
+        @click="$router.push({ name: 'NotificationDelivery' })"
+      />
+      <Button
         :tooltip="__('Mark all as read')"
-        :label="__('Mark all as read')"
+        :aria-label="__('Mark all as read')"
+        class="min-h-11 min-w-11"
         :iconLeft="MarkAsDoneIcon"
         @click="markAllAsRead"
       />
@@ -19,7 +27,15 @@
   </LayoutHeader>
   <div class="flex flex-col overflow-hidden text-ink-gray-9">
     <div
-      v-if="notificationItems.length"
+      v-if="notificationError || notifications.error"
+      class="p-4"
+      role="alert"
+    >
+      <p>{{ notificationError || __('Could not load notifications.') }}</p>
+      <Button :label="__('Retry')" @click="notifications.reload()" />
+    </div>
+    <div
+      v-else-if="notificationItems.length"
       class="divide-y divide-outline-gray-1 overflow-y-auto text-base"
     >
       <RouterLink
@@ -85,7 +101,11 @@ import MessageCircleIcon from '~icons/lucide/message-circle'
 import MarkAsDoneIcon from '@/components/Icons/MarkAsDoneIcon.vue'
 import NotificationsIcon from '@/components/Icons/NotificationsIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
-import { notifications, notificationsStore } from '@/stores/notifications'
+import {
+  notifications,
+  notificationError,
+  notificationsStore,
+} from '@/stores/notifications'
 import { timeAgo, sanitizeHTML } from '@/utils'
 import { Breadcrumbs } from 'frappe-ui'
 import { computed } from 'vue'
@@ -95,10 +115,11 @@ const notificationItems = computed(
 )
 
 function markAsRead(notification) {
-  markNotificationAsRead(notification.name)
+  if (notification.type !== 'Messenger') markNotificationAsRead(notification)
 }
 
 function getRoute(notification) {
+  if (notification.path) return notification.path.replace(/^\/crm/, '') || '/'
   let params = {
     leadId: notification.reference_name,
   }

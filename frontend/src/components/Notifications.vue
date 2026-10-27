@@ -33,7 +33,15 @@
       />
       <div v-if="activeTab == 'all'" class="flex h-full">
         <div
-          v-if="notificationItems.length"
+          v-if="notificationError || notifications.error"
+          class="p-4"
+          role="alert"
+        >
+          <p>{{ notificationError || __('Could not load notifications.') }}</p>
+          <Button :label="__('Retry')" @click="notifications.reload()" />
+        </div>
+        <div
+          v-else-if="notificationItems.length"
           class="divide-y divide-outline-elevation-2 overflow-auto text-base"
         >
           <RouterLink
@@ -110,6 +118,7 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import {
   visible,
   notifications,
+  notificationError,
   notificationsStore,
 } from '@/stores/notifications'
 import { useEventNotificationAlert } from '@/data/notifications'
@@ -148,7 +157,7 @@ onClickOutside(
 
 function markAsRead(notification) {
   capture('notification_mark_as_read')
-  markNotificationAsRead(notification.name)
+  if (notification.type !== 'Messenger') markNotificationAsRead(notification)
   toggle()
 }
 
@@ -166,6 +175,7 @@ onMounted(() => {
 })
 
 function getRoute(notification) {
+  if (notification.path) return notification.path.replace(/^\/crm/, '') || '/'
   let params = {
     leadId: notification.reference_name,
   }

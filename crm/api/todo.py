@@ -157,6 +157,7 @@ def notify_assigned_user(doc, is_cancelled=False):
 			"reference_docname": doc.reference_name,
 			"redirect_to_doctype": redirect_to_doctype,
 			"redirect_to_docname": redirect_to_name,
+			"event_id": f"crm-assignment:{doc.name}:{'removed' if is_cancelled else 'assigned'}",
 		}
 	)
 

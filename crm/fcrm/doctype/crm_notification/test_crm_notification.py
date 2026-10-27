@@ -86,7 +86,10 @@ class TestCRMNotification(UnitTestCase):
 			to_user="manager@example.com",
 			reference_name="LEAD-1",
 		)
-		with patch.object(frappe, "publish_realtime") as publish:
+		with (
+			patch.object(frappe, "publish_realtime") as publish,
+			patch("crm.fcrm.doctype.crm_notification.crm_notification.can_access_notification", return_value=True),
+		):
 			CRMNotification.on_update(doc)
 
 		publish.assert_called_once_with(
@@ -239,22 +242,20 @@ class TestMessengerNotificationLifecycle(IntegrationTestCase):
 		self._revoke_user_sales_role(user)
 		self.assertFalse(frappe.has_permission("CRM Lead", "read", doc=self.lead))
 
-		result = get_notifications()
-		self.assertNotIn(messenger.name, {row["name"] for row in result["notifications"]})
+		with self.assertRaises(frappe.PermissionError):
+			get_notifications()
 
-	def test_mark_all_has_no_more_when_only_inaccessible_messenger_rows_remain(self):
+	def test_role_revocation_prevents_mark_all_and_preserves_unread_rows(self):
 		user = self._make_sales_user()
 		messenger, ordinary = self._make_user_notifications(user)
 		self._revoke_user_sales_role(user)
 
-		result = mark_all_as_read()
-
-		self.assertFalse(result["has_more"])
-		self.assertEqual(result["marked"], 1)
+		with self.assertRaises(frappe.PermissionError):
+			mark_all_as_read()
 		messenger.reload()
 		ordinary.reload()
 		self.assertFalse(messenger.read)
-		self.assertTrue(ordinary.read)
+		self.assertFalse(ordinary.read)
 
 	def test_standard_list_hides_revoked_messenger_but_keeps_ordinary_notification(self):
 		messenger, ordinary = self._make_user_notifications()

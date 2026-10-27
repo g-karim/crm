@@ -31,6 +31,11 @@
           </div>
         </div>
         <div>
+          <div v-if="doctype === 'CRM Task' && (document.crmTaskRemoteChanged || document.crmTaskUnavailable || document.crmTaskRefreshError)" class="mb-4 space-y-2 text-base" role="status">
+            <p>{{ __(document.crmTaskUnavailable ? 'This CRM task is no longer available.' : document.crmTaskRemoteChanged ? 'This task changed in another window. Your draft is kept.' : 'Could not refresh this task. Your draft is kept.') }}</p>
+            <Button :label="__('Reload saved task')" :disabled="document.crmTaskSaving" @click="reloadTask" />
+          </div>
+          <div v-if="!document.crmTaskUnavailable" :inert="doctype === 'CRM Task' && (document.crmTaskSaving || Boolean(document.crmTaskPending))" @input.capture="markTaskTyping" @focusout.capture="finishTaskTyping">
           <FieldLayout
             v-if="layout.data"
             :tabs="layout.data"
@@ -38,6 +43,7 @@
             :doctype="doctype"
             :docname="docname"
           />
+          </div>
           <ErrorMessage v-if="error" class="mt-4" :message="__(error)" />
         </div>
       </div>
@@ -45,8 +51,9 @@
         <div class="flex flex-row-reverse gap-2">
           <Button
             variant="solid"
-            :label="editMode ? __('Update') : __('Create')"
-            :loading="editMode ? document.save.loading : create.loading"
+            :label="document.crmTaskPending ? __('Retry') : editMode ? __('Update') : __('Create')"
+            :loading="document.crmTaskSaving || (editMode ? document.save.loading : create.loading)"
+            :disabled="document.crmTaskSaving || document.crmTaskRemoteChanged || document.crmTaskUnavailable"
             @click="editMode ? update() : create()"
           />
         </div>
@@ -60,6 +67,7 @@ import EditIcon from '@/components/Icons/EditIcon.vue'
 import FieldLayout from '@/components/FieldLayout/FieldLayout.vue'
 import CustomActions from '@/components/CustomActions.vue'
 import { useDocument } from '@/data/document'
+import { hasTaskDraft } from '@/utils/taskRefresh'
 import { globalStore } from '@/stores/global'
 import { usersStore } from '@/stores/users'
 import { showQuickEntryModal, quickEntryProps } from '@/composables/modals'
@@ -89,6 +97,16 @@ const { document, scripts, triggerOnRender, triggerOnBeforeCreate } =
   useDocument(props.doctype, props.docname || null)
 
 const doc = computed(() => document.doc || {})
+
+// Some native fields commit on blur. Protect their DOM input before the model changes.
+function markTaskTyping() { if (props.doctype === 'CRM Task' && editMode.value) document.crmTaskTyping = true }
+function finishTaskTyping() { queueMicrotask(() => { document.crmTaskTyping = false }) }
+
+async function reloadTask() {
+  if ((hasTaskDraft(document) || document.crmTaskPending) && !window.confirm(__('Discard unsaved changes?'))) return
+  document.crmTaskPending = null
+  await document.crmTaskReload?.()
+}
 
 const layout = createResource({
   url: 'crm.fcrm.doctype.crm_fields_layout.crm_fields_layout.get_fields_layout',

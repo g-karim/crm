@@ -1,0 +1,10 @@
+{
+ "doctype": "DocType", "name": "CRM Task Operation", "module": "FCRM", "autoname": "prompt", "engine": "InnoDB",
+ "field_order": ["user", "request_hash", "task"],
+ "fields": [
+  {"fieldname":"user","fieldtype":"Link","options":"User","label":"User","reqd":1},
+  {"fieldname":"request_hash","fieldtype":"Data","label":"Request Hash","reqd":1},
+  {"fieldname":"task","fieldtype":"Link","options":"CRM Task","label":"Task","reqd":1}
+ ],
+ "permissions": [], "track_changes": 0, "index_web_pages_for_search": 0
+}

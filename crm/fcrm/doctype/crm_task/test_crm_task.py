@@ -4,6 +4,10 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
+# These tests create their users and contexts explicitly. Traversing User's
+# Email Account / optional Payments dependencies is unrelated to CRM Task.
+IGNORE_TEST_RECORD_DEPENDENCIES = ["User", "DocType"]
+
 
 class TestCRMTask(IntegrationTestCase):
 	def tearDown(self) -> None:

@@ -72,6 +72,55 @@ describe('notifications store', () => {
     })
   })
 
+  it('passes the displayed head and session owner to a read request', async () => {
+    notifications.data = {
+      notifications: [{ name: 'N-1', head: 'loaded-head' }],
+      viewer: 'person@example.invalid',
+    }
+    await notificationsStore().markNotificationAsRead('N-1')
+    expect(
+      resources.get('crm.api.notifications.mark_as_read').submit,
+    ).toHaveBeenCalledWith({
+      notification: 'N-1',
+      observed_head: 'loaded-head',
+      expected_viewer: 'person@example.invalid',
+    })
+  })
+
+  it('keeps one frozen snapshot while paging mark-all', async () => {
+    notifications.data = {
+      notifications: [],
+      viewer: 'person@example.invalid',
+      snapshot_token: 'loaded-snapshot',
+    }
+    const store = notificationsStore()
+    const markAll = resources.get('crm.api.notifications.mark_all_as_read')
+    markAll.submit
+      .mockResolvedValueOnce({
+        has_more: true,
+        snapshot_token: 'loaded-snapshot',
+        cursor: 500,
+      })
+      .mockResolvedValueOnce({
+        has_more: false,
+        snapshot_token: 'loaded-snapshot',
+        cursor: 1000,
+      })
+    await store.markAllAsRead()
+    expect(markAll.submit).toHaveBeenNthCalledWith(1, {
+      limit: 500,
+      snapshot_token: 'loaded-snapshot',
+      cursor: 0,
+      expected_viewer: 'person@example.invalid',
+    })
+    expect(markAll.submit).toHaveBeenNthCalledWith(2, {
+      limit: 500,
+      snapshot_token: 'loaded-snapshot',
+      cursor: 500,
+      expected_viewer: 'person@example.invalid',
+    })
+  })
+
   it('repeats bounded mark-all requests while the server has more rows', async () => {
     let store = notificationsStore()
     let markAll = resources.get('crm.api.notifications.mark_all_as_read')

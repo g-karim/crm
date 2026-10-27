@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.query_builder.functions import Coalesce, Sum
+from frappe.query_builder.functions import Coalesce
 from frappe.utils import add_to_date, cint, now_datetime
 
 from crm.fcrm.doctype.crm_notification.crm_notification import (
@@ -10,6 +10,7 @@ from crm.fcrm.doctype.crm_notification.crm_notification import (
 
 @frappe.whitelist()
 def get_notifications(limit: int = 100):
+	user = _require_viewer()
 	limit = min(max(cint(limit) or 100, 1), 100)
 	Notification = frappe.qb.DocType("CRM Notification")
 	rows = (
@@ -32,9 +33,11 @@ def get_notifications(limit: int = 100):
 			Notification.message,
 		)
 		.orderby(Coalesce(Notification.last_event_at, Notification.creation), order=frappe.qb.desc)
-		.limit(limit + 1)
 		.run(as_dict=True)
 	)
+	rows = [row for row in rows if can_access_notification(row, user=user)]
+	unread_count = sum(max(cint(row.event_count), 1) if row.type == "Messenger" else 1 for row in rows if not row.read)
+	snapshot_token = _snapshot(user, [row for row in rows if not row.read])
 	has_more = len(rows) > limit
 	rows = rows[:limit]
 	from_users = {row.from_user for row in rows if row.from_user}
@@ -54,6 +57,8 @@ def get_notifications(limit: int = 100):
 		notifications.append(
 			{
 				"name": row.name,
+				"head": _head(row),
+				"path": _route(row),
 				"creation": row.creation,
 				"last_event_at": row.last_event_at,
 				"last_event_id": row.last_event_id,
@@ -72,26 +77,13 @@ def get_notifications(limit: int = 100):
 			}
 		)
 
-	unread_value = (
-		frappe.qb.terms.Case()
-		.when(
-			Notification.type == "Messenger",
-			frappe.qb.terms.Function("greatest", Coalesce(Notification.event_count, 1), 1),
-		)
-		.else_(1)
-	)
-	unread_count = (
-		_visible_notifications_query(Notification)
-		.select(Coalesce(Sum(unread_value), 0).as_("unread_count"))
-		.where(Notification.read == 0)
-		.run(as_dict=True)[0]
-		.unread_count
-	)
-	return {"notifications": notifications, "unread_count": cint(unread_count), "has_more": has_more}
+	return {"viewer": user, "notifications": notifications, "unread_count": unread_count,
+		"has_more": has_more, "snapshot_token": snapshot_token}
 
 
 @frappe.whitelist(methods=["POST"])
 def mark_messenger_as_read(conversation: str, last_event_id: str):
+	_require_viewer()
 	conversation_row = frappe.db.get_value(
 		"Messenger Conversation",
 		conversation,
@@ -175,40 +167,34 @@ def mark_messenger_notifications_through(conversation: str, up_to_message: str |
 
 
 @frappe.whitelist(methods=["POST"])
-def mark_as_read(notification: str):
+def mark_as_read(notification: str, observed_head: str | None = None, expected_viewer: str | None = None):
+	_require_viewer(expected_viewer)
 	row = _lock_notification(notification)
 	if not row or row.to_user != frappe.session.user or row.read or not can_access_notification(row):
 		return {"ok": True, "marked": 0}
+	if (row.type == "Messenger" and observed_head is None) or (observed_head is not None and observed_head != _head(row)):
+		return {"ok": True, "marked": 0, "stale": True}
 	_mark_locked_notification_read(row.name)
 	return {"ok": True, "marked": 1}
 
 
 @frappe.whitelist(methods=["POST"])
-def mark_all_as_read(limit: int = 500):
+def mark_all_as_read(limit: int = 500, snapshot_token: str | None = None, cursor: int = 0, expected_viewer: str | None = None):
+	user = _require_viewer(expected_viewer)
 	limit = min(max(cint(limit) or 500, 1), 500)
-	Notification = frappe.qb.DocType("CRM Notification")
-	rows = (
-		_visible_notifications_query(Notification)
-		.select(Notification.name)
-		.where(Notification.read == 0)
-		.orderby(Notification.creation)
-		.limit(limit)
-		.run(as_dict=True)
-	)
+	if not snapshot_token:
+		rows = frappe.get_all("CRM Notification", filters={"to_user": user, "read": 0}, fields=["*"], limit=0)
+		snapshot_token = _snapshot(user, [row for row in rows if can_access_notification(row)])
+	rows = _read_snapshot(user, snapshot_token)
+	cursor = max(cint(cursor), 0)
 	marked = 0
-	for candidate in rows:
+	for candidate in rows[cursor:cursor + limit]:
 		row = _lock_notification(candidate.name)
-		if row and row.to_user == frappe.session.user and not row.read and can_access_notification(row):
+		if row and row.to_user == user and not row.read and _head(row) == candidate.head and can_access_notification(row):
 			_mark_locked_notification_read(row.name)
 			marked += 1
-	has_more = bool(
-		_visible_notifications_query(Notification)
-		.select(Notification.name)
-		.where(Notification.read == 0)
-		.limit(1)
-		.run()
-	)
-	return {"ok": True, "marked": marked, "has_more": has_more}
+	return {"ok": True, "marked": marked, "has_more": cursor + limit < len(rows),
+		"snapshot_token": snapshot_token, "cursor": cursor + limit}
 
 
 def _visible_notifications_query(Notification):
@@ -254,7 +240,7 @@ def get_hash(notification):
 def _lock_notification(name):
 	rows = frappe.db.sql(
 		"""
-		select name, to_user, `read`, type, reference_doctype, reference_name
+		select *
 		from `tabCRM Notification`
 		where name = %s
 		for update
@@ -263,6 +249,43 @@ def _lock_notification(name):
 		as_dict=True,
 	)
 	return rows[0] if rows else None
+
+
+def _head(row):
+	from crm.notification_source import notification_head
+
+	return notification_head(row)
+
+
+def _route(row):
+	from crm.notification_source import notification_route
+
+	return notification_route(row)
+
+
+def _require_viewer(expected_viewer=None):
+	user = frappe.session.user
+	if user == "Guest" or not frappe.db.get_value("User", user, "enabled") or (expected_viewer is not None and expected_viewer != user):
+		frappe.throw(_("Your session changed. Reload this page."), frappe.AuthenticationError)
+	if not frappe.has_permission("CRM Notification", "read", user=user):
+		frappe.throw(_("You are not permitted to access this page."), frappe.PermissionError)
+	return user
+
+
+def _snapshot(user, rows):
+	token = frappe.generate_hash(length=32)
+	frappe.cache.set_value(f"crm_notification_snapshot:{user}:{token}",
+		[{"name": row.name, "head": _head(row)} for row in rows], expires_in_sec=900)
+	return token
+
+
+def _read_snapshot(user, token):
+	if not isinstance(token, str) or len(token) != 32 or not token.isalnum():
+		frappe.throw(_("Invalid notification snapshot."))
+	rows = frappe.cache.get_value(f"crm_notification_snapshot:{user}:{token}")
+	if rows is None:
+		frappe.throw(_("This notification view expired. Refresh it before continuing."))
+	return [frappe._dict(row) for row in rows]
 
 
 def _mark_locked_notification_read(name):
