@@ -44,6 +44,10 @@ class TestActivityPermlevel(IntegrationTestCase):
 		# permissions explicitly instead of inheriting another suite's read flag.
 		update_permission_property("CRM Lead", "Sales Manager", 1, "read", 1)
 		update_permission_property("CRM Lead", "Sales Manager", 1, "write", 1)
+		# A worker can refill shared metadata while these fixture permissions are
+		# still uncommitted. Publish the class fixture before invalidating that
+		# cache, so another process cannot replace it with the old permission set.
+		frappe.db.commit()
 		frappe.clear_cache(doctype="CRM Lead")
 
 	def setUp(self):
