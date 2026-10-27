@@ -85,7 +85,7 @@
    "fieldname": "default_medium",
    "fieldtype": "Select",
    "label": "Default Medium",
-   "options": "\nTwilio\nExotel"
+   "options": "\nTwilio\nExotel\nExolve"
   },
   {
    "default": "Computer",

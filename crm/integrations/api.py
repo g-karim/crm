@@ -35,10 +35,13 @@ def _get_recording_credentials(telephony_medium: str) -> tuple | None:
 
 @frappe.whitelist()
 def is_call_integration_enabled():
+	from crm.integrations.exolve.api import is_enabled as exolve_enabled
+
 	return {
 		"integrations": {
 			"twilio": bool(frappe.db.get_single_value("CRM Twilio Settings", "enabled")),
 			"exotel": bool(frappe.db.get_single_value("CRM Exotel Settings", "enabled")),
+			"exolve": exolve_enabled(),
 		},
 		"default_calling_medium": get_user_default_calling_medium(),
 	}
@@ -260,9 +263,21 @@ def get_recording_url(call_log_name: str):
 
 	log = frappe.get_doc("CRM Call Log", call_log_name)
 	log.check_permission("read")
+	reference_type = getattr(log, "reference_doctype", None)
+	reference_name = getattr(log, "reference_docname", None)
+	# Preserve old provider rows whose only reference is the Lead schema default.
+	if reference_type == 'CRM Lead' and not reference_name:
+		reference_type = None
+	if reference_type or reference_name:
+		if not reference_type or not reference_name or not frappe.has_permission(reference_type, "read", reference_name):
+			frappe.throw(_("You do not have permission to access this call recording."), frappe.PermissionError)
 
 	if not log.recording_url:
 		frappe.throw(_("Recording URL not found"), frappe.DoesNotExistError)
+	if log.telephony_medium == "Exolve":
+		from crm.integrations.exolve.recording import browser_recording
+
+		return browser_recording(log)
 
 	auth = _get_recording_credentials(log.telephony_medium)
 	# forward the browser's Range header so the provider (Twilio/Exotel CDN) can return

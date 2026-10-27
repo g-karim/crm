@@ -1,0 +1,100 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Call Outcome",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "call_log",
+  "outcome",
+  "reference_doctype",
+  "reference_docname",
+  "callback_task",
+  "processed_by",
+  "processed_at",
+  "revision",
+  "last_mutation",
+  "last_hash",
+  "callback_call",
+  "callback_linked_by",
+  "callback_linked_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "call_log",
+   "fieldtype": "Link",
+   "label": "Call Log",
+   "options": "CRM Call Log"
+  },
+  {
+   "fieldname": "outcome",
+   "fieldtype": "Select",
+   "label": "Outcome",
+   "options": "Agreed\nCallback\nNot interested\nWrong number"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Doctype",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "reference_docname",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Docname",
+   "options": "reference_doctype"
+  },
+  {
+   "fieldname": "callback_task",
+   "fieldtype": "Link",
+   "label": "Callback Task",
+   "options": "CRM Task"
+  },
+  {
+   "fieldname": "processed_by",
+   "fieldtype": "Link",
+   "label": "Processed By",
+   "options": "User"
+  },
+  {
+   "fieldname": "processed_at",
+   "fieldtype": "Datetime",
+   "label": "Processed At"
+  },
+  {
+   "fieldname": "revision",
+   "fieldtype": "Int",
+   "label": "Revision"
+  },
+  {
+   "fieldname": "last_mutation",
+   "fieldtype": "Data",
+   "label": "Last Mutation"
+  },
+  {
+   "fieldname": "last_hash",
+   "fieldtype": "Data",
+   "label": "Last Hash"
+  },
+  {
+   "fieldname": "callback_call",
+   "fieldtype": "Link",
+   "label": "Callback Call",
+   "options": "CRM Call Log"
+  },
+  {
+   "fieldname": "callback_linked_by",
+   "fieldtype": "Link",
+   "label": "Callback Linked By",
+   "options": "User"
+  },
+  {
+   "fieldname": "callback_linked_at",
+   "fieldtype": "Datetime",
+   "label": "Callback Linked At"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 1,
+ "index_web_pages_for_search": 0
+}

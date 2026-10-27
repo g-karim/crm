@@ -1,0 +1,52 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Call Work",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "user",
+  "revision",
+  "data",
+  "call_log",
+  "last_mutation",
+  "last_hash"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User"
+  },
+  {
+   "fieldname": "revision",
+   "fieldtype": "Int",
+   "label": "Revision"
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Long Text",
+   "label": "Data"
+  },
+  {
+   "fieldname": "call_log",
+   "fieldtype": "Link",
+   "label": "Call Log",
+   "options": "CRM Call Log"
+  },
+  {
+   "fieldname": "last_mutation",
+   "fieldtype": "Data",
+   "label": "Last Mutation"
+  },
+  {
+   "fieldname": "last_hash",
+   "fieldtype": "Data",
+   "label": "Last Hash"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 0,
+ "index_web_pages_for_search": 0
+}

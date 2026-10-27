@@ -1,0 +1,64 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Exolve Settings",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "application_id",
+  "api_key",
+  "agents",
+  "history_enabled",
+  "history_start"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "0"
+  },
+  {
+   "fieldname": "application_id",
+   "fieldtype": "Data",
+   "label": "Application ID"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "agents",
+   "fieldtype": "Table",
+   "options": "CRM Exolve Agent",
+   "label": "SIP Accounts"
+  },
+  {
+   "fieldname": "history_enabled",
+   "fieldtype": "Check",
+   "default": "0",
+   "label": "Synchronize call history on the server"
+  },
+  {
+   "fieldname": "history_start",
+   "fieldtype": "Date",
+   "label": "History start date"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "issingle": 1
+}

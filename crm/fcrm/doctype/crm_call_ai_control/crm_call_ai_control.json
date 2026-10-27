@@ -1,0 +1,38 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Call AI Control",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "enabled",
+  "daily_limit",
+  "run_reserve",
+  "revision"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "daily_limit",
+   "fieldtype": "Float",
+   "label": "Daily Limit"
+  },
+  {
+   "fieldname": "run_reserve",
+   "fieldtype": "Float",
+   "label": "Run Reserve"
+  },
+  {
+   "fieldname": "revision",
+   "fieldtype": "Int",
+   "label": "Revision"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 1,
+ "index_web_pages_for_search": 0
+}

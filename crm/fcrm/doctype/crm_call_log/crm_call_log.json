@@ -43,7 +43,10 @@
   "end_time",
   "note",
   "section_break_kebz",
-  "links"
+  "links",
+  "exolve_call_id",
+  "exolve_application_id",
+  "exolve_recording_state"
  ],
  "fields": [
   {
@@ -286,12 +289,35 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Telephony Medium",
-   "options": "\nManual\nTwilio\nExotel",
+   "options": "\nManual\nTwilio\nExotel\nExolve",
    "read_only": 1
   },
   {
    "fieldname": "section_break_gyqe",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "exolve_call_id",
+   "fieldtype": "Data",
+   "label": "Exolve Call Id",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "exolve_application_id",
+   "fieldtype": "Data",
+   "label": "Exolve Application Id",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "exolve_recording_state",
+   "fieldtype": "Select",
+   "options": "\npending\nready\nunavailable",
+   "label": "Exolve Recording State",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

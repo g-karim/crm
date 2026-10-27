@@ -65,7 +65,7 @@ def get_config(*, language: str | None = None, require_api_key: bool = True) -> 
 def get_public_status() -> dict:
 	config = get_config(require_api_key=False)
 	return {
-		"enabled": True,
+		"enabled": bool(frappe.db.table_exists("CRM Call AI Control") and frappe.db.get_value("CRM Call AI Control", "global", "enabled")),
 		"configured": bool(config.api_key),
 	}
 

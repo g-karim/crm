@@ -3,9 +3,6 @@ from __future__ import annotations
 import frappe
 from frappe.utils import flt
 
-from .config import CallAnalysisConfigurationError, get_config, get_user_analysis_language
-from .tasks import enqueue_call_analysis
-
 MIN_AUTO_ANALYSIS_SECONDS = 10
 
 
@@ -32,19 +29,6 @@ def get_analysis_user(call_log) -> str:
 
 
 def maybe_enqueue_call_analysis(call_log, method: str | None = None):
-	if not should_auto_analyze(call_log):
-		return None
-
-	try:
-		user = get_analysis_user(call_log)
-		language = get_user_analysis_language(user)
-		get_config(language=language)
-		return enqueue_call_analysis(call_log, user, language=language)
-	except CallAnalysisConfigurationError:
-		return None
-	except Exception:
-		frappe.log_error(
-			title=f"Could not enqueue automatic call analysis: {call_log.name}",
-			message=frappe.get_traceback(),
-		)
-		return None
+	# Stage 4 is explicit, opt-in and budgeted. Saving/importing a call must never
+	# disclose its audio to AI or schedule a paid request automatically.
+	return None

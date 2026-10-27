@@ -1,42 +1,22 @@
-from __future__ import annotations
+"""Legacy route uses the same opt-in and budget gate as the Telephony workspace."""
+
+from uuid import uuid4
 
 import frappe
-from frappe import _
 from frappe.rate_limiter import rate_limit
-from frappe.utils import cint
 
-from .config import (
-	CallAnalysisConfigurationError,
-	get_config,
-	get_public_status,
-	get_user_analysis_language,
-)
-from .tasks import enqueue_call_analysis
+from .config import get_public_status
 
 
 @frappe.whitelist()
-def get_runtime_status() -> dict:
+def get_runtime_status():
 	return get_public_status()
 
 
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=5, seconds=60)
-def start_analysis(call_log_name: str, force: int | str = 0) -> dict:
-	call_log = frappe.get_doc("CRM Call Log", call_log_name)
-	call_log.check_permission("write")
-	if not call_log.recording_url:
-		frappe.throw(_("This call has no recording to analyze."), frappe.ValidationError)
+def start_analysis(call_log_name, force=0):
+	from .workspace import start
 
-	language = get_user_analysis_language(frappe.session.user)
-	try:
-		get_config(language=language)
-	except CallAnalysisConfigurationError as exc:
-		frappe.throw(_(str(exc)), frappe.ValidationError)
-
-	active = call_log.ai_analysis_status in {"Queued", "Processing"}
-	if active:
-		return {"queued": False, "status": call_log.ai_analysis_status}
-	if call_log.ai_analysis_status == "Completed" and not cint(force):
-		return {"queued": False, "status": "Completed"}
-
-	return enqueue_call_analysis(call_log, frappe.session.user, language=language)
+	data = start(call_log_name, str(uuid4()), retry=force)
+	return {"queued": data["result"]["state"] == "Queued", "status": data["result"]["state"]}

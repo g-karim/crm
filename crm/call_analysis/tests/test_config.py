@@ -59,9 +59,11 @@ class TestCallAnalysisConfig(TestCase):
 		self.assertEqual(result.proxy_url, "socks5h://voice-proxy:1080")
 
 	@patch.dict(os.environ, {}, clear=True)
-	def test_feature_is_always_enabled_but_reports_missing_key(self):
-		with patch.object(config, "frappe", SimpleNamespace(conf={})):
-			self.assertEqual(config.get_public_status(), {"enabled": True, "configured": False})
+	def test_feature_is_disabled_without_explicit_site_opt_in(self):
+		with patch.object(
+			config, "frappe", SimpleNamespace(conf={}, db=SimpleNamespace(table_exists=lambda _name: False))
+		):
+			self.assertEqual(config.get_public_status(), {"enabled": False, "configured": False})
 			with self.assertRaises(config.CallAnalysisConfigurationError):
 				config.get_config()
 

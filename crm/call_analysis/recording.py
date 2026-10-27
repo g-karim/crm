@@ -48,7 +48,12 @@ def download_recording(call_log, *, max_bytes: int) -> Recording:
 	upstream = None
 	content_type = ""
 	try:
-		upstream = _fetch_recording(call_log.recording_url, auth, {})
+		if call_log.telephony_medium == "Exolve":
+			from crm.integrations.exolve.api import fetch_recording
+
+			upstream = fetch_recording(call_log)
+		else:
+			upstream = _fetch_recording(call_log.recording_url, auth, {})
 		upstream.raise_for_status()
 		content_type = str(upstream.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
 		content_length = _content_length(upstream.headers.get("Content-Length"))

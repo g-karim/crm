@@ -1,0 +1,63 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Exolve History Sync",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "application_id",
+  "sip_resource_id",
+  "user",
+  "state",
+  "last_success_at",
+  "next_retry_at",
+  "failures",
+  "last_error"
+ ],
+ "fields": [
+  {
+   "fieldname": "application_id",
+   "fieldtype": "Data",
+   "label": "Application Id"
+  },
+  {
+   "fieldname": "sip_resource_id",
+   "fieldtype": "Data",
+   "label": "Sip Resource Id"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User"
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Long Text",
+   "label": "State"
+  },
+  {
+   "fieldname": "last_success_at",
+   "fieldtype": "Datetime",
+   "label": "Last Success At"
+  },
+  {
+   "fieldname": "next_retry_at",
+   "fieldtype": "Datetime",
+   "label": "Next Retry At"
+  },
+  {
+   "fieldname": "failures",
+   "fieldtype": "Int",
+   "label": "Failures"
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Small Text",
+   "label": "Last Error"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 0,
+ "index_web_pages_for_search": 0
+}

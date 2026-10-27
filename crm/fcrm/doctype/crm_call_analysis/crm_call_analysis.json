@@ -1,0 +1,160 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Call Analysis",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "call_log",
+  "requested_by",
+  "mutation_id",
+  "state",
+  "stage",
+  "budget_day",
+  "budget_charge",
+  "actual_cost",
+  "recording_source",
+  "recording_hash",
+  "audio_seconds",
+  "raw_transcript",
+  "segments",
+  "stt_response",
+  "summary_response",
+  "summary_json",
+  "task_receipts",
+  "error",
+  "provider_ids",
+  "reconciled_by",
+  "reconciliation_note",
+  "reference_doctype",
+  "reference_docname"
+ ],
+ "fields": [
+  {
+   "fieldname": "call_log",
+   "fieldtype": "Link",
+   "label": "Call Log",
+   "options": "CRM Call Log"
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User"
+  },
+  {
+   "fieldname": "mutation_id",
+   "fieldtype": "Data",
+   "label": "Mutation Id"
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "State"
+  },
+  {
+   "fieldname": "stage",
+   "fieldtype": "Data",
+   "label": "Stage"
+  },
+  {
+   "fieldname": "budget_day",
+   "fieldtype": "Date",
+   "label": "Budget Day"
+  },
+  {
+   "fieldname": "budget_charge",
+   "fieldtype": "Float",
+   "label": "Budget Charge",
+   "precision": "9"
+  },
+  {
+   "fieldname": "actual_cost",
+   "fieldtype": "Float",
+   "label": "Actual Cost",
+   "precision": "9"
+  },
+  {
+   "fieldname": "recording_source",
+   "fieldtype": "Small Text",
+   "label": "Recording Source"
+  },
+  {
+   "fieldname": "recording_hash",
+   "fieldtype": "Data",
+   "label": "Recording Hash"
+  },
+  {
+   "fieldname": "audio_seconds",
+   "fieldtype": "Float",
+   "label": "Audio Seconds",
+   "precision": "9"
+  },
+  {
+   "fieldname": "raw_transcript",
+   "fieldtype": "Long Text",
+   "label": "Raw Transcript"
+  },
+  {
+   "fieldname": "segments",
+   "fieldtype": "Long Text",
+   "label": "Segments"
+  },
+  {
+   "fieldname": "stt_response",
+   "fieldtype": "Long Text",
+   "label": "Stt Response"
+  },
+  {
+   "fieldname": "summary_response",
+   "fieldtype": "Long Text",
+   "label": "Summary Response"
+  },
+  {
+   "fieldname": "summary_json",
+   "fieldtype": "Long Text",
+   "label": "Summary Json"
+  },
+  {
+   "fieldname": "task_receipts",
+   "fieldtype": "Long Text",
+   "label": "Task Receipts"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error"
+  },
+  {
+   "fieldname": "provider_ids",
+   "fieldtype": "Small Text",
+   "label": "Provider Ids"
+  },
+  {
+   "fieldname": "reconciled_by",
+   "fieldtype": "Link",
+   "label": "Reconciled By",
+   "options": "User"
+  },
+  {
+   "fieldname": "reconciliation_note",
+   "fieldtype": "Small Text",
+   "label": "Reconciliation Note"
+  },
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference Doctype",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "reference_docname",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Docname",
+   "options": "reference_doctype"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 0,
+ "index_web_pages_for_search": 0
+}

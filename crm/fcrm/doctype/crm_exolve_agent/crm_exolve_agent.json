@@ -1,0 +1,37 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Exolve Agent",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "sip_resource_id",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "User",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sip_resource_id",
+   "fieldtype": "Data",
+   "label": "SIP Resource ID",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1",
+   "in_list_view": 1
+  }
+ ],
+ "permissions": [],
+ "istable": 1
+}

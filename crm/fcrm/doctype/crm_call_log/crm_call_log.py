@@ -56,7 +56,9 @@ class CRMCallLog(Document):
 			"Queued",
 			"Canceled",
 		]
-		telephony_medium: DF.Literal["", "Manual", "Twilio", "Exotel"]
+		telephony_medium: DF.Literal["", "Manual", "Twilio", "Exotel", "Exolve"]
+		exolve_call_id: DF.Data | None
+		exolve_application_id: DF.Data | None
 		to: DF.Data
 		type: DF.Literal["Incoming", "Outgoing"]
 	# end: auto-generated types
@@ -71,6 +73,9 @@ class CRMCallLog(Document):
 		self._maybe_enqueue_call_analysis()
 
 	def validate(self):
+		from crm.integrations.exolve.api import validate_call_log
+
+		validate_call_log(self)
 		if not self.is_new() and self.has_value_changed("recording_url"):
 			self._clear_call_analysis()
 
@@ -78,6 +83,8 @@ class CRMCallLog(Document):
 		self._maybe_enqueue_call_analysis()
 
 	def _maybe_enqueue_call_analysis(self):
+		if frappe.flags.in_exolve_sync:
+			return  # Importing a pilot call never starts a paid AI request implicitly.
 		from crm.call_analysis.automation import maybe_enqueue_call_analysis
 
 		maybe_enqueue_call_analysis(self)
