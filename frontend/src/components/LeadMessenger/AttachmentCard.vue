@@ -1,36 +1,41 @@
 <template>
   <component
-    :is="action ? 'a' : 'div'"
-    :href="action || undefined"
-    :target="action ? '_blank' : undefined"
-    :rel="action ? 'noopener noreferrer' : undefined"
+    :is="cardAction ? 'a' : 'div'"
+    :href="cardAction || undefined"
+    :target="cardAction ? '_blank' : undefined"
+    :rel="cardAction ? 'noopener noreferrer' : undefined"
     data-attachment-card
-    class="flex min-w-0 items-center gap-3 rounded-lg border border-outline-gray-1 bg-surface-base p-3 no-underline"
-    :class="[
-      action ? 'hover:bg-surface-gray-1' : '',
-      isGenericFile
-        ? 'w-fit max-w-[min(20rem,100%)] justify-self-start'
-        : 'max-w-sm',
-    ]"
+    class="flex w-full min-w-0 max-w-full items-center gap-3 rounded-lg border border-outline-gray-1 bg-surface-base p-3 no-underline"
+    :class="
+      cardAction
+        ? 'hover:bg-surface-gray-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3'
+        : ''
+    "
   >
     <div
       v-if="attachment.type === 'video' && attachment.preview_url"
       class="relative h-16 w-24 shrink-0 overflow-hidden rounded bg-surface-gray-2"
     >
-      <img :src="attachment.preview_url" class="size-full object-cover" />
+      <img
+        :src="attachment.preview_url"
+        alt=""
+        class="size-full object-cover"
+      />
       <PlayIcon class="absolute inset-0 m-auto size-7 text-white drop-shadow" />
     </div>
     <div
       v-else
       class="flex size-10 shrink-0 items-center justify-center rounded bg-surface-gray-2 text-ink-gray-6"
     >
-      <LoadingIndicator v-if="state.busy" class="size-5" />
+      <LoadingIndicator v-if="state.busy && !waitingForUpdate" class="size-5" />
+      <ClockIcon v-else-if="state.busy" class="size-5" />
       <component :is="cardIcon" v-else class="size-5" />
     </div>
-    <div class="min-w-0" :class="isGenericFile ? '' : 'flex-1'">
+    <div class="min-w-0 flex-1">
       <div
         data-attachment-card-title
         class="truncate text-sm font-medium text-ink-gray-8"
+        :title="__(title)"
       >
         {{ __(title) }}
       </div>
@@ -42,7 +47,10 @@
         <span>{{ __(state.label) }}</span>
       </div>
     </div>
-    <ExternalLinkIcon v-if="action" class="size-4 shrink-0 text-ink-gray-5" />
+    <ExternalLinkIcon
+      v-if="cardAction && attachment.type !== 'file'"
+      class="size-4 shrink-0 text-ink-gray-5"
+    />
   </component>
 </template>
 
@@ -54,8 +62,9 @@ import {
   getAttachmentAction,
   getAttachmentState,
 } from '@/utils/messengerAttachments'
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import CircleHelpIcon from '~icons/lucide/circle-help'
+import ClockIcon from '~icons/lucide/clock-3'
 import ExternalLinkIcon from '~icons/lucide/external-link'
 import FileIcon from '~icons/lucide/file'
 import LinkIcon from '~icons/lucide/link'
@@ -68,10 +77,11 @@ const props = defineProps({
   icon: { type: String, default: '' },
 })
 const state = computed(() => getAttachmentState(props.attachment))
-const action = computed(() => getAttachmentAction(props.attachment))
+const cardAction = computed(() => getAttachmentAction(props.attachment))
+const waitingForUpdate = ref(false)
+let waitingTimer = null
 const size = computed(() => formatAttachmentSize(props.attachment.size_bytes))
 const title = computed(() => getMessengerAttachmentTitle(props.attachment))
-const isGenericFile = computed(() => props.attachment.type === 'file')
 const cardIcon = computed(() => {
   if (props.icon === 'sticker') return StickerIcon
   if (props.attachment.type === 'link') return LinkIcon
@@ -79,4 +89,18 @@ const cardIcon = computed(() => {
   if (props.attachment.type === 'unsupported') return CircleHelpIcon
   return FileIcon
 })
+
+watch(
+  [() => props.attachment.id, () => state.value.status],
+  () => {
+    clearTimeout(waitingTimer)
+    waitingForUpdate.value = false
+    if (state.value.busy) {
+      waitingTimer = setTimeout(() => (waitingForUpdate.value = true), 30000)
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => clearTimeout(waitingTimer))
 </script>

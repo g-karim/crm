@@ -81,6 +81,147 @@ const delta = (changes = [], overrides = {}) => ({
 })
 
 describe('messenger sync', () => {
+  it.each([
+    ['wazzup', 'whatsapp'],
+    ['wazzup', 'telegram'],
+    ['max_direct', 'max'],
+    ['vk_direct', 'vk'],
+    ['telegram_bot', 'telegram'],
+    ['avito_direct', 'avito'],
+  ])(
+    'keeps %s %s millisecond chronology and ties identical across snapshot, delta and reload',
+    async (provider, platform) => {
+      let rows = [
+        {
+          name: 'OUTBOUND-FIRST',
+          direction: 'outbound',
+          message_datetime: '2026-10-23 09:00:00.005000',
+          creation: '2026-10-23 09:00:03.000000',
+        },
+        {
+          name: 'INBOUND-SECOND',
+          direction: 'inbound',
+          message_datetime: '2026-10-23 09:00:00.006000',
+          creation: '2026-10-23 09:00:01.000000',
+        },
+        {
+          name: 'OUTBOUND-THIRD',
+          direction: 'outbound',
+          message_datetime: '2026-10-23 09:00:00.010000',
+          creation: '2026-10-23 09:00:02.001001',
+        },
+        {
+          name: 'INBOUND-TIE-A',
+          direction: 'inbound',
+          message_datetime: '2026-10-23 09:00:00.010000',
+          creation: '2026-10-23 09:00:02.001002',
+        },
+        {
+          name: 'INBOUND-TIE-B',
+          direction: 'inbound',
+          message_datetime: '2026-10-23 09:00:00.010000',
+          creation: '2026-10-23 09:00:02.001002',
+        },
+      ].map((row) => ({
+        ...row,
+        provider,
+        platform,
+        modified: '2026-10-23 09:01:00.000001',
+      }))
+      let expected = rows.map((row) => row.name)
+      let snapshotCount = 0
+      let harness = createHarness({
+        get_message_page: () =>
+          snapshotCount++
+            ? snapshot([...rows].reverse())
+            : snapshot([rows[4], rows[2], rows[0]]),
+        get_message_changes: delta([rows[3], rows[1], rows[2]]),
+      })
+
+      await harness.controller.start('LEAD-1')
+      expect(harness.controller.getMessages().map((row) => row.name)).toEqual([
+        expected[0],
+        expected[2],
+        expected[4],
+      ])
+      await harness.controller.syncDelta()
+      expect(harness.controller.getMessages()).toEqual(rows)
+      await harness.controller.loadSnapshot()
+      expect(harness.controller.getMessages()).toEqual(rows)
+      harness.controller.stop()
+    },
+  )
+
+  it.each(['whatsapp', 'telegram'])(
+    'applies only authoritative Wazzup %s timestamp corrections without guessing legacy order',
+    async (platform) => {
+      let legacy = {
+        name: 'LEGACY-OUTBOUND',
+        provider: 'wazzup',
+        platform,
+        direction: 'outbound',
+        message_datetime: '2026-10-23 09:00:30.100000',
+        creation: '2026-10-23 09:00:00.000001',
+        sent_at: '2026-10-23 09:00:00.000002',
+        modified: '2026-10-23 09:01:00.000001',
+      }
+      let inbound = {
+        ...legacy,
+        name: 'INBOUND',
+        direction: 'inbound',
+        message_datetime: '2026-10-23 09:00:00.006000',
+        creation: '2026-10-23 09:00:02.000001',
+      }
+      let current = {
+        ...legacy,
+        name: 'CURRENT-OUTBOUND',
+        message_datetime: '2026-10-23 09:00:30.200000',
+        creation: '2026-10-23 09:00:01.000001',
+      }
+      let corrected = {
+        ...current,
+        message_datetime: '2026-10-23 09:00:00.005000',
+        modified: '2026-10-23 09:01:00.000002',
+      }
+      let snapshotCount = 0
+      let harness = createHarness({
+        get_message_page: () =>
+          snapshot(
+            snapshotCount++
+              ? [legacy, corrected, inbound]
+              : [legacy, current, inbound],
+          ),
+        get_message_changes: delta([corrected]),
+      })
+
+      await harness.controller.start('LEAD-1')
+      expect(harness.controller.getMessages()).toEqual([
+        inbound,
+        legacy,
+        current,
+      ])
+      await harness.controller.syncDelta()
+      expect(harness.controller.getMessages()).toEqual([
+        corrected,
+        inbound,
+        legacy,
+      ])
+      expect(harness.changes.at(-1).inserted).toEqual([])
+      expect(harness.changes.at(-1).updated).toEqual(['CURRENT-OUTBOUND'])
+      await harness.controller.loadSnapshot()
+      expect(harness.controller.getMessages()).toEqual([
+        corrected,
+        inbound,
+        legacy,
+      ])
+      expect(legacy.message_datetime).toBe('2026-10-23 09:00:30.100000')
+      expect(
+        harness.calls.every(([method]) => /get_message_/.test(method)),
+      ).toBe(true)
+      harness.controller.stop()
+    },
+  )
+
   it('merges an exact unloaded reply target through the shared ordering path', () => {
     let harness = createHarness()
     let older = {
@@ -178,6 +319,56 @@ describe('messenger sync', () => {
     ])
   })
 
+  it('reconciles late VK image delivery in the existing bubble without resending', async () => {
+    let pending = {
+      name: 'VK-IMAGE-1',
+      provider: 'vk_direct',
+      direction: 'outbound',
+      message_type: 'image',
+      status: 'unknown',
+      delivery_status: 'unknown',
+      external_message_id: '',
+      failure_reason: 'VK message delivery result is unknown.',
+      message_datetime: '2026-10-12 10:00:00',
+      modified: '2026-10-12 10:00:01',
+      attachments: [{ type: 'image', url: '/private/files/photo.jpg' }],
+    }
+    let confirmed = {
+      ...pending,
+      status: 'sent',
+      delivery_status: 'sent',
+      external_message_id: 'VK-PROVIDER-1',
+      failure_reason: '',
+      modified: '2026-10-12 10:01:00',
+    }
+    let harness = createHarness({
+      get_message_page: snapshot([pending]),
+      get_message_changes: delta([confirmed]),
+    })
+    await harness.controller.start('LEAD-1')
+
+    harness.socket.emit('crm_messenger:conversation_changed', {
+      version: 1,
+      reference_doctype: 'CRM Lead',
+      reference_name: 'LEAD-1',
+    })
+    await vi.waitFor(() =>
+      expect(harness.controller.getMessages()).toEqual([confirmed]),
+    )
+
+    expect(harness.changes.at(-1).updated).toEqual(['VK-IMAGE-1'])
+    expect(harness.changes.at(-1).inserted).toEqual([])
+    expect(
+      harness.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+    expect(
+      harness.calls.some(([method]) =>
+        method.endsWith('retry_outbound_message'),
+      ),
+    ).toBe(false)
+    harness.controller.stop()
+  })
+
   it('propagates permission loss from a delta response', async () => {
     let operator = {
       can_read: true,
@@ -264,6 +455,168 @@ describe('messenger sync', () => {
     })
     expect(harness.controller.getMessages()).toHaveLength(1)
   })
+
+  it.each(['whatsapp', 'telegram'])(
+    'merges normalized Wazzup %s text and delivery updates without duplicate messages',
+    async (platform) => {
+      let outgoing = {
+        name: 'WAZZUP-OUTBOUND',
+        provider: 'wazzup',
+        platform,
+        channel: 'WAZZUP-CHANNEL',
+        conversation: 'WAZZUP-CONVERSATION',
+        direction: 'outbound',
+        message_type: 'text',
+        text: 'Здравствуйте',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        can_retry: false,
+        message_datetime: '2026-10-02 10:00:00',
+      }
+      let incoming = {
+        ...outgoing,
+        name: 'WAZZUP-INBOUND',
+        direction: 'inbound',
+        ingest_source: 'provider_webhook',
+        text: 'Хочу уточнить заказ',
+        status: 'received',
+        delivery_status: '',
+        message_datetime: '2026-10-02 10:01:00',
+      }
+      let harness = createHarness({
+        get_message_page: snapshot([outgoing]),
+        get_message_changes: vi
+          .fn()
+          .mockReturnValueOnce(delta([incoming]))
+          .mockReturnValueOnce(
+            delta(
+              [
+                incoming,
+                { ...outgoing, status: 'read', delivery_status: 'read' },
+              ],
+              { next_cursor: 'cursor-3' },
+            ),
+          ),
+      })
+      await harness.controller.start('LEAD-1')
+
+      let event = {
+        version: 1,
+        reference_doctype: 'CRM Lead',
+        reference_name: 'LEAD-1',
+        conversation: incoming.conversation,
+      }
+      harness.socket.emit('crm_messenger:conversation_changed', event)
+      await vi.waitFor(() =>
+        expect(harness.controller.getMessages()).toHaveLength(2),
+      )
+      let firstDelta = harness.changes.find((change) => change.kind === 'delta')
+      expect(firstDelta.inserted).toEqual([incoming.name])
+      expect(
+        countNewMessengerMessages({
+          ...firstDelta,
+          previousLastMessage: outgoing,
+        }),
+      ).toBe(1)
+
+      harness.socket.emit('crm_messenger:conversation_changed', event)
+      await vi.waitFor(() =>
+        expect(harness.controller.getMessages()[0].delivery_status).toBe(
+          'read',
+        ),
+      )
+
+      expect(harness.controller.getMessages()).toEqual([
+        { ...outgoing, status: 'read', delivery_status: 'read' },
+        incoming,
+      ])
+      let lastDelta = harness.changes.at(-1)
+      expect(lastDelta.inserted).toEqual([])
+      expect(
+        countNewMessengerMessages({
+          ...lastDelta,
+          previousLastMessage: incoming,
+        }),
+      ).toBe(0)
+      expect(harness.calls.every(([method]) => !method.includes('retry'))).toBe(
+        true,
+      )
+      harness.controller.stop()
+    },
+  )
+
+  it.each(['whatsapp', 'telegram'])(
+    'updates downloaded Wazzup %s media and its quote without inserting another message',
+    async (platform) => {
+      let pending = {
+        name: 'WAZZUP-MEDIA',
+        provider: 'wazzup',
+        platform,
+        conversation: 'WAZZUP-CONVERSATION',
+        direction: 'inbound',
+        ingest_source: 'provider_webhook',
+        message_type: 'image',
+        text: '',
+        status: 'received',
+        attachments: [{ id: 'WAZZUP-IMAGE', type: 'image', status: 'pending' }],
+        reply_context: {
+          state: 'unavailable',
+          message: null,
+          snapshot: { text: 'Original' },
+        },
+        message_datetime: '2026-10-02 10:00:00',
+      }
+      let downloaded = {
+        ...pending,
+        attachments: [
+          {
+            ...pending.attachments[0],
+            status: 'available',
+            url: '/api/private-wazzup-image',
+            download_url: '/api/private-wazzup-image-download',
+          },
+        ],
+        reply_context: {
+          state: 'available',
+          message: 'WAZZUP-ORIGINAL',
+          snapshot: { text: 'Original' },
+        },
+      }
+      let harness = createHarness({
+        get_message_page: snapshot([pending]),
+        get_message_changes: delta([downloaded]),
+      })
+      await harness.controller.start('LEAD-1')
+      let event = {
+        version: 1,
+        reference_doctype: 'CRM Lead',
+        reference_name: 'LEAD-1',
+        conversation: pending.conversation,
+      }
+      harness.socket.emit('crm_messenger:conversation_changed', event)
+      await vi.waitFor(() =>
+        expect(harness.controller.getMessages()).toEqual([downloaded]),
+      )
+
+      let update = harness.changes.at(-1)
+      expect(update.inserted).toEqual([])
+      expect(update.updated).toEqual([pending.name])
+      expect(
+        countNewMessengerMessages({ ...update, previousLastMessage: pending }),
+      ).toBe(0)
+      harness.socket.emit('crm_messenger:conversation_changed', event)
+      await vi.waitFor(() =>
+        expect(
+          harness.calls.filter(([method]) =>
+            method.endsWith('get_message_changes'),
+          ),
+        ).toHaveLength(2),
+      )
+      expect(harness.controller.getMessages()).toEqual([downloaded])
+      expect(harness.changes.at(-1).inserted).toEqual([])
+      harness.controller.stop()
+    },
+  )
 
   it('notifies the conversation layer about lifecycle realtime changes', async () => {
     let stateChanges = []

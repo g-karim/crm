@@ -13,6 +13,7 @@ const PLATFORM_LABELS = {
 const DELIVERY_LABELS = {
   queued: 'Queued',
   sending: 'Sending',
+  accepted: 'Awaiting provider status',
   retrying: 'Retrying',
   unknown: 'Result unknown',
   sent: 'Sent',
@@ -80,6 +81,8 @@ export function buildMessengerMessageItems(messages = [], now = dayjsLocal()) {
         : ''
     previousDayKey = dayKey
 
+    // Wazzup timestamps can differ by milliseconds for separately sent photos.
+    // Keep messages independent without a provider album identity.
     let previous = result.at(-1)
     let previousMessage = previous?.messages?.at(-1)
     if (
@@ -180,7 +183,15 @@ export function getMessengerDeliveryState(message = {}) {
 }
 
 export function getMessengerFailureReason(message = {}) {
+  let unknownHint = getMessengerUnknownResultHint(message)
+  if (unknownHint) return unknownHint
   let reason = message?.failure_reason || message?.error || ''
+  if (
+    message?.provider === 'wazzup' &&
+    reason === 'wazzup_configuration_invalid'
+  ) {
+    return 'Wazzup configuration is invalid. Check the saved channel settings.'
+  }
   if (
     message?.provider === 'vk_direct' &&
     (reason === VK_PHOTO_UPLOAD_INVALID_REASON ||
@@ -189,6 +200,16 @@ export function getMessengerFailureReason(message = {}) {
     return VK_PHOTO_UPLOAD_USER_REASON
   }
   return reason
+}
+
+export function getMessengerUnknownResultHint(message = {}) {
+  if (
+    message?.provider === 'vk_direct' &&
+    getMessengerDeliveryState(message) === 'unknown'
+  ) {
+    return 'VK message result is unknown. Automatic resend is disabled.'
+  }
+  return ''
 }
 
 export function shouldShowMessengerText(message = {}) {
@@ -304,7 +325,16 @@ export function getMessengerCapabilities(channel = {}) {
       channel?.capabilities?.supported_attachment_types || [],
     supported_attachment_file_types:
       channel?.capabilities?.supported_attachment_file_types || [],
+    supported_attachment_file_types_by_type:
+      channel?.capabilities?.supported_attachment_file_types_by_type || {},
     supports_image_caption: channel?.capabilities?.supports_image_caption,
+    supports_attachment_captions:
+      channel?.capabilities?.supports_attachment_captions,
+    max_attachment_size_bytes: Number(
+      channel?.capabilities?.max_attachment_size_bytes || 0,
+    ),
+    max_attachment_size_bytes_by_type:
+      channel?.capabilities?.max_attachment_size_bytes_by_type || {},
     max_attachment_count: Math.max(
       1,
       Number(channel?.capabilities?.max_attachment_count || 10),

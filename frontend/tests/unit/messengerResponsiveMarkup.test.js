@@ -55,9 +55,7 @@ describe('messenger responsive markup', () => {
   })
 
   it('keeps direct and forwarded sticker bubbles at their media widths', () => {
-    expect(conversationSource).toContain(
-      "return 'w-[14.5rem] !max-w-[94%] sm:!max-w-[14.5rem]'",
-    )
+    expect(conversationSource).toContain("return 'w-[11.5rem] !max-w-[94%]'")
     expect(conversationSource).toContain(
       "return 'w-64 !max-w-[94%] sm:!max-w-64'",
     )
@@ -74,17 +72,14 @@ describe('messenger responsive markup', () => {
     expect(composerAttachmentsSource).not.toContain('bg-surface-blue-3')
   })
 
-  it('keeps generic file cards compact and long filenames constrained', () => {
+  it('fills the bubble content with file cards and constrains long filenames', () => {
     expect(attachmentCardSource).toContain(
-      "? 'w-fit max-w-[min(20rem,100%)] justify-self-start'",
+      'flex w-full min-w-0 max-w-full items-center',
     )
-    expect(attachmentCardSource).toContain(
-      `class="min-w-0" :class="isGenericFile ? '' : 'flex-1'"`,
-    )
+    expect(attachmentCardSource).toContain('class="min-w-0 flex-1"')
     expect(attachmentCardSource).toContain(
       'class="truncate text-sm font-medium text-ink-gray-8"',
     )
-    expect(attachmentCardSource).toContain("props.attachment.type === 'file'")
   })
 
   it('lets long notification previews shrink and wrap on every layout', () => {

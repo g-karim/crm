@@ -93,7 +93,7 @@ import ShieldCheck from '~icons/lucide/shield-check'
 import LucideZap from '~icons/lucide/zap'
 import SlaConfig from './Sla/SlaConfig.vue'
 
-const { isManager, getUser } = usersStore()
+const { isAdmin, isManager, getUser } = usersStore()
 
 const user = computed(() => getUser() || {})
 
@@ -211,7 +211,7 @@ const tabs = computed(() => {
           label: __('Message Channels'),
           icon: LucideMessagesSquare,
           component: markRaw(MessengerSettings),
-          condition: () => isMessengerInstalled.value && isManager(),
+          condition: () => isMessengerInstalled.value && isAdmin(),
         },
         {
           label: __('WhatsApp'),

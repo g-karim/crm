@@ -8,8 +8,7 @@
       :class="isStickerOnlyForwardItem(item) ? 'w-[14.5rem]' : 'w-[20rem]'"
     >
       <div
-        class="mb-1 flex min-w-0 items-center gap-2 text-xs text-ink-gray-6"
-        :class="isStickerOnlyForwardItem(item) ? 'flex-wrap' : ''"
+        class="mb-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-ink-gray-6"
       >
         <span class="shrink-0 font-medium">
           {{
@@ -39,7 +38,7 @@
         v-if="item.text"
         class="whitespace-pre-wrap break-words text-sm text-ink-gray-8 [overflow-wrap:anywhere]"
       >
-        {{ item.text }}
+        <MessageText :text="item.text" />
       </div>
       <AttachmentRenderer
         v-if="item.attachments?.length"
@@ -78,6 +77,7 @@
 <script setup>
 import { isStickerOnlyForwardItem } from '@/utils/messengerForwarding'
 import AttachmentRenderer from './AttachmentRenderer.vue'
+import MessageText from './MessageText.vue'
 
 defineProps({
   context: { type: Object, default: null },

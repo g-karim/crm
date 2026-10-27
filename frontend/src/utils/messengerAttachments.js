@@ -16,7 +16,7 @@ const STATUS_LABELS = {
   external: 'Open in external service',
   uploading: 'Uploading',
   uploaded: 'Uploaded',
-  failed: 'Upload failed',
+  failed: 'Attachment unavailable',
   unsupported: 'Unsupported',
 }
 
@@ -99,7 +99,20 @@ export function getMessengerReplyAttachmentLabel(snapshot = {}) {
 }
 
 export function getMessengerAttachmentTitle(attachment = {}) {
-  if (attachment.display_title) return String(attachment.display_title)
+  let provider = attachment.provider || ''
+  let genericFileTitle =
+    attachment.type === 'file' &&
+    /^(?:file|файл|document|документ|attachment|вложение)$/iu.test(
+      String(attachment.display_title || '').trim(),
+    )
+  if (
+    attachment.display_title &&
+    !genericFileTitle &&
+    (provider !== 'wazzup' ||
+      !isTechnicalAttachmentName(attachment.display_title, provider))
+  ) {
+    return String(attachment.display_title)
+  }
   let type = attachment.is_voice ? 'voice' : attachment.type || 'unsupported'
   if (
     type === 'sticker' &&
@@ -120,12 +133,15 @@ export function getMessengerAttachmentTitle(attachment = {}) {
   ) {
     return ATTACHMENT_TITLES[type]
   }
-  if (attachment.title && !isTechnicalAttachmentName(attachment.title)) {
+  if (
+    attachment.title &&
+    !isTechnicalAttachmentName(attachment.title, provider)
+  ) {
     return String(attachment.title)
   }
   if (
     attachment.file_name &&
-    !isTechnicalAttachmentName(attachment.file_name)
+    !isTechnicalAttachmentName(attachment.file_name, provider)
   ) {
     return String(attachment.file_name)
   }
@@ -138,7 +154,7 @@ export function getMessengerMessagePreview(message = {}) {
   return ATTACHMENT_TITLES[message.message_type] || 'Attachment'
 }
 
-export function isTechnicalAttachmentName(value) {
+export function isTechnicalAttachmentName(value, provider = '') {
   let name = String(value || '')
     .split('/')
     .at(-1)
@@ -147,7 +163,12 @@ export function isTechnicalAttachmentName(value) {
   return (
     TECHNICAL_FILENAMES.has(name) ||
     /^vk-(audio|photo|sticker|video)(-|\.|$)/i.test(name) ||
-    /^max-(audio|file|image|sticker|video)(-|\.|$)/i.test(name)
+    /^max-(audio|file|image|sticker|video)(-|\.|$)/i.test(name) ||
+    /^wazzup-(audio|file|image|sticker|video)(-|\.|$)/i.test(name) ||
+    (provider === 'wazzup' &&
+      /^(?:[a-f0-9]{32,64}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})(?:\.[a-z0-9]{1,10})?$/i.test(
+        name,
+      ))
   )
 }
 
@@ -167,6 +188,14 @@ export function groupMessengerAttachments(attachments = []) {
 export function buildMessengerAttachmentSegments(attachments = []) {
   let segments = []
   attachments.forEach((attachment, index) => {
+    if (isCompactWazzupStickerImage(attachment)) {
+      segments.push({
+        type: 'sticker',
+        key: `${attachment.id || 'sticker-image'}-${index}`,
+        attachment,
+      })
+      return
+    }
     if (
       attachment?.is_animated &&
       ['image', 'video'].includes(attachment?.type)
@@ -190,7 +219,10 @@ export function buildMessengerAttachmentSegments(attachments = []) {
       return
     }
     segments.push({
-      type: attachment?.type || 'unsupported',
+      type:
+        attachment?.type === 'voice'
+          ? 'audio'
+          : attachment?.type || 'unsupported',
       key: `${attachment?.id || attachment?.type || 'attachment'}-${index}`,
       attachment,
     })
@@ -202,8 +234,25 @@ export function isSingleImageAttachmentSet(attachments = []) {
   return attachments.length === 1 && attachments[0]?.type === 'image'
 }
 
-export function isSingleStickerAttachmentSet(attachments = []) {
-  return attachments.length === 1 && attachments[0]?.type === 'sticker'
+export function isCompactWazzupStickerImage(attachment = {}, provider = '') {
+  // This media hint changes presentation only: Wazzup does not
+  // distinguish static WhatsApp stickers from ordinary images in its DTO.
+  if (!attachment) return false
+  return Boolean(
+    (provider || attachment.provider) === 'wazzup' &&
+      attachment.type === 'image' &&
+      attachment.mime_type === 'image/webp' &&
+      attachment.is_sticker_candidate &&
+      !attachment.is_animated,
+  )
+}
+
+export function isSingleStickerAttachmentSet(attachments = [], provider = '') {
+  return (
+    attachments.length === 1 &&
+    (attachments[0]?.type === 'sticker' ||
+      isCompactWazzupStickerImage(attachments[0], provider))
+  )
 }
 
 export function isSingleLocationAttachmentSet(attachments = []) {
@@ -218,8 +267,12 @@ export function isSingleAudioAttachmentSet(attachments = []) {
   )
 }
 
+export function isSingleFileAttachmentSet(attachments = []) {
+  return attachments.length === 1 && attachments[0]?.type === 'file'
+}
+
 export function getSingleImageBubbleWidthClass(image = {}) {
-  return 'w-fit max-w-full'
+  return 'w-fit'
 }
 
 export function getSingleImageMediaWidthClass(image = {}) {
@@ -263,12 +316,14 @@ function getMediaFrameDimensions(media, maxWidth, maxHeight) {
 }
 
 export function getAttachmentState(attachment = {}) {
-  let status = attachment.status || 'unsupported'
+  let status = Object.hasOwn(STATUS_LABELS, attachment.status)
+    ? attachment.status
+    : 'unsupported'
   let playableFailedVoice =
     status === 'failed' && attachment.is_voice && Boolean(attachment.url)
   return {
     status,
-    label: STATUS_LABELS[status] || status,
+    label: STATUS_LABELS[status],
     busy: BUSY_STATUSES.has(status),
     failed: status === 'failed',
     unsupported: status === 'unsupported',
@@ -278,7 +333,7 @@ export function getAttachmentState(attachment = {}) {
 
 export function getAttachmentAction(attachment = {}) {
   if (!getAttachmentState(attachment).active) return ''
-  return attachment.open_url || attachment.url || ''
+  return attachment.open_url || attachment.url || attachment.download_url || ''
 }
 
 export function getVideoExternalAction(attachment = {}) {

@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
 import {
   getForwardedContentKind,
@@ -26,6 +26,34 @@ function mount(context, props = {}) {
 }
 
 describe('message reply quote', () => {
+  it.each(['available', 'unavailable'])(
+    'renders a canonical Wazzup media quote whose original is %s',
+    (state) => {
+      let onNavigate = vi.fn()
+      let root = mount(
+        {
+          state,
+          message: state === 'available' ? 'WAZZUP-ORIGINAL' : null,
+          snapshot: {
+            direction: 'inbound',
+            attachment_types: ['image'],
+            text: '',
+            sender_name: 'Client',
+          },
+        },
+        { onNavigate },
+      )
+      let quote = root.querySelector('[data-message-reply-quote]')
+
+      expect(root.textContent).toContain('Image')
+      expect(quote.disabled).toBe(state === 'unavailable')
+      quote.click()
+      if (state === 'available')
+        expect(onNavigate).toHaveBeenCalledWith('WAZZUP-ORIGINAL')
+      else expect(onNavigate).not.toHaveBeenCalled()
+    },
+  )
+
   it('classifies forwarded trees consistently for composer snapshots', () => {
     expect(
       getForwardedContentKind({

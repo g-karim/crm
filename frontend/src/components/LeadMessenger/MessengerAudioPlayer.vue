@@ -1,6 +1,7 @@
 <template>
   <div data-messenger-audio class="w-full min-w-0 max-w-full">
     <div
+      v-if="playable"
       class="mb-2 flex min-w-0 items-center gap-2 text-sm font-medium text-ink-gray-8"
     >
       <AudioLinesIcon class="size-4 shrink-0" />
@@ -8,74 +9,84 @@
     </div>
 
     <audio
-      v-if="attachment.url && state.active"
+      v-if="playable"
+      :key="`${attachment.id || ''}:${attachment.url}`"
       ref="audio"
       class="hidden"
       :src="attachment.url"
+      :volume="volume"
+      :muted="muted"
       preload="metadata"
-      @loadstart="loading = true"
+      @loadstart="startLoading"
       @loadedmetadata="onMetadata"
       @durationchange="onMetadata"
       @timeupdate="onTimeUpdate"
-      @waiting="loading = true"
-      @canplay="loading = false"
+      @waiting="startLoading"
+      @canplay="finishLoading"
       @playing="onPlaying"
-      @pause="playing = false"
+      @pause="onPause"
       @ended="onEnded"
       @error="onError"
       @volumechange="onVolumeChange"
     />
 
-    <template v-if="attachment.url && state.active">
-      <div
-        v-if="bars.length"
-        class="flex h-8 touch-none cursor-pointer items-center gap-[2px] rounded px-1 outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
-        role="slider"
-        tabindex="0"
-        :aria-label="__('Playback Position')"
-        :aria-valuemin="0"
-        :aria-valuemax="Math.round(duration)"
-        :aria-valuenow="Math.round(currentTime)"
-        @pointerdown="seekDrag.pointerDown"
-        @pointermove="seekDrag.pointerMove"
-        @pointerup="seekDrag.pointerUp"
-        @pointercancel="seekDrag.pointerCancel"
-        @keydown="seekFromKeyboard"
-      >
-        <span
-          v-for="(bar, index) in bars"
-          :key="index"
-          class="flex-1 rounded-full"
-          :class="
-            barProgress(index) <= progress
-              ? 'bg-surface-blue-7'
-              : 'bg-surface-gray-5'
-          "
-          :style="{ height: `${2 + bar * 22}px` }"
-        />
-      </div>
-      <input
-        v-else
-        class="audio-seek-range h-8 w-full rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
-        type="range"
-        min="0"
-        max="1"
-        step="0.001"
-        :value="progress"
-        :style="{ '--seek-progress': `${progress * 100}%` }"
-        :aria-label="__('Playback Position')"
-        @input="seekToFraction($event.target.value)"
-      />
-
-      <div class="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+    <template v-if="playable">
+      <div class="flex min-w-0 items-center gap-2">
         <Button
-          class="!size-9 shrink-0 !p-0"
+          class="!size-10 shrink-0 !p-0"
           variant="ghost"
           :icon="playing ? 'pause' : 'play'"
           :aria-label="playing ? __('Pause') : __('Play')"
           :disabled="Boolean(error)"
           @click="togglePlayback"
         />
+        <div class="min-w-0 flex-1">
+          <div
+            v-if="bars.length"
+            class="flex h-8 touch-none cursor-pointer items-center gap-[2px] rounded px-1 outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+            role="slider"
+            tabindex="0"
+            :aria-disabled="!duration || Boolean(error)"
+            :aria-label="__('Playback Position')"
+            :aria-valuemin="0"
+            :aria-valuemax="Math.round(duration)"
+            :aria-valuenow="Math.round(currentTime)"
+            :aria-valuetext="`${formatAudioTime(currentTime)} / ${formatAudioTime(duration)}`"
+            @pointerdown="seekDrag.pointerDown"
+            @pointermove="seekDrag.pointerMove"
+            @pointerup="seekDrag.pointerUp"
+            @pointercancel="seekDrag.pointerCancel"
+            @keydown="seekFromKeyboard"
+          >
+            <span
+              v-for="(bar, index) in bars"
+              :key="index"
+              class="flex-1 rounded-full"
+              :class="
+                barProgress(index) <= progress
+                  ? 'bg-surface-blue-7'
+                  : 'bg-surface-gray-5'
+              "
+              :style="{ height: `${2 + bar * 22}px` }"
+            />
+          </div>
+          <input
+            v-else
+            class="audio-seek-range h-8 w-full rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+            type="range"
+            min="0"
+            max="1"
+            step="0.001"
+            :value="progress"
+            :style="{ '--seek-progress': `${progress * 100}%` }"
+            :aria-label="__('Playback Position')"
+            :disabled="!duration || Boolean(error)"
+            @input="seekToFraction($event.target.value)"
+          />
+        </div>
+      </div>
+
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
         <LoadingIndicator v-if="loading && !error" class="size-4 shrink-0" />
         <span class="shrink-0 text-xs tabular-nums text-ink-gray-5">
           {{ formatAudioTime(currentTime) }} / {{ formatAudioTime(duration) }}
@@ -102,18 +113,28 @@
       </div>
       <div
         v-if="error"
-        class="mt-2 flex items-center gap-2 text-xs text-ink-red-8"
+        class="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-red-8"
+        role="status"
       >
         <CircleAlertIcon class="size-4 shrink-0" />
         <span>{{ error }}</span>
+        <Button
+          :label="__('Try Again')"
+          variant="outline"
+          @click="retryPlayback"
+        />
+        <a
+          v-if="downloadAction"
+          :href="downloadAction"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="rounded underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+          >{{ __('Download') }}</a
+        >
       </div>
     </template>
 
-    <div v-else class="flex items-center gap-2 text-sm text-ink-gray-5">
-      <LoadingIndicator v-if="state.busy" class="size-4" />
-      <CircleAlertIcon v-else class="size-4" />
-      <span>{{ __(state.label) }}</span>
-    </div>
+    <AttachmentCard v-else :attachment="fallbackAttachment" />
   </div>
 </template>
 
@@ -123,17 +144,20 @@ import {
   clampAudioFraction,
   createAudioSeekDrag,
   formatAudioTime,
+  getAudioDuration,
   normalizeAudioVolume,
   prepareWaveform,
 } from '@/utils/messengerAudio'
 import {
   getAttachmentState,
+  getAttachmentAction,
   getMessengerAttachmentTitle,
 } from '@/utils/messengerAttachments'
 import { Button } from 'frappe-ui'
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import AudioLinesIcon from '~icons/lucide/audio-lines'
 import CircleAlertIcon from '~icons/lucide/circle-alert'
+import AttachmentCard from './AttachmentCard.vue'
 
 const props = defineProps({
   attachment: { type: Object, required: true },
@@ -141,19 +165,38 @@ const props = defineProps({
 })
 const audio = ref(null)
 const playing = ref(false)
-const loading = ref(true)
+const loading = ref(false)
 const error = ref('')
 const currentTime = ref(0)
 const metadataDuration = ref(0)
 const volume = ref(1)
 const muted = ref(false)
 let previousVolume = 1
+let loadingTimer = null
 
 const state = computed(() => getAttachmentState(props.attachment))
+const playable = computed(() =>
+  Boolean(props.attachment.url && state.value.active),
+)
+const fallbackAttachment = computed(() =>
+  state.value.active
+    ? {
+        ...props.attachment,
+        status: 'failed',
+        url: null,
+        download_url: null,
+        open_url: null,
+      }
+    : props.attachment,
+)
+const downloadAction = computed(() =>
+  state.value.active
+    ? props.attachment.download_url || getAttachmentAction(props.attachment)
+    : '',
+)
 const bars = computed(() => prepareWaveform(props.attachment.waveform, 64))
-const duration = computed(
-  () =>
-    metadataDuration.value || Number(props.attachment.duration_ms || 0) / 1000,
+const duration = computed(() =>
+  getAudioDuration(metadataDuration.value, props.attachment.duration_ms),
 )
 const progress = computed(() =>
   duration.value ? clampAudioFraction(currentTime.value / duration.value) : 0,
@@ -166,7 +209,7 @@ async function togglePlayback() {
     audio.value.pause()
     return
   }
-  loading.value = true
+  startLoading()
   try {
     await audio.value.play()
   } catch {
@@ -177,7 +220,7 @@ async function togglePlayback() {
 function onMetadata() {
   let value = Number(audio.value?.duration || 0)
   metadataDuration.value = Number.isFinite(value) ? value : 0
-  loading.value = false
+  finishLoading()
 }
 
 function onTimeUpdate() {
@@ -186,23 +229,50 @@ function onTimeUpdate() {
 
 function onPlaying() {
   playing.value = true
-  loading.value = false
+  finishLoading()
   error.value = ''
 }
 
 function onEnded() {
+  finishLoading()
   playing.value = false
   currentTime.value = duration.value
 }
 
-function onError() {
+function onPause() {
   playing.value = false
-  loading.value = false
+  finishLoading()
+}
+
+function onError() {
+  audio.value?.pause()
+  playing.value = false
+  finishLoading()
   error.value = __('Could not play the audio')
 }
 
+function startLoading() {
+  if (error.value || loadingTimer !== null) return
+  loading.value = true
+  loadingTimer = setTimeout(onError, 20000)
+}
+
+function finishLoading() {
+  clearTimeout(loadingTimer)
+  loadingTimer = null
+  loading.value = false
+}
+
+function retryPlayback() {
+  if (!audio.value || !playable.value) return
+  error.value = ''
+  currentTime.value = 0
+  startLoading()
+  audio.value.load()
+}
+
 function seekToFraction(value) {
-  if (!audio.value || !duration.value) return
+  if (!audio.value || !duration.value || error.value) return
   let next = clampAudioFraction(value) * duration.value
   audio.value.currentTime = next
   currentTime.value = next
@@ -253,7 +323,20 @@ function barProgress(index) {
   return (index + 1) / bars.value.length
 }
 
+watch(
+  () => [props.attachment.id, props.attachment.url, playable.value],
+  () => {
+    audio.value?.pause()
+    finishLoading()
+    playing.value = false
+    error.value = ''
+    currentTime.value = 0
+    metadataDuration.value = 0
+  },
+)
+
 onBeforeUnmount(() => {
+  finishLoading()
   seekDrag.cancel()
   audio.value?.pause()
 })

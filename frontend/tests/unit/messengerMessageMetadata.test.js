@@ -50,6 +50,60 @@ function mountMetadata(overrides = {}) {
 }
 
 describe('message metadata layout', () => {
+  it.each(['pending', 'unknown'])(
+    'hides edit and delete while a Wazzup edit is %s',
+    (editState) => {
+      let root = mountMetadata({
+        message: {
+          name: 'WZ-EDIT',
+          provider: 'wazzup',
+          message_type: 'text',
+          can_edit: true,
+          can_delete: true,
+          edit_state: editState,
+        },
+      })
+      expect(root.querySelector('[data-message-actions]')).toBeNull()
+    },
+  )
+
+  it('hides edit and delete after a locally lost Wazzup edit response', () => {
+    let root = mountMetadata({
+      message: {
+        name: 'WZ-EDIT',
+        provider: 'wazzup',
+        message_type: 'text',
+        can_edit: true,
+        can_delete: true,
+      },
+      editBlocked: true,
+    })
+    expect(root.querySelector('[data-message-actions]')).toBeNull()
+  })
+
+  it.each(['pending', 'unknown'])(
+    'hides a Wazzup delete action in durable %s state despite a stale flag',
+    (deleteState) => {
+      let root = mountMetadata({
+        message: {
+          name: 'WZ-1',
+          provider: 'wazzup',
+          can_delete: true,
+          delete_state: deleteState,
+        },
+      })
+      expect(root.querySelector('[data-message-actions]')).toBeNull()
+    },
+  )
+
+  it('hides a deletion blocked after a lost response in the current view', () => {
+    let root = mountMetadata({
+      message: { name: 'WZ-1', provider: 'wazzup', can_delete: true },
+      deleteBlocked: true,
+    })
+    expect(root.querySelector('[data-message-actions]')).toBeNull()
+  })
+
   it('excludes metadata from intrinsic width only when explicitly requested', () => {
     let regular = mountMetadata()
     let constrained = mountMetadata({ constrainIntrinsicWidth: true })
@@ -93,6 +147,39 @@ describe('message metadata layout', () => {
     )
     expect(root.querySelector('[data-message-actions]')).not.toBeNull()
     expect(root.textContent).toContain('WhatsApp Business')
+  })
+
+  it('gives a sticker channel the full second row below sender and menu', () => {
+    let source = 'Канал'.repeat(28)
+    let regular = mountMetadata({ source })
+    let sticker = mountMetadata({ source, wrapSource: true })
+    let label = sticker.querySelector('[data-message-source]')
+
+    expect(label.textContent).toBe(source)
+    expect(source).toHaveLength(140)
+    expect(label.className.split(/\s+/)).toEqual(
+      expect.arrayContaining([
+        'col-span-full',
+        'row-start-2',
+        '!h-auto',
+        '!whitespace-normal',
+        '!overflow-visible',
+        '[overflow-wrap:anywhere]',
+      ]),
+    )
+    expect(
+      regular.querySelector('[data-message-source]').className,
+    ).not.toContain('!whitespace-normal')
+    expect(sticker.querySelector('[data-message-actions]')).not.toBeNull()
+    expect(
+      sticker.querySelector('[data-message-metadata]').className,
+    ).toContain('grid-cols-[minmax(0,1fr)_auto]')
+    expect(sticker.querySelector('[data-message-labels]').className).toBe(
+      'contents',
+    )
+    expect(sticker.querySelector('[data-message-actions]').className).toContain(
+      'row-start-1',
+    )
   })
 
   it('shows the existing edit action for a backend-eligible photo message', () => {

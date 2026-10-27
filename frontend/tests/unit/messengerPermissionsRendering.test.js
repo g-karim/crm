@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => {
   return {
     attachmentPreserve: vi.fn(),
     attachmentRetarget: vi.fn(async () => {}),
+    attachmentRelease: vi.fn(),
+    attachmentUnmount: vi.fn(),
     call: vi.fn(),
     dialog: vi.fn(),
     toastError: vi.fn(),
@@ -91,25 +93,39 @@ vi.mock('@/components/LeadMessenger/MessageForwardStack.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/MessageMetadata.vue', () => ({
   default: {
     props: ['message', 'constrainIntrinsicWidth'],
-    emits: ['retry'],
+    emits: ['retry', 'reply'],
     template: `<div data-message-metadata :class="constrainIntrinsicWidth ? 'w-0 min-w-full' : 'min-w-0'">
-			<button v-if="message.can_retry" data-testid="mock-message-retry" @click="$emit('retry')">retry</button>
+				<button v-if="message.can_retry" data-testid="mock-message-retry" @click="$emit('retry')">retry</button>
+				<button v-if="message.can_reply" data-testid="mock-message-reply" @click="$emit('reply')">reply</button>
 		</div>`,
   },
 }))
 vi.mock('@/components/LeadMessenger/MessageReactions.vue', emptyComponent)
-vi.mock('@/components/LeadMessenger/MessageReplyQuote.vue', emptyComponent)
 vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
   default: {
-    props: ['acceptedFileTypes', 'maxFiles', 'supportedAttachmentTypes'],
+    props: [
+      'acceptedFileTypes',
+      'acceptedFileTypesByType',
+      'maxFiles',
+      'supportedAttachmentTypes',
+      'maxAttachmentSizeBytes',
+      'maxAttachmentSizeBytesByType',
+    ],
     emits: ['change'],
+    data: () => ({ files: [] }),
+    beforeUnmount() {
+      mocks.attachmentUnmount()
+    },
     methods: {
       discard() {},
       freeze() {
-        return []
+        return this.files
       },
       unfreeze() {},
-      release() {},
+      release() {
+        mocks.attachmentRelease()
+        this.clearDraft()
+      },
       retarget(conversation) {
         return mocks.attachmentRetarget(conversation)
       },
@@ -117,11 +133,25 @@ vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
         mocks.attachmentPreserve()
       },
       openFileSelector() {},
+      setDraft(name, type) {
+        this.files = [`FILE-${name}`]
+        this.$emit('change', [
+          {
+            status: 'uploaded',
+            file: { name, type },
+            uploadedFile: { name: this.files[0] },
+          },
+        ])
+      },
+      clearDraft() {
+        this.files = []
+        this.$emit('change', [])
+      },
     },
-    template: `<span>
-      <button data-testid="mock-attachment-draft" @click="$emit('change', [{ status: 'uploaded', file: { name: 'draft.pdf', type: 'application/pdf' } }])">attachment draft</button>
-      <button data-testid="mock-image-draft" @click="$emit('change', [{ status: 'uploaded', file: { name: 'photo.jpg', type: 'image/jpeg' } }])">image draft</button>
-      <button data-testid="mock-clear-attachments" @click="$emit('change', [])">clear attachments</button>
+    template: `<span data-attachment-policy :data-max-size="maxAttachmentSizeBytes" :data-image-max-size="maxAttachmentSizeBytesByType?.image" :data-max-files="maxFiles" :data-video-formats="acceptedFileTypesByType?.video?.join(',')">
+      <button data-testid="mock-attachment-draft" @click="setDraft('draft.pdf', 'application/pdf')">attachment draft</button>
+      <button data-testid="mock-image-draft" @click="setDraft('photo.jpg', 'image/jpeg')">image draft</button>
+      <button data-testid="mock-clear-attachments" @click="clearDraft">clear attachments</button>
     </span>`,
   },
 }))
@@ -327,13 +357,13 @@ async function resolveSelectionRequests(requests, first) {
 }
 
 describe('Avito subscription restriction', () => {
-  function restrictedChannel() {
+  function restrictedChannel(name = 'AVITO') {
     return {
-      ...channel('AVITO'),
+      ...channel(name),
       provider: 'avito_direct',
       platform: 'avito',
       capabilities: {
-        ...channel('AVITO').capabilities,
+        ...channel(name).capabilities,
         messenger_access: 'subscription_required',
         supports_text: false,
         supports_attachments: false,
@@ -343,57 +373,92 @@ describe('Avito subscription restriction', () => {
     }
   }
 
-  it('shows the real chat link, hides old messages and removes the composer', async () => {
+  it.each([
+    ['no source', {}],
+    ['VK source', { source: 'VK' }],
+    ['Telegram source', { source: 'Telegram bot' }],
+  ])('shows an empty conversation for a lead with %s', async (_, lead) => {
     permissions = { ...permissions, can_operate: true }
-    channelRows = [restrictedChannel()]
-    conversationRows = [
-      {
-        name: 'AVITO-CHAT',
-        provider: 'avito_direct',
-        channel: 'AVITO',
-        external_chat_id: 'A'.repeat(26),
-        status: 'Open',
-      },
-    ]
-    conversationRows[0].avito_item = {
-      id: '123',
-      title: 'Balancing machine',
-      price_string: '1 615 680 ₽',
-      url: 'https://www.avito.ru/item_123',
-    }
-    snapshotMessages = [
-      {
-        name: 'OLD-AVITO-MESSAGE',
-        conversation: 'AVITO-CHAT',
-        channel: 'AVITO',
-        provider: 'avito_direct',
-        direction: 'inbound',
-        text: 'old content',
-        message_datetime: '2026-08-23 10:00:00',
-      },
-    ]
-    let root = await mountConversation()
-    let notice = root.querySelector('[data-testid="avito-subscription-notice"]')
-    expect(notice?.textContent).toContain(
-      'The lead is synchronized automatically',
-    )
-    expect(notice?.querySelector('[data-testid="avito-open-chat"]').href).toBe(
-      `https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`,
+    channelRows = [restrictedChannel(), channel('TELEGRAM')]
+    conversationRows = []
+
+    let root = await mountConversation({ lead })
+
+    expect(root.querySelector('input[placeholder="Platform"]')?.value).toBe(
+      'AVITO',
     )
     expect(
-      root.querySelector('[data-message-id="OLD-AVITO-MESSAGE"]'),
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
     ).toBeNull()
+    expect(root.querySelector('[data-testid="avito-open-chat"]')).toBeNull()
+    expect(root.textContent).toContain('No messages yet')
     expect(
       root.querySelector('input[placeholder="Enter a message..."]'),
     ).toBeNull()
-    expect(root.querySelector('[data-testid="avito-item-card"]')).toBeNull()
     expect(
-      root.querySelectorAll('[data-testid="avito-subscription-notice"]'),
-    ).toHaveLength(1)
-    expect(root.textContent.match(/Balancing machine/g)).toHaveLength(1)
-    expect(notice.textContent).toContain('1 615 680 ₽')
-    expect(root.textContent).not.toContain('No messages yet')
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
   })
+
+  it.each([
+    ['Avito source', { source: 'Avito' }],
+    ['no source', {}],
+  ])(
+    'shows the real chat link and restricts a linked Avito chat with %s',
+    async (_, lead) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [restrictedChannel()]
+      conversationRows = [
+        {
+          name: 'AVITO-CHAT',
+          provider: 'avito_direct',
+          channel: 'AVITO',
+          external_chat_id: 'A'.repeat(26),
+          status: 'Open',
+        },
+      ]
+      conversationRows[0].avito_item = {
+        id: '123',
+        title: 'Balancing machine',
+        price_string: '1 615 680 ₽',
+        url: 'https://www.avito.ru/item_123',
+      }
+      snapshotMessages = [
+        {
+          name: 'OLD-AVITO-MESSAGE',
+          conversation: 'AVITO-CHAT',
+          channel: 'AVITO',
+          provider: 'avito_direct',
+          direction: 'inbound',
+          text: 'old content',
+          message_datetime: '2026-08-23 10:00:00',
+        },
+      ]
+      let root = await mountConversation({ lead })
+      let notice = root.querySelector(
+        '[data-testid="avito-subscription-notice"]',
+      )
+      expect(notice?.textContent).toContain(
+        'The lead is synchronized automatically',
+      )
+      expect(
+        notice?.querySelector('[data-testid="avito-open-chat"]').href,
+      ).toBe(`https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`)
+      expect(
+        root.querySelector('[data-message-id="OLD-AVITO-MESSAGE"]'),
+      ).toBeNull()
+      expect(
+        root.querySelector('input[placeholder="Enter a message..."]'),
+      ).toBeNull()
+      expect(root.querySelector('[data-testid="avito-item-card"]')).toBeNull()
+      expect(
+        root.querySelectorAll('[data-testid="avito-subscription-notice"]'),
+      ).toHaveLength(1)
+      expect(root.textContent.match(/Balancing machine/g)).toHaveLength(1)
+      expect(notice.textContent).toContain('1 615 680 ₽')
+      expect(root.textContent).not.toContain('No messages yet')
+    },
+  )
 
   it('reloads channel access when an open conversation is invalidated', async () => {
     permissions = { ...permissions, can_operate: true }
@@ -433,9 +498,51 @@ describe('Avito subscription restriction', () => {
     ).not.toBeNull()
   })
 
-  it('keeps another messenger available in the same lead', async () => {
+  it.each([
+    ['Telegram', 'telegram_bot', 'telegram'],
+    ['VK', 'vk_direct', 'vk'],
+  ])(
+    'keeps %s available in a lead with a restricted Avito channel',
+    async (_, provider, platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        restrictedChannel(),
+        { ...channel('OTHER'), provider, platform, channel_type: platform },
+      ]
+      conversationRows = [
+        {
+          name: 'OTHER-CHAT',
+          channel: 'OTHER',
+          provider,
+          external_chat_id: 'chat-1',
+          status: 'Open',
+        },
+        {
+          name: 'AVITO-CHAT',
+          channel: 'AVITO',
+          provider: 'avito_direct',
+          external_chat_id: 'A'.repeat(26),
+          status: 'Open',
+        },
+      ]
+      latestInbound = { conversation: 'OTHER-CHAT', channel: 'OTHER' }
+      let root = await mountConversation()
+      expect(
+        root.querySelector('[data-testid="avito-subscription-notice"]'),
+      ).toBeNull()
+      expect(
+        root.querySelector('input[placeholder="Enter a message..."]')?.disabled,
+      ).toBe(false)
+    },
+  )
+
+  it('shows the notice only for the selected chat while switching channels and conversations', async () => {
     permissions = { ...permissions, can_operate: true }
-    channelRows = [channel('TELEGRAM'), restrictedChannel()]
+    channelRows = [
+      restrictedChannel(),
+      restrictedChannel('UNRELATED-AVITO'),
+      channel('TELEGRAM'),
+    ]
     conversationRows = [
       {
         name: 'TELEGRAM-CHAT',
@@ -444,22 +551,101 @@ describe('Avito subscription restriction', () => {
         external_chat_id: 'chat-1',
         status: 'Open',
       },
-      {
-        name: 'AVITO-CHAT',
+      ...['A', 'B'].map((id) => ({
+        name: `AVITO-CHAT-${id}`,
         channel: 'AVITO',
         provider: 'avito_direct',
-        external_chat_id: 'A'.repeat(26),
+        external_chat_id: id.repeat(26),
         status: 'Open',
-      },
+      })),
     ]
     latestInbound = { conversation: 'TELEGRAM-CHAT', channel: 'TELEGRAM' }
     let root = await mountConversation()
+    let platform = root.querySelector('input[placeholder="Platform"]')
+    platform.value = 'AVITO'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+
+    expect(
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
+    ).toBeNull()
+    let externalChat = root.querySelector('input[placeholder="External Chat"]')
+    expect(externalChat?.value).toBe('')
+    for (let id of ['A', 'B']) {
+      externalChat.value = `AVITO-CHAT-${id}`
+      externalChat.dispatchEvent(new Event('input'))
+      await nextTick()
+      expect(root.querySelector('[data-testid="avito-open-chat"]')?.href).toBe(
+        `https://www.avito.ru/profile/messenger/channel/${id.repeat(26)}`,
+      )
+    }
+
+    platform.value = 'UNRELATED-AVITO'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
+    expect(
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
+    ).toBeNull()
+    expect(root.querySelector('[data-testid="avito-open-chat"]')).toBeNull()
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]'),
+    ).toBeNull()
+    expect(
+      mocks.call.mock.calls.some(([method]) =>
+        ['send_message', 'send_typing'].some((name) => method.endsWith(name)),
+      ),
+    ).toBe(false)
+
+    platform.value = 'TELEGRAM'
+    platform.dispatchEvent(new Event('input'))
+    await nextTick()
     expect(
       root.querySelector('[data-testid="avito-subscription-notice"]'),
     ).toBeNull()
     expect(
       root.querySelector('input[placeholder="Enter a message..."]')?.disabled,
     ).toBe(false)
+  })
+
+  it('clears the notice for a different lead and restores it for the linked chat', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [restrictedChannel()]
+    conversationRows = [
+      {
+        name: 'AVITO-CHAT',
+        provider: 'avito_direct',
+        channel: 'AVITO',
+        external_chat_id: 'A'.repeat(26),
+        status: 'Open',
+      },
+    ]
+    let linkedConversations = conversationRows
+    let root = await mountConversation({ lead: { source: 'Avito' } })
+    expect(root.querySelector('[data-testid="avito-open-chat"]')?.href).toBe(
+      `https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`,
+    )
+
+    conversationRows = []
+    mounted.at(-1).props.leadName = 'LEAD-2'
+    mounted.at(-1).props.lead = { source: 'VK' }
+    await nextTick()
+    await vi.waitFor(() =>
+      expect(root.textContent).toContain('No messages yet'),
+    )
+    expect(
+      root.querySelector('[data-testid="avito-subscription-notice"]'),
+    ).toBeNull()
+    expect(root.querySelector('[data-testid="avito-open-chat"]')).toBeNull()
+
+    conversationRows = linkedConversations
+    mounted.at(-1).props.leadName = 'LEAD-1'
+    mounted.at(-1).props.lead = {}
+    await nextTick()
+    await vi.waitFor(() =>
+      expect(root.querySelector('[data-testid="avito-open-chat"]')?.href).toBe(
+        `https://www.avito.ru/profile/messenger/channel/${'A'.repeat(26)}`,
+      ),
+    )
   })
 })
 
@@ -761,6 +947,698 @@ describe('messenger initial selection', () => {
     )
     expect(composer.value).toBe('Keep this draft on conversation 1')
   })
+})
+
+describe('Wazzup configuration warnings', () => {
+  it.each([
+    ['partner_api_v2', 'Ask your system administrator to check the connection'],
+    ['user_api_v3', 'Enable the integration and enter an API token'],
+  ])(
+    'uses the connection model for %s send failures',
+    async (mode, warning) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        {
+          ...channel('CHANNEL-1'),
+          provider: 'wazzup',
+          platform: 'whatsapp',
+          channel_type: 'whatsapp',
+          wazzup_api_mode: mode,
+        },
+      ]
+      conversationRows[0].provider = 'wazzup'
+      const defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((method, args) =>
+        method.endsWith('send_message')
+          ? Promise.resolve({
+              ok: false,
+              name: 'MESSAGE-FAILED',
+              channel: 'CHANNEL-1',
+              reason: 'not_configured',
+            })
+          : defaultCall(method, args),
+      )
+      const root = await mountConversation()
+      const composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Check connection'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      const send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      send.click()
+      await vi.waitFor(() => expect(root.textContent).toContain(warning))
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        expect.stringContaining(warning),
+      )
+      if (mode === 'partner_api_v2') {
+        expect(root.textContent).not.toContain('enter an API token')
+      }
+    },
+  )
+})
+
+describe('VK image outbound composer', () => {
+  async function mountVKImageComposer() {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [
+      {
+        ...channel('CHANNEL-1', { supports_attachments: true }),
+        provider: 'vk_direct',
+        platform: 'vk',
+        channel_type: 'vk',
+      },
+    ]
+    conversationRows[0].provider = 'vk_direct'
+    let root = await mountConversation()
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+    let send = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Send',
+    )
+    return { root, send }
+  }
+
+  it('consumes the accepted image once and blocks concurrent sends', async () => {
+    let request = deferred()
+    let defaultCall = mocks.call.getMockImplementation()
+    mocks.call.mockImplementation((method, args) =>
+      method.endsWith('send_message')
+        ? request.promise
+        : defaultCall(method, args),
+    )
+    let { send } = await mountVKImageComposer()
+
+    send.click()
+    send.click()
+    await vi.waitFor(() =>
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('send_message'),
+        ),
+      ).toHaveLength(1),
+    )
+    expect(send.disabled).toBe(true)
+    expect(mocks.call).toHaveBeenCalledWith(
+      'crm_messenger.api.messages.send_message',
+      expect.objectContaining({
+        attachments: ['FILE-photo.jpg'],
+        client_request_id: expect.any(String),
+      }),
+    )
+
+    request.resolve({ ok: true, name: 'VK-IMAGE-1', status: 'queued' })
+    await vi.waitFor(() =>
+      expect(mocks.attachmentRelease).toHaveBeenCalledOnce(),
+    )
+    expect(send.disabled).toBe(true)
+    send.click()
+    expect(
+      mocks.call.mock.calls.filter(([method]) =>
+        method.endsWith('send_message'),
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('keeps the same request ID for a user retry after the CRM RPC response is lost', async () => {
+    let defaultCall = mocks.call.getMockImplementation()
+    mocks.call.mockImplementation(async (method, args) => {
+      if (method.endsWith('send_message')) throw new Error('network error')
+      return defaultCall(method, args)
+    })
+    let { root, send } = await mountVKImageComposer()
+    send.click()
+    await vi.waitFor(() => expect(mocks.toastError).toHaveBeenCalledOnce())
+    expect(mocks.attachmentRelease).not.toHaveBeenCalled()
+    await vi.waitFor(() => {
+      send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      expect(send?.disabled).toBe(false)
+    })
+    let calls = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('send_message'),
+    )
+    expect(calls).toHaveLength(1)
+    expect(mocks.attachmentUnmount).not.toHaveBeenCalled()
+
+    send.click()
+    await vi.waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(2))
+    calls = mocks.call.mock.calls.filter(([method]) =>
+      method.endsWith('send_message'),
+    )
+    expect(calls).toHaveLength(2)
+    expect(calls[1][1].client_request_id).toBe(calls[0][1].client_request_id)
+    expect(calls[1][1].attachments).toEqual(calls[0][1].attachments)
+    expect(mocks.attachmentUnmount).not.toHaveBeenCalled()
+  })
+})
+
+describe('Wazzup ambiguous sends', () => {
+  it.each([false, true])(
+    'ignores stale Wazzup unknown retry events with confirmation=%s',
+    async (requiresConfirmation) => {
+      permissions = { ...permissions, can_operate: true }
+      snapshotMessages = [
+        {
+          name: 'WAZZUP-UNKNOWN',
+          provider: 'wazzup',
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'outbound',
+          status: 'unknown',
+          delivery_status: 'unknown',
+          message_type: 'text',
+          text: 'проверка',
+          attachments: [],
+          can_retry: true,
+          retry_requires_confirmation: requiresConfirmation,
+          message_datetime: '2026-10-22 10:56:00',
+        },
+      ]
+      let root = await mountConversation()
+
+      root.querySelector('[data-testid="mock-message-retry"]').click()
+      await nextTick()
+
+      expect(mocks.dialog).not.toHaveBeenCalled()
+      expect(
+        mocks.call.mock.calls.some(([method]) =>
+          method.endsWith('retry_outbound_message'),
+        ),
+      ).toBe(false)
+    },
+  )
+})
+
+describe('locally disconnected conversation channels', () => {
+  it.each([
+    ['wazzup', 0],
+    ['wazzup', false],
+    ['telegram_bot', 0],
+    ['telegram_bot', false],
+  ])(
+    'blocks the selected %s channel for enabled=%s while preserving history, sibling routing and resume',
+    async (provider, disabled) => {
+      permissions = { ...permissions, can_operate: true }
+      const primary = { ...channel('CHANNEL-1'), provider, enabled: 1 }
+      const sibling = { ...channel('CHANNEL-2'), provider, enabled: 1 }
+      channelRows = [primary, sibling]
+      conversationRows = [
+        { ...conversationRows[0], provider, channel_info: primary },
+        {
+          name: 'CONVERSATION-2',
+          channel: 'CHANNEL-2',
+          provider,
+          status: 'Open',
+          external_chat_id: 'chat-2',
+          channel_info: sibling,
+        },
+      ]
+      snapshotMessages = [
+        {
+          name: 'PAUSED-CHANNEL-HISTORY',
+          conversation: 'CONVERSATION-1',
+          channel: 'CHANNEL-1',
+          provider,
+          direction: 'inbound',
+          text: 'Saved history',
+          message_datetime: '2026-08-23 10:00:00',
+        },
+      ]
+      const root = await mountConversation()
+      const composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      const platform = root.querySelector('input[placeholder="Platform"]')
+      const send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      composer.value = 'Keep this draft'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      expect(composer.disabled).toBe(false)
+      expect(send.disabled).toBe(false)
+
+      // The active-channel endpoint omits the paused channel; its known local
+      // enable flag still arrives with the existing conversation's channel_info.
+      channelRows = [sibling]
+      conversationRows = conversationRows.map((conversation) =>
+        conversation.channel === primary.name
+          ? {
+              ...conversation,
+              channel_info: {
+                ...primary,
+                enabled: disabled,
+                state: 'connected',
+                wazzup_status: 'active',
+              },
+            }
+          : conversation,
+      )
+      const refresh = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Refresh',
+      )
+      refresh.click()
+      await vi.waitFor(() => expect(composer.disabled).toBe(true))
+      expect(send.disabled).toBe(true)
+      expect(composer.value).toBe('Keep this draft')
+      expect(
+        root.querySelector('[data-message-id="PAUSED-CHANNEL-HISTORY"]'),
+      ).not.toBeNull()
+      expect(platform.disabled).toBe(false)
+
+      platform.value = sibling.name
+      platform.dispatchEvent(new Event('input'))
+      await vi.waitFor(() => expect(composer.disabled).toBe(false))
+      expect(send.disabled).toBe(false)
+      expect(composer.value).toBe('Keep this draft')
+
+      channelRows = [primary, sibling]
+      conversationRows = conversationRows.map((conversation) =>
+        conversation.channel === primary.name
+          ? { ...conversation, channel_info: primary }
+          : conversation,
+      )
+      const previousLoads = mocks.call.mock.calls.filter(([method]) =>
+        method.endsWith('get_channels'),
+      ).length
+      refresh.click()
+      await vi.waitFor(() =>
+        expect(
+          mocks.call.mock.calls.filter(([method]) =>
+            method.endsWith('get_channels'),
+          ).length,
+        ).toBeGreaterThan(previousLoads),
+      )
+      platform.value = primary.name
+      platform.dispatchEvent(new Event('input'))
+      await vi.waitFor(() => expect(platform.value).toBe(primary.name))
+      await nextTick()
+      expect(composer.disabled).toBe(false)
+      expect(send.disabled).toBe(false)
+      expect(composer.value).toBe('Keep this draft')
+      expect(
+        root.querySelector('[data-message-id="PAUSED-CHANNEL-HISTORY"]'),
+      ).not.toBeNull()
+      expect(
+        mocks.call.mock.calls.some(([method]) =>
+          method.endsWith('send_message'),
+        ),
+      ).toBe(false)
+    },
+  )
+
+  it('keeps older partial channel DTOs without enabled usable even when can_send is not authoritative', async () => {
+    permissions = { ...permissions, can_operate: true }
+    const partial = {
+      ...channel('CHANNEL-1'),
+      provider: 'wazzup',
+      can_send: false,
+    }
+    channelRows = [partial, { ...channel('CHANNEL-2'), enabled: 1 }]
+    conversationRows[0] = {
+      ...conversationRows[0],
+      provider: 'wazzup',
+      channel_info: partial,
+    }
+    const root = await mountConversation()
+    const composer = root.querySelector(
+      'input[placeholder="Enter a message..."]',
+    )
+    expect(composer.disabled).toBe(false)
+    composer.value = 'A partial DTO still permits composing'
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    expect(
+      [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      ).disabled,
+    ).toBe(false)
+  })
+})
+
+describe('Wazzup native text replies', () => {
+  function wazzupChannel(platform) {
+    return {
+      ...channel('CHANNEL-1', { requires_phone: true }),
+      provider: 'wazzup',
+      platform,
+      channel_type: platform,
+    }
+  }
+
+  it.each(['whatsapp', 'telegram'])(
+    'sends to an existing Wazzup %s chat without a phone on the lead',
+    async (platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [wazzupChannel(platform)]
+      conversationRows[0].provider = 'wazzup'
+      let root = await mountConversation()
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+
+      expect(composer.disabled).toBe(false)
+      composer.value = 'Ответ в существующий чат'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      let send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      expect(send.disabled).toBe(false)
+      send.click()
+
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            conversation: 'CONVERSATION-1',
+            channel: 'CHANNEL-1',
+            text: 'Ответ в существующий чат',
+          }),
+        ),
+      )
+    },
+  )
+
+  it('keeps first contact blocked without a phone or an existing Wazzup chat', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [wazzupChannel('telegram')]
+    conversationRows = []
+    let root = await mountConversation()
+
+    expect(
+      root.querySelector('input[placeholder="Enter a message..."]').disabled,
+    ).toBe(true)
+    expect(root.textContent).toContain('Add a phone number to the lead record.')
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+  })
+
+  it.each([
+    ['wazzup', false],
+    ['telegram_bot', true],
+  ])(
+    'shows the file drop invitation only for an attachment-capable %s channel',
+    async (provider, supportsAttachments) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        {
+          ...channel('CHANNEL-1', {
+            supports_attachments: supportsAttachments,
+          }),
+          provider,
+        },
+      ]
+      let root = await mountConversation()
+      let event = new Event('dragover', { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'dataTransfer', {
+        value: { types: ['Files'] },
+      })
+
+      root
+        .querySelector('input[placeholder="Enter a message..."]')
+        .dispatchEvent(event)
+      await nextTick()
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(root.textContent.includes('Drop files here')).toBe(
+        supportsAttachments,
+      )
+    },
+  )
+
+  function mediaChannel(platform) {
+    return {
+      ...wazzupChannel(platform),
+      capabilities: {
+        ...wazzupChannel(platform).capabilities,
+        supports_attachments: true,
+        supported_attachment_types: ['image', 'file', 'audio', 'video'],
+        supported_attachment_file_types_by_type: { video: ['.mp4'] },
+        max_attachment_count: 1,
+        max_attachment_size_bytes: 10_000_000,
+        max_attachment_size_bytes_by_type:
+          platform === 'telegram' ? { image: 5_000_000 } : {},
+        supports_attachment_captions: false,
+        supports_image_caption: false,
+      },
+    }
+  }
+
+  it.each(['whatsapp', 'telegram'])(
+    'keeps Wazzup %s text and file drafts separate without discarding either',
+    async (platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [mediaChannel(platform)]
+      let root = await mountConversation()
+      expect(
+        root.querySelector('[aria-label="Record a Voice Message"]'),
+      ).toBeNull()
+      expect(root.querySelector('[aria-label="Add Location"]')).toBeNull()
+      let policy = root.querySelector('[data-attachment-policy]')
+      expect(policy.dataset.maxSize).toBe('10000000')
+      expect(policy.dataset.maxFiles).toBe('1')
+      expect(policy.dataset.videoFormats).toBe('.mp4')
+      expect(policy.dataset.imageMaxSize).toBe(
+        platform === 'telegram' ? '5000000' : undefined,
+      )
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Keep this text'
+      composer.dispatchEvent(new Event('input'))
+      root.querySelector('[data-testid="mock-attachment-draft"]').click()
+      await nextTick()
+      let send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+
+      expect(composer.disabled).toBe(false)
+      expect(composer.value).toBe('Keep this text')
+      expect(send.disabled).toBe(true)
+      expect(root.textContent).toContain(
+        'This channel cannot send text and an attachment together. Send them as separate messages.',
+      )
+      expect(root.textContent).not.toContain('Avito API')
+      composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+      send.click()
+      await nextTick()
+      expect(
+        mocks.call.mock.calls.some(([method]) =>
+          method.endsWith('send_message'),
+        ),
+      ).toBe(false)
+
+      root.querySelector('[data-testid="mock-clear-attachments"]').click()
+      await nextTick()
+      expect(composer.value).toBe('Keep this text')
+      expect(send.disabled).toBe(false)
+      root.querySelector('[data-testid="mock-attachment-draft"]').click()
+      await nextTick()
+      composer.value = ''
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      expect(composer.disabled).toBe(true)
+      expect(composer.placeholder).toBe(
+        'Text and attachments must be sent separately.',
+      )
+      expect(send.disabled).toBe(false)
+      send.click()
+
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            text: '',
+            attachments: ['FILE-draft.pdf'],
+          }),
+        ),
+      )
+      let sends = mocks.call.mock.calls.filter(([method]) =>
+        method.endsWith('send_message'),
+      )
+      expect(sends).toHaveLength(1)
+      expect(sends[0][1].location).toBeUndefined()
+      expect(
+        mocks.call.mock.calls.some(([method]) =>
+          method.endsWith('send_voice_message'),
+        ),
+      ).toBe(false)
+    },
+  )
+
+  it.each([
+    ['max_direct', 'max'],
+    ['vk_direct', 'vk'],
+    ['telegram_bot', 'telegram'],
+  ])(
+    'preserves supported captions, recorder and location for %s',
+    async (provider, platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        {
+          ...channel('CHANNEL-1', {
+            supports_attachments: true,
+            supported_attachment_types: ['image', 'file', 'audio', 'video'],
+            supports_attachment_captions: true,
+            supports_image_caption: true,
+            voice: { send: true },
+            location: { send: true },
+          }),
+          provider,
+          platform,
+          channel_type: platform,
+        },
+      ]
+      let root = await mountConversation()
+      expect(
+        root.querySelector('[aria-label="Record a Voice Message"]'),
+      ).not.toBeNull()
+      expect(root.querySelector('[aria-label="Add Location"]')).not.toBeNull()
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'An attachment caption'
+      composer.dispatchEvent(new Event('input'))
+      root.querySelector('[data-testid="mock-attachment-draft"]').click()
+      await nextTick()
+      let send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+
+      expect(send.disabled).toBe(false)
+      expect(
+        root.querySelector('[data-testid="image-caption-warning"]'),
+      ).toBeNull()
+      send.click()
+
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            text: 'An attachment caption',
+            attachments: ['FILE-draft.pdf'],
+          }),
+        ),
+      )
+      expect(
+        mocks.call.mock.calls.filter(([method]) =>
+          method.endsWith('send_message'),
+        ),
+      ).toHaveLength(1)
+    },
+  )
+
+  it.each(['whatsapp', 'telegram'])(
+    'sends a Wazzup %s quoted reply using the local original message id',
+    async (platform) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [mediaChannel(platform)]
+      snapshotMessages = [
+        {
+          name: 'WAZZUP-ORIGINAL',
+          external_message_id: 'provider-original-id',
+          provider: 'wazzup',
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'inbound',
+          status: 'received',
+          message_type: 'image',
+          text: '',
+          attachments: [{ id: 'IMAGE-1', type: 'image', status: 'available' }],
+          can_reply: true,
+          message_datetime: '2026-10-02 10:00:00',
+        },
+      ]
+      let defaultCall = mocks.call.getMockImplementation()
+      mocks.call.mockImplementation((method, args) => {
+        if (method.endsWith('resolve_send_target'))
+          return { ok: true, conversation: conversationRows[0] }
+        return defaultCall(method, args)
+      })
+      let root = await mountConversation()
+      root.querySelector('[data-testid="mock-message-reply"]').click()
+      await nextTick()
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      composer.value = 'Reply to the photo'
+      composer.dispatchEvent(new Event('input'))
+      await nextTick()
+      ;[...root.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Send')
+        .click()
+
+      await vi.waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          'crm_messenger.api.messages.send_message',
+          expect.objectContaining({
+            conversation: 'CONVERSATION-1',
+            text: 'Reply to the photo',
+            reply_to_message: 'WAZZUP-ORIGINAL',
+          }),
+        ),
+      )
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.conversations.resolve_send_target',
+        expect.objectContaining({ reply_to_message: 'WAZZUP-ORIGINAL' }),
+      )
+    },
+  )
+
+  it.each([
+    [
+      'static sticker',
+      { type: 'image', mime_type: 'image/webp', is_sticker_candidate: true },
+      'Sticker',
+    ],
+    [
+      'ordinary WebP image',
+      { type: 'image', mime_type: 'image/webp' },
+      'Image',
+    ],
+    [
+      'animated sticker',
+      {
+        type: 'sticker',
+        mime_type: 'application/x-tgsticker',
+        is_animated: true,
+      },
+      'Sticker',
+    ],
+  ])(
+    'labels a Wazzup %s correctly in the reply composer',
+    async (_kind, attachment, label) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [mediaChannel('telegram')]
+      snapshotMessages = [
+        {
+          name: 'WAZZUP-ORIGINAL',
+          provider: 'wazzup',
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'inbound',
+          status: 'received',
+          message_type: attachment.type,
+          text: '',
+          attachments: [{ id: 'MEDIA-1', status: 'available', ...attachment }],
+          can_reply: true,
+          message_datetime: '2026-10-25 10:00:00',
+        },
+      ]
+      let root = await mountConversation()
+      root.querySelector('[data-testid="mock-message-reply"]').click()
+      await nextTick()
+      expect(
+        root.querySelector('[data-message-reply-quote]').textContent,
+      ).toContain(label)
+    },
+  )
 })
 
 describe('Avito messenger UX', () => {
@@ -1161,6 +2039,68 @@ describe('messenger conversation routing guard', () => {
       expect(metadata.className.split(/\s+/)).toEqual(
         expect.arrayContaining(['w-0', 'min-w-full']),
       )
+    },
+  )
+
+  it.each(['wazzup', 'vk_direct', 'telegram_bot', 'max_direct'])(
+    'keeps sender and channel in the intrinsic width of a short %s reply',
+    async (provider) => {
+      snapshotMessages = [
+        {
+          name: 'SHORT-REPLY',
+          provider,
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'outbound',
+          status: 'sent',
+          text: 'Ок',
+          attachments: [],
+          reply_context: {
+            state: 'available',
+            message: 'ORIGINAL',
+            snapshot: { attachment_types: ['image'] },
+          },
+          message_datetime: '2026-09-14 10:56:00',
+        },
+      ]
+      let root = await mountConversation()
+      expect(root.querySelector('[data-message-reply-quote]')).not.toBeNull()
+      expect(
+        root.querySelector('[data-message-metadata]').classList.contains('w-0'),
+      ).toBe(false)
+      expect(root.querySelector('[data-message-bubble]').className).toContain(
+        'min-w-[min(18rem,94%)]',
+      )
+    },
+  )
+
+  it.each(['wazzup', 'vk_direct', 'telegram_bot', 'max_direct'])(
+    'hides the original quote in a deleted %s reply bubble',
+    async (provider) => {
+      snapshotMessages = [
+        {
+          name: 'DELETED-REPLY',
+          provider,
+          channel: 'CHANNEL-1',
+          conversation: 'CONVERSATION-1',
+          direction: 'outbound',
+          status: 'deleted',
+          text: null,
+          attachments: [],
+          reply_context: {
+            state: 'available',
+            message: 'ORIGINAL',
+            snapshot: { text: 'Original quoted text', direction: 'outbound' },
+          },
+          message_datetime: '2026-10-25 10:00:00',
+        },
+      ]
+      let root = await mountConversation()
+      expect(root.querySelector('[data-message-reply-quote]')).toBeNull()
+      expect(root.textContent).not.toContain('Original quoted text')
+      expect(
+        root.querySelector('[data-message-bubble]').className,
+      ).not.toContain('min-w-[min(18rem,94%)]')
     },
   )
 

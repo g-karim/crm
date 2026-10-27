@@ -279,6 +279,49 @@ export function validateComposerFileMix(files, existing, context = {}) {
     }
   }
 
+  for (let file of combined) {
+    let type =
+      file.type?.startsWith('video/') || /\.(avi|mkv)$/i.test(file.name || '')
+        ? 'video'
+        : composerAttachmentType(file)
+    let allowedFormats = context.acceptedFileTypesByType?.[type] || []
+    if (
+      allowedFormats.length &&
+      !matchesAcceptedFileType(file, allowedFormats)
+    ) {
+      return {
+        files: [],
+        error: translate(
+          type === 'video' &&
+            allowedFormats.length === 1 &&
+            allowedFormats[0] === '.mp4'
+            ? 'The selected channel supports MP4 video files only.'
+            : 'This file format is not supported by the selected channel.',
+        ),
+      }
+    }
+  }
+
+  for (let file of combined) {
+    let limits = [
+      Number(context.maxAttachmentSizeBytes),
+      Number(
+        context.maxAttachmentSizeBytesByType?.[composerAttachmentType(file)],
+      ),
+    ].filter((limit) => Number.isFinite(limit) && limit > 0)
+    if (!limits.length) continue
+    let limit = Math.min(...limits)
+    if (Number(file.size) > limit) {
+      return {
+        files: [],
+        error: translate(
+          'The attachment exceeds the selected channel size limit of {0} MB.',
+          [limit / 1_000_000],
+        ),
+      }
+    }
+  }
+
   if (context.channelType !== 'max') return { files }
 
   let mediaFlags = combined.map(
@@ -340,6 +383,12 @@ export function getComposerAttachmentPolicy(
     ),
     supportedAttachmentTypes,
     acceptedFileTypes,
+    acceptedFileTypesByType:
+      capabilities.supported_attachment_file_types_by_type || {},
+    maxAttachmentSizeBytes: Number(capabilities.max_attachment_size_bytes || 0),
+    maxAttachmentSizeBytesByType:
+      capabilities.max_attachment_size_bytes_by_type || {},
+    supportsAttachmentCaptions: capabilities.supports_attachment_captions,
     supportsImageCaption:
       capabilities.supports_image_caption ?? channelType !== 'avito',
     unsupportedFileMessage:
@@ -354,15 +403,15 @@ export function getComposerAttachmentPolicy(
   }
 }
 
-export function getComposerImageCaptionState(
-  text,
-  attachments = [],
-  policy = {},
-) {
+export function getComposerCaptionState(text, attachments = [], policy = {}) {
   let hasImage = attachments.some((item) => isImageFile(item?.file || item))
-  let blocked = hasImage && policy.supportsImageCaption === false
+  let blocked =
+    (attachments.length > 0 && policy.supportsAttachmentCaptions === false) ||
+    (hasImage && policy.supportsImageCaption === false)
   let message = blocked
-    ? 'Avito API does not support image captions. Send the text as a separate message.'
+    ? policy.channelType === 'avito'
+      ? 'Avito API does not support image captions. Send the text as a separate message.'
+      : 'This channel cannot send text and an attachment together. Send them as separate messages.'
     : ''
   return {
     blocked,

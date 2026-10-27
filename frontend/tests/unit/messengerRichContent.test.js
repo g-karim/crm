@@ -109,6 +109,30 @@ async function flushImports() {
 }
 
 describe('messenger rich content', () => {
+  it('plays canonical Wazzup audio without assuming it is a voice message', () => {
+    let root = mount(MessengerAudioPlayer, {
+      attachment: {
+        id: 'WAZZUP-AUDIO',
+        type: 'audio',
+        status: 'available',
+        is_voice: false,
+        file_name: 'recording.mp3',
+        mime_type: 'audio/mpeg',
+        url: '/api/private-wazzup-audio',
+        duration_ms: 5000,
+      },
+    })
+
+    expect(root.querySelector('audio')?.getAttribute('src')).toBe(
+      '/api/private-wazzup-audio',
+    )
+    expect(
+      root.querySelector('input[aria-label="Playback Position"]'),
+    ).not.toBeNull()
+    expect(root.textContent).toContain('recording.mp3')
+    expect(root.textContent).not.toContain('Voice message')
+  })
+
   it('renders the common voice title for a Telegram technical filename', () => {
     let root = mount(MessengerAudioPlayer, {
       attachment: {
