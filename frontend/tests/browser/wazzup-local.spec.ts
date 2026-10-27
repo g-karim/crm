@@ -75,6 +75,8 @@ for (const platform of ['whatsapp', 'telegram']) {
     const traffic: Record<string, number> = {}
     const clientRequestIds = new Map<string, string>()
     let externalResponses = 0
+    const embeddedResponseProtocols: Record<string, number> = {}
+    const externalResponseOrigins: Record<string, number> = {}
     const scriptErrors: string[] = []
     const moduleErrors: string[] = []
     let socketConnected = false
@@ -104,7 +106,17 @@ for (const platform of ['whatsapp', 'telegram']) {
     })
     page.on('response', async (response) => {
       const url = new URL(response.url())
-      if (url.hostname !== '127.0.0.1') externalResponses += 1
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        if (url.hostname !== '127.0.0.1') {
+          externalResponses += 1
+          externalResponseOrigins[url.origin] =
+            (externalResponseOrigins[url.origin] || 0) + 1
+        }
+      } else {
+        // Browser-generated blob/data responses are local media, not HTTP I/O.
+        embeddedResponseProtocols[url.protocol] =
+          (embeddedResponseProtocols[url.protocol] || 0) + 1
+      }
       if (
         url.pathname === '/socket.io/' &&
         url.searchParams.get('transport') === 'polling' &&
@@ -498,7 +510,7 @@ for (const platform of ['whatsapp', 'telegram']) {
     ).toHaveLength(0)
     expect(
       externalResponses,
-      'the isolated browser must not receive external HTTP responses',
+      `the isolated browser must not receive external HTTP responses: ${JSON.stringify(externalResponseOrigins)}`,
     ).toBe(0)
     expect(traffic['crm.www.crm.get_context_for_dev']).toBeGreaterThan(0)
     expect(
@@ -517,6 +529,7 @@ for (const platform of ['whatsapp', 'telegram']) {
       platform,
       traffic,
       externalResponses,
+      embeddedResponseProtocols,
       socketConnected,
       csrfProbe: csrfProbe.status(),
       authProbes,
