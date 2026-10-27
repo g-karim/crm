@@ -91,6 +91,45 @@ class TestActivityPermlevel(IntegrationTestCase):
 		self.assertIn("status", changed_fields(activities))
 		self.assertNotIn(RESTRICTED_FIELD, changed_fields(activities))
 
+	def test_readable_change_after_a_restricted_change_is_visible(self):
+		lead = self.make_lead_with_restricted_change()
+		self.add_version(
+			lead,
+			[
+				[RESTRICTED_FIELD, None, RESTRICTED_VALUE],
+				["first_name", "Permlevel", "Updated name"],
+			],
+		)
+
+		activities = self.activities_as("rep@permlevel.test", lead.name)
+
+		self.assertIn("first_name", changed_fields(activities))
+		self.assertNotIn(RESTRICTED_FIELD, changed_fields(activities))
+		self.assertNotIn(RESTRICTED_VALUE, frappe.as_json(activities))
+
+	def test_permitted_change_after_an_ignored_change_is_visible(self):
+		lead = self.make_lead_with_restricted_change()
+		frappe.db.delete("Version", {"ref_doctype": "CRM Lead", "docname": lead.name})
+		self.add_version(
+			lead,
+			[["sla", None, "Ignored SLA"], [RESTRICTED_FIELD, None, RESTRICTED_VALUE]],
+		)
+
+		activities = self.activities_as("mgr@permlevel.test", lead.name)
+
+		self.assertIn(RESTRICTED_FIELD, changed_fields(activities))
+		self.assertNotIn("sla", changed_fields(activities))
+
+	def add_version(self, lead, changes):
+		frappe.get_doc(
+			{
+				"doctype": "Version",
+				"ref_doctype": "CRM Lead",
+				"docname": lead.name,
+				"data": frappe.as_json({"changed": changes}),
+			}
+		).insert(ignore_permissions=True)
+
 
 def changed_fields(activities):
 	"""Fieldnames reported by the timeline, including grouped versions."""
