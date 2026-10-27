@@ -267,7 +267,9 @@ function getIcon(routeName, icon) {
 
 // A saved view's key is its name; a plain nav item's key is its route name.
 function currentRouteKey() {
-  return route.query.view || route.name
+  return (
+    route.query.view || (route.name === 'Call Logs' ? 'Telephony' : route.name)
+  )
 }
 
 // Set the highlight on click rather than waiting for the route, since route

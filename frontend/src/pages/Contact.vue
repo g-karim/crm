@@ -92,7 +92,13 @@
                   :label="__('Make Call')"
                   size="sm"
                   :iconLeft="PhoneIcon"
-                  @click="callEnabled && makeCall(contact.doc.mobile_no)"
+                  @click="
+                    callEnabled &&
+                    makeCall(contact.doc.mobile_no, {
+                      doctype: 'Contact',
+                      name: contactId,
+                    })
+                  "
                 />
                 <Button
                   v-if="canDelete"

@@ -65,10 +65,12 @@ import Users from '@/components/Settings/Users.vue'
 import Hierarchy from '@/components/Settings/Hierarchy/Hierarchy.vue'
 import ProfilePage from '@/components/Settings/Profile/ProfilePage.vue'
 import PreferencesSettings from '@/components/Settings/PreferencesSettings.vue'
+import NotificationDelivery from '@/components/Settings/NotificationDelivery.vue'
 import WhatsAppSettings from '@/components/Settings/WhatsAppSettings.vue'
 import ERPNextSettings from '@/components/Settings/ERPNextSettings.vue'
 import LeadSyncSourcePage from '@/components/Settings/LeadSyncing/LeadSyncSourcePage.vue'
 import MessengerSettings from '@/components/Settings/MessengerSettings.vue'
+import TelephonyPage from '@/components/Settings/Telephony/TelephonyPage.vue'
 import DefaultsSettings from '@/components/Settings/DefaultsSettings.vue'
 import CalendarSettings from '@/components/Settings/CalendarSettings.vue'
 import FormsSettings from '@/components/Settings/Forms/FormsSettings.vue'
@@ -78,6 +80,7 @@ import EnrichmentSettings from '@/components/Settings/EnrichmentSettings.vue'
 import TouchSettings from '@/components/Settings/TouchSettings.vue'
 import DashboardSettings from '@/components/Settings/DashboardSettings.vue'
 import EmailTemplatePage from '@/components/Settings/EmailTemplate/EmailTemplatePage.vue'
+import EmailConfig from '@/components/Settings/EmailConfig.vue'
 import Icon from '@/components/Icon.vue'
 import { usersStore } from '@/stores/users'
 import {
@@ -94,7 +97,7 @@ import ShieldCheck from '~icons/lucide/shield-check'
 import LucideZap from '~icons/lucide/zap'
 import SlaConfig from './Sla/SlaConfig.vue'
 
-const { isManager, getUser } = usersStore()
+const { isManager, isAdmin, getUser } = usersStore()
 
 const user = computed(() => getUser() || {})
 
@@ -117,6 +120,11 @@ const tabs = computed(() => {
           label: __('Preferences'),
           icon: SlidersIcon,
           component: markRaw(PreferencesSettings),
+        },
+        {
+          label: __('Notification delivery'),
+          icon: 'bell',
+          component: markRaw(NotificationDelivery),
         },
       ],
     },
@@ -215,10 +223,21 @@ const tabs = computed(() => {
       label: __('Integrations', null, 'FCRM'),
       items: [
         {
+          label: __('Telephony'),
+          icon: 'phone',
+          component: markRaw(TelephonyPage),
+        },
+        {
           label: __('Message Channels'),
           icon: LucideMessagesSquare,
           component: markRaw(MessengerSettings),
           condition: () => isMessengerInstalled.value && isManager(),
+        },
+        {
+          label: __('Email Accounts'),
+          icon: 'mail',
+          component: markRaw(EmailConfig),
+          condition: () => isAdmin(),
         },
         {
           label: __('WhatsApp'),

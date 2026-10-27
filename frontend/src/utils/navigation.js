@@ -4,6 +4,7 @@ import LeadsIcon from '@/components/Icons/LeadsIcon.vue'
 import NoteIcon from '@/components/Icons/NoteIcon.vue'
 import OrganizationsIcon from '@/components/Icons/OrganizationsIcon.vue'
 import PhoneIcon from '@/components/Icons/PhoneIcon.vue'
+import InboxIcon from '@/components/Icons/InboxIcon.vue'
 import TaskIcon from '@/components/Icons/TaskIcon.vue'
 import CalendarIcon from '@/components/Icons/CalendarIcon.vue'
 import LucideLayoutDashboard from '~icons/lucide/layout-dashboard'
@@ -28,7 +29,8 @@ export const navigationItems = [
     route: 'Calendar',
     desktopOnly: true,
   },
-  { label: 'Call Logs', icon: PhoneIcon, route: 'Call Logs' },
+  { label: 'Telephony', icon: PhoneIcon, route: 'Telephony' },
+  { label: 'Мессенджер', icon: InboxIcon, route: 'Messenger' },
 ]
 
 export function getNavigationItems({ mobile = false } = {}) {

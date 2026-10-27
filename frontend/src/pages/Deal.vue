@@ -51,8 +51,14 @@
       :tabs="tabs"
       class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:cursor-grab [&_[role='tab']:active]:cursor-grabbing [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
     >
-      <template #tab-panel>
+      <template #tab-panel="{ tab }">
+        <RelatedInbox
+          v-if="tab.name === 'Messenger'"
+          doctype="CRM Deal"
+          :name="dealId"
+        />
         <Activities
+          v-else
           ref="activities"
           v-model:reload="reload"
           v-model:tabIndex="tabIndex"
@@ -353,6 +359,7 @@
   />
 </template>
 <script setup>
+import RelatedInbox from '@/components/Inbox/RelatedInbox.vue'
 import DeleteLinkedDocModal from '@/components/DeleteLinkedDocModal.vue'
 import ErrorPage from '@/components/ErrorPage.vue'
 import Icon from '@/components/Icon.vue'
@@ -780,6 +787,12 @@ const defaultTabs = computed(() => {
       icon: CommentIcon,
     },
     {
+      name: 'Messenger',
+      label: __('Мессенджер'),
+      icon: CommentIcon,
+      condition: () => globalThis.crm_messenger_enabled === true,
+    },
+    {
       name: 'Data',
       label: __('Data'),
       icon: DetailsIcon,
@@ -998,7 +1011,7 @@ function triggerCall() {
     return
   }
 
-  makeCall(mobile_no)
+  makeCall(mobile_no, { doctype: 'CRM Deal', name: props.dealId })
 }
 
 async function triggerStatusChange(value) {

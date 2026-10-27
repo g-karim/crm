@@ -3736,7 +3736,7 @@ msgstr "Группа по: "
 
 #: frontend/src/components/Telephony/TwilioCallUI.vue:63
 msgid "Hang Up"
-msgstr ""
+msgstr "Завершить"
 
 #: crm/templates/emails/helpdesk_invitation.html:2
 msgid "Hello"
@@ -9950,3 +9950,1102 @@ msgstr "Клиент не отвечает на повторные обраще�
 #: crm/install.py
 msgid "The prospect was not a good fit for the product or service."
 msgstr "Продукт или услуга не подходят клиенту."
+
+#: crm/api/celio_tasks.py
+msgid "Choose an available customer context."
+msgstr "Выберите доступный контекст клиента."
+
+#: crm/api/celio_tasks.py
+msgid "Enter a task title of up to 140 characters."
+msgstr "Введите название задачи длиной до 140 символов."
+
+#: crm/api/celio_tasks.py
+msgid "Invalid CRM task changes."
+msgstr "Недопустимые изменения CRM-задачи."
+
+#: crm/api/celio_tasks.py
+msgid "Invalid CRM task choices."
+msgstr "Недопустимые параметры CRM-задачи."
+
+#: crm/api/celio_tasks.py
+msgid "Invalid customer context."
+msgstr "Недопустимый контекст клиента."
+
+#: crm/api/celio_tasks.py
+msgid "Task operations are managed by CRM."
+msgstr "Операциями задач управляет CRM."
+
+#: crm/api/celio_tasks.py
+msgid "The assignee must have access to this CRM task and its customer context."
+msgstr "Ответственному нужен доступ к CRM-задаче и её контексту клиента."
+
+#: crm/api/celio_tasks.py
+msgid "This CRM task is not available."
+msgstr "CRM-задача недоступна."
+
+#: crm/api/celio_tasks.py
+msgid "This request was already used for different changes."
+msgstr "Этот запрос уже использован для других изменений."
+
+#: crm/api/celio_tasks.py
+msgid "This task changed in another window. Your draft is kept; reload before saving."
+msgstr "Задача изменилась в другом окне. Черновик сохранён; перед записью загрузите актуальную версию."
+
+#: crm/api/celio_tasks.py
+msgid "You cannot edit this CRM task."
+msgstr "У вас нет прав изменять эту CRM-задачу."
+
+#: crm/api/celio_tasks.py
+msgid "Your account changed. Reload before saving."
+msgstr "Аккаунт изменился. Перед сохранением обновите страницу."
+
+msgid "This CRM task is no longer available."
+msgstr "Эта CRM-задача больше недоступна."
+
+msgid "This task changed in another window. Your draft is kept."
+msgstr "Задача изменена в другом окне. Ваш черновик сохранён."
+
+msgid "Could not refresh this task. Your draft is kept."
+msgstr "Не удалось обновить задачу. Ваш черновик сохранён."
+
+msgid "Reload saved task"
+msgstr "Загрузить сохранённую задачу"
+
+msgid "Discard unsaved changes?"
+msgstr "Отменить несохранённые изменения?"
+
+msgid "Task editing is not ready on this site."
+msgstr "Редактирование задач на этом сайте ещё не настроено."
+
+#: frontend/src/components/Settings/Settings.vue
+#: frontend/src/components/Settings/Forms/FormsList.vue
+msgid "Forms"
+msgstr "Формы"
+
+#: frontend/src/components/Settings/Forms/FormsList.vue
+msgid "Capture leads and deals from public forms you embed on your website."
+msgstr "Получайте лиды и сделки через общедоступные формы, встроенные на ваш сайт."
+
+#: frontend/src/components/Settings/Forms/FormsList.vue
+msgid "No web forms yet"
+msgstr "Веб-форм пока нет"
+
+#: frontend/src/components/Settings/Forms/FormsList.vue
+msgid "Create one to start capturing leads."
+msgstr "Создайте форму, чтобы начать получать лиды."
+
+#: frontend/src/components/Settings/Forms/FormsList.vue
+msgid "Maps to"
+msgstr "Создаёт"
+
+#: frontend/src/components/Settings/Forms/FormsList.vue
+msgid "New form"
+msgstr "Новая форма"
+
+#: frontend/src/components/Settings/Forms/FormsList.vue
+msgid "Contact sales"
+msgstr "Связаться с отделом продаж"
+
+#: frontend/src/components/Settings/Forms/FormsList.vue
+msgid "Create form"
+msgstr "Создать форму"
+
+#. Telephony workspace
+msgid "All calls"
+msgstr "Все звонки"
+
+#. Telephony workspace
+msgid "All employees"
+msgstr "Все сотрудники"
+
+#. Telephony workspace
+msgid "All matching calls are shown"
+msgstr "Все подходящие звонки показаны"
+
+#. Telephony workspace
+msgid "All time"
+msgstr "Весь период"
+
+#. Telephony workspace
+msgid "Back to calls"
+msgstr "К списку звонков"
+
+#. Telephony workspace
+msgid "Call back"
+msgstr "Перезвонить"
+
+#. Telephony workspace
+msgid "Call details"
+msgstr "Детали звонка"
+
+#. Telephony workspace
+msgid "Call filters"
+msgstr "Фильтры звонков"
+
+#. Telephony workspace
+msgid "Call history"
+msgstr "История звонков"
+
+#. Telephony workspace
+msgid "Call recording"
+msgstr "Запись разговора"
+
+#. Telephony workspace
+msgid "Connect headset"
+msgstr "Подключить гарнитуру"
+
+#. Telephony workspace
+msgid "Could not load calls. Check your access and connection."
+msgstr "Не удалось загрузить звонки. Проверьте доступ и соединение."
+
+#. Telephony workspace
+msgid "Could not load the recording. Check access or try again later."
+msgstr "Не удалось загрузить запись. Проверьте доступ или повторите позже."
+
+#. Telephony workspace
+msgid "Could not search customers. Enter a phone number instead."
+msgstr "Не удалось найти клиента. Введите номер телефона."
+
+#. Telephony workspace
+msgid "Customer context"
+msgstr "Карточки клиента"
+
+#. Telephony workspace
+msgid "Customer or phone number"
+msgstr "Клиент или номер телефона"
+
+#. Telephony workspace
+msgid "Date and time"
+msgstr "Дата и время"
+
+#. Telephony workspace
+msgid "Date unavailable"
+msgstr "Дата неизвестна"
+
+#. Telephony workspace
+msgid "Delete digit"
+msgstr "Удалить цифру"
+
+#. Telephony workspace
+msgid "Dial Pad"
+msgstr "Клавиатура набора"
+
+#. Telephony workspace
+msgid "Dial a number"
+msgstr "Набрать номер"
+
+#. Telephony workspace
+msgid "Employee"
+msgstr "Сотрудник"
+
+#. Telephony workspace
+msgid "Find a customer or enter a phone number."
+msgstr "Найдите клиента по имени или введите номер телефона."
+
+#. Telephony workspace
+msgid "Finish the current call before starting another."
+msgstr "Завершите текущий звонок перед новым вызовом."
+
+#. Telephony workspace
+msgid "Headset connected"
+msgstr "Гарнитура подключена"
+
+#. Telephony workspace
+msgid "Last 30 days"
+msgstr "Последние 30 дней"
+
+#. Telephony workspace
+msgid "Last 7 days"
+msgstr "Последние 7 дней"
+
+#. Telephony workspace
+msgid "Load more calls"
+msgstr "Показать ещё звонки"
+
+#. Telephony workspace
+msgid "Loading call details…"
+msgstr "Загрузка деталей звонка…"
+
+#. Telephony workspace
+msgid "Loading calls…"
+msgstr "Загрузка звонков…"
+
+#. Telephony workspace
+msgid "Loading recording…"
+msgstr "Загрузка записи…"
+
+#. Telephony workspace
+msgid "Missed calls"
+msgstr "Пропущенные"
+
+#. Telephony workspace
+msgid "My calls"
+msgstr "Мои звонки"
+
+#. Telephony workspace
+msgid "No calls found"
+msgstr "Звонков не найдено"
+
+#. Telephony workspace
+msgid "No recording is available for this call."
+msgstr "Для этого звонка нет записи."
+
+#. Telephony workspace
+msgid "Notes, tasks and more"
+msgstr "Заметки, задачи и другие действия"
+
+#. Telephony workspace
+msgid "Number or customer name"
+msgstr "Номер или имя клиента"
+
+#. Telephony workspace
+msgid "Open call with {0}"
+msgstr "Открыть звонок: {0}"
+
+#. Telephony workspace
+msgid "Open dialer"
+msgstr "Открыть телефонию"
+
+#. Telephony workspace
+msgid "Phone line"
+msgstr "Линия"
+
+#. Telephony workspace
+msgid "Phone number or name"
+msgstr "Номер телефона или имя"
+
+#. Telephony workspace
+msgid "Recording"
+msgstr "Запись"
+
+#. Telephony workspace
+msgid "Recording paused during a live call."
+msgstr "Воспроизведение записи приостановлено на время звонка."
+
+#. Telephony workspace
+msgid "Refresh calls"
+msgstr "Обновить звонки"
+
+#. Telephony workspace
+msgid "Reset filters"
+msgstr "Сбросить фильтры"
+
+#. Telephony workspace
+msgid "Return to call"
+msgstr "Вернуться к звонку"
+
+#. Telephony workspace
+msgid "Review the number and confirm the call in the dialer."
+msgstr "Проверьте номер и подтвердите звонок в телефонии."
+
+#. Telephony workspace
+msgid "Search calls"
+msgstr "Поиск звонков"
+
+#. Telephony workspace
+msgid "Searching customers…"
+msgstr "Поиск клиентов…"
+
+#. Telephony workspace
+msgid "Set up telephony to make calls."
+msgstr "Настройте телефонию, чтобы совершать звонки."
+
+#. Telephony workspace
+msgid "Table view"
+msgstr "Таблица"
+
+#. Telephony workspace
+msgid "Telephony settings"
+msgstr "Настройки телефонии"
+
+#. Telephony workspace
+msgid "The recording may arrive after the call ends and history is updated."
+msgstr "Запись может появиться после завершения звонка и обновления истории."
+
+#. Telephony workspace
+msgid "This call is not linked to an accessible customer record."
+msgstr "У звонка нет связи с доступной карточкой клиента."
+
+#. Telephony workspace
+msgid "This call is unavailable or you no longer have access."
+msgstr "Звонок недоступен или у вас больше нет доступа."
+
+#. Telephony workspace
+msgid "Try a different search or period. New calls will appear here after synchronization."
+msgstr "Измените поиск или период. Новые звонки появятся после синхронизации."
+
+#. Telephony workspace
+msgid "Unassigned"
+msgstr "Не назначен"
+
+#. Telephony workspace
+msgid "Unknown number"
+msgstr "Неизвестный номер"
+
+#. Telephony workspace
+msgid "With recording"
+msgstr "С записью"
+
+#. Telephony workspace
+msgid "Call completed"
+msgstr "Завершён"
+
+#. Telephony workspace
+msgid "Call failed"
+msgstr "Ошибка вызова"
+
+#. Telephony workspace
+msgid "Line busy"
+msgstr "Занято"
+
+#. Telephony workspace
+msgid "No answer"
+msgstr "Без ответа"
+
+#. Telephony workspace
+msgid "Call canceled"
+msgstr "Отменён"
+
+#. Telephony workspace
+msgid "Unknown status"
+msgstr "Неизвестный статус"
+
+#. Telephony workspace
+msgid "Invalid call filters."
+msgstr "Некорректные фильтры звонков."
+
+#. Telephony workspace
+msgid "You do not have permission to access this call recording."
+msgstr "У вас нет доступа к записи этого звонка."
+
+#. Telephony workspace
+msgid "Incoming calls"
+msgstr "Входящие"
+
+#. Telephony workspace
+msgid "Outgoing calls"
+msgstr "Исходящие"
+
+#. Telephony workspace
+msgid "Dialer connected"
+msgstr "Телефония подключена"
+
+#. Telephony workspace
+msgid "Connect dialer"
+msgstr "Подключить телефонию"
+
+#. Telephony workspace
+msgid "List view"
+msgstr "Список"
+
+#. Telephony workspace
+msgid "Check dialer connection"
+msgstr "Проверить подключение"
+
+#. Telephony workspace
+msgid "The dialer connects automatically. Microphone access is requested when you call or answer."
+msgstr "Телефония подключается автоматически. Доступ к микрофону потребуется при звонке или ответе."
+
+#. Telephony workspace
+msgid "Configure a SIP account for your CRM user in telephony settings."
+msgstr "Назначьте SIP-аккаунт вашему пользователю CRM в настройках телефонии."
+
+#. Telephony workspace
+msgid "Automatic connection is enabled in this browser. Disconnecting pauses it until you connect again."
+msgstr "Автоподключение включено в этом браузере. Кнопка «Отключить» приостановит его до следующего подключения."
+
+#. Telephony workspace
+msgid "Your CRM user has no Exolve SIP account. Contact your administrator."
+msgstr "Вашему пользователю CRM не назначен SIP-аккаунт Exolve. Назначьте его в настройках телефонии."
+
+#. Telephony workspace
+msgid "Enter the Exolve application ID and API key."
+msgstr "Укажите ID приложения Exolve и API-ключ."
+
+#. Telephony workspace
+msgid "You do not have permission to use the dialer."
+msgstr "У вас нет прав на использование телефонии."
+
+#. Telephony workspace
+msgid "Exolve calling is disabled."
+msgstr "Телефония Exolve отключена в настройках."
+
+#. Telephony workspace
+msgid "Could not check the dialer configuration. Try again."
+msgstr "Не удалось проверить настройки телефонии. Повторите попытку."
+
+#. Telephony workspace
+msgid "Connecting…"
+msgstr "Подключение…"
+
+#. Telephony workspace
+msgid "Could not connect Exolve. Check your SIP mapping and saved API key."
+msgstr "Не удалось получить данные SIP. Проверьте привязку сотрудника и сохранённый ключ Exolve."
+
+#. Telephony workspace
+msgid "Exolve is connected in another tab. Disconnect it there first."
+msgstr "Телефония уже подключена в другой вкладке. Продолжите там или отключите её в той вкладке."
+
+#. Telephony workspace
+msgid "Could not register the Exolve SIP account."
+msgstr "Не удалось зарегистрировать SIP-аккаунт. Проверьте его состояние и пароль в Exolve."
+
+#. Telephony workspace
+msgid "Exolve connection timed out. Try connecting again."
+msgstr "Истекло время ожидания Exolve. Проверьте интернет и повторите подключение."
+
+#. Telephony workspace
+msgid "Automatic connection is paused. Connect to enable it again."
+msgstr "Автоподключение приостановлено. Нажмите «Подключить Exolve», чтобы включить его снова."
+
+#. Telephony workspace
+msgid "Phone Number"
+msgstr "Номер телефона"
+
+#. Telephony workspace
+msgid "Add task"
+msgstr "Добавить задачу"
+
+#. Telephony workspace
+msgid "Call note"
+msgstr "Заметка к разговору"
+
+#. Telephony workspace
+msgid "Call notes"
+msgstr "Разговор"
+
+#. Telephony workspace
+msgid "Choose a lead or deal above to save. You can keep typing."
+msgstr "Выберите лид или сделку выше. Пока можно продолжать писать черновик."
+
+#. Telephony workspace
+msgid "Choose a lead or deal before saving."
+msgstr "Перед сохранением выберите лид или сделку."
+
+#. Telephony workspace
+msgid "Choose where to save"
+msgstr "Куда сохранить"
+
+#. Telephony workspace
+msgid "Conversation drafts"
+msgstr "Материалы разговоров"
+
+#. Telephony workspace
+msgid "Could not save. Check the fields, customer access and assignee."
+msgstr "Не удалось сохранить. Проверьте поля, доступ к карточке и ответственного."
+
+#. Telephony workspace
+msgid "Create task"
+msgstr "Создать задачу"
+
+#. Telephony workspace
+msgid "Find a lead or deal"
+msgstr "Найти лид или сделку"
+
+#. Telephony workspace
+msgid "Load latest version"
+msgstr "Загрузить актуальную версию"
+
+#. Telephony workspace
+msgid "Loading customer context…"
+msgstr "Загрузка карточки…"
+
+#. Telephony workspace
+msgid "No matching customer records."
+msgstr "Подходящих карточек не найдено."
+
+#. Telephony workspace
+msgid "Note text"
+msgstr "Текст заметки"
+
+#. Telephony workspace
+msgid "Note title"
+msgstr "Заголовок заметки"
+
+#. Telephony workspace
+msgid "Notes and tasks"
+msgstr "Заметки и задачи"
+
+#. Telephony workspace
+msgid "Notes and tasks are saved directly to the selected CRM record. Conversation drafts stay available while this CRM tab is open."
+msgstr "Заметки и задачи сохраняются прямо в выбранную карточку CRM. Черновики доступны, пока открыта эта вкладка CRM."
+
+#. Telephony workspace
+msgid "Restore my draft"
+msgstr "Вернуть мой черновик"
+
+#. Telephony workspace
+msgid "Retry saving"
+msgstr "Повторить сохранение"
+
+#. Telephony workspace
+msgid "Save changes"
+msgstr "Сохранить изменения"
+
+#. Telephony workspace
+msgid "Save note"
+msgstr "Сохранить заметку"
+
+#. Telephony workspace
+msgid "Save to"
+msgstr "Сохранять в"
+
+#. Telephony workspace
+msgid "Saved notes and tasks stay in this customer record."
+msgstr "Сохранённые заметки и задачи остаются в этой карточке."
+
+#. Telephony workspace
+msgid "Saving was not confirmed. Retry safely; your draft is kept."
+msgstr "Сохранение не подтверждено. Повторите запрос — дубль не появится. Черновик сохранён."
+
+#. Telephony workspace
+msgid "Several customer records are linked. Choose one for this conversation."
+msgstr "Есть несколько связанных карточек. Выберите нужную для этого разговора."
+
+#. Telephony workspace
+msgid "Task title"
+msgstr "Название задачи"
+
+#. Telephony workspace
+msgid "The latest version is loaded. Your previous draft can be restored."
+msgstr "Загружена актуальная версия. Предыдущий черновик можно вернуть."
+
+#. Telephony workspace
+msgid "This customer or record is unavailable. Your draft is kept."
+msgstr "Карточка или запись недоступна. Черновик сохранён."
+
+#. Telephony workspace
+msgid "This record changed in another window. Your draft is kept."
+msgstr "Запись изменилась в другом окне. Черновик сохранён."
+
+#. Telephony workspace
+msgid "Could not read the customer context. Choose an accessible lead or deal."
+msgstr "Не удалось открыть карточку. Выберите доступный лид или сделку."
+
+#. Telephony workspace
+msgid "Could not load saving options. Check customer access and try again."
+msgstr "Не удалось проверить возможность сохранения. Проверьте доступ к карточке и повторите попытку."
+
+#. Telephony workspace
+msgid "Checking saving permissions…"
+msgstr "Проверка доступа к сохранению…"
+
+#. Telephony workspace
+msgid "Telephony connects automatically. Microphone access is requested when you call or answer."
+msgstr "Телефония подключается автоматически. Доступ к микрофону потребуется при звонке или ответе."
+
+#. Telephony workspace
+msgid "You do not have permission to use telephony."
+msgstr "У вас нет прав на использование телефонии."
+
+#. Telephony workspace
+msgid "Could not check telephony configuration. Try again."
+msgstr "Не удалось проверить настройки телефонии. Повторите попытку."
+
+#. Telephony workspace
+msgid "Telephony is connected in another tab. Continue there or close that tab."
+msgstr "Телефония уже подключена в другой вкладке. Продолжите там или закройте ту вкладку."
+
+#. Telephony workspace
+msgid "Open telephony"
+msgstr "Открыть телефонию"
+
+#. Telephony workspace
+msgid "Review the number and confirm the call in telephony."
+msgstr "Проверьте номер и подтвердите звонок в телефонии."
+
+#. Telephony workspace
+msgid "Find another lead or deal"
+msgstr "Найти другой лид или сделку"
+
+#. Telephony workspace
+msgid "Customer phone number"
+msgstr "Номер клиента"
+
+#. Telephony workspace
+msgid "Call customer"
+msgstr "Позвонить"
+
+#. Telephony workspace
+msgid "Connect telephony"
+msgstr "Подключить телефонию"
+
+#. Telephony workspace
+msgid "Ready to call"
+msgstr "Готово к звонку"
+
+#. Telephony workspace
+msgid "Calling from {0}"
+msgstr "С номера {0}"
+
+#. Telephony workspace
+msgid "Customer record"
+msgstr "Карточка клиента"
+
+#. Telephony workspace
+msgid "Choose the lead or deal for notes and tasks."
+msgstr "Выберите лид или сделку — сюда попадут заметки и задачи."
+
+#. Telephony workspace
+msgid "Previous conversations"
+msgstr "Предыдущие разговоры"
+
+#. Telephony workspace
+msgid "Agreed on a next step?"
+msgstr "Договорились о следующем шаге?"
+
+#. Telephony workspace
+msgid "Add a task and a deadline so nothing is forgotten."
+msgstr "Добавьте задачу и срок, чтобы вернуться к договорённости."
+
+#. Telephony workspace
+msgid "Edit note title"
+msgstr "Изменить заголовок заметки"
+
+#. Telephony workspace
+msgid "Write down the essentials of the conversation…"
+msgstr "Что обсудили? Какие договорённости?"
+
+#. Telephony workspace
+msgid "For example, send a proposal"
+msgstr "Например, отправить предложение"
+
+#. Telephony workspace
+msgid "Task details"
+msgstr "Подробности задачи"
+
+#. Telephony workspace
+msgid "Edit task"
+msgstr "Редактировать задачу"
+
+#. Telephony workspace
+msgid "Collapse task"
+msgstr "Свернуть задачу"
+
+#. Telephony workspace
+msgid "Choose a customer record to save. Your text stays here."
+msgstr "Выберите карточку клиента для сохранения. Введённый текст останется здесь."
+
+#. Telephony workspace
+msgid "Change customer record"
+msgstr "Изменить"
+
+#. Telephony workspace
+msgid "Task assignee"
+msgstr "Ответственный"
+
+#. Telephony workspace
+msgid "Turn on microphone"
+msgstr "Включить микрофон"
+
+#. Telephony workspace
+msgid "Turn off microphone"
+msgstr "Выключить микрофон"
+
+#. Telephony workspace
+msgid "Current call"
+msgstr "Текущий звонок"
+
+#. Telephony workspace
+msgid "Expand call"
+msgstr "Развернуть звонок"
+
+#. Telephony workspace
+msgid "Minimize call"
+msgstr "Свернуть звонок"
+
+#. Telephony workspace
+msgid "Customer search results"
+msgstr "Результаты поиска клиентов"
+
+#. Telephony workspace
+msgid "Call audio"
+msgstr "Звук и устройства"
+
+#. Telephony workspace
+msgid "Choose your devices and check the sound before calling."
+msgstr "Выберите устройства и проверьте звук перед звонком."
+
+#. Telephony workspace
+msgid "Microphone"
+msgstr "Микрофон"
+
+#. Telephony workspace
+msgid "Speaker"
+msgstr "Динамики"
+
+#. Telephony workspace
+msgid "System default"
+msgstr "По умолчанию в системе"
+
+#. Telephony workspace
+msgid "Audio device {0}"
+msgstr "Аудиоустройство {0}"
+
+#. Telephony workspace
+msgid "Selected device is unavailable"
+msgstr "Выбранное устройство недоступно"
+
+#. Telephony workspace
+msgid "This browser uses the system speaker. Change the output in your system settings."
+msgstr "Этот браузер использует системные динамики. Выход можно изменить в настройках системы."
+
+#. Telephony workspace
+msgid "Finish the call to change or test audio devices."
+msgstr "Изменить и проверить устройства можно после завершения звонка."
+
+#. Telephony workspace
+msgid "Stop microphone check"
+msgstr "Остановить проверку микрофона"
+
+#. Telephony workspace
+msgid "Check microphone"
+msgstr "Проверить микрофон"
+
+#. Telephony workspace
+msgid "Microphone level"
+msgstr "Уровень микрофона"
+
+#. Telephony workspace
+msgid "Allow microphone access in your browser."
+msgstr "Разрешите доступ к микрофону в браузере."
+
+#. Telephony workspace
+msgid "Speak a few words. The meter should move."
+msgstr "Скажите несколько слов — индикатор должен двигаться."
+
+#. Telephony workspace
+msgid "Microphone check stays on this device and stops after 20 seconds."
+msgstr "Проверка проходит на этом устройстве и остановится через 20 секунд."
+
+#. Telephony workspace
+msgid "Stop test sound"
+msgstr "Остановить тестовый звук"
+
+#. Telephony workspace
+msgid "Play test sound"
+msgstr "Проверить динамики"
+
+#. Telephony workspace
+msgid "You should hear two short tones in the selected speaker."
+msgstr "Вы должны услышать два коротких сигнала в выбранных динамиках."
+
+#. Telephony workspace
+msgid "Refresh devices"
+msgstr "Обновить устройства"
+
+#. Telephony workspace
+msgid "Could not list audio devices. Check browser permissions."
+msgstr "Не удалось получить список устройств. Проверьте разрешения браузера."
+
+#. Telephony workspace
+msgid "Could not access the selected microphone. Check permissions or choose another device."
+msgstr "Не удалось включить выбранный микрофон. Проверьте разрешения или выберите другое устройство."
+
+#. Telephony workspace
+msgid "Could not play test sound. Check the selected speaker."
+msgstr "Не удалось воспроизвести тестовый звук. Проверьте выбранные динамики."
+
+#. Telephony workspace
+msgid "Could not use the selected speaker. Check permissions or choose another device."
+msgstr "Выбранные динамики недоступны. Проверьте разрешения или выберите другое устройство."
+
+#. Telephony workspace
+msgid "Back to call"
+msgstr "К разговору"
+
+#. Telephony workspace
+msgid "Restoring conversation drafts…"
+msgstr "Восстанавливаем черновики разговоров…"
+
+#. Telephony workspace
+msgid "Could not restore conversation drafts. Try again."
+msgstr "Не удалось восстановить черновики разговоров. Повторите попытку."
+
+#. Telephony workspace
+msgid "Saving conversation draft…"
+msgstr "Сохраняем черновик…"
+
+#. Telephony workspace
+msgid "Conversation draft saved on the server"
+msgstr "Черновик сохранён на сервере"
+
+#. Telephony workspace
+msgid "Conversation changes are not saved yet"
+msgstr "Изменения ещё не сохранены"
+
+#. Telephony workspace
+msgid "This conversation draft changed in another window. Your text is kept."
+msgstr "Черновик изменён в другой вкладке. Ваш текст сохранён в этой вкладке."
+
+#. Telephony workspace
+msgid "Could not save the conversation draft. Your text stays in this tab."
+msgstr "Не удалось сохранить черновик. Текст остаётся в этой вкладке."
+
+#. Telephony workspace
+msgid "Retry draft saving"
+msgstr "Повторить сохранение черновика"
+
+#. Telephony workspace
+msgid "Load saved conversation draft"
+msgstr "Загрузить черновик с сервера"
+
+#. Telephony workspace
+msgid "Restore my conversation changes"
+msgstr "Вернуть мои изменения"
+
+#. Telephony workspace
+msgid "Draft restored. A previous call is not resumed automatically."
+msgstr "Черновик восстановлен. Предыдущий звонок автоматически не возобновляется."
+
+#. Telephony workspace
+msgid "Load older conversation drafts"
+msgstr "Загрузить более ранние разговоры"
+
+#. Telephony workspace
+msgid "Linked call in history"
+msgstr "Звонок в истории"
+
+#. Telephony workspace
+msgid "Link to a call in history"
+msgstr "Связать со звонком в истории"
+
+#. Telephony workspace
+msgid "Choose the exact conversation. Calls are never linked by phone number automatically."
+msgstr "Выберите именно этот разговор. Совпадение номера не связывает звонки автоматически."
+
+#. Telephony workspace
+msgid "Calls to link"
+msgstr "Звонки для связи с разговором"
+
+#. Telephony workspace
+msgid "No matching calls yet. Server synchronization will add completed calls here."
+msgstr "Подходящих звонков пока нет. Завершённые звонки появятся после серверной синхронизации."
+
+#. Telephony workspace
+msgid "Link selected call"
+msgstr "Связать выбранный звонок"
+
+#. Telephony workspace
+msgid "Could not load calls for linking. Try again."
+msgstr "Не удалось загрузить звонки. Повторите попытку."
+
+#. Telephony workspace
+msgid "Could not link this call. Check access or refresh the conversation draft."
+msgstr "Не удалось связать звонок. Проверьте доступ или загрузите актуальный черновик."
+
+#. Telephony workspace
+msgid "Open conversation notes and tasks"
+msgstr "Открыть заметки и задачи разговора"
+
+#. Telephony workspace
+msgid "Recording loading error"
+msgstr "Ошибка загрузки записи"
+
+#. Telephony workspace
+msgid "Recording is available"
+msgstr "Запись доступна"
+
+#. Telephony workspace
+msgid "Recording is being prepared"
+msgstr "Запись готовится"
+
+#. Telephony workspace
+msgid "Recording is unavailable"
+msgstr "Запись отсутствует"
+
+#. Telephony workspace
+msgid "Synchronize call history on the server"
+msgstr "Синхронизировать историю звонков на сервере"
+
+#. Telephony workspace
+msgid "History start date"
+msgstr "Начало истории звонков"
+
+#. Telephony workspace
+msgid "Leave empty to recover the last 30 days. Synchronization continues while CRM is closed."
+msgstr "Оставьте пустым для восстановления последних 30 дней. История обновляется и при закрытой CRM."
+
+#. Telephony workspace
+msgid "Call history could not be synchronized. Check the Exolve connection."
+msgstr "Не удалось обновить историю звонков. Проверьте подключение Exolve."
+
+#. Telephony workspace
+msgid "Server history updated at {0}"
+msgstr "История на сервере обновлена {0}"
+
+#. Telephony workspace
+msgid "Server history synchronization is starting…"
+msgstr "Серверная синхронизация истории запускается…"
+
+#. Telephony workspace
+msgid "Server history recovery is in progress…"
+msgstr "Восстановление истории на сервере продолжается…"
+
+#. Telephony workspace
+msgid "Call outcome"
+msgstr "Итог звонка"
+
+#. Telephony workspace
+msgid "Choose a call outcome"
+msgstr "Выберите итог звонка"
+
+#. Telephony workspace
+msgid "Agreed"
+msgstr "Договорились"
+
+#. Telephony workspace
+msgid "Callback"
+msgstr "Перезвонить"
+
+#. Telephony workspace
+msgid "Not interested"
+msgstr "Неинтересно"
+
+#. Telephony workspace
+msgid "Wrong number"
+msgstr "Неверный номер"
+
+#. Telephony workspace
+msgid "Needs attention"
+msgstr "Требуют внимания"
+
+#. Telephony workspace
+msgid "Unhandled missed call"
+msgstr "Пропущенный не обработан"
+
+#. Telephony workspace
+msgid "Overdue tasks"
+msgstr "Просроченные задачи"
+
+#. Telephony workspace
+msgid "Tasks due today"
+msgstr "Задачи на сегодня"
+
+#. Telephony workspace
+msgid "All lines"
+msgstr "Все линии"
+
+#. Telephony workspace
+msgid "All outcomes"
+msgstr "Все итоги"
+
+#. Telephony workspace
+msgid "No outcome yet"
+msgstr "Итог не указан"
+
+#. Telephony workspace
+msgid "Unhandled missed calls and linked tasks due today or earlier, regardless of call date."
+msgstr "Необработанные пропущенные и связанные задачи на сегодня или раньше — независимо от даты звонка."
+
+#. Telephony workspace
+msgid "Save callback to"
+msgstr "Сохранить перезвон в"
+
+#. Telephony workspace
+msgid "Callback time"
+msgstr "Время перезвона"
+
+#. Telephony workspace
+msgid "Call back to customer"
+msgstr "Перезвонить клиенту"
+
+#. Telephony workspace
+msgid "Choose assignee"
+msgstr "Выберите ответственного"
+
+#. Telephony workspace
+msgid "Save outcome"
+msgstr "Сохранить итог"
+
+#. Telephony workspace
+msgid "Save outcome and create callback"
+msgstr "Сохранить итог и создать задачу"
+
+#. Telephony workspace
+msgid "An open callback task already exists. Complete it or cancel it before scheduling another."
+msgstr "Задача на перезвон уже есть. Завершите или отмените её перед новым назначением."
+
+#. Telephony workspace
+msgid "The manager outcome is separate from the call connection status."
+msgstr "Итог менеджера сохраняется отдельно от статуса соединения."
+
+#. Telephony workspace
+msgid "Linked tasks"
+msgstr "Связанные задачи"
+
+#. Telephony workspace
+msgid "Complete task"
+msgstr "Завершить задачу"
+
+#. Telephony workspace
+msgid "Cancel callback task"
+msgstr "Отменить перезвон"
+
+#. Telephony workspace
+msgid "Retry the same save"
+msgstr "Повторить это сохранение"
+
+#. Telephony workspace
+msgid "Reload saved outcome"
+msgstr "Обновить сохранённый итог"
+
+#. Telephony workspace
+msgid "Loading call work…"
+msgstr "Загружаем итог, заметки и задачи…"
+
+#. Telephony workspace
+msgid "Call work is unavailable. Check access and try again."
+msgstr "Материалы звонка недоступны. Проверьте доступ и повторите попытку."
+
+#. Telephony workspace
+msgid "Could not load callback assignees."
+msgstr "Не удалось загрузить ответственных за перезвон."
+
+#. Telephony workspace
+msgid "Could not find customer records."
+msgstr "Не удалось найти карточки клиентов."
+
+#. Telephony workspace
+msgid "The call outcome or task changed. Your input is kept; reload before saving."
+msgstr "Итог или задача изменены в другом окне. Ваш ввод сохранён здесь. Обновите данные перед сохранением."
+
+#. Telephony workspace
+msgid "Could not save. Check the customer, assignee, deadline and access."
+msgstr "Не удалось сохранить. Проверьте клиента, ответственного, срок и права доступа."
+
+#. Telephony workspace
+msgid "The result is unknown. Retry the same save before making changes."
+msgstr "Ответ сервера не получен. Повторите это сохранение перед новыми изменениями."
+
+#. Telephony workspace
+msgid "To save the outcome or schedule a callback, link this conversation to its exact call in history above."
+msgstr "Чтобы сохранить итог или назначить перезвон, выберите выше точный звонок из истории."
+
+#. Telephony workspace
+msgid "Back 10 seconds"
+msgstr "Назад на 10 секунд"
+
+#. Telephony workspace
+msgid "Forward 10 seconds"
+msgstr "Вперёд на 10 секунд"
+
+#. Telephony workspace
+msgid "Playback speed"
+msgstr "Скорость записи"
+
+#. Telephony workspace
+msgid "Callback from call history"
+msgstr "Перезвон по звонку из истории"
+
+#. Telephony workspace
+msgid "−10 s"
+msgstr "−10 с"
+
+#. Telephony workspace
+msgid "+10 s"
+msgstr "+10 с"
+
+#. Telephony workspace
+msgid "Notes linked to call"
+msgstr "Заметки к звонку"

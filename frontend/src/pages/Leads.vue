@@ -541,7 +541,8 @@ function actions(itemName) {
     {
       icon: h(PhoneIcon, { class: 'h-4 w-4' }),
       label: __('Make a Call'),
-      onClick: () => makeCall(mobile_no),
+      onClick: () =>
+        makeCall(mobile_no, { doctype: 'CRM Lead', name: itemName }),
       condition: () => mobile_no && callEnabled.value,
     },
     {

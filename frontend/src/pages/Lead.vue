@@ -69,13 +69,33 @@
       class="flex flex-1 overflow-hidden flex-col [&_[role='tab']]:cursor-grab [&_[role='tab']:active]:cursor-grabbing [&_[role='tab']]:px-0 [&_[role='tab']]:shrink-0 [&_[role='tablist']]:px-5 [&_[role='tablist']::-webkit-scrollbar]:h-0 [&_[role='tablist']]:min-h-[45px] [&_[role='tablist']]:gap-7.5 [&_[role='tabpanel']:not([hidden])]:flex [&_[role='tabpanel']:not([hidden])]:grow"
     >
       <template #tab-panel="{ tab }">
-        <LeadConversation
+        <div
           v-if="tab.name == 'Messenger'"
-          :leadName="leadId"
-          :lead="doc"
-          :phone="doc.mobile_no || doc.phone"
-          :active="tabs[tabIndex]?.name === 'Messenger'"
-        />
+          class="flex min-h-0 min-w-0 flex-1 flex-col"
+        >
+          <div class="flex justify-end border-b px-5 py-2">
+            <Button
+              class="min-h-11"
+              :label="__('Открыть в общем мессенджере')"
+              @click="
+                router.push({
+                  name: 'Messenger',
+                  query: {
+                    reference_doctype: 'CRM Lead',
+                    reference_name: leadId,
+                    view: 'all',
+                  },
+                })
+              "
+            />
+          </div>
+          <LeadConversation
+            :leadName="leadId"
+            :lead="doc"
+            :phone="doc.mobile_no || doc.phone"
+            :active="tabs[tabIndex]?.name === 'Messenger'"
+          />
+        </div>
         <Activities
           v-else
           ref="activities"
@@ -158,7 +178,10 @@
                   @click="
                     () =>
                       doc.mobile_no
-                        ? makeCall(doc.mobile_no)
+                        ? makeCall(doc.mobile_no, {
+                            doctype: 'CRM Lead',
+                            name: doc.name,
+                          })
                         : toast.error(
                             __('Please set a mobile number to make calls'),
                           )
@@ -543,7 +566,11 @@ function communicationCommands() {
       title: 'Make a call',
       group: 'Lead',
       icon: 'phone',
-      perform: () => makeCall(doc.value.mobile_no),
+      perform: () =>
+        makeCall(doc.value.mobile_no, {
+          doctype: 'CRM Lead',
+          name: doc.value.name,
+        }),
     })
   }
   return commands

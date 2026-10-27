@@ -12,6 +12,25 @@ RUSSIAN_TRANSLATIONS = {
 	"Listing details are not available yet.": "Данные объявления пока недоступны.",
 	"Listing ID: {0}": "ID объявления: {0}",
 	"Open on Avito": "Открыть на Avito",
+	"Notification delivery": "Доставка уведомлений",
+	"Choose optional delivery of CRM task assignments to EXP One.": "Получайте назначения задач CRM в EXP One, если вам удобно.",
+	"This is the same setting in CRM, Home and EXP One.": "Это одна настройка в CRM, Home и EXP One.",
+	"Receive task assignments in EXP One": "Получать назначения задач в EXP One",
+	"Messages arrive in your private chat with the selected sender.": "Сообщения приходят в вашу личку с выбранным отправителем.",
+	"Notify with push from EXP One": "Оповещать push из EXP One",
+	"Turning this off keeps notification history and other channels. Reading the chat does not read the source notification.": "Отключение сохраняет историю уведомлений и другие каналы. Прочтение чата не помечает уведомление CRM прочитанным.",
+	"Open notification center": "Открыть общий центр уведомлений",
+	"EXP One is unavailable for your account.": "EXP One недоступен для вашего аккаунта.",
+	"The selected sender is unavailable.": "Выбранный отправитель недоступен.",
+	"Delivery is on": "Доставка включена",
+	"Delivery is off": "Доставка выключена",
+	"Choose a sender": "Выберите отправителя",
+	"Sender": "Отправитель",
+	"Reload": "Обновить",
+	"Could not load notification settings.": "Не удалось загрузить настройки уведомлений.",
+	"Could not save notification settings.": "Не удалось сохранить настройки уведомлений.",
+	"Could not load notifications.": "Не удалось загрузить уведомления.",
+	"Could not update notification read state. Refresh and try again.": "Не удалось сохранить прочтение. Обновите список и повторите.",
 	# Message channel settings
 	"Avito chat import": "Импорт чатов Авито",
 	"Choose which past chats create leads when the channel connects or this setting is saved. Chats created after connection are processed automatically.": "Выберите, какие старые чаты создадут лиды при подключении канала или сохранении настройки. Чаты, созданные после подключения, обрабатываются автоматически.",
@@ -433,4 +452,6 @@ RUSSIAN_TRANSLATIONS = {
 def get_crm_translations(language: str | None) -> dict[str, str]:
 	if not str(language or "").lower().startswith("ru"):
 		return {}
-	return RUSSIAN_TRANSLATIONS.copy()
+	from crm.integrations.exolve.translations import RUSSIAN_TRANSLATIONS as exolve_translations
+
+	return {**RUSSIAN_TRANSLATIONS, **exolve_translations}

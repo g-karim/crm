@@ -7,6 +7,7 @@ app_publisher = "EXP VERSE"
 app_description = APP_NAME
 app_email = "shariq@frappe.io"
 app_license = "AGPLv3"
+exp_notification_sources = ["crm.notification_source.make_source"]
 app_icon_url = APP_LOGO_URL
 app_icon_title = APP_NAME
 app_icon_route = APP_ROUTE
@@ -139,12 +140,18 @@ before_uninstall = "crm.uninstall.before_uninstall"
 # Permissions evaluated in scripted ways
 
 permission_query_conditions = {
+	"FCRM Note": "crm.permissions.call_work.note_query",
+	"CRM Task": "crm.permissions.call_work.task_query",
 	"CRM Lead": "crm.permissions.org_hierarchy.get_lead_permission_query_conditions",
 	"CRM Deal": "crm.permissions.org_hierarchy.get_deal_permission_query_conditions",
 	"CRM Notification": "crm.fcrm.doctype.crm_notification.crm_notification.get_permission_query_conditions",
 }
 
 has_permission = {
+	"Communication": "crm.permissions.inbox.communication_permission",
+	"File": "crm.permissions.inbox.file_permission",
+	"FCRM Note": "crm.permissions.call_work.note_permission",
+	"CRM Task": "crm.permissions.call_work.task_permission",
 	"CRM Lead": "crm.permissions.org_hierarchy.has_lead_permission",
 	"CRM Deal": "crm.permissions.org_hierarchy.has_deal_permission",
 	"CRM Notification": "crm.fcrm.doctype.crm_notification.crm_notification.has_permission",
@@ -172,6 +179,10 @@ doc_events = {
 		"after_insert": ["crm.touch_tracking.capture_created"],
 		"on_update": ["crm.touch_tracking.capture_status_change"],
 	},
+	"CRM Notification": {
+		"after_insert": "crm.notification_source.publish",
+		"on_update": "crm.notification_source.changed",
+	},
 	"Contact": {
 		"validate": ["crm.api.contact.validate"],
 	},
@@ -197,7 +208,7 @@ doc_events = {
 		"on_update": ["crm.api.comment.on_update", "crm.touch_tracking_internal.capture_internal"],
 	},
 	"FCRM Note": {"on_update": ["crm.touch_tracking_internal.capture_internal"]},
-	"CRM Task": {"on_update": ["crm.touch_tracking_internal.capture_internal"]},
+	"CRM Task": {"on_update": ["crm.touch_tracking_internal.capture_internal", "crm.task_operations.changed"]},
 	"CRM Call Log": {"after_insert": ["crm.touch_tracking_channels.capture_manual_call"]},
 	"Messenger Message": {
 		"after_insert": ["crm.touch_tracking_channels.on_message"],
@@ -284,6 +295,7 @@ scheduler_events = {
 	"hourly_long": ["crm.lead_syncing.background_sync.sync_leads_from_sources_hourly"],
 	"monthly_long": ["crm.lead_syncing.background_sync.sync_leads_from_sources_monthly"],
 	"cron": {
+		"* * * * *": ["crm.integrations.exolve.history.run"],
 		"*/5 * * * *": [
 			"crm.lead_syncing.background_sync.sync_leads_from_sources_5_minutes",
 			"crm.touch_tracking.maintenance",
@@ -363,6 +375,7 @@ ignore_links_on_delete = ["Failed Lead Sync Log"]
 # ]
 
 after_migrate = [
+	"crm.call_analysis.workspace.install",
 	"crm.fcrm.doctype.fcrm_settings.fcrm_settings.after_migrate",
 	"crm.branding.ensure_crm_branding_defaults",
 	"crm.dropdown.ensure_crm_dropdown_items",

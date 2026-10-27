@@ -11,7 +11,10 @@ import {
   getPendingFetchFields,
   getSourceFieldnames,
 } from '@/utils/fetchFrom'
-import { call, createDocumentResource, createResource, toast } from 'frappe-ui'
+import { useCRMTaskUpdates } from '@/composables/useCRMTaskUpdates'
+import { taskChanges, standardTaskChanges } from '@/utils/taskRefresh'
+import { saveCRMTaskDraft } from '@/utils/taskSave'
+import { call, createDocumentResource, createResource, frappeRequest, toast } from 'frappe-ui'
 import { ref, reactive, getCurrentInstance } from 'vue'
 
 const documentsCache = {}
@@ -63,7 +66,7 @@ export function useDocument(doctype, docname, resourceOverrides = {}) {
     if (docname) {
       documentsCache[doctype][docname] = createDocumentResource(
         {
-          realtime: Boolean(vm?.$socket),
+          realtime: doctype === 'CRM Task' ? false : Boolean(vm?.$socket),
           doctype: doctype,
           name: docname,
           onSuccess: async () => await setupFormScript(),
@@ -144,6 +147,16 @@ export function useDocument(doctype, docname, resourceOverrides = {}) {
         }
         const mandatory = checkMandatory(documentsCache[doctype][docname].doc)
         if (mandatory) return
+        const resource = documentsCache[doctype][docname]
+        if (doctype === 'CRM Task' && resource.crmTaskSafeSave !== false && (resource.crmTaskPending || standardTaskChanges(taskChanges(resource)))) {
+          resource.crmTaskViewer ||= new URLSearchParams(document.cookie.split('; ').join('&')).get('user_id')
+          return saveCRMTaskDraft(resource, {
+            request: (method, params, verb) => frappeRequest({ url: `/api/method/crm.api.celio_tasks.${method}`, method: verb, params, signal: AbortSignal.timeout(20000) }),
+            viewer: resource.crmTaskViewer, mutationId: () => crypto.randomUUID(),
+            onSuccess: (value) => { triggerOnSave(); processPendingDeletions(); toast.success(__('Document updated successfully')); args[1]?.onSuccess?.(value) },
+            onError: (error) => { triggerOnError(error); args[1]?.onError?.(error) },
+          })
+        }
         return _originalSubmit.apply(_save, args)
       }
     } else {
@@ -155,6 +168,7 @@ export function useDocument(doctype, docname, resourceOverrides = {}) {
     }
   }
 
+  if (vm && docname) useCRMTaskUpdates(documentsCache[doctype][docname], doctype, docname, vm.$socket, setupFormScript)
   assigneesCache[doctype] = assigneesCache[doctype] || {}
 
   if (!assigneesCache[doctype][docname || '']) {

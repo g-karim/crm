@@ -15,5 +15,7 @@ describe('navigationItems', () => {
     expect(mobileRoutes).not.toContain('Dashboard')
     expect(mobileRoutes).not.toContain('Calendar')
     expect(mobileRoutes).toContain('Leads')
+    expect(mobileRoutes).toContain('Telephony')
+    expect(mobileRoutes).not.toContain('Call Logs')
   })
 })

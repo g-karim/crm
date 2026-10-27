@@ -73,6 +73,11 @@ const routes = [
     component: () => import('@/pages/Tasks.vue'),
   },
   {
+    path: '/notification-settings',
+    name: 'NotificationDelivery',
+    component: () => import('@/components/Settings/NotificationDelivery.vue'),
+  },
+  {
     alias: '/contacts',
     path: '/contacts/view/:viewType?',
     name: 'Contacts',
@@ -95,6 +100,16 @@ const routes = [
     name: 'Organization',
     component: () => import(`@/pages/${handleMobileView('Organization')}.vue`),
     props: true,
+  },
+  {
+    path: '/messenger',
+    name: 'Messenger',
+    component: () => import('@/pages/Messenger.vue'),
+  },
+  {
+    path: '/telephony',
+    name: 'Telephony',
+    component: () => import('@/pages/Telephony.vue'),
   },
   {
     alias: '/call-logs',
