@@ -4,6 +4,12 @@
       <ViewBreadcrumbs v-model="viewControls" routeName="Call Logs" />
     </template>
     <template #right-header>
+      <Button
+        :label="__('Telephony')"
+        icon-left="lucide-phone"
+        variant="ghost"
+        @click="$router.push({ name: 'Telephony' })"
+      />
       <CustomActions
         v-if="callLogsListView?.customListActions"
         :actions="callLogsListView.customListActions"
@@ -73,11 +79,15 @@ import { getCallLogDetail } from '@/utils/callLog'
 import { useTelemetry } from 'frappe-ui/frappe'
 import { createResource } from 'frappe-ui'
 import { computed, ref, onMounted } from 'vue'
+import { useEventListener } from '@vueuse/core'
 
 const callLogsListView = ref(null)
 
 // callLogs data is loaded in the ViewControls component
 const callLogs = ref({})
+useEventListener(window, 'crm-exolve-calls-updated', () =>
+  callLogs.value?.reload?.(),
+)
 const loadMore = ref(1)
 const triggerResize = ref(1)
 const updatedPageCount = ref(20)

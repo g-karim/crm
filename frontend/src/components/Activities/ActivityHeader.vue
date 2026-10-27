@@ -102,6 +102,7 @@ import { Dropdown } from 'frappe-ui'
 import { computed, h } from 'vue'
 
 const props = defineProps({
+  doctype: { type: String, default: 'CRM Lead' },
   tabs: { type: Array, default: () => [] },
   title: { type: String, default: '' },
   doc: { type: Object, default: () => ({}) },
@@ -143,7 +144,11 @@ const defaultActions = computed(() => {
     {
       icon: h(PhoneIcon, { class: 'h-4 w-4' }),
       label: __('Make a Call'),
-      onClick: () => makeCall(props.doc.mobile_no),
+      onClick: () =>
+        makeCall(props.doc.mobile_no, {
+          doctype: props.doctype,
+          name: props.doc.name,
+        }),
       condition: () => callEnabled.value,
     },
     {
@@ -187,7 +192,11 @@ const callActions = computed(() => {
     {
       label: __('Make a Call'),
       icon: h(PhoneIcon, { class: 'h-4 w-4' }),
-      onClick: () => makeCall(props.doc.mobile_no),
+      onClick: () =>
+        makeCall(props.doc.mobile_no, {
+          doctype: props.doctype,
+          name: props.doc.name,
+        }),
       condition: () => callEnabled.value,
     },
   ]

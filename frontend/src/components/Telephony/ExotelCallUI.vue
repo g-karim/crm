@@ -238,6 +238,7 @@ import { sessionStore } from '@/stores/session'
 import { useDraggable, useWindowSize } from '@vueuse/core'
 import { Avatar, Button, createResource, toast } from 'frappe-ui'
 import { ref, onBeforeUnmount, watch, nextTick } from 'vue'
+import { callSessions } from '@/composables/telephony'
 import { useRouter } from 'vue-router'
 
 const { $socket } = globalStore()
@@ -259,6 +260,18 @@ let { style } = useDraggable(callPopupHeader, {
 })
 
 const callStatus = ref('')
+watch(
+  callStatus,
+  (status) => {
+    callSessions.exotel.active = Boolean(
+      status && !['Call ended', 'No answer', 'Busy', 'Failed'].includes(status),
+    )
+  },
+  { flush: 'sync' },
+)
+onBeforeUnmount(() => {
+  callSessions.exotel.active = false
+})
 const phoneNumber = ref('')
 const callData = ref(null)
 const counterUp = ref(null)

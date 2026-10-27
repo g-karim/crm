@@ -1,9 +1,24 @@
 import { createResource } from 'frappe-ui'
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 
 const integrations = ref({})
 export const defaultCallingMedium = ref('')
 export const callEnabled = ref(false)
+// In-memory UI state only. Never put SIP credentials in this shared object.
+export const callSessions = reactive({
+  exolve: {
+    active: false,
+    connection: 'offline',
+    line: '',
+    state: 'idle',
+    error: '',
+  },
+  twilio: { active: false },
+  exotel: { active: false },
+})
+export const hasActiveCall = computed(() =>
+  Object.values(callSessions).some((session) => session.active),
+)
 
 createResource({
   url: 'crm.integrations.api.is_call_integration_enabled',
@@ -37,5 +52,15 @@ export function useTelephony() {
     Object.values(integrations.value).some(Boolean),
   )
 
-  return { integrations: allIntegrations, isEnabled, isAnyEnabled }
+  const preferredIntegration = computed(() => {
+    const enabled = ['twilio', 'exotel', 'exolve'].filter(isEnabled)
+    const preferred = String(defaultCallingMedium.value || '').toLowerCase()
+    return enabled.includes(preferred) ? preferred : enabled[0] || ''
+  })
+  return {
+    integrations: allIntegrations,
+    isEnabled,
+    isAnyEnabled,
+    preferredIntegration,
+  }
 }

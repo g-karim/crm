@@ -105,7 +105,7 @@ import TimelineTimestamp from '@/components/Activities/TimelineTimestamp.vue'
 import { getCallStatusLabel, statusColorMap } from '@/utils/callLog.js'
 import { formatDate } from '@/utils'
 import { Avatar, Badge, createResource } from 'frappe-ui'
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 
 const props = defineProps({
   activity: { type: Object, default: () => ({}) },
@@ -120,4 +120,17 @@ const callLog = createResource({
   auto: true,
 })
 const showCallLogDetailModal = ref(false)
+
+watch(
+  () => props.activity,
+  (value) => {
+    const changed =
+      value.recording_url !== call.recording_url ||
+      value.status !== call.status ||
+      value.duration !== call.duration
+    const showRecording = call.show_recording
+    Object.assign(call, value, { show_recording: showRecording })
+    if (changed) callLog.reload()
+  },
+)
 </script>

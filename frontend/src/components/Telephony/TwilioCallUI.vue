@@ -178,7 +178,8 @@ import { Device } from '@twilio/voice-sdk'
 import { useDraggable, useWindowSize } from '@vueuse/core'
 import { useTelemetry, useOnboarding } from 'frappe-ui/frappe'
 import { Avatar, call, createResource } from 'frappe-ui'
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
+import { callSessions } from '@/composables/telephony'
 
 const { capture } = useTelemetry()
 const { updateOnboardingStep } = useOnboarding('frappecrm')
@@ -195,6 +196,22 @@ let muted = ref(false)
 let callPopup = ref(null)
 let counterUp = ref(null)
 let callStatus = ref('')
+watch(
+  [onCall, calling, showCallPopup, showSmallCallWindow, callStatus],
+  () => {
+    callSessions.twilio.active = Boolean(
+      onCall.value ||
+      calling.value ||
+      showCallPopup.value ||
+      showSmallCallWindow.value ||
+      callStatus.value === 'initiating',
+    )
+  },
+  { flush: 'sync' },
+)
+onBeforeUnmount(() => {
+  callSessions.twilio.active = false
+})
 
 const phoneNumber = ref('')
 

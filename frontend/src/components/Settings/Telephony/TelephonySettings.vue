@@ -50,6 +50,7 @@
               { label: __(''), value: '' },
               { label: __('Twilio'), value: 'Twilio' },
               { label: __('Exotel'), value: 'Exotel' },
+              { label: __('Exolve'), value: 'Exolve' },
             ]"
             :placeholder="__('Select Medium')"
           />
@@ -208,6 +209,25 @@
             isEnabled('exotel') ? __('Update Configuration') : __('Configure')
           "
           @click="emit('updateStep', 'exotel-settings')"
+        />
+      </div>
+      <div
+        v-if="isManager()"
+        class="flex items-center justify-between gap-4 border-t border-outline-gray-2 px-2 py-3"
+      >
+        <div class="flex flex-col gap-1">
+          <span class="text-base-medium text-ink-gray-8">{{
+            __('Exolve')
+          }}</span>
+          <span class="text-sm text-ink-gray-6">{{
+            __('Make and receive calls in CRM using Exolve SIP accounts.')
+          }}</span>
+        </div>
+        <Button
+          :label="
+            isEnabled('exolve') ? __('Update Configuration') : __('Configure')
+          "
+          @click="emit('updateStep', 'exolve-settings')"
         />
       </div>
     </div>

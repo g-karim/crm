@@ -1,9 +1,14 @@
 <template>
   <div class="w-full text-sm text-ink-gray-5">
+    <p v-if="hasActiveCall" class="mb-2 text-sm text-ink-gray-6" role="status">
+      {{ __('Recording paused during a live call.') }}
+    </p>
     <div class="flex items-center gap-2">
       <Button
         variant="ghost"
         class="text-ink-gray-5"
+        :disabled="hasActiveCall"
+        :aria-label="isPaused ? __('Play') : __('Pause')"
         :icon="isPaused ? PlayIcon : PauseIcon"
         @click="playPause"
       />
@@ -77,6 +82,7 @@
       @loadedmetadata="setupDuration"
       @timeupdate="updateCurrentTime"
       @ended="isPaused = true"
+      @play="guardRecordingPlayback"
     ></audio>
   </div>
 </template>
@@ -90,7 +96,8 @@ import MuteIcon from '@/components/Icons/MuteIcon.vue'
 import PlaybackSpeedIcon from '@/components/Icons/PlaybackSpeedIcon.vue'
 import PlaybackSpeedOption from '@/components/Activities/PlaybackSpeedOption.vue'
 import { Dropdown } from 'frappe-ui'
-import { computed, h, ref } from 'vue'
+import { computed, h, ref, watch } from 'vue'
+import { hasActiveCall } from '@/composables/telephony'
 
 const props = defineProps({
   src: { type: String, default: '' },
@@ -98,6 +105,19 @@ const props = defineProps({
 
 const audio = ref(null)
 const isPaused = ref(true)
+function guardRecordingPlayback() {
+  if (hasActiveCall.value) {
+    audio.value?.pause()
+    isPaused.value = true
+  }
+}
+watch(
+  hasActiveCall,
+  (active) => {
+    if (active) guardRecordingPlayback()
+  },
+  { flush: 'sync' },
+)
 
 const duration = ref(0)
 const currentTime = ref(0)
@@ -114,6 +134,7 @@ function updateCurrentTime() {
 }
 
 function playPause() {
+  if (hasActiveCall.value) return
   if (audio.value.paused) {
     audio.value.play()
     isPaused.value = false

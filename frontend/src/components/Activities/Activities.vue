@@ -1,5 +1,6 @@
 <template>
   <ActivityHeader
+    :doctype="doctype"
     v-model="tabIndex"
     v-model:showWhatsappTemplates="showWhatsappTemplates"
     v-model:showFilesUploader="showFilesUploader"
@@ -502,7 +503,7 @@ import { whatsappEnabled } from '@/composables/whatsapp'
 import { useDocument } from '@/data/document'
 import { useTelemetry } from 'frappe-ui/frappe'
 import { Button, createResource, toast } from 'frappe-ui'
-import { useElementVisibility } from '@vueuse/core'
+import { useElementVisibility, useEventListener } from '@vueuse/core'
 import {
   ref,
   computed,
@@ -551,6 +552,15 @@ const changeTabTo = (tabName) => {
   if (index == -1) return
   tabIndex.value = index
 }
+
+useEventListener(window, 'crm-exolve-calls-updated', () =>
+  all_activities.reload(),
+)
+useEventListener(window, 'crm-call-work-saved', (event) => {
+  const context = event.detail?.context
+  if (context?.doctype === props.doctype && context?.name === props.docname)
+    all_activities.reload()
+})
 
 const all_activities = createResource({
   url: 'crm.api.activities.get_activities',

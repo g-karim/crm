@@ -92,12 +92,22 @@
                 v-else-if="field.name == 'recording_url_path'"
                 class="w-full"
               >
+                <p
+                  v-if="hasActiveCall"
+                  class="text-sm leading-5 text-ink-gray-6"
+                  role="status"
+                >
+                  {{ __('Recording paused during a live call.') }}
+                </p>
                 <audio
                   v-if="!recordingError"
+                  v-show="!hasActiveCall"
+                  ref="recordingAudio"
                   class="audio-control w-full"
                   controls
                   :src="field.value"
                   @error="recordingError = true"
+                  @play="guardRecordingPlayback"
                 ></audio>
                 <div
                   v-else
@@ -188,6 +198,7 @@ import CallAnalysisPanel from '@/components/Activities/CallAnalysisPanel.vue'
 import { getCallLogDetail } from '@/utils/callLog'
 import { sanitizeHTML } from '@/utils'
 import { isMobileView } from '@/composables/settings'
+import { hasActiveCall } from '@/composables/telephony'
 import { useDoctypeModal } from '@/composables/doctypeModal'
 import { useDocument } from '@/data/document'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
@@ -211,6 +222,17 @@ const task = ref('')
 // (recording never made / expired) — track load failure to show a fallback instead
 // of a dead 0:00 player
 const recordingError = ref(false)
+const recordingAudio = ref([])
+function guardRecordingPlayback(event) {
+  if (hasActiveCall.value) event.target.pause()
+}
+watch(
+  hasActiveCall,
+  (active) => {
+    if (active) recordingAudio.value.forEach((audio) => audio.pause())
+  },
+  { flush: 'sync' },
+)
 
 function showNote(name) {
   showModal({
