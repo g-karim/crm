@@ -39,6 +39,9 @@ class TestActivityPermlevel(IntegrationTestCase):
 
 		# only Sales Manager gets permlevel 1 on CRM Lead
 		add_permission("CRM Lead", "Sales Manager", 1)
+		# add_permission leaves an existing rule untouched. Declare both fixture
+		# permissions explicitly instead of inheriting another suite's read flag.
+		update_permission_property("CRM Lead", "Sales Manager", 1, "read", 1)
 		update_permission_property("CRM Lead", "Sales Manager", 1, "write", 1)
 		frappe.clear_cache(doctype="CRM Lead")
 
