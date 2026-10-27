@@ -1,0 +1,45 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Inbox Access",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "source_kind",
+  "account",
+  "user",
+  "can_read",
+  "can_send"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_kind",
+   "fieldtype": "Data",
+   "label": "source_kind"
+  },
+  {
+   "fieldname": "account",
+   "fieldtype": "Data",
+   "label": "account"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "user",
+   "options": "User"
+  },
+  {
+   "fieldname": "can_read",
+   "fieldtype": "Check",
+   "label": "can_read"
+  },
+  {
+   "fieldname": "can_send",
+   "fieldtype": "Check",
+   "label": "can_send"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 0
+}
+

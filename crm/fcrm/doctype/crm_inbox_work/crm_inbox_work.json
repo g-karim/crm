@@ -1,0 +1,69 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Inbox Work",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "source_kind",
+  "source_name",
+  "revision",
+  "status",
+  "assigned_to",
+  "snoozed_until",
+  "watermark",
+  "context_doctype",
+  "context_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_kind",
+   "fieldtype": "Data",
+   "label": "source_kind"
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Data",
+   "label": "source_name"
+  },
+  {
+   "fieldname": "revision",
+   "fieldtype": "Int",
+   "label": "revision"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "label": "status"
+  },
+  {
+   "fieldname": "assigned_to",
+   "fieldtype": "Link",
+   "label": "assigned_to",
+   "options": "User"
+  },
+  {
+   "fieldname": "snoozed_until",
+   "fieldtype": "Datetime",
+   "label": "snoozed_until"
+  },
+  {
+   "fieldname": "watermark",
+   "fieldtype": "Data",
+   "label": "watermark"
+  },
+  {
+   "fieldname": "context_doctype",
+   "fieldtype": "Data",
+   "label": "context_doctype"
+  },
+  {
+   "fieldname": "context_name",
+   "fieldtype": "Data",
+   "label": "context_name"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 0
+}
+

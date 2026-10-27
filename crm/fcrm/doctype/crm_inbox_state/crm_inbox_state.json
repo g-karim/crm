@@ -1,0 +1,57 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Inbox State",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "source_kind",
+  "source_name",
+  "user",
+  "revision",
+  "data",
+  "correspondence_draft",
+  "read_cursor"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_kind",
+   "fieldtype": "Data",
+   "label": "source_kind"
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Data",
+   "label": "source_name"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "user",
+   "options": "User"
+  },
+  {
+   "fieldname": "revision",
+   "fieldtype": "Int",
+   "label": "revision"
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Long Text",
+   "label": "data"
+  },
+  {
+   "fieldname": "correspondence_draft",
+   "fieldtype": "Long Text",
+   "label": "Personal correspondence draft"
+  },
+  {
+   "fieldname": "read_cursor",
+   "fieldtype": "Long Text",
+   "label": "read_cursor"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 0
+}
+

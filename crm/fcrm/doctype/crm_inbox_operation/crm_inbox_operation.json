@@ -1,0 +1,45 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Inbox Operation",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "field_order": [
+  "source_kind",
+  "source_name",
+  "user",
+  "request_hash",
+  "result"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_kind",
+   "fieldtype": "Data",
+   "label": "source_kind"
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Data",
+   "label": "source_name"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "user",
+   "options": "User"
+  },
+  {
+   "fieldname": "request_hash",
+   "fieldtype": "Data",
+   "label": "request_hash"
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Long Text",
+   "label": "result"
+  }
+ ],
+ "permissions": [],
+ "track_changes": 0
+}
+
