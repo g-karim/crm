@@ -16,7 +16,7 @@ on:
         - cron: "0 0 * * *"
 env:
     CRM_BRANCH: ${{ github.base_ref || github.ref_name }}
-    CRM_MESSENGER_REF: 0588c7c71102ff24b015aaaac6e79cb5197a727d
+    CRM_MESSENGER_REF: aca3f14815309dd7c14b4490d1a4e57585b721b4
 
 concurrency:
     group: develop-crm-${{ github.event.number }}
@@ -94,7 +94,7 @@ jobs:
               uses: ./.github/actions/run-server-tests
               with:
                   bench-path: "/home/runner/frappe-bench"
-                  site: "test_site"
+                  site: "test-site.localhost"
                   app: "crm"
                   enable-coverage: "true"
                   type: "server"
@@ -112,7 +112,7 @@ jobs:
               uses: ./.github/actions/run-server-tests
               with:
                   bench-path: "/home/runner/frappe-bench"
-                  site: "test_site"
+                  site: "test-site.localhost"
                   app: "crm_messenger"
                   enable-coverage: "false"
                   type: "server"

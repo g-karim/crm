@@ -78,7 +78,7 @@ jobs:
               uses: actions/checkout@v6
               with:
                   repository: g-karim/crm_messenger
-                  ref: 0588c7c71102ff24b015aaaac6e79cb5197a727d
+                  ref: aca3f14815309dd7c14b4490d1a4e57585b721b4
                   token: ${{ secrets.CRM_MESSENGER_READ_TOKEN }}
                   path: pr-crm-messenger
 
@@ -109,7 +109,7 @@ jobs:
 
             - name: Configure database
               run: |
-                  echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
+                  echo "127.0.0.1 test-site.localhost" | sudo tee -a /etc/hosts
                   mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
                   mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
                   mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "CREATE USER 'test_frappe'@'localhost' IDENTIFIED BY 'test_frappe'"
@@ -126,8 +126,8 @@ jobs:
             - name: Install CRM at base branch
               working-directory: /home/runner/frappe-bench
               run: |
-                  mkdir sites/test_site
-                  cp "${GITHUB_WORKSPACE}/pr-crm/.github/helper/site_config.json" sites/test_site/site_config.json
+                  mkdir sites/test-site.localhost
+                  cp "${GITHUB_WORKSPACE}/pr-crm/.github/helper/site_config.json" sites/test-site.localhost/site_config.json
                   sed -i 's/watch:/# watch:/g; s/schedule:/# schedule:/g; s/socketio:/# socketio:/g; s/redis_socketio:/# redis_socketio:/g' Procfile
                   bench get-app crm "${GITHUB_WORKSPACE}/base-crm"
                   bench get-app erpnext --branch "${{ steps.frappe.outputs.branch }}"
@@ -136,8 +136,8 @@ jobs:
                   bench setup requirements --dev
                   bench start >> "$BENCH_PATH/bench_start.log" 2>&1 &
                   CI=Yes bench build --app frappe &
-                  bench --site test_site reinstall --yes
-                  bench --verbose --site test_site install-app erpnext payments crm crm_messenger
+                  bench --site test-site.localhost reinstall --yes
+                  bench --verbose --site test-site.localhost install-app erpnext payments crm crm_messenger
 
             - name: Upgrade CRM to PR code and migrate
               working-directory: /home/runner/frappe-bench
@@ -146,4 +146,4 @@ jobs:
                   rsync -a --delete --exclude=".git" "${GITHUB_WORKSPACE}/pr-crm/" apps/crm/
                   rsync -a --delete --exclude=".git" "${GITHUB_WORKSPACE}/pr-crm-messenger/" apps/crm_messenger/
                   bench setup requirements --dev
-                  bench --site test_site migrate
+                  bench --site test-site.localhost migrate
