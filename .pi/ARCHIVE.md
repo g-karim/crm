@@ -1,5 +1,986 @@
 # CRM — Completed Work Archive
 
+## Home aligned with Celio Signal — local, 2026-10-25
+
+At the user's request, reused Celio's existing Signal palette and typography for
+Home overview, notifications, modules, correspondence and existing task/AI surfaces.
+Replaced the blue-grey chrome with warm neutral backgrounds, olive navigation and
+the established orange accent. Main heading is 24 px/600; Inter uses the bundled
+Frappe font, without editing Frappe or Celio. One subtle border per surface, quiet
+shadows, a 1 px overview top separator and no double mail-selection outline.
+Light/dark unread text and its black-dot indicator remain distinguishable.
+
+Chrome checked six views, 375/667/768/1024/1440 widths, both mail themes, reply
+focus, compact navigation/reload/profile menu, keyboard focus and unread-state
+text contrast. The unread CSS case uses a DOM-only fixture because this mailbox
+is currently read; no message state was changed to create test data. No JS/HTTP
+errors or send requests. SHA comparison preserves all rows in 14 mail/business
+DocTypes. Existing services remain running; generic scheduler/mail remain muted.
+Private evidence: `evidence/home-celio-style-20261025` in the isolated bench.
+Only local CSS and the asset version changed; no production access/deploy or
+business/backend changes. Existing dirty work and original CRM assets retained.
+
+## Complete personal mailbox history and external recipients — local, 2026-10-24
+
+At the user's explicit request, imported all 79 provider messages from five folders:
+70 INBOX, 8 Sent, 1 Drafts, empty Junk/Trash. Existing two received self-tests reused;
+76 Communication records and one editable private Home draft added. All dates,
+MIME digests and 23 attachment payloads verified against read-only provider fetches.
+Initial read/star/folder state stays personal; all original provider flags preserved.
+Folder-scoped cursors and service-only provenance make repeated import a no-op.
+The existing isolated worker now receives new mail from all five configured folders.
+
+Removed the self-recipient restriction only for the configured employee/account,
+using explicit local admin config. Native Home receipts, current source permissions,
+exact sender and Communication/envelope recipient equality still gate SMTP. To/CC/
+BCC may be external; generic queues/scheduler remain muted. No extra live test mail
+was sent. Provider drafts never enter the queue automatically.
+
+Validation: 81 native tests; completeness/dates/attachment hashes, unchanged old
+records/files/accounts/assignments/native queue and repeat import verified locally.
+Chrome covers imported incoming/sent/draft, the absent self-recipient hint, active
+outgoing permission and mobile. Private evidence: `evidence/home-mail-history-20261024`.
+No production access, provider mutations, paid AI, commits, pushes or deployment.
+
+## Live personal Beget mailbox — isolated acceptance, 2026-10-24
+
+The user supplied the mailbox password and authorized reading SMTP settings from
+production. Read-only SQL on the currently running production bench at
+200.169.176.193 confirmed smtp.beget.com:465 with SSL (the existing notification
+account; no personal account/password was exported). Official Beget IMAP settings
+and both actual TLS authentications were verified. Configured only the local
+g.karim@exp-verse.com account, preserving User Email assignments/global defaults;
+the secret is in native encrypted password storage, never source/evidence/logs.
+
+Generic scheduler and mail remain muted. An explicit site policy enables only
+this account/user and self-recipient. Native Home send receipts authorize a bounded
+queue worker; other native queues, recipients or revoked account access are skipped.
+Native queue suspension and retries are retained. Receiving uses read-only INBOX,
+BODY.PEEK and an internal UID cursor beginning after the existing 68 letters.
+No provider flags, old messages, auto-replies or participant forwarding are changed.
+The existing isolated inbox process runs the pilot; no general jobs were enabled.
+
+Two actual self-addressed UI submissions were accepted by SMTP and received by IMAP.
+The first exposed native text-MIME newline normalization. Text files now use binary
+MIME, preserving original encoding/newlines. The second round trip proves TXT/PDF/
+PNG attachment hashes, native queue completion, one incoming copy, ZIP download,
+protected PDF preview and readable desktop/mobile Home rendering. Native email
+layout wrappers are flattened without discarding authored tables; exact letters
+open at the start. Original raw HTML remains unchanged.
+
+Validation: 72 native tests, actual TLS/SMTP/IMAP and Chrome with no JS errors.
+Evidence is `evidence/home-mail-live-20261024` in the isolated bench. All old business
+records, native files and CRM internal-note data are preserved. Only the selected
+local account, encrypted credential, explicit pilot config and own mail/cursor
+metadata changed; the four new native mails and twelve private file records are
+the two retained round trips. No production writes/restarts/deploys, paid AI,
+commits or pushes. External-recipient use, initial history and IMAP flag sync remain
+outside this acceptance.
+
+## Everyday Home mail client — local implementation, 2026-10-24
+
+Added mailbox-scoped address suggestions and recipient chips; keyboard selection,
+validation and pending-address draft persistence; native rich-text writing, safe
+links, attachment-backed inline images and personal signature management. The
+canonical signature is User.email_signature with revision/content-stamp checking.
+Attachments show sizes and protected PDF/image previews, support drag/drop,
+upload progress/cancel/retry and ZIP download. Cancelled queued uploads are skipped.
+
+Added page selection, atomic revisioned bulk read/archive/spam/trash actions,
+previous/next navigation and sender/recipient/date/unread/attachment search.
+The indexed exact-letter path selects only a page's headers and point-reads the
+body. On a rollback-only 5001-letter mailbox, first/deep pages projected 31 headers
+and returned 30 in 51/58 ms; a text-filtered page took 408 ms. This is a local pilot
+measurement, not a provider or production performance guarantee.
+
+Native queue status/error/retry DTOs never invent delivery or expose traceback/
+credentials. Retry preserves already sent recipients. Original bytes are passed
+to native MIME, avoiding generic File text decoding for small binary uploads,
+native attachment copies and downloads. Shared Frappe sources are unchanged.
+
+Validation: 61 native tests; Chrome exercises real protected preview/ZIP/upload,
+rich writing/link/signature insertion, bulk/search/navigation, two independent
+browser-storage contexts and explicit draft-conflict resolution. Light/dark and
+1440/1024/375/667 layouts pass; the mobile composer no longer scrolls sideways.
+Real uploads show progress; a cancelled queued file is never uploaded, and one
+injected connection reset is recoverable through the native upload endpoint.
+Loopback TCP SMTP accepts native MIME, rejects the second recipient once, then
+receives only that recipient on idempotent retry. PDF/image bytes and inline CID
+are preserved; native receiving deduplicates a captured incoming MIME message and
+shows it in Home. No real provider or employee mailbox was contacted.
+
+The user chose g.karim@exp-verse.com for live verification; its local account has
+no IMAP/SMTP hosts/password and both transports are disabled. A settings-file path
+was requested. This remaining acceptance and external-client IMAP flags are not
+claimed complete. Evidence: `evidence/home-mail-client-20261024` in the isolated
+bench. Production was untouched, generic scheduler/mail remain paused, no paid AI,
+commits or pushes. Existing dirty work and native business records are preserved.
+The final audit verifies all original business rows/fields, CRM internal notes,
+14 native file blobs, all 5527 previous CRM assets, site-config bytes and the
+existing two AI analyses/cost. Only own Home metadata and two own-address examples
+with six native private file records were added. Transient transport contacts and
+upload fixtures were removed with native deletion audit retained.
+
+## Home mail actions — local implementation, 2026-10-24
+
+Implemented safe clickable links in the default readable body, contextual Reply /
+Reply All, always visible reply recipient summary, Forward with native private
+attachments, Archive with return to Inbox, personal Trash with restore, and
+revisioned draft deletion. Forward prepares a separate compose with blank To/CC/BCC,
+quote/Fwd subject, source access marker and no inherited CRM reference/in_reply_to.
+It preserves edited drafts on request retry and uses native sender/idempotent send.
+HTML allows formatting and HTTP(S)/simple mailto links while stripping all scripts,
+styles, tracking content and other URL schemes; source HTML remains unchanged.
+
+Trash is excluded from all normal folders/counts. Restore preserves prior archive,
+spam, favorite and draft state. Both native Spam/Trash defaults remain reversible
+inside Home without provider writes. Draft clearing retains a revision marker:
+concurrent stale saves/sends/deletes fail and stale browser caches do not resurrect
+text after reload. The same marker is used after send. Exact-letter conflict
+resolution and fast typing in the next compose after send were corrected; pending
+unsaved edits no longer display a misleading saved status.
+
+On phones an open letter gets the viewport; Back restores folders/navigation.
+Validation: 40 native tests pass; real Chrome accepts links, recipient modes,
+forward/send/download with a private file, archive/restore, trash/restore and
+native two-window discard/reload. Layout checks prove reply and send controls fit
+1440/1024/375/667 viewports with no horizontal overflow or JS errors; dark theme
+was visually inspected. Before-state and evidence: `evidence/home-mail-actions-20261024`.
+Added only one own-address incoming example, one file and one local-only sent
+forward. Previous native records/config/assets are preserved. Production was not
+accessed; transport remains muted, scheduler paused, no new paid AI or deployment.
+
+## Home mail folders and own-address examples — local update, 2026-10-24
+
+Reworked the workspace around individual letters instead of mixed incoming/
+outgoing chains. Inbox is the default, followed by Favorites, Sent, Drafts, Spam,
+All. The employee's own assigned mailbox is selected first. Incoming unread,
+incoming read and outgoing letters have distinct fills, with a black unread dot
+in every folder and explicit outgoing recipient/direction labels. Favorite stars,
+personal spam/restore and mark-unread use source-checked revisioned metadata.
+Exact-letter drafts/attachments and reply IDs preserve neighboring replies;
+legacy thread API and internal CRM notes remain intact. Same-window metadata
+writes serialize, while concurrent-window revisions still reject stale writes.
+
+Removed preview banners and test-button wording without fabricating delivery
+states. Added one disabled own-address mailbox, eight native received/sent
+examples, a private draft and attachment for g.karim@exp-verse.com. Browser
+acceptance adds one native local-only reply. A private admin marker, mute_emails
+and disabled transports constrain this sample path. Native Email Account setup
+resaved one previous mailbox assignment: its original fields were restored and
+only this task's duplicate new assignment was undone. Previous mail/business
+records, account settings and audit examples remain preserved.
+
+Validation: all 29 Home native tests pass; Chrome accepts all folders, individual
+reading, unread dot, three colors, favorites, spam/restore, own-address sender/
+recipient, draft and native reply, four widths and dark mode with no JS errors.
+Scoped Ruff F/format, JavaScript syntax and app diff checks pass. Evidence is in
+`evidence/home-mail-folders-20261024` of the isolated bench. No production access,
+provider send, paid AI, commits or pushes; scheduler and real mail stay paused.
+
+## Home correspondence readability — local UI update, 2026-10-24
+
+User-requested contrast and space revision keeps native data/permission APIs.
+Stronger light surfaces, selected conversation fill and borders distinguish the
+list, history, inputs and paper. Body text is 16px; the compact header and default
+closed reply form increase the 1440×900 reading pane from 160px to 544px high.
+The sidebar collapses to a 68px icon rail with a smaller logo, accessible labels,
+reachable profile menu and per-user browser persistence. Mail content uses all
+available width; replies keep recipients/subject behind an explicit control.
+New mail and existing nonempty drafts open the composer. Collapse retains text;
+reply all, quote and revision conflict reveal the form when needed.
+
+Chrome acceptance covers persisted navigation/profile, actual reply draft
+collapse/reload, To/CC, new compose reload, both themes, six viewport widths
+375–1512px and existing Home/notifications. No JS errors or horizontal overflow.
+Measured light text/metadata/primary-button contrast is 15.7/7.3/6.1:1.
+JavaScript syntax and app diff checks pass. UI source snapshot, before/after
+screenshots and acceptance report live in `evidence/home-correspondence-ui-20261024`
+of the local bench. Backend/data schema and providers are unchanged; no real
+messages, calls, paid AI, production access, commits or pushes.
+
+## Home personal correspondence — local implementation, 2026-10-24
+
+Implemented `/home?view=correspondence` for any enabled System User, including
+production employees without CRM or Sales roles. Assigned native `User Email`
+mailboxes appear automatically. Additional channels can only be selected from
+already configured mailboxes/channels with existing access; selection never
+creates a provider account or grants permissions. Provider setup stays with the
+administrator. The existing Home overview and separate notifications remain.
+
+Native Communication and Messenger history remain the sources of truth. Mail
+read/reply/new compose, To/CC/BCC, reply all, quotes, private attachments, account
+filters, unread/sent/draft views and native cursor pagination work in Home.
+Configured Messenger channels use native conversation permissions and text
+replies; media sending remains in the native channel panel. Owning a mailbox
+does not expose linked CRM records: customer context requires separate native
+read permission. No global administrator sweep of private mailboxes.
+
+Private read cursors are shared with CRM where installed. Home drafts use a
+separate field and preserve internal CRM notes; independent fallback storage
+supports mail-only sites. Revisions, account/viewer binding and operation
+receipts protect draft conflicts and sending retries. Stale empty browser
+drafts cannot overwrite another window's newer text. Email HTML is sanitized
+and sandboxed without remote trackers. Native timestamps convert from the
+system zone through UTC to the viewer zone.
+
+The pilot retains two disabled invalid-address mailboxes, a production staff
+profile, three incoming sample letters and private attachments. Native mail
+hooks created five sample correspondent Contacts; only these new fixture
+contacts are added. Browser replies/new mail are local examples, with no real
+SMTP or provider calls. Original business rows and every original field remain
+unchanged, including native messages and account settings. Site configuration
+bytes, 5527 original CRM asset files, two recording previews and both prior
+paid analysis records/cost are preserved. Backups exist; no restore rehearsal
+is claimed. The maintained Theme checkout was only read and copied into the
+isolated pilot, where this implementation lives.
+
+Validation: 709 frontend unit tests and 158 combined native tests, followed by
+a focused rerun of all 22 Home tests after final compatibility guards. Real
+local browser acceptance covers production staff without CRM roles, mail and
+configured channel selection, CC/private uploads/downloads, new mail without a
+CRM record, reload and two-window conflicts, empty-stale draft preservation,
+time zones, button contrast, four viewport widths and dark mode; no JavaScript
+errors. Scoped Python F checks, JavaScript syntax and all app diff checks pass.
+General scheduler/jobs remain paused, real mail muted. Only the dedicated local
+inbox process was restarted to include explicit Home message delivery.
+
+Usage and boundaries: `../../exp_theme/docs/home-correspondence-2026-10-24.md`.
+Private acceptance evidence: `evidence/home-correspondence-20261024` in the
+isolated bench. No production access, real outbound messages, calls, new paid
+AI, commits or pushes. Live IMAP/SMTP/channel acceptance and release remain
+future work in PLAN.
+
+## Messenger workspace — local implementation, 2026-10-24
+
+Completed the four-part implementation plan for `/crm/messenger`: unified inbox
+and queues; source-native replies and email threads; CRM customer context with
+canonical notes/tasks; shared handling, account permissions and responsive UI.
+The plan and usage are in [Messenger](./feats/communications/messenger.md), stable
+contracts in SPEC. Original Lead messaging is retained; Lead and Deal both open
+the shared inbox with an exact customer reference filter.
+
+Messenger Conversation/Message and Communication remain the sources of history.
+Email grouping uses native reply identities, with account/customer boundaries.
+Private drafts/read cursors and shared assignment/status/context have separate
+service-only storage, optimistic revisions and explicit conflict resolution.
+Source/account/customer permissions apply before search/counts, native history
+access, delivery and attachment download. Draft uploads remain private until
+send. All UI writes bind the expected viewer; switching accounts cannot save
+another user's captured draft or action. Email HTML is sanitized, inert and
+sandboxed without remote trackers. No fake typing/provider-delivery state.
+
+Local examples use two isolated demo Leads, one Deal, two Messenger conversations
+and two email threads, with private attachment samples. Browser acceptance saves
+real native notes/tasks only in that demo Deal and local-only replies in those
+sources. Working channel/email accounts are not configured. Real email stays
+muted; general scheduler/jobs remain paused. A dedicated local process processes
+only explicitly submitted `crm-inbox-` messages through native delivery and
+rechecks their author; it does not consume the legacy general queue.
+
+Validation: 709 frontend tests, 28 native inbox tests and 108 telephony/Exolve
+regressions; scoped Ruff/ESLint/Prettier, production build and diff checks.
+Browser checks cover native note/task context, source replies and CC, draft
+reload and two-window conflicts, assignment/close/reopen/snooze, native Lead/Deal
+links and settings, five viewport sizes and dark mode. Every original business
+row/field, 5527 original hashed assets and two recording previews is preserved.
+Existing AI credentials/configuration and two paid analysis records/cost remain
+unchanged. Backups and acceptance: `evidence/messenger-workspace-20261023` in the
+isolated bench. No production access, real outbound messages, calls, new paid AI,
+commits or pushes. Live-channel acceptance and release remain separate work.
+
+## CRM AI connected locally from existing production key, 2026-10-23
+
+User explicitly authorized reading the CRM call-analysis key from production and
+using it on the local Exolve pilot. The currently serving bench was verified on
+200.169.176.193 through nginx roots, at
+/home/frappe/deployments/exp-unified-prod-20261023/production-bench. The exact
+crm_call_analysis_api_key was transported in-process over SSH into the local
+site configuration, mode 0600, without printing or committing the secret.
+Production config and provider key limits remained unchanged.
+
+The existing inference key is shared and has no dedicated daily cap. Added explicit
+server-side shared-key opt-in with local serialized reservations, current price and
+bounded whole-request quotes, available credit/key checks and the existing
+unknown-charge stop. Default dedicated-key behavior remains. The local site uses
+$1/day and $0.25/run reserve. Native local HTTP proxy works without adding SOCKS
+packages; generic queues/scheduler remain paused and emails muted.
+
+An old Administrator recording was denied before paid I/O; recording permissions
+are now checked before queue admission and reflected in the UI. Another own-caller
+recording had the old default Lead type with no customer name. Journal, recording
+and analysis reads now recognize that exact unlinked shape, while retaining stored
+provider fields and all real customer/mapping/participant checks.
+
+The existing 22.2s call completed real ASR and summary: 59 raw characters, 2 segments,
+no suggested tasks, actual total USD 0.0024055. Browser acceptance verified real
+result rendering, seek in original audio and the enabled shared-key budget UI.
+All original fields of 12 calls, 9 deals, 14 leads, 6 tasks, 9 contacts, 6 notes and
+30 ToDo remain unchanged; original recording preview preserved. No new calls/SMS,
+production writes, user tasks or notes. Validation: 702 frontend and 147 backend
+tests, build/lint/diff checks. Evidence: evidence/ai-connection-20261023.
+
+
+## Telephony Stage 4 — local call insights and analytics, 2026-10-23
+
+Implemented immutable raw ASR, bounded segment timestamps/seek on the existing
+recording player, separate summary/agreements, transcript search and explicit
+native CRM Task confirmation. Analysis versions retain original customer/source
+identity and recheck their permissions after call relinking. A replaced recording
+can receive a new version; old timestamps never seek the replacement. Legacy
+results remain readable with explicit provenance limits. Manager notes, original
+audio and provider call facts are preserved.
+
+AI is opt-in and disabled by default. Service-only runs/control, daily admission
+reservations, actual usage costs, explicit reconciliation and durable pre-request
+intent replace the old automatic/unbudgeted path. Old queued worker entrypoints
+cannot send audio. Each paid step checks current user/customer/call, key daily
+limit and spending state. STT catalog price checks, actual duration/size limits,
+bounded summary output and provider chat price caps constrain requests. Unknown
+responses/costs hold reservations and suspend processing. Known summary errors
+reuse raw ASR on explicit retry. Native author/call/run locking and task receipts
+prevent a second task on a lost-response retry or a second edited confirmation.
+
+The analytics view uses the journal's permission/filter query over all matching
+server rows, with distinct authorized native task counts and manager outcomes.
+Callback speed is explicitly scoped to manager-confirmed missed→outgoing attempts,
+with readable coverage, rather than inferred phone/time or task completion.
+Shared view tabs and filters remain visible; mobile header controls fit 375px.
+
+Validation: 702 frontend tests in 64 files, 142 native backend tests, build,
+scoped ESLint/Ruff and diff checks passed. Browser acceptance verified lazy
+recording seek, transcript search, real native task creation after explicit
+confirmation, committed lost-response retry, journal-equivalent counts, callback
+proof and fresh mobile layouts with no JS errors. Stage 3 browser regression
+passed on the same final build. Two synchronized native database processes proved
+one remaining reserve admits only one call and concurrent requests for one call
+return a single run. A real local ffprobe verified generated audio duration.
+
+The isolated site now has its own AI queue worker; general jobs/scheduler remain
+paused and email muted. Repeated native QA reached the paused general queue's
+550-job admission threshold during fixture cleanup. Only this local site's
+max_queued_jobs was raised to 5000; queued jobs were preserved, no generic worker
+was enabled, exact owned cleanup was completed and regression rerun passed.
+The key/password/SIP mapping and every other site configuration field were retained.
+
+Final preservation audit: all original fields of 12 calls, 9 deals, 14 leads,
+6 tasks, 9 contacts, 6 notes and 30 ToDo are identical to backup. All 4771 original
+asset paths/hashes and the original recording preview were retained. QA fixtures
+were removed. Source/database/config/files backups and candidate asset retention
+are under evidence/telephony-stage4-20261023. Production was not accessed, and no
+live calls/SMS/paid AI requests occurred. A separate AI key is absent on the pilot;
+live AI quality/cost acceptance and the previously deferred physical-mic/DTMF test
+remain explicit future checks in PLAN. Usage: [Stage 4](./feats/telephony/stage4.md).
+
+## Telephony Stage 3 — local work queue and outcomes, 2026-10-23
+
+Added manager outcomes independently of provider facts, atomic native callback
+tasks, the Needs attention queue, employee/line/outcome filters and canonical
+notes/tasks in the call sidebar. Callback tasks use the existing source task API,
+assignment and operation receipts; exact retries create one task. Call and UUID
+both participate in the task-operation identity. Review storage has no ordinary
+role CRUD grants and uses the guarded internal-write controller.
+
+Writes serialize author/call/review, recheck fresh call/customer permissions and
+use revision CAS. Native task completion/cancellation checks the linked task's
+permissions and modified value. Another open callback cannot be silently replaced.
+Completed/canceled tasks and missed calls remain in history. Attention filters
+authorized tasks before pagination and uses their assignee; call age never hides
+due work. Restricted review context/materials are excluded independently of the
+call. Private drafts are never exposed through the shared sidebar.
+
+The same outcome block appears in an explicitly linked finished conversation.
+Unlinked browser attempts retain the Stage 2 exact-call selection requirement.
+Unknown responses retry frozen input; concurrent outcome changes require an
+explicit reload/resave while retaining local input. Quiet journal refresh keeps
+the player and form mounted, so playback/input are preserved. The player supports
+0.75–2x playback and bounded +/-10 second seeking.
+
+Validation: 699 frontend tests and 90 native backend tests, scoped ESLint/Ruff and
+the frontend build passed. Browser scenarios used actual local CRM writes with
+mocked SIP/media: explicit Deal choice, a committed save with lost response and
+exact retry, native completion, retained missed-call history, two-tab outcome CAS,
+future/overdue callbacks on old calls, user/site deadline roundtrips, canonical
+material customers distinct from the call primary reference, filters, speed/seek and uninterrupted
+playback during refresh. Mobile acceptance uses a fresh 375px page load, matching
+the app's existing initial-layout selection; resizing an already mounted desktop
+page is not evidence of a native mobile layout. Stage 2 browser regression also
+passed, including draft privacy, conflicts, exact links and recording states.
+
+Full local source/database/config/files and old asset backups preceded the
+single targeted DocType installation. Exact owned QA fixtures were removed;
+preexisting business data, IDs, recordings and original asset paths were retained.
+Production was not accessed; no live calls, SMS, AI, new incoming routes or Stage 4
+work started. The shared scheduler remains paused. Evidence and runner:
+`evidence/telephony-stage3-20261023/`, `config/check_telephony_stage3.py`.
+Usage: [Stage 3](./feats/telephony/stage3.md).
+
+## Telephony Stage 2 — local implementation, 2026-10-23
+
+Implemented private server autosave/recovery, revision-conflict handling, explicit
+call/material associations and bounded server-side Exolve history. Private tables
+have no native CRUD grants and validate service-only writes. Recovery checks the
+current customer and native item permissions, never another user's drafts. Native
+Save persists its exact pending operation before creating/updating the original
+CRM Note/Task. The server draft and the canonical CRM save have separate statuses.
+
+Two tabs cannot silently overwrite the same private version. Before loading the
+server's conflicting version, the local changes are made durable as another private
+conversation, retaining their customer and native IDs. Restored conversations do
+not reconnect media or get reused as a later incoming attempt. Clean canonical
+records refresh on opening; unsaved text remains untouched.
+
+Provider statistics expose a stable call ID but no accepted proof of equality with
+the browser SIP dialog in this integration. Linking therefore requires explicit
+selection of the exact accessible call; phone/time matching only narrows candidates.
+Native Dynamic Links reference existing Note/Task IDs, including later saves.
+A call belongs to at most one conversation; existing participants and customer
+references are preserved. A default Lead DocType without a record name was found
+to hide newly imported unlinked calls; new imports explicitly keep both empty.
+Old calls are not retargeted by this fix.
+
+The opt-in background importer checkpoints bounded date windows/pages, overlaps
+recent history, repeats historical sweeps and backs off after errors. Browser
+closure does not stop it. Existing historical participant/owner/line are retained
+when the current SIP assignment differs, without opening recording access to the
+new employee. Provider snapshots do not erase an available recording or start AI.
+UI distinguishes preparation, availability, absence and playback failure/retry.
+
+Validation: 689 frontend tests, 75 native backend tests, scoped ESLint/Ruff and a
+local production frontend build passed. Browser acceptance exercised actual local
+private autosaves and canonical writes, reload, another user, two-tab conflicts,
+closed-CRM recovery of older calls, deduplication, explicit ambiguous selection,
+existing native IDs, later attachments, recording states and mobile layout. SIP,
+audio and provider statistics were mocked in these scenarios, with no real calls
+or JavaScript errors. Exact owned fixtures were removed; audits were retained.
+The preservation audit caught a three-hour shift of three earlier calls caused
+by a changed local site timezone. Their original timestamps and modification
+metadata were restored from the before snapshot; background refresh now preserves
+existing timestamps and caller numbers. The regression test covers that shift.
+The separate local history process also reads the actual configured Exolve account;
+it recovered two previously missing calls, completed the 30-day backfill and
+passed repeated synchronization without duplicates or errors. The final audit
+verified all original business fields, 3,397 original asset files and the original
+recording preview. One native modification timestamp from adding the new ready
+recording state was retained; the audit does not conceal that legitimate update.
+Its cursor/status and preservation checks are in the result evidence.
+
+The local scheduler remains paused; only the dedicated history loop is running.
+Full local DB/config/file and recording-preview backups precede the additive schema
+installation. Production was not accessed. Physical-mic/DTMF acceptance remains
+deferred by the user; stages 3–4 and SMS were not started. Runner and evidence:
+bench `config/check_telephony_stage2.py`, `evidence/telephony-stage2-20261023/`.
+
+## Telephony Stage 1 — local implementation, 2026-10-23
+
+Exolve now uses one recipient/conversation screen from cards, journal and the
+workspace header. Search and number entry sit directly in call controls; customer
+search selection never dials. Existing explicit, permission-checked context
+resolution and ambiguity handling are preserved. Legacy provider preparation is
+retained using the same preferred-provider selection as the global call UI.
+
+Minimize exposes customer, state, timer, mute and hangup in a compact panel;
+incoming answer/decline and autoplay recovery are available there too. Reopening
+and SPA navigation retain the SIP session, chosen card and note/task drafts.
+
+Audio controls use a view of the same Dialog rather than stacked sibling dialogs:
+the local native dialog implementation hid sibling modal content from accessibility
+while it was visible. Input/output fields also receive explicit accessible labels.
+Microphone/speaker device IDs are remembered per browser user. Exact microphone
+constraints are read on each dial/answer; speaker routing is applied before the
+call action and blocks it on failure. Unsupported output selection uses the system
+output with an explanation. Live call tracks are not swapped mid-conversation.
+
+Explicit audio checks use a local RMS meter and generated WAV; neither captures
+a recording nor contacts a provider. Cleanup covers close/back, incoming call,
+device change, unmount, denied/late permission and the twenty-second timeout.
+
+Validation: 679 frontend tests, scoped ESLint, production frontend build (local
+assets only), and browser acceptance with real local Note/Task writes and mocked
+SIP/audio devices. Four synthetic outgoing calls plus an incoming fixture tested
+compact answer/mute/hangup, selected constraints, unavailable output, actual local
+meter and WAV playback, stale searches/contexts, retries, ambiguous customers,
+mobile/landscape/large text and drafts across navigation. No browser JS errors,
+provider connections or real calls. Owned fixtures were removed; existing business
+rows and old asset paths were preserved. Runner: bench
+`config/check_telephony_stage1.py`; evidence: `evidence/telephony-stage1-20261023/`.
+
+Physical-mic two-way speech, recording and delivered DTMF remain live acceptance,
+deferred by the user on 23 October. Production was not accessed; stages 2–4,
+SMS, server drafts and automatic Call Log correlation were not implemented here.
+
+## Conversation-focused local telephony interface, 2026-10-23
+
+Replaced the vertical dialer/sidebar and large CRM form with one persistent call
+control strip, compact customer context and parallel note/task areas. Call actions
+stay above scrolling work on all widths. Desktop places the note in the main pane
+and tasks in a narrower pane; mobile buttons switch between them without unmounting
+or losing input. The primary action says Call customer; caller line and customer
+number are distinct. Routine provider/balance explanations are removed.
+
+Note titles remain automatic and editable through a pencil action. Task creation
+shows title/deadline first and discloses description, assignee, priority and status
+through Task details. Confirmed, clean saves collapse tasks to summaries; Edit task
+updates the same canonical record. Drafts, conflicts, pending requests and later
+typing keep the task editor open. Conversation history is an explicit action while
+inactive. The DTMF keypad is a dismissible popover; timer ticks are excluded from
+live status announcements. Context choice, native permissions and save contracts
+are unchanged; no automatic customer choice or automatic persistence was added.
+
+Validation: build, scoped ESLint, 671 frontend tests and browser acceptance passed.
+Actual local HTTP writes exercised notes, several tasks, update of the same task,
+optional note title, lost responses and concurrent retries; mocked SIP exercised
+call controls, DTMF/Escape, navigation/hangup, mobile switching, landscape/large
+text and delayed context resolution. No JavaScript errors, real calls or provider
+connections. Owned fixtures were removed. Original business records, SIP settings
+and older asset paths were preserved; production was not accessed.
+Runner: bench `config/check_telephony_conversation.py`; evidence:
+`evidence/telephony-conversation-20261023/`.
+
+## Local telephony layout cleanup, 2026-10-23
+
+Removed settings and connection-state actions from the Telephony workspace header;
+List view and Dial a number remain. Removed the call dialog's manual history
+refresh, reconciliation messages, Disconnect action and auto-connect explanation.
+Automatic registration and post-call reconciliation remain active. The dialog and
+all Russian UI wording now use Telephony instead of dialer; technical identifiers
+and legacy translation keys remain compatible.
+
+Expanded the customer-work dialog from 4xl to 7xl and to the available viewport
+height. Desktop controls and customer work scroll independently; mobile call
+controls remain above the editor. Explicit candidate cards are shown first, with
+search for another card collapsed behind a button. Unknown callers still get
+immediate search. No save, context ownership or provider contract changed.
+
+Validation: production frontend build, scoped ESLint and all 671 frontend tests
+passed. Browser acceptance verified actual native CRM saves with mocked SIP,
+removed controls/terminology, viewport fit, independent scrolling, compact
+candidate selection, mobile/large text/landscape, retries and draft retention.
+Owned fixtures were removed and original business records preserved. No real
+provider connection, call, message, backend migration or production access occurred.
+Runner: bench `config/check_telephony_layout.py`; evidence:
+`evidence/telephony-layout-20261023/`.
+
+## Local in-call notes and tasks, 2026-10-23
+
+Implemented the explicitly approved local slice from call-work-notes.md. Exolve's
+persistent dialog now has call controls and a customer-work pane. Lead/Deal card
+and list actions and Contact actions pass an explicit context through the existing
+global helpers; old number-only calls remain compatible. Contact resolution uses
+explicit links and permissions; multiple deals require selection. A manually
+entered number begins without a target. Editing a prepared number invalidates
+its context, and late resolver responses cannot restore it.
+
+Notes are ordinary FCRM Note records; tasks are ordinary CRM Task records with
+native assignment ToDo/notifications, deadline, priority and status. They save
+immediately in the selected Lead/Deal, before provider history exists. Task writes
+reuse the existing source-owned task operation service. Note writes use a new
+private CRM Note Operation receipt table; only that additive DocType was installed
+on the isolated local site. Receipts contain no note text and have no client CRUD.
+Both writes recheck author/account, native record/context access, revision and
+assignee permissions. Repeated unknown requests keep their exact operation ID and
+payload; later input remains dirty. Conflicts keep drafts, permit loading the
+current version and restoring the user's prior text for explicit reconciliation.
+Native record/list permission hooks also check customer access for operation-managed
+notes/tasks. Legacy records without receipts retain their existing access;
+Frappe's explicit document-sharing semantics are unchanged. The call workspace
+always requires access to the selected customer, including on retries.
+
+Separate in-memory work items survive hangup, modal dismissal, SPA navigation and
+selection of unrelated historical calls. Saved/pending work locks its target;
+old drafts remain available when another conversation is prepared. The phone
+layout keeps call controls above the scrolling editor. Drafts do not go into
+localStorage; reload warns when unsaved work exists. Saved records are visible
+through the normal customer activities and general Notes/Tasks. The customer
+activity view refreshes on successful workspace saves.
+
+Database/config/source backups and prior hashed frontend assets were preserved.
+Validation: 671 frontend tests in 60 files; 60 backend tests (20 call-work,
+10 telephony,25 Exolve,5 recording). Native fixtures were rolled back with commits
+and external HTTP blocked. Browser acceptance uses actual CRM HTTP writes with
+mocked SIP: Lead/Deal routing, several tasks, lost create/update responses, later
+typing, concurrent HTTP create/replay, navigation/hangup, unknown numbers and a
+Contact with two deals. Owned test records are removed afterward. Evidence and
+the reproducible browser runner live in the dedicated bench under
+`evidence/in-call-work-20261023/` and `config/check_in_call_work.py`.
+
+Production, provider configuration and original call/recording data are unchanged.
+No real calls or messages were sent. Automatic Call Log attachment is deferred
+until SIP/provider correlation is verified; timestamp/phone matching is not used
+as proof. Server drafts across reloads and physical microphone acceptance remain
+separate stages. See [the user workflow](./feats/telephony/call-work-notes.md).
+
+## Telephony connection and navigation refinement, 2026-10-23
+
+The reported connection failure was a local user mismatch: SIP 247407 was mapped
+to Administrator while the browser used karim. Reassigned that existing local
+mapping to karim through the native settings controller; API key and provider
+configuration were retained. Historical Call Log participants were not rewritten,
+and historical recording access is not widened by the new mapping.
+
+Added a local-only current-user readiness endpoint (available/reason), then
+automatic app-level SIP registration for mapped users. No fallback to another
+operator, credential persistence, microphone request or outgoing call is involved.
+Manual Disconnect stores a user-specific browser opt-out; manual Connect clears
+it. Navigation keeps the client; reload restores it. Native transport recovery
+keeps tab ownership, and a second tab can retry after the owner closes. Settings
+saves revalidate configuration. Missing mappings now have an actionable message
+and a settings action for managers instead of a generic API-key error.
+
+Changed the old journal entry from Table view to List view, removed the separate
+recorded filter tab, and retained inline recording indicators and playback.
+The backend recorded filter is retained for API compatibility.
+
+Notes/tasks received read-only analysis only. The current helpers require an
+existing Call Log and create a linked note/task without its own CRM reference;
+Exolve's Call Log appears after the conversation. The proposed design preserves
+explicit Lead/Deal context through dialing, saves canonical Note/Task records in
+that context during the call, and attaches the same records to a validated call
+later. SIP/provider-ID correlation remains unverified. See
+[the proposed workflow](./feats/telephony/call-work-notes.md).
+
+Validation: 662 frontend tests,40 backend tests, scoped ESLint and production
+build. Browser checks use karim's separate native local session (no password reset
+or clearing of existing sessions): auto-connect without a click or microphone,
+navigation/reload, transport recovery, tab exclusion/recovery, persisted manual
+pause/resume, precise unmapped state, mobile layout and actual Exolve SIP
+registration. Zero real calls/messages or note/task writes. Evidence lives in
+`evidence/telephony-refinement-20261023/` in the dedicated bench. Production and
+the old shared source are unchanged.
+
+## Local Telephony workspace, 2026-10-23
+
+Added `/crm/telephony` over the existing CRM Call Log. The sidebar now opens this
+workspace; legacy table routes, saved views, modal deep links and card calls are
+preserved. A dated call list has normalized customer/phone search, period, own
+calls and incoming/outgoing/missed/recorded filters. The adjacent pane shows a
+recording player, call metadata, explicit CRM context and callback controls.
+The dialer supports readable customer search and numeric entry. Old note/task
+actions remain available through the native call-details modal.
+
+The new read-only API applies native call and primary customer permissions in
+SQL before paging/search, checks detail links again, and never returns provider
+recording URLs. Deal contact names are resolved only through explicit links and
+independent Contact read permissions. The recording proxy rechecks primary
+customer permission before provider/cache access. No schema migration or data
+rewrite was needed. Existing producer/recording/AI logic remains independent.
+
+Workspace call preparation always opens controls first. Existing card behavior
+is retained. Exolve/Twilio/Exotel publish non-secret UI activity state so record
+players pause while a call is active, including in the legacy details/timeline.
+The persistent app-level dialer survives navigation. Telephony alone keeps its
+page instance across query-string selection, preserving filters and mobile pane
+state; all other route keys retain their previous behavior.
+
+Validation: 661 frontend tests in59 files;37 backend tests (10 workspace access/
+filter/pagination/revocation/contact-privacy cases,22 Exolve,5 recording download),
+scoped ESLint and production build. Native fixture writes were rolled back with
+commits and provider requests blocked. Local browser checks exercised actual
+search/filter responses, legacy deep links, real cached recording playback and
+seeking, live-call playback exclusion and navigation with a mocked SIP session,
+375px list/details/dialer/back, landscape and larger text. No JavaScript errors
+or unexpected HTTP failures. No real calls, registrations or messages were sent.
+
+Source/local diffs, old catalogs and all hashed frontend assets were preserved
+before changes. Missing prior/intermediate hashes were restored after builds for
+older tabs. Evidence: `/Users/g-karim/frappe/crm-exolve-20261022/evidence/telephony-workspace-20261023/`.
+Production and the old shared source were not changed. Callback task queues,
+line/team analytics, incoming routing, SMS and the unified Inbox remain future
+work; installing this view does not improve provider-history completeness.
+
+## EXP Theme installed and Russian labels restored locally, 2026-10-23
+
+Read-only Git inspection on the user-designated production host confirmed clean,
+detached EXP Theme `79dad3a7d4e870006719c7c72a7b980bbcd107e4`. Installed a separate
+clean checkout of that commit in the isolated bench and its private Python env.
+Neither the shared dirty theme checkout nor production was changed. No local
+notification-service experiments were copied into this production theme version.
+
+The normal theme setup would delete extra Language/Gender entries and rewrite
+all user languages. The one-time installer substitutes only that setup function
+with branding plus the system ru default, preserving all 82 languages, seven
+Gender entries and all six users' language/theme settings. It still uses the
+native installer for schema, hooks and translation registration. Full future
+theme migration needs the same preservation review. SQL/public/private/config
+and previous compiled catalogs were backed up before installation.
+
+Loaded the theme's Russian translation map and compiled native Frappe/CRM ru MO
+files inside this bench only. Browser labels now include «Журнал звонков»,
+«Настройки пользователя», «Воронки продаж», «Иерархия продаж», «Шаблоны писем»
+and «Политика SLA». Eight missing Web Forms list/dialog messages were added to
+the local CRM ru PO and compiled; no frontend build was needed.
+
+Detected and reproduced an optional-integration incompatibility: CRM's local
+notification on_update hook imported the new shared-service module whenever
+any exp_theme was installed. The production theme has no such module. The hook
+now also requires the service's subscription schema, matching the settings API.
+Four regression tests cover older/absent/ready themes and missing recipients;
+four existing translation tests also pass. Native notification insert/save/read
+state changes passed with commits blocked and a complete rollback.
+
+Authenticated browser checks passed for the three main lists, both demo Lead
+message tabs and pipeline/hierarchy/channel/form settings, plus theme asset URLs.
+No JavaScript errors or failed local HTTP responses. All protected business,
+credential and dictionary rows match before/after; scheduler/email remain off,
+Messenger remains disabled and empty. Evidence and private backup:
+`/Users/g-karim/frappe/crm-exolve-20261022/evidence/install-theme-20261023/`.
+No real calls/messages, commits, pushes or production writes occurred.
+
+## Messenger installed on the local test site, 2026-10-23
+
+Installed the already downloaded `crm_messenger` at commit
+`eb4af567072df2ba9dc0360561e42cab24aeea19` with the native Frappe app installer
+on `crm-exolve.localhost` / `_crm_exolve_20261022` only. Registered the app in
+this bench's `sites/apps.txt`; all nine DocTypes are present. No full-site
+migration, frontend build, provider connection or production operation was needed.
+Messaging and automatic Lead creation remain disabled; channels, conversations,
+messages and webhook logs are empty. Scheduler remains paused, email muted.
+
+Before installation, verified a full native SQL/public/private/config backup.
+The demo HTTP listener was stopped and restarted using its verified owned PID;
+other local benches were not restarted. Installer HTTP requests were blocked.
+All original Lead, Deal, Contact, Dynamic Link, Call Log, Exolve Agent, Task,
+ToDo, Notification, Email Queue, Exolve Settings and encrypted credential rows
+match both immediately after installation and after browser acceptance.
+
+Authenticated Chrome verified the installed-app API, safe settings API,
+«Переписка» empty states on both demo Leads with sending unavailable, and
+«Настройки» → «Каналы сообщений». No JavaScript errors or failed local HTTP
+responses; no messages or calls sent. Screenshots, digests and private backup:
+`/Users/g-karim/frappe/crm-exolve-20261022/evidence/install-messenger-20261023/`.
+The unified Inbox remains a separate future feature. Production, source commits
+and external accounts were not changed.
+
+## Local CRM updated to production base, 2026-10-22
+
+Read-only SSH to the user-provided `200.169.176.193` confirmed clean production
+CRM `7dfa800f90fb7cf63cc08911d419fc5fb906f426` (codex/tatkardan-touch-stage7),
+Messenger `eb4af567072df2ba9dc0360561e42cab24aeea19` and Frappe16.51.0
+`6b450a166e076dd842e4db7ea0843f62881e62ac`. The pilot now uses a separate CRM
+checkout inside `/Users/g-karim/frappe/crm-exolve-20261022/apps/crm`, based on that
+exact production CRM commit, with local Exolve/task/notification changes applied.
+The old shared `/Users/g-karim/projects/crm` and its dirty files remain unchanged.
+
+Three-way conflicts retained the production Lead visibility/invalidation fixes,
+fetch-from helpers and Touch Tracking hooks alongside local notification guards,
+task callbacks, Exolve and translations. The old ignored migration guide that
+collided with the production tracked guide is preserved in the evidence directory.
+The production guide stays in the active checkout. Existing hashed assets remain
+available to older browser tabs. No commit or push was made.
+
+The pilot has its own Python environment. Editable imports no longer redirect
+other benches; dependencies match the active app declarations (`uv pip check`
+passes). FRAPPE_BENCH_ROOT is explicit for web/CLI resource isolation. The CRM ru
+catalog is compiled only for this bench. Messenger source/package are present,
+but no Messenger schema, channel or account was installed or enabled.
+
+Before updating the local site, saved SQL/public/private files/configuration and
+1,145 source-file hashes/archive plus the complete working diff. Full migration
+ran only on crm-exolve.localhost with HTTP requests blocked and search indexing
+skipped. Before/after comparisons matched all original business row values and
+Exolve settings; Touch Tracking stays disabled and scheduler/email stay off.
+
+Validation:654 frontend tests in58 files, frontend build and scoped ESLint;
+35 backend Exolve/notification regressions plus5 recording-download tests passed.
+A transactional real-permission probe verified visible owner notifications,
+revoked Lead filtering in both native lists, frozen mark-all access checks and
+reference-free realtime invalidation, committing no fixture rows. Browser
+acceptance evidence is kept with the update report.
+
+Evidence: `/Users/g-karim/frappe/crm-exolve-20261022/evidence/update-to-production-20261022/`.
+Source/runtime rollback pointers are retained inside the bench. Physical-mic
+conversation acceptance, incoming routing, SMS and new workspaces remain future
+stages. Production was not modified and no real calls/messages were sent.
+
+
+## Exolve — remove idle header launcher, 2026-10-22
+
+Removed the permanent Exolve button from the shared app header. The dialer still
+opens through card phone actions, fills the destination without calling, and
+retains its mounted client. Dismissing an active call reveals a neutral floating
+button at the bottom right; reopening it restores the call controls. It disappears
+when the call ends. No provider credentials, routing or call transport changed.
+
+Validation: 445 frontend tests in 42 files, frontend build and scoped ESLint.
+Local authenticated browser checks passed for an absent idle header button,
+opening from the seeded Lead, no automatic dialing, reopening a minimised call,
+SPA navigation to Deals with the same call, hangup cleanup and a 390px viewport.
+SIP/session were mocked: zero provider connections and zero real phone calls.
+Existing hashed assets were preserved across the local build.
+
+Competitor research and proposed Telephony/Inbox workspaces remain a design
+proposal, not implemented CRM sections: [communications](./feats/communications/workspaces.md).
+An illustrative HTML concept with theme/section switching lives on the isolated
+demo under `/assets/communications-concept-20261022.html`.
+Evidence: `/Users/g-karim/frappe/crm-exolve-20261022/evidence/communications-20261022/`.
+Production, provider accounts, schema, commits and pushes were not changed.
+
+## Exolve — real local call and recording acceptance, 2026-10-22
+
+User explicitly authorized a real local CRM call to their confirmed personal
+phone. One short first attempt was cancelled by the test harness too soon: ICE
+gathering delayed the actual INVITE by roughly 40 seconds. An answered retry
+used the real CRM UI, SIP/WebRTC and carrier with a known Russian WAV as its
+browser microphone. The user confirmed hearing the phrase normally. Their
+return speech was captured in the browser and in the provider's separate phone
+channel (waveform correlation 0.903 after alignment). Speech recognition was
+performed locally on cached MLX Whisper; no paid AI or external ASR was used.
+
+The accepted call is Completed with 34.48 seconds talk time; the provider's
+34.661-second original is 8kHz stereo Microsoft ADPCM WAV. Chrome could not
+decode it. The Exolve-only recording route now creates a private PCM WAV preview,
+preserving original rate/channels. It authenticates the participant/application
+on every request, including cache hits, and serves actual byte ranges. Real
+HTTP 200/206, metadata, playback and seeking passed. The native CRM modal shows
+the recording without an error; original provider bytes remain separate.
+
+The preview needs server ffmpeg, fixed WAV input/local-file protocol, bounded
+source/output sizes and timeout; the cache is site-private with 0600 files.
+The original download for future manual AI remains unchanged. SIP offers now
+stop gathering once a public or relay candidate exists. A browser probe measured
+0.479s preparation with all INVITEs blocked before transmission; cancellation
+also cleared the UI. This probe did not place an additional phone call.
+
+Physical Mac microphone capture independently returned live input and nonzero
+levels. At the user's request, a real conversation through that physical input
+is deferred. No further phone calls were placed after that request. DTMF delivery,
+incoming routing and SMS remain future checks. No provider routes/services,
+production, migrations of existing sites, commits or pushes changed.
+
+Validation: 445 frontend tests/build/ESLint, 22 Exolve backend tests plus 5
+recording regressions, Ruff and diff checks. Local evidence and launch helpers:
+`/Users/g-karim/frappe/crm-exolve-20261022/evidence/real-call-20261022/`, `config/`.
+
+## Exolve — first local browser dialer, 2026-10-22
+
+Added a third calling provider, manager configuration and per-user SIP mappings,
+explicit connection/call UI with incoming controls, mute/timer/DTMF, a memory-only
+JsSIP transport, terminal provider-statistics Call Logs and protected recordings.
+The published wrapper's localStorage password storage is not used. Concurrent
+tabs cannot register the same SIP when Web Locks are available. Reconciliation
+handles duplicate requests, late recordings and MariaDB 1020 snapshot retry.
+
+Runs on a new Frappe16.51 site/DB at
+`/Users/g-karim/frappe/crm-exolve-20261022`; existing Frappe17-dev and working local
+sites were not migrated. The actual API key is encrypted in this site's settings.
+No provider route/service changes, phone calls, SMS, AI requests, production,
+commits or pushes are included. Real SIP registration/disconnection succeeded;
+captured outbound SIP methods contained REGISTER and no INVITE. Two concurrent
+DB imports returned the same single CRM row after snapshot retry.
+
+Validation: 444 frontend tests in 42 files, production frontend build, 21 Exolve
+backend tests and 5 recording regressions passed; changed-source ESLint/Ruff and
+diff whitespace checks passed. Real Chrome checks cover settings save with key
+retention, provider read access, registration/disconnection, second-tab exclusion
+and the 390px dialer. Evidence and local launch instructions are in the isolated
+bench's `README.md`, `config/` and `evidence/` directories.
+
+Real audio/call/recording and incoming-route acceptance remain in PLAN. There is
+no public webhook or background importer in this first slice. Contract:
+[Exolve local pilot](./feats/telephony/exolve.md).
+
+## CRM Task retry correction — local, 2026-10-19
+
+The source serializes same-author saves before receipt lookup and retries up to
+three complete top-level save RPC transactions on database snapshot/deadlock or
+timeout conflicts. A retry clears actor permission caches; embedded calls outside
+those RPCs leave transaction recovery to their caller. Both Celio and native CRM
+retain the original mutation after transient/unknown responses. No schema change,
+explicit commit, mirrored task, role grant or historical-data repair was added.
+
+Validation:147 targeted backend,452 Celio and438 CRM frontend tests, both builds,
+ESLint/Ruff/Frappe Semgrep; real2/4/8 HTTP creates, repeated edits, CAS/hash rejection,
+lost responses and retained drafts. Real role revocation while waiting returns403
+and creates no Task/receipt. Final full Celio871/871 in1120.125s with1240 backend
+files unchanged. All work remains local and uncommitted; working data preserved.
+Technical record: `/Users/g-karim/frappe/celio/bench-v16/apps/celio/docs/crm-task-retry-fix-2026-10-19.md`.
+
+## CRM Task in Celio — local integration, 2026-10-19
+
+A later explicit authorization adds one canonical CRM Task in both UIs. The source
+API checks Task and customer context permissions, six agreed fields, eligible
+assignee, current viewer, modified/CAS and durable exact-request replay. It uses
+native save/ToDo/notification hooks, including correct assignment removal. There
+are no ERP copies, role grants or automatic Celio project features. Customer
+creation choices are permitted Lead/Deal. A private CRM Task Operation holds only
+request identity/hash and source task reference.
+
+Native CRM forms protect live input (including commit-on-blur fields) during
+cross-tab reads. Agreed field saves use the source CAS/replay path; custom field
+changes retain native behavior and scripting callbacks. Unknown outcomes keep the
+same request and remain retryable after background reads. Old schema reads still
+work; the new writer is unavailable until its own isolated schema is installed.
+No existing working site was migrated.
+
+Current local evidence: frontend433 tests/build/ESLint, native Task10, CRM shared
+notifications14, Celio integration23, actual CRM UI→Celio→CRM, native draft/CAS,
+lost-response creation/edit replay, RU/EN/mobile/themes. Full Celio repeat passed867/867 on a separate test database. Concurrent Theme
+changes were followed by123/123 final coupled regressions with no source drift;
+exact evidence and scope belong to Celio HANDOFF.
+Frappe16.28/ERP16.29 compatibility was tested without upgrading the working bench.
+
+Technical record: `/Users/g-karim/frappe/celio/bench-v16/apps/celio/docs/crm-work-and-shared-notifications-2026-10-19.md`.
+Demonstration: `/Users/g-karim/frappe/celio-exp-integration-20261019`.
+All dirty trees and fictional data preserved; no commit/push/deploy/PR/Wiki or
+production connections, real mail/device push or paid AI.
+
+
+## Shared EXP notifications — local CRM stage, 2026-10-19
+
+Later authorized Home design stage: added optional display metadata to the shared
+source adapter using the existing recipient/task/parent checks and native field-level
+read/mask filtering. The shared GET preview has no write effects; source navigation
+still uses the existing head-protected read path. Local shared-notification suite16/16
+and real browser Home→CRM source navigation/read/task-status separation passed.
+Native CRM frontend, saved preferences, historical identities and Celio are unchanged.
+See `/Users/g-karim/projects/exp_theme/docs/notifications-live-design-2026-10-19.md`.
+
+User authorized continuing CRM, EXP One and `/home` while another chat works on
+Celio. This is a local implementation and acceptance stage, with no release,
+commit, push, PR, production access, real email/device push or paid AI.
+
+Implemented native CRM Notification adapter, current reference permission checks
+for ordinary assignments as well as Messenger, shared weighted counts/read state,
+head-protected reads and frozen bounded mark-all, atomic ToDo event identities,
+optional durable One bot delivery and a CRM UI for the same common subscription.
+Source panel remains CRM-only; One's own panel keeps its native events. No copied
+task storage, copied read receipts or second CRM preference was introduced.
+
+The original dirty PLAN/SPEC/ARCHIVE and edited source files were backed up before
+changes. Original code and all prior hashed CRM build assets are preserved in the
+private sandbox backup. Frappe's install-generated Desktop Icon export was also
+preserved there, outside the change. Existing global/source channel settings and
+historical notification IDs were not rewritten. Early One preferences/receipts
+remain saved and do not grant consent for bot messages.
+
+Validation on `exp-notifications.localhost`, Frappe 16.51, installed apps only
+frappe/exp_theme/raven/crm (no Celio):
+
+- 14 new CRM integration tests; 10 native notification-link regressions;
+  7 native recipient-permission tests; 3 native notification unit tests.
+- 24 common-service DB tests rerun with CRM installed, including real One messages.
+- 423 CRM frontend tests in 40 files; production frontend build passed.
+- Browser: real CRM Task/ToDo assignment, one message per event through the private
+  worker, settings in all three directions, read state in both directions,
+  stale draft rejection, history after disable, mobile RU/EN, no overflow,
+  unknown committed HTTP response followed by exact replay, visible GET failure/retry.
+- Ruff F and diff whitespace checks passed. Frappe Semgrep has no new findings;
+  the pre-existing `override-doctype-class` finding in CRM hooks is reproduced
+  from the exact baseline backup and is unrelated to these hooks.
+
+Local standard CRM fixtures generated 29 email queues despite mute;
+they were never sent and are preserved as Error alongside the earlier 28 fixture
+queues. The sandbox-only CLI now disables welcome mail and native email notifications
+for the standard CRM fixture users when loading them.
+Browser task creation leaves the queue unchanged; Sent and pending email are zero,
+Raven Push Delivery is zero. TCP/UDP outbound remains blocked and scheduler off.
+
+Evidence and reproduction: `/Users/g-karim/frappe/exp-notifications-20261019/README.md`,
+`evidence/browser-crm*.json`, `evidence/crm-validation.json`, `logs/crm-*.log`.
+No live Messenger provider or real phone push was exercised. Celio adapter,
+early Celio receipt migration, team routes, sender creation, task actions, Meet
+and AI remain separate stages in the shared handoff plan.
+
 > **This file**: Completed phases only — decision rationale, what was built, implementation detail. Completed analysis stages are marked explicitly.
 > **Current API contracts**: [SPEC.md](./SPEC.md)  
 > **Upcoming work**: [PLAN.md](./PLAN.md)

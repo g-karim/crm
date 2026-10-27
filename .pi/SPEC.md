@@ -8,6 +8,641 @@
 
 ---
 
+## Home presentation — local Signal styling, 2026-10-25
+
+Standalone `/home` uses the existing Celio Signal light/dark palette and Inter,
+with shared semantic tokens in `exp_theme/public/css/home_workspace.css`.
+Separators use 1 px low-emphasis borders; selection and keyboard focus retain
+distinct indicators. Mail direction backgrounds and black unread dots remain.
+The 208/68 px navigation widths, compact-state persistence, mail reading area and
+existing actions are preserved. Component treatments are scoped to
+`.exp-home-standalone`; embedded/native Desk defaults and authored message HTML
+are not restyled by this change. No backend, permissions or mail transport change.
+
+## Personal correspondence in Home — local contract, 2026-10-24
+
+`/home?view=correspondence` is a native-mail/channel workspace for System Users,
+independent of CRM roles or customer links. `exp_theme.correspondence` reads native
+User Email assignments and optional existing account grants, with explicit opt-in
+for additional configured accounts/channels. Selection never grants access or
+creates provider accounts. Mailbox ownership authorizes the mail copy only;
+business context is checked independently. Native channel reference checks remain.
+
+On CRM sites, the source/user read cursor and revision reuse `CRM Inbox State`.
+Home's reply lives in the optional `correspondence_draft` field; `data` retains the
+existing CRM reply/internal-note draft unchanged. This permits an internal note
+and a mail reply at the same time. Other sites use the service-only Theme state.
+Native mail history, source IDs and sender-account binding remain canonical.
+The current Home mail UI defaults to Inbox and the employee's own assigned
+mailbox. Folder order is Inbox, Favorites, Sent, Drafts, Spam, All, Trash. It requests
+`list_threads(message_list=1)` and `get_thread(message_only=1)`: one native
+Communication per list item and reading pane. The same flag on save/send/upload/
+download binds private drafts/attachments and reply identity to the exact letter;
+legacy thread calls without that flag retain their previous behavior.
+`update_flags(kind,name,values,expected_revision,expected_viewer)` stores personal
+read/favorite/spam/archived/trash boolean metadata after source/viewer checks. Native
+Spam/Trash are fallbacks; personal restore does not write to the provider. Archive
+excludes Inbox only; Trash excludes every other folder and their counts, preserving
+other flags/drafts for restoration. Explicit letter read
+state never acknowledges other messages in its chain. Nonempty drafts and internal
+CRM notes remain independent. Sample transport guards are server-only.
+`get_thread` adds `reply.can_reply_all` only when distinct other To/CC participants
+exist. Actual own source/user addresses, reply recipients and BCC are excluded.
+Readable body HTML uses a strict server-side tag/attribute/URL allowlist; no remote
+content or scripts are loaded, HTTP(S)/simple mailto links remain usable.
+`prepare_forward(name,draft_id,expected_viewer)` creates one private compose draft
+with blank recipients, source quote and native attachments. A server-only origin
+marker rechecks source access on subsequent reads/sends. Forwarding uses compose,
+so native `in_reply_to` and CRM reference are not inherited.
+`discard_draft(kind,name,expected_revision,expected_viewer,account,message_only)`
+clears only the current user's exact draft with revision checking. Private DTOs
+include `cleared_revision`; old browser drafts cannot resurrect deleted/sent text.
+The state and clear marker remain for stale save/send/discard detection. Internal
+CRM `data`, neighboring letter drafts, source messages and attachments are retained.
+Local docs: [Home correspondence](../../exp_theme/docs/home-correspondence-2026-10-24.md).
+
+Mail-client additions use the same source/user access rules and native records:
+
+- `list_threads(message_list=1, search, offset, limit)` accepts sender, recipient,
+  inclusive local-calendar from/to dates, unread and attachment filters. Account
+  scope applies before counts/search. MariaDB projects at most `limit+1` headers
+  for a mailbox page, including deep offsets; exact reads never regroup history.
+  Explicit index installation is `exp_theme.correspondence_query.ensure_indexes()`;
+  reads never run DDL. Mixed optional channels retain native source checks.
+- `search_recipients(query,account)` suggests at most eight addresses from that
+  accessible mailbox's history. Incoming BCC and unrelated contact lists are excluded.
+- `update_many(items,values,mutation_id,expected_viewer)` checks every source and
+  revision before applying up to 100 personal metadata changes. Retries return
+  the operation receipt. `get_neighbors` respects the current folder/search.
+- Drafts accept sanitized `html` alongside `text`. Inline images require a native
+  attachment ID owned by this draft/source; remote images stay blocked. Native
+  MIME uses verified original bytes and CID images, with native queue/account
+  binding checked before accepting send. File uploads/copies/downloads preserve
+  bytes without the generic text-decoding helper.
+- `get_signature`/`save_signature` use the current user's native
+  `User.email_signature`; revision plus a content stamp detect other Home/Desk
+  edits. Only the signature field is written, leaving mailbox assignments intact.
+- `preview_attachment` rechecks file/source access. PDF pages are rendered to PNG;
+  image type/pixel/size limits apply. `download_attachments` returns a source-bound
+  ZIP (up to 100 files/50 MB). Originals remain native private Files.
+- `get_delivery` reads native Email Queue/Recipient status only. SMTP acceptance
+  is labelled as acceptance by the mail server, not receipt by the addressee.
+  `retry_delivery` requires current send access, original author and a current
+  queue stamp; it preserves recipients already Sent and is idempotent.
+  `get_mailbox_status` exposes connection flags without hosts or credentials.
+
+Personal read/spam/archive/trash state and drafts synchronize between Home
+sessions through the server. They do not mutate IMAP folders or provider flags.
+Real Beget SMTP/IMAP self-addressed acceptance for g.karim@exp-verse.com is verified
+locally. Credentials use native encrypted Email Account storage; production supplied
+only read-only SMTP metadata. Generic mail/scheduler remain paused.
+
+The optional admin-only `exp_home_mail_pilot` site config selects one exact account
+and employee. It requires the isolated switches and read-only IMAP and has no public
+configuration API. Legacy self-only policy remains valid; external To/CC/BCC require
+both `recipients=[]` and explicit `allow_external_recipients=true`. Home retains its
+native send receipt. The private worker selects only receipt-backed native queues,
+rechecks author/account/source rights, compares the entire queue envelope against
+the Communication's To/CC/BCC and binds the sender to the configured employee.
+It respects queue suspension/retry delays and verified TLS; generic queues stay muted.
+
+The configured folder manifest uses independent UIDVALIDITY/UID cursors, including
+the existing INBOX cursor. History is seeded explicitly by an authorized local import.
+EXAMINE/BODY.PEEK never mutate provider flags or folders. Native MIME parsing/File
+storage create Communication Email with the original date and appropriate Sent/
+Received direction. Native Message-ID dedup is scoped to account and direction;
+folder/UID provenance handles missing IDs and restart safety without rewriting old
+messages or their UIDs. Replies stay within the same account; CRM references are
+not inferred. Provider drafts become the employee's editable private Home compose
+drafts, with no outgoing Communication/queue until explicit Send. Reimport cannot
+overwrite or resurrect a locally edited/deleted draft. Initial read/star/spam/trash/
+archive flags seed personal metadata only for newly imported mail. Later Home changes
+remain independent of external IMAP flags. Auto replies/participant forwarding never
+run. The isolated inbox runner checks all configured folders; absent policy is a no-op.
+
+Outgoing native MIME receives original file bytes. Text attachments use binary MIME
+to preserve line endings and legacy encodings. Display normalization flattens only
+known native/presentation layout tables, retains authored data tables, and starts
+an exact letter at its top. The original mail HTML is not rewritten.
+
+## Messenger workspace — local contract, 2026-10-24
+
+`/crm/messenger?open=<messenger|email>:<source name>` opens the exact source.
+The source is Messenger Conversation/Message or Communication Email. No history
+copies, name/phone merges or subject-based email grouping are created.
+
+- `crm.api.inbox.list_threads(view='open', query='', channel='', account='',
+  reference_doctype='', reference_name='', offset=0, limit=30)` returns headers,
+  authorized queue counts, available accounts and `has_more`. Views: open, mine,
+  unassigned, needs_reply, waiting_customer, unread, snoozed, closed, all. Page size
+  1–100. Account and current source CRM permissions apply before search/counts;
+  native source subscription restrictions also apply to previews/body search.
+  Reference filtering includes explicit Deal.lead relationships under both records'
+  independent permissions. It never grants Deal-only readers access to a private Lead.
+- `get_thread(kind,name,before_cursor=None)` rechecks source access and returns
+  native messages/attachments, private state, explicit CRM contexts, permitted
+  customer/company/contacts, native notes/tasks/calls and actual send capabilities.
+  Messenger history uses its native bounded cursor API. Read APIs perform no
+  provider calls, delivery, provider-read acknowledgements or business writes.
+- `save_private(kind,name,expected_revision,draft,read_cursor)` stores only the
+  current user's draft/read cursor. A cursor must identify a real inbound source
+  message; it cannot acknowledge a concurrent unseen message in another thread.
+  Revision conflicts retain text and require explicit user resolution. Browser
+  copies are user/source scoped, with their last known server revision.
+- `update_work(...,expected_revision,status,assigned_to,snoozed_until,
+  context_doctype,context_name)` manages shared operator work separately from
+  source/provider states. Snooze requires a future deadline; new inbound identity
+  reopens closed/waiting/snoozed work. Read does not close work. Assignment requires
+  the assignee's source/account/customer access. Context must be an independently
+  writable explicit related Lead/Deal; already saved materials never move.
+- `add_note(...,text,mutation_id,context_doctype,context_name)` creates one native
+  FCRM Note; `add_task(...,values,mutation_id)` delegates to native CRM Task with
+  normal assignment/hooks. Both recheck source and selected context, escape note
+  text and retain canonical idempotence. No second task/note is created after a
+  lost-response retry. Suggestions and personal drafts are not CRM activities.
+- `send_reply(...,text,mutation_id,subject,to,cc,bcc,attachments)` uses the exact
+  source account. Messenger calls its native delivery API; its request key is
+  server-namespaced by author and prefixed `crm-inbox-`. Email uses native
+  Communication creation/queueing, with a transactionally stored operation receipt.
+  Header injection and another author's/another thread's attachments are rejected.
+  Current local `mute_emails` prevents real email send; local examples never send.
+- `upload_attachment` uses private source- and author-bound storage. Email uploads
+  belong to the user's CRM Inbox State until native Communication attachment
+  creation on explicit send. `email_attachment(file)` rechecks current mailbox
+  and CRM context on download. Native Communication/File permission hooks also
+  enforce account revocation/private draft ownership. They retain all other
+  framework restrictions, including native Inbox User role requirements.
+- `set_account_access(kind,account,user,can_read,can_send)` is admin-only. Explicit
+  policies override implicit User Email access; absent a policy, personal email
+  follows native membership. System Managers retain account administration and
+  are the only readers/operators of unlinked conversations. Native Messenger
+  lists/history/deltas/attachments/send paths apply the same optional inbox policy.
+- `link_customer` is admin-only for Messenger, requires the new primary customer's
+  write permission, and does not move saved notes/tasks. Email reference ownership
+  stays native. `search_customers` returns at most 20 independently readable cards.
+
+CRM Inbox Work/State/Access/Operation are service-only DocTypes with no generic
+REST permissions or writes. Content is never placed in realtime notifications.
+All write endpoints accept `expected_viewer`; the UI always binds it to the
+author of the captured draft/action. A changed session rejects the write before
+any mutation. When a read detects another viewer, the page reloads after keeping
+the old draft only under its original user's local key.
+The local delivery process selects only explicit `crm-inbox-` outbound messages,
+rechecks the author, and uses native outbound state/retry/unknown handling. It
+does not consume legacy RQ jobs or send email. Local examples require the explicit
+local config flag, have isolated customers and a visible local-only notice.
+Usage and acceptance: [Мессенджер](./feats/communications/messenger.md).
+
+## Telephony workspace — local contract, 2026-10-23
+
+`/crm/telephony` is the workspace; `?open=<CRM Call Log.name>` selects a call.
+The technical `Call Logs` route, `/crm/call-logs`, saved views and legacy `open`
+links remain available. Telephony and Messenger preserve their page instances
+across query changes, keeping filters and drafts while selecting records. Other
+route keys are unchanged.
+
+- `crm.api.telephony.get_calls(search='', view='all', period='30', mine=0,
+  offset=0, page_length=40)` is read-only. Views: all/missed/incoming/outgoing/
+  recorded. Periods: all/today/7/30. Page size is bounded to 1–100. Native call
+  permissions and primary Lead/Deal/Contact access apply in SQL before search,
+  pagination and `has_more`. Unlinked calls follow native call-log access.
+  Ordering is start_time-or-creation descending with name as a tie breaker.
+  No global total or team analytics are inferred from the loaded page.
+- Results expose client number, own line, agent, timestamp, status, duration,
+  permitted context and `has_recording`. Provider recording URLs are excluded.
+  Search escapes LIKE wildcards and normalizes formatted phone input. Deal
+  customer names/search use explicit primary Contact links under Contact's own
+  permissions; a private Contact name is not exposed through a readable Deal.
+- `get_call(name)` checks call and primary-context access again, including on
+  direct links. Its references contain only accessible explicit CRM links.
+  `recording_path` reuses the existing authenticated recording proxy or native
+  local File path. The proxy also rechecks primary-context read access before
+  provider/cache handling; Exolve's participant/application checks remain.
+- `search_customers(search)` returns up to five readable phone-bearing records
+  per Lead/Deal/Contact type. Choosing a result fills a number; it never places a
+  call, creates a CRM record, merges customers or changes call relationships.
+- `globalStore.prepareCall(number='')` opens controls before any provider action.
+  Exolve uses its persistent dialog; legacy providers receive the existing
+  explicit confirmation dialog. Existing card `makeCall` behavior is retained.
+  Shared in-memory session state contains connection/line/activity only, no SIP
+  credentials. Record players pause during live calls and never auto-resume.
+- A missed filter is incoming No Answer/Busy/Failed/Canceled, separate from any
+  callback task. Outgoing No Answer remains an unanswered attempt. Completed is
+  displayed as a provider completion, not evidence of two-way speech.
+
+The workspace issues no provider requests, imports, calls, paid analysis, messages
+or schema changes from its list/detail/search APIs. Since the 23 October
+refinement, the separate app-level Exolve client automatically registers the
+current mapped user on CRM load. `get_connection_status()` checks only local
+enabled/user/role/mapping/key readiness and returns available/reason, without
+credentials, other users or provider calls. Unmapped users never borrow an
+Administrator mapping. Registration preferences persist a non-secret per-user browser opt-out;
+earlier paused connections can be enabled by manual Connect. Settings
+saves revalidate the connection. Microphone, dialing and answering stay explicit;
+native JsSIP transport recovery retains the client and tab lock. No call starts
+from registration. The UI entry to the legacy journal is List view; the separate
+recorded tab is removed, while the backend recorded filter remains compatible.
+Existing Exolve post-call reconciliation remains independent.
+The workspace header exposes List view and Dial a number; settings and connection
+status actions are removed. The call dialog is titled Telephony, up to 7xl wide
+and sized to the available viewport height. One shared top bar holds the number,
+call state/timer and call actions on desktop and mobile. Customer selection is a
+compact bar below it. Notes and tasks occupy separate desktop panes; mobile
+buttons switch between them without losing input. Manual history refresh, disconnect and
+auto-connect help are removed from this dialog. Current connection state remains
+inside the call controls; settings remain accessible through the main settings UI.
+Physical-mic/DTMF/incoming-route acceptance remains pending. Callback work is
+implemented locally in Stage 3 below. In-call note/task writing is available locally:
+[ownership and correlation limits](./feats/telephony/call-work-notes.md).
+
+## Telephony Stage 4 — call analysis and metrics, local 2026-10-23
+
+- `?pane=analytics` selects the analytics workspace. Journal and analytics share
+  `telephony.filtered_query`; native call/customer permissions and all filters
+  precede pagination/metrics. Raw transcript search also checks the analysis's
+  original customer independently of the current Call Log reference. Metrics cover
+  all permitted imported rows; task counts deduplicate explicit native links and
+  independently gate task/customer access. Completed is a journal status, not
+  universal proof of an answered conversation.
+- `crm.call_analysis.workspace.get(name, run_name=None)` returns an authorized
+  immutable analysis version, its accessible versions and opt-in status. Analysis
+  source customer is snapshotted and checked again after call relinking. Legacy
+  text remains readable with explicit provenance limitations. `recording_matches`
+  prevents old timestamps from seeking a replacement recording. Original audio,
+  manager notes and provider facts are never analysis output targets.
+- Service-only `CRM Call Analysis` and `CRM Call AI Control` have no native CRUD
+  role grants and use guarded writes. Once saved, raw text, STT/summary responses,
+  segments, hash and summary are immutable. Call/source/customer/request identity
+  is immutable from insertion. Settings use revision CAS and native audit versions.
+- `start(name, mutation_id, retry=0)` is POST-only, manual, call-write gated and
+  disabled by default. It reserves a shared daily USD budget using fresh locking
+  reads under one control lock, deduplicates active/exact requests and retries
+  stale-snapshot admission only at the owning RPC transaction boundary. Old
+  unbudgeted enqueue/worker routes cannot send audio; call save/import does not
+  schedule AI. Only the isolated opted-in queue processes new runs.
+- Every paid step records durable intent, checks current user/call/source access,
+  daily reservations and the provider key's daily limit. A duration-priced STT
+  catalog check, actual audio-duration/size bound, summary token cap and chat price
+  limits bound inputs. Missing cost or interrupted/unknown response retains the
+  reservation and blocks further AI until explicit manager reconciliation. Known
+  summary failures retain raw output and reuse it on a new explicit request.
+- `confirm_task(name, run_name, index, values, mutation_id, expected_viewer)` is
+  POST-only. It requires an explicit edited title/customer/assignee/deadline and
+  creates through native CRM task operations. Author/call/run locking and a
+  per-suggestion receipt make exact retries idempotent and reject a second edited
+  confirmation. Assignment/access/notification behavior stays source-owned.
+- `crm.call_analysis.analytics.report` applies the same journal filters to server
+  metrics. `callback_status`/`callback_candidates` never infer a link;
+  `link_callback(name,outgoing,expected_revision,expected_viewer)` requires explicit
+  confirmation of an accessible later outgoing attempt to the same number. The
+  separately guarded outcome stores its ID/author/time. Speed counts only readable
+  confirmed missed→attempt links, never Task completion as evidence of a call.
+
+Usage, spending behavior, sources and local queue: [Stage 4](./feats/telephony/stage4.md).
+Production, SMS and live paid acceptance remain outside this local contract.
+
+### Existing shared AI key — explicit local opt-in, 2026-10-23
+
+`crm_call_analysis_allow_shared_key=true` enables reuse of an existing inference
+key when explicitly authorized. Default remains dedicated-key enforcement.
+Shared mode never changes provider credentials/limits: it checks GET /key and
+GET /credits, current STT rate, bounded UTF-8 prompt/output costs and the complete
+local reserve before paid I/O. Existing daily locking/receipts/unknown-cost blocks
+remain mandatory. `settings.shared_key` identifies this mode in the budget UI.
+
+Analysis admission and `get.can_start` enforce Exolve's current mapping, exact
+application and participant recording access before reserving money. The known
+legacy Call Log shape `CRM Lead` with no reference_docname is treated as unlinked
+by journal/recording/analysis reads without changing its stored fields. Named
+customer references remain permission gated. Failed preflight is retained at zero
+cost; it is not a paid retry. A current-caller recording completed live acceptance
+locally with immutable raw text, timestamps, summary and actual cost.
+
+## Telephony Stage 3 — outcomes and callback work, local 2026-10-23
+
+- `CRM Call Outcome` is service-only storage keyed by the exact Call Log name.
+  It stores the manager outcome independently of provider status: `Agreed`,
+  `Callback`, `Not interested`, `Wrong number`. No native role CRUD grants;
+  normal service writes use the existing guarded internal-write controller.
+- `crm.api.call_followups.get_workspace(name)` projects readable canonical notes
+  and tasks from explicit Dynamic Links, plus outcome/revision and accessible
+  customer choices, including customers of explicitly linked canonical materials.
+  The finished conversation prefers its already selected customer. Each material
+  and its current customer are checked independently.
+  Personal `CRM Call Work.data` is never part of the response. A revoked callback
+  customer hides that review/materials even if the unlinked call remains readable.
+- `save_outcome(name, outcome, expected_revision, mutation_id, expected_viewer,
+  callback)` is POST-only. It checks current enabled user, call/customer access,
+  terminal provider status and native Call Log write permission. Author/call/review
+  locking, fresh parent checks, revision CAS and exact last-operation replay prevent
+  accidental overwrite. Only the top-level RPC owns deadlock retry/rollback.
+- Callback requires explicit `{context_kind,context_name,title,assigned_to,due_date}`.
+  One transaction creates a native CRM Task through the source task API, links its
+  existing ID to the call and records the outcome. The assignee must independently
+  read that task/customer. The task receipt ID is bound to call and operation UUID.
+  The form converts the chosen user-local deadline with public `dayjs/getConfig`,
+  using the inverse of native `dayjsLocal`;
+  the API stores the system-timezone datetime, and native `formatDate` displays it.
+  Native assignments, notifications, permissions and task revisions remain canonical.
+- An open callback must be explicitly completed/canceled before replacing its
+  outcome or scheduling another. Old tasks and links remain. `complete_task` is
+  POST-only and updates that linked native task to `Done` or `Canceled` using its
+  expected modified value and a task-operation UUID; it does not delete calls/tasks.
+- `telephony.get_calls` additionally accepts `view=attention`, exact `employee`,
+  `line` and `outcome` filters. `outcome=unprocessed` means no accessible saved
+  manager outcome. Legacy `mine` remains compatible. All predicates and native
+  call/task/customer permissions apply before pagination/has_more.
+- Attention = accessible incoming missed calls without a saved accessible outcome,
+  or calls with accessible linked open CRM Tasks due before tomorrow. Future tasks
+  wait until due; call-date period is ignored in attention. Employee filters use
+  missed-call receiver or due-task assignee there; ordinary views use call participant.
+  Completing a task removes that pending work, preserving missed-call history.
+- Filter directories contain only employees/lines from permitted calls; SQL distinct
+  avoids scanning a truncated page. List rows expose outcome and authorized due/
+  overdue task counts, never restricted material titles or provider recording URLs.
+- The journal sidebar and explicitly linked finished-conversation screen share the
+  outcome UI. Unknown responses freeze/retry the same mutation. Conflict reload
+  retains input and requires another deliberate save. Quiet journal refresh keeps
+  player/component identity and does not pause playback or discard outcome input.
+  Playback offers 0.75–2x and bounded +/-10s seeking; live calls still pause audio.
+
+See [Stage 3 usage](./feats/telephony/stage3.md). Production, new channels and Stage 4
+are separate work; none are enabled by this contract.
+
+## Telephony Stage 1 — local call controls and audio, 2026-10-23
+
+- `useTelephony().preferredIntegration` follows the enabled Twilio/Exotel/Exolve
+  order, preferring the configured calling medium when it is enabled. Workspace
+  and provider controls use the same choice. For Exolve, Dial a number opens the
+  same app-level conversation as card/journal actions, without a second dialer.
+  Legacy provider preparation and confirmation remain compatible.
+- The unified recipient field searches `crm.api.telephony.search_customers`.
+  Choosing a result fills the number and passes its explicit `{doctype,name}`
+  into the existing permission-checked resolver; it never places a call. Editing
+  the number invalidates old context. Versioned requests discard stale results.
+  Ambiguous linked cards still require an explicit Lead/Deal choice.
+- Minimize preserves the existing SIP client and conversation store. The compact
+  panel shows customer/state/timer and supports mute, hangup, incoming answer/
+  decline, audio unblocking and reopening the full workspace. SPA navigation
+  does not discard the call or drafts. Stage 2 below adds private draft recovery;
+  a media session is never resumed after a reload.
+- Audio device preferences contain only input/output device IDs under the current
+  user's browser key. SIP credentials, note/task content and sound are excluded.
+  `createExolveClient({getAudioConstraints})` reads fresh microphone constraints
+  for each call and incoming answer; the default remains `audio: true`.
+- A selected microphone uses exact `deviceId`. The chosen speaker is applied to
+  the actual call audio element before dial/answer, using feature-detected
+  `setSinkId`; a routing failure blocks that action and is shown to the user.
+  Browsers without output selection use system output and explain this in audio
+  controls. Device changes apply before the next call, without replacing active
+  tracks. A pending answer cannot answer a later incoming conversation.
+- Audio controls are a view in the same Dialog, retaining conversation input.
+  Enumerating devices does not request microphone access. Explicit microphone
+  check uses a local Web Audio RMS meter, without recording or network output.
+  Stop/back/close/device change/incoming call/unmount and the 20-second deadline
+  release tracks, animation and AudioContext; a late permission result is stopped.
+  Speaker check plays a short generated local WAV through the selected output;
+  closing/changing devices ends playback and revokes its object URL.
+
+Physical microphone/two-way speech/recording and delivered DTMF are separate live
+acceptance checks, deferred by the user on 23 October. See
+[Stage 1 instructions](./feats/telephony/stage1.md).
+
+## In-call customer work — local contract, 2026-10-23
+
+- `makeCall(number, context=null)` and `prepareCall(number='', context=null)`
+  retain their string-number behavior. The optional context is `{doctype,name}`
+  or explicit references; Lead/Deal cards, lists and Contact actions pass it.
+  Exolve resolves it under current permissions. Multiple candidate deals require
+  selection; changing a prepared number invalidates its context. Legacy providers
+  retain their existing call behavior and ignore this extra parameter.
+- `crm.api.call_work.resolve_context`, `search_contexts`, `options`, `get_item`
+  read local data only. Supported save targets are CRM Lead / CRM Deal. Contact
+  resolution uses explicit Dynamic Links / CRM Contacts, never phone matching.
+- `save_note` and `save_task` take `values`, `mutation_id`, `expected_viewer`,
+  optional `name` and `expected_modified`. Values include an explicit
+  `context_kind`/`context_name`. Notes use plain `title`/`text`; tasks use the native
+  title/description/assignee/date/status/priority fields, with plain description
+  escaped on the server. Both create ordinary native records with CRM references.
+  Workspace edits are restricted to the author's records and cannot retarget them.
+  When explicit candidates exist, search for another customer is collapsed until
+  requested; a number with no candidates shows the search immediately.
+  The note title is optional to display and remains editable through its pencil
+  action. New tasks show title/deadline first; description/assignee/priority/status
+  are under Task details. Confirmed clean task saves collapse to a summary; Edit
+  task opens the same record. Unknown outcomes and later edits keep the editor open.
+  Previous conversations are available through the history action while inactive.
+- Note retry receipts use the private CRM Note Operation table, with no client
+  CRUD, storing user/request hash/note ID only. Task saves reuse the existing CRM
+  Task Operation service and native assignment hooks. User/context/record checks,
+  transaction retry and `modified` comparison apply on writes and replays.
+  An unknown outcome retries the same operation ID and frozen payload; later text
+  stays unsaved until a subsequent operation. Conflicts preserve the draft.
+- Native record/list hooks apply customer access checks to operation-managed
+  notes/tasks too. Records without receipts and Frappe's explicit document-sharing
+  semantics keep their prior behavior. Workspace APIs always recheck the target.
+- The app-level store holds separate work items per conversation after hangup and
+  SPA navigation. Stage 2 persists private drafts on the server; it never stores
+  customer text in localStorage. Saved/pending work fixes the target context.
+  Beforeunload warns for active calls or unacknowledged drafts. Browser call
+  states remain untrusted UI metadata; provider history is not fabricated.
+
+## Telephony Stage 2 — private recovery and server history, 2026-10-23
+
+- Private service-managed DocTypes `CRM Call Work` and `CRM Exolve History Sync`
+  have no ordinary CRUD permissions. Controllers restrict writes/deletes to an
+  internal context. Draft RPCs always bind the enabled authenticated user and
+  require native call creation permission; manager roles cannot request another
+  user's draft. Saved items also recheck native author and customer permissions.
+  Unreadable/deleted customer drafts remain stored but are omitted from recovery.
+- `call_drafts.save_draft(snapshot, expected_revision, mutation_id, expected_viewer)`
+  stores a bounded, validated private conversation snapshot without creating a
+  Note/Task. User/work UUID identifies the row; revision CAS and the frozen last
+  mutation/hash make unknown outcomes replayable and reject conflicting payloads.
+  There are at most 30 tasks, 100k note text and a 1.2MB snapshot. Started attempt
+  number/direction and saved/pending context cannot be silently changed.
+- `list_drafts(offset)` pages 30 personal entries; `get_draft(work_id|call_log)`
+  rechecks access, returns a current context and canonical saved-record versions.
+  Recovery refreshes clean records while retaining personal edits/conflicts and
+  exact pending native mutation IDs. UI autosave is debounced and serial per work.
+  Native Save waits until its frozen request is durable, then uses the existing
+  canonical Note/Task APIs. A draft acknowledgement is distinct from Saved in CRM.
+- Unknown autosave outcomes retry the exact snapshot and UUID before later edits.
+  Two-tab CAS conflicts stop overwrites. Loading the server's version first saves
+  the local version as a separate private draft; Restore switches to that copy.
+  This cannot silently move text to another tab's customer or discard it on reload.
+  Restoring a prior incoming attempt never reuses it for a later incoming call.
+- `call_candidates(work_id)` reads up to 50 accessible Exolve calls for the same
+  number/current participant and attempt direction; it never chooses a result.
+  `link_call(work_id, call_log, expected_revision, expected_viewer)` requires an
+  explicit selection, participant/read permission, matching number/direction,
+  author/customer access and an exclusive call/conversation association. It adds
+  Dynamic Links to existing native Note/Task IDs under transaction locks. Later
+  confirmed saves add the same IDs to that call; no native record is copied.
+  No SIP/provider correlation is inferred from phone, clock, duration or a browser
+  supplied disposition. Call detail can open the current user's linked materials.
+- Exolve settings add opt-in `history_enabled` and optional `history_start` (site
+  date; default initial recovery is 30 days). `history.run` is registered at one
+  minute intervals but requires both calling and history enabled. A site/account
+  lock, fixed page windows, stored offsets and per-page commits permit bounded
+  recovery after a closed CRM or failed process. Recent two-day overlapping scans
+  and repeated daily historical sweeps recover delayed data and recording readiness.
+  Failure preserves the last committed cursor and retries with 1–60 minute backoff.
+- Each row is normalized against the authenticated application and exact SIP,
+  with terminal provider facts and stable application/call identity. Existing
+  imported call participants, owner, caller line and relationships are retained
+  when the SIP mapping changes; existing start/end timestamps are immutable even
+  after a site timezone change. The foreground user's RPC cannot take over those
+  calls. Existing ready recording URLs are never erased by a late empty snapshot.
+  History requests perform reads only and never change routes, send messages,
+  start calls or enqueue paid analysis. The credentials remain server-only.
+- `history.status()` exposes the current mapped user's local progress/error only.
+  Workspace refresh polls local APIs while visible. Recording state is ready,
+  pending or unavailable based on provider flags, with a separate client loading
+  error/retry state; a download error never means that a recording is absent.
+  The authenticated recording proxy, source files and byte-range behavior remain.
+
+Local runtime: `/Users/g-karim/frappe/crm-exolve-20261022` runs only this job in
+`config/run_exolve_history.py`, maintained by `config/start_demo.py`. The shared
+scheduler stays paused and emails muted. Additive schema and history opt-in were
+applied only to `crm-exolve.localhost`. See [Stage 2](./feats/telephony/stage2.md).
+
+## CRM tasks exposed in Celio — local contract, 2026-10-19
+
+`crm.api.celio_tasks` owns optional Celio task operations. It reads/updates the
+same CRM Task through the native controller, including ToDo and notification
+hooks. There is no mirrored ERP Task, execution handoff or project capability
+added to CRM tasks. Personal My Work scope uses assigned_to=current user.
+
+Read/search/count/update require current CRM Task permission and read access to
+its linked context. Creation offers permitted Lead/Deal contexts; a new assignee
+must be enabled and able to read both CRM Task and its context. Celio membership
+or notification subscription does not grant CRM roles or private customer access.
+
+`save_task(values, mutation_id, name=None, expected_modified=None,
+expected_viewer=None)` accepts only title/description/due_date/priority/assigned_to/
+status, plus context_kind/context_name on create. Updates require the exact saved
+modified revision. Unknown HTTP outcomes reuse the exact operation ID and values;
+CRM Task Operation stores user/task/request hash only and has no ordinary CRUD.
+Replays recheck current source access and return the present permitted task.
+Native assignment changes may update modified after insertion; the response reloads
+that saved revision. Clearing an assignee also cancels its previous native ToDo.
+
+Concurrent source saves serialize on the authenticated User row until commit.
+Only the two top-level CRM/Celio save POST RPCs retry a whole failed transaction,
+up to three attempts for database deadlocks/timeouts. A retry clears cached actor
+permissions and rechecks current access. Embedded server calls leave rollback
+and retry to their own caller. No explicit commit or new schema is introduced.
+Both forms retain the immutable operation after transient/unknown server errors;
+definitive input/access/version rejection permits correction or explicit reload.
+
+`get_task`, `options`, `search_contexts` and `search_people` are source-owned;
+Celio delegates to them. Current permissions filter before list/count/pagination
+and export. Native statuses stay native, with display-only state groups. Minimal
+recipient-scoped realtime invalidation contains no task text; focus/poll/refetch
+preserves local drafts. CRM Task notifications remain CRM source regardless of
+which app saved the task. Nothing is automatically copied into Celio projects.
+
+## Shared EXP Notifications — local contract, 2026-10-19
+
+This contract is implemented locally and has no production release. The server
+service belongs to `exp_theme.notifications`; CRM and One remain independently
+installable. CRM registers `crm.notification_source.make_source` through the
+`exp_notification_sources` hook. No personal notification or read-state copy is
+stored in Theme or One.
+
+- An installed older EXP Theme without the shared notification schema is treated
+  as an unavailable optional service. Native CRM notification creation/updates
+  still work; installing the visual theme does not enable shared delivery.
+- `CRM Notification` remains the canonical record. The adapter checks the
+  recipient, enabled account, current Lead/Deal permission and current linked
+  CRM Task/parent permission before every list, count, read, open and delivery.
+  The native API applies these checks to ordinary notices as well as Messenger.
+  Generic notification writes by ordinary recipients are denied; read actions
+  use the authorized native endpoints.
+- Native `get_notifications()` additionally returns `viewer`, per-row `head`
+  and safe internal `path`, and a 15-minute `snapshot_token` covering all visible
+  unread rows. Existing fields remain. Counts retain Messenger `event_count`
+  weighting, including in Home.
+- `mark_as_read(notification, observed_head=None, expected_viewer=None)` rejects
+  stale heads. Messenger requires an observed head; the existing conversation
+  endpoint still requires the exact loaded `last_event_id`. Both paths retain
+  native read state, clear the read aggregate's `aggregation_key` and leave the
+  conversation unread count and task status unchanged.
+- `mark_all_as_read(limit=500, snapshot_token=None, cursor=0,
+  expected_viewer=None)` returns the same token, next cursor and `has_more`.
+  The updated client reuses one snapshot. New rows and aggregates whose head
+  changed since the snapshot stay unread. A snapshot cannot be used by another
+  account. Old callers omitting a token get a fresh bounded snapshot per call;
+  they must upgrade to the new protocol for the multi-page guarantee.
+- New assignment identity is `crm-assignment:<ToDo.name>:assigned|removed`.
+  The native notification name is an atomic unique hash of event and recipient.
+  Replaying the same ToDo event does not create a second CRM notice or delivery;
+  a later new ToDo assignment has a different identity. No historical rows are
+  renamed or guessed by title/time.
+- The current One delivery category is **new CRM Task assignments**. Lead/Deal
+  assignment history and other accessible native notices appear in Home, but
+  no new One delivery categories are silently enabled. Removal notifications
+  are not delivered as new assignments. Native Notification Log shadows are
+  excluded from the generic platform projection.
+- `crm.api.application_notifications.get_settings()` and `save_settings(...)`
+  delegate to the one common subscription for `source=crm`. Save accepts enabled,
+  sender, push route, expected revision, mutation ID and expected viewer. It
+  never accepts a recipient, arbitrary channel, source, DocType or code. Unknown
+  HTTP outcomes retain the exact mutation for retry; a stale draft requires reload.
+  Home and One display this same record. No CRM mirror preference is introduced.
+- One is optional. Its disabled/unavailable delivery does not remove native
+  CRM history, source panel or other channel preferences. Native read state is
+  independent of chat reads and task completion. Connecting does not backfill.
+
+CRM user settings include **Notification delivery**. The direct route
+`/crm/notification-settings` is also reachable from mobile Notifications. Native
+read counters/settings refresh on recipient realtime, user-scoped BroadcastChannel,
+focus/visibility and a visible-page 15-second poll. RU/EN labels use the existing
+CRM translation mechanism. No sender administration is exposed to ordinary users.
+
+The adapter's generic notification-list scan and real device/PWA delivery have
+not been load/device certified. Existing backend retention of Messenger notices
+is unchanged; this integration adds no historical cleanup or preference migration.
+
+Home's accepted local design adds an optional text-only `presentation` to the
+adapter's authorized rows: actor display name, current task title/description/status
+and the permitted parent title. Task/parent field-level read and mask permissions
+apply before projection. Background calls for a different session user omit these
+additional private display fields. No task, notification, subscription or read-state
+copy is created. Home's new GET preview rechecks the existing adapter access/head
+without marking the source read. Native CRM endpoints and frontend are unchanged.
+
+## Exolve browser calling — local pilot contract
+
+`crm.integrations.exolve.api` exposes manager-only `get_settings`, `save_settings`
+and `test_connection`, and current-mapped-user POST `get_sip_credentials` and
+`sync_calls`. API keys are never returned. SIP credentials are no-store and never
+persisted by the browser transport. Settings map enabled users to unique provider
+SIP resource IDs; the browser cannot choose another user's account.
+
+The additive `CRM Exolve Settings` Singleton owns the Password API key and child
+`CRM Exolve Agent` mappings. `Exolve` is appended to the existing Telephony Agent
+default and Call Log medium choices. The call schema adds immutable provider
+application/call IDs. Existing provider identifiers and history remain unchanged.
+
+The first client connects on explicit user action and uses a memory-only JsSIP
+transport. A card click fills the dialer; Call starts the actual call. The idle
+header has no Exolve launcher; a dismissed active call exposes a compact call
+panel at the bottom right, while the client stays mounted across navigation. Server Call
+Logs come only from authenticated terminal provider statistics for that SIP.
+Reconciliation is limited to 15 minutes/100 rows, deduplicates across transactions,
+retains ready recordings and has one whole-transaction snapshot-conflict retry.
+Import does not trigger paid AI or register a Touch Tracking adapter. Recordings
+are fetched by validated identity from the fixed provider endpoint; credentials
+are dropped before CDN redirects. The Exolve browser route prepares a private
+PCM WAV preview using server ffmpeg, retaining source rate/channels. Current
+access is checked on cache hits as well as initial fetch; previews have 0600
+permissions, bounded conversion, and normal conditional/range responses.
+SIP offers may finish gathering on a public or relay candidate rather than
+waiting for every interface timeout. Full contract and limits:
+[Exolve](./feats/telephony/exolve.md).
+
 ## Table of Contents
 
 1. [Form Script Class Contract](#form-script-class-contract)
