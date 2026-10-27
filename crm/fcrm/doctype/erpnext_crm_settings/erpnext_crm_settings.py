@@ -16,6 +16,13 @@ def _is_erpnext_installed():
 	return "erpnext" in frappe.get_installed_apps()
 
 
+def _use_ru_erp(crm_deal: str):
+	if "ru_erp" not in frappe.get_installed_apps():
+		return False
+	company = frappe.db.get_value("CRM Deal", crm_deal, "custom_ru_selling_company")
+	return bool(company and frappe.db.get_value("Company", company, "custom_ru_enabled"))
+
+
 def _log_and_throw(message: str, title: str | None = None):
 	frappe.log_error(frappe.get_traceback(), title or message)
 	frappe.throw(_(message))
@@ -339,6 +346,10 @@ def get_erpnext_site_client(erpnext_crm_settings):
 
 
 def get_local_customer(crm_deal: str):
+	if _use_ru_erp(crm_deal):
+		from ru_erp.crm import find_customer
+
+		return find_customer(crm_deal)
 	customer = frappe.db.exists("Customer", {"crm_deal": crm_deal})
 	if not customer:
 		customer = frappe.db.get_value("CRM Deal", crm_deal, "erpnext_customer")
@@ -374,6 +385,11 @@ def get_customer_link(crm_deal: str):
 @frappe.whitelist()
 def get_quotation_url(crm_deal: str, organization: str | None = None):
 	erpnext_crm_settings = _get_enabled_settings()
+	frappe.get_doc("CRM Deal", crm_deal).check_permission("read")
+	if not erpnext_crm_settings.is_erpnext_in_different_site and _use_ru_erp(crm_deal):
+		from ru_erp.crm import get_quotation_url as ru_quotation_url
+
+		return ru_quotation_url(crm_deal)
 
 	contact = get_primary_contact(crm_deal)
 	address = get_organization_address(organization)
@@ -448,10 +464,13 @@ def prefill_quotation_items(crm_deal: str):
 	if not frappe.db.exists("CRM Deal", crm_deal):
 		return []
 	deal = frappe.get_doc("CRM Deal", crm_deal)
+	deal.check_permission("read")
 	items = []
+	missing = []
 	for row in deal.products:
 		item_code = frappe.db.get_value("CRM Product", row.product_code, "erpnext_item_code")
 		if not item_code:
+			missing.append(row.product_name or row.product_code)
 			continue
 		items.append(
 			{
@@ -461,6 +480,8 @@ def prefill_quotation_items(crm_deal: str):
 				"discount_percentage": row.discount_percentage or 0,
 			}
 		)
+	if missing:
+		frappe.throw(_("Select an ERP Item for these products: {0}").format(", ".join(missing)))
 	return items
 
 
@@ -567,6 +588,10 @@ def get_deal_from_sales_order(doc):
 
 
 def create_customer_from_deal(doc, erpnext_crm_settings):
+	if not erpnext_crm_settings.is_erpnext_in_different_site and _use_ru_erp(doc.name):
+		from ru_erp.crm import create_customer
+
+		return create_customer(doc.name)
 	contacts = get_contacts(doc)
 	address = get_organization_address(doc.organization)
 

@@ -1,5 +1,6 @@
 <template>
   <ActivityHeader
+    v-if="title != 'Documents'"
     v-model="tabIndex"
     v-model:showWhatsappTemplates="showWhatsappTemplates"
     v-model:showFilesUploader="showFilesUploader"
@@ -11,8 +12,12 @@
     :modalRef="modalRef"
   />
   <FadedScrollableDiv class="flex flex-col h-full overflow-y-auto">
+    <ERPDocuments
+      v-if="doctype == 'CRM Deal' && title == 'Documents'"
+      :deal="docname"
+    />
     <div
-      v-if="all_activities?.loading"
+      v-else-if="all_activities?.loading"
       class="flex flex-1 flex-col items-center justify-center gap-3 text-2xl-medium text-ink-gray-4"
     >
       <LoadingIndicator class="h-6 w-6" />
@@ -458,6 +463,7 @@ import CallArea from '@/components/Activities/CallArea.vue'
 import NoteArea from '@/components/Activities/NoteArea.vue'
 import TaskArea from '@/components/Activities/TaskArea.vue'
 import AttachmentArea from '@/components/Activities/AttachmentArea.vue'
+import ERPDocuments from '@/components/ERPDocuments.vue'
 import DataFields from '@/components/Activities/DataFields.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import ActivityIcon from '@/components/Icons/ActivityIcon.vue'

@@ -571,6 +571,11 @@ usePageMeta(() => {
   }
 })
 
+const erpDocumentsCapabilities = createResource({
+  url: 'crm.api.erp_documents.capabilities',
+  auto: true,
+})
+
 const defaultTabs = computed(() => {
   return [
     {
@@ -617,6 +622,12 @@ const defaultTabs = computed(() => {
       name: 'Attachments',
       label: __('Attachments'),
       icon: AttachmentIcon,
+    },
+    {
+      name: 'Documents',
+      label: 'Документы',
+      icon: AttachmentIcon,
+      condition: () => erpDocumentsCapabilities.data?.enabled,
     },
     {
       name: 'WhatsApp',
