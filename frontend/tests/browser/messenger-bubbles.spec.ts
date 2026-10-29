@@ -195,7 +195,7 @@ for (const platform of ['whatsapp', 'telegram']) {
               140,
             )
       await page.goto(
-        `/tests/browser/messenger-bubbles.html?wazzupMedia=1&case=image-sticker-inferred&platform=${platform}&direction=${direction}&channelLabel=${encodeURIComponent(source)}`,
+        `/tests/browser/messenger-bubbles.html?wazzupMedia=1&case=image-sticker-webp&platform=${platform}&direction=${direction}&channelLabel=${encodeURIComponent(source)}`,
       )
       await page.evaluate(() => {
         document.documentElement.style.zoom = '1.25'
@@ -327,7 +327,7 @@ for (const platform of ['whatsapp', 'telegram']) {
         (await pendingSticker.locator('[data-message-bubble]').boundingBox())!
           .width,
       ).toBeLessThanOrEqual(184)
-      for (const key of ['image-sticker', 'image-sticker-inferred']) {
+      for (const key of ['image-sticker', 'image-sticker-webp']) {
         const container = page.locator(`[data-case="${key}"]`)
         await expect(container.locator('[data-sticker-image]')).toBeVisible()
         await expect(container.locator('[data-sticker-loading]')).toHaveCount(0)
@@ -345,15 +345,18 @@ for (const platform of ['whatsapp', 'telegram']) {
       expect(
         await sticker.evaluate((node) => node.getBoundingClientRect().width),
       ).toBeLessThanOrEqual(160)
-      const inferredSticker = page.locator(
-        '[data-case="image-sticker-inferred"] [data-sticker-attachment]',
+      const webpSticker = page.locator(
+        '[data-case="image-sticker-webp"] [data-sticker-attachment]',
       )
-      await expect(inferredSticker).toBeVisible()
+      await expect(webpSticker).toBeVisible()
       expect(
-        await inferredSticker.evaluate(
+        await webpSticker.evaluate(
           (node) => node.getBoundingClientRect().width,
         ),
       ).toBeLessThanOrEqual(160)
+      const artwork = page.locator('[data-case="transparent-webp-artwork"]')
+      await expect(artwork.locator('[data-single-image]')).toBeVisible()
+      await expect(artwork.locator('[data-sticker-attachment]')).toHaveCount(0)
       const frame = page.locator(
         '[data-case="portrait-video"] [data-video-frame]',
       )
@@ -387,7 +390,7 @@ for (const platform of ['whatsapp', 'telegram']) {
       await expect(portraitFrame.locator('[data-media-backdrop]')).toHaveCount(
         1,
       )
-      for (const key of ['image-sticker', 'image-sticker-inferred']) {
+      for (const key of ['image-sticker', 'image-sticker-webp']) {
         const container = page.locator(`[data-case="${key}"]`)
         await expect(container.locator('[data-sticker-loading]')).toHaveCount(0)
         await expect(container.locator('[data-sticker-fallback]')).toHaveCount(

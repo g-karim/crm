@@ -56,6 +56,8 @@ const constrainMetadata = new Function(
 )(...Object.values(sizingBindings))
 const picture = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="380" height="380"><rect width="380" height="380" fill="#334155"/><rect x="24" y="30" width="332" height="28" fill="#64748b"/><rect x="24" y="80" width="240" height="18" fill="#94a3b8"/><rect x="24" y="120" width="300" height="200" fill="#475569"/></svg>')}`
 const portraitPicture = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="900"><rect width="100" height="900" fill="#334155"/></svg>')}`
+const transparentWebpPicture =
+  'data:image/webp;base64,UklGRjwAAABXRUJQVlA4TC8AAAAv/8F/EA8wgmM0tEMb8FDUtpE0wx/0vK5dAo7o/wQE//f1ffIf//Ef//Ef/x25PQA='
 const file = (
   title = 'ТПР-1-23_Хайруллин_Ильназ_Документ_с_длинным_названием_для_проверки.pdf',
 ) => ({
@@ -339,9 +341,21 @@ const wazzupCases = [
     ],
   },
   {
-    key: 'image-sticker-inferred',
+    key: 'image-sticker-webp',
     attachments: [
-      image('STICKER-INFERRED', {
+      image('STICKER-WEBP', {
+        type: 'sticker',
+        mime_type: 'image/webp',
+      }),
+    ],
+  },
+  {
+    key: 'transparent-webp-artwork',
+    attachments: [
+      image('WEBP-ARTWORK', {
+        url: transparentWebpPicture,
+        width: 512,
+        height: 512,
         mime_type: 'image/webp',
         is_sticker_candidate: true,
       }),
@@ -351,12 +365,12 @@ const wazzupCases = [
     key: 'image-sticker-pending',
     attachments: [
       image('STICKER-PENDING', {
+        type: 'sticker',
         status: 'pending',
         url: null,
         width: null,
         height: null,
         mime_type: 'image/webp',
-        is_sticker_candidate: true,
       }),
     ],
   },
@@ -515,7 +529,6 @@ const app = createApp({
                     constrainIntrinsicWidth: constrainMetadata({ message }),
                     wrapSource: attachments.isSingleStickerAttachmentSet(
                       message.attachments,
-                      message.provider,
                     ),
                   }),
                   message.reply_context &&

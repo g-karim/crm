@@ -415,6 +415,11 @@ for (const platform of ['whatsapp', 'telegram']) {
     const authenticatedDownload = await page.request.get(downloadUrl)
     expect(authenticatedDownload.ok()).toBeTruthy()
     expect((await authenticatedDownload.body()).equals(bytes)).toBe(true)
+    const disposition = authenticatedDownload.headers()['content-disposition']
+    expect(disposition).toMatch(/^attachment; filename\*=UTF-8''/)
+    expect(decodeURIComponent(disposition.split("UTF-8''")[1])).toBe(
+      fixture.file_name,
+    )
     const guest = await playwrightRequest.newContext({
       baseURL: fixture.base_url,
     })
