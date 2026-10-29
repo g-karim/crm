@@ -68,7 +68,9 @@ async function incoming(
   channel: string,
   platform: string,
   text: string,
-  chatId = platform === 'whatsapp' ? '79990000002' : '900000002',
+  chatId = ['whatsapp', 'viber'].includes(platform)
+    ? '79990000002'
+    : '900000002',
 ) {
   const bench = process.env.WAZZUP_PARTNER_E2E_BENCH
   const site = process.env.WAZZUP_PARTNER_E2E_SITE
@@ -541,6 +543,8 @@ async function exerciseFirstOutbound(
 for (const [label, platform] of [
   ['WhatsApp', 'whatsapp'],
   ['Telegram personal chats', 'telegram'],
+  ['MAX personal chats', 'max'],
+  ['Viber', 'viber'],
 ]) {
   test(`${label}: shared channel modal, QR/2FA and real incoming/outgoing messages`, async ({
     page,
@@ -566,13 +570,15 @@ for (const [label, platform] of [
     })
     await expect(dialog).toBeVisible()
     await page.getByRole('combobox', { name: /^Provider/ }).click()
-    await expect(page.getByRole('option')).toHaveCount(6)
+    await expect(page.getByRole('option')).toHaveCount(8)
     expect(await page.getByRole('option').allTextContents()).toEqual([
       'WhatsApp',
       'Telegram personal chats',
+      'MAX personal chats',
+      'Viber',
       'Telegram Bot',
       'VK',
-      'MAX',
+      'MAX bot',
       'Avito',
     ])
     await page.getByRole('option', { name: label, exact: true }).click()
@@ -893,32 +899,34 @@ for (const [label, platform] of [
     })
     expect(await conversations()).toHaveLength(1)
     await expect(page.getByText(outboundText, { exact: true })).toHaveCount(1)
-    const orders: FirstPhase[][] =
-      platform === 'whatsapp'
-        ? [['http', 'status', 'echo']]
-        : [
-            ['http', 'status', 'echo'],
-            ['http', 'echo', 'status'],
-            ['status', 'http', 'echo'],
-            ['status', 'echo', 'http'],
-            ['echo', 'http', 'status'],
-            ['echo', 'status', 'http'],
-          ]
-    for (const order of orders) {
-      await test.step(`First outbound: ${order.join(' → ')}`, async () => {
-        await firstOutbound(page, testInfo, platform, name, order)
+    if (['whatsapp', 'telegram'].includes(platform)) {
+      const orders: FirstPhase[][] =
+        platform === 'whatsapp'
+          ? [['http', 'status', 'echo']]
+          : [
+              ['http', 'status', 'echo'],
+              ['http', 'echo', 'status'],
+              ['status', 'http', 'echo'],
+              ['status', 'echo', 'http'],
+              ['echo', 'http', 'status'],
+              ['echo', 'status', 'http'],
+            ]
+      for (const order of orders) {
+        await test.step(`First outbound: ${order.join(' → ')}`, async () => {
+          await firstOutbound(page, testInfo, platform, name, order)
+        })
+      }
+      await test.step('Temporary null echo followed by the exact late chat identity', async () => {
+        await firstOutbound(
+          page,
+          testInfo,
+          platform,
+          name,
+          ['echo', 'status', 'http'],
+          true,
+        )
       })
     }
-    await test.step('Temporary null echo followed by the exact late chat identity', async () => {
-      await firstOutbound(
-        page,
-        testInfo,
-        platform,
-        name,
-        ['echo', 'status', 'http'],
-        true,
-      )
-    })
 
     await test.step('Disconnect preserves history and the other channel; restore keeps authorization', async () => {
       async function history() {

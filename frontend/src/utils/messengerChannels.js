@@ -8,6 +8,7 @@ const PLATFORM_LABELS = {
   telegram: 'Telegram',
   vk: 'VK',
   max: 'MAX',
+  viber: 'Viber',
 }
 
 const DELIVERY_LABELS = {

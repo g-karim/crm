@@ -9636,3 +9636,30 @@ msgstr "За этим сайтом уже закреплён аккаунт Wazz
 
 msgid "This site has conflicting Wazzup Account assignments."
 msgstr "Обнаружены конфликтующие привязки аккаунтов Wazzup к этому сайту."
+
+msgid "MAX personal chats"
+msgstr "MAX (личный)"
+
+msgid "MAX bot"
+msgstr "MAX бот"
+
+msgid "Viber"
+msgstr "Viber"
+
+msgid "Select a supported personal messaging platform."
+msgstr "Выберите поддерживаемый личный мессенджер."
+
+msgid "This channel is not waiting for two-factor authentication."
+msgstr "Этот канал не ожидает дополнительной авторизации."
+
+msgid "Enter a valid two-factor authentication code."
+msgstr "Введите корректный код дополнительной авторизации."
+
+msgid "This channel transport is not supported."
+msgstr "Этот мессенджер не поддерживается каналом."
+
+msgid "This lead has no valid phone number."
+msgstr "У лида не указан корректный номер телефона."
+
+msgid "Select a supported personal Wazzup channel."
+msgstr "Выберите поддерживаемый личный канал Wazzup."

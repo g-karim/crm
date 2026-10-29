@@ -1,5 +1,7 @@
 import {
   isWazzupPartnerChannel,
+  WAZZUP_PARTNER_TRANSPORTS,
+  wazzupPartnerTransport,
   wazzupPartnerStatus,
 } from '@/utils/wazzupPartnerConnection'
 
@@ -13,19 +15,20 @@ export const DIRECT_MESSENGER_PROVIDERS = [
 export const MESSENGER_PROVIDER_OPTIONS = [
   { label: 'Telegram Bot', value: 'telegram_bot' },
   { label: 'VK', value: 'vk_direct' },
-  { label: 'MAX', value: 'max_direct' },
+  { label: 'MAX bot', value: 'max_direct' },
   { label: 'Avito', value: 'avito_direct' },
   { label: 'Wazzup', value: 'wazzup' },
 ]
 
 export function messengerChannelCreationOptions(legacyEnabled = false) {
   return [
-    { label: 'WhatsApp', value: 'partner_whatsapp', platform: 'whatsapp' },
-    {
-      label: 'Telegram personal chats',
-      value: 'partner_telegram',
-      platform: 'telegram',
-    },
+    ...Object.entries(WAZZUP_PARTNER_TRANSPORTS).map(
+      ([platform, transport]) => ({
+        label: transport.label,
+        value: `partner_${platform}`,
+        platform,
+      }),
+    ),
     ...MESSENGER_PROVIDER_OPTIONS.filter(
       (option) => option.value !== 'wazzup' || legacyEnabled,
     ).map((option) => ({
@@ -52,8 +55,10 @@ export function isDirectMessengerProvider(provider) {
 }
 
 export function messengerProviderLabel(provider) {
-  if (provider === 'partner_whatsapp') return 'WhatsApp'
-  if (provider === 'partner_telegram') return 'Telegram personal chats'
+  if (provider?.startsWith('partner_')) {
+    const transport = wazzupPartnerTransport(provider.slice('partner_'.length))
+    if (transport) return transport.label
+  }
   return (
     MESSENGER_PROVIDER_OPTIONS.find((option) => option.value === provider)
       ?.label || provider

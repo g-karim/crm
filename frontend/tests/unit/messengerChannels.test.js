@@ -61,6 +61,7 @@ describe('messengerChannels', () => {
     ).toBe('Telegram')
     expect(getMessengerPlatformLabel({ platform: 'vk' })).toBe('VK')
     expect(getMessengerPlatformLabel({ platform: 'max' })).toBe('MAX')
+    expect(getMessengerPlatformLabel({ platform: 'viber' })).toBe('Viber')
   })
 
   it('humanizes custom platform labels', () => {

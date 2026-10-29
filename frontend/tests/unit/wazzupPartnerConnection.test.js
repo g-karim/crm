@@ -154,7 +154,7 @@ describe('embedded Partner connection state and actions', () => {
     expect(mocks.call).not.toHaveBeenCalled()
   })
 
-  it.each(['whatsapp', 'telegram'])(
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
     'starts the selected %s platform without a manual provider UUID or API key',
     async (platform) => {
       mocks.call.mockResolvedValue(
@@ -202,38 +202,45 @@ describe('embedded Partner connection state and actions', () => {
     )
     expect(root.querySelector('[data-wazzup-qr]')).not.toBeNull()
   })
-  it('connects WhatsApp, displays QR and becomes active without emitting QR in the public channel', async () => {
-    mocks.call.mockImplementation(async (method) =>
-      method === 'simulator_scan' ? result('active') : result(),
-    )
-    const { root, updated } = await mount()
-    await start(root)
-    expect(mocks.call.mock.calls[0]).toEqual([
-      'start_connection',
-      {
-        platform: 'whatsapp',
-        custom_display_name: '',
-        client_request_id: expect.any(String),
-      },
-    ])
-    expect(root.querySelector('[data-wazzup-qr]').getAttribute('src')).toBe(PNG)
-    expect(updated.mock.lastCall[0].wazzup_status).toBe('waiting_qr')
-    expect(root.textContent).toContain('Use the simulator button below')
-    expect(root.textContent).not.toContain(
-      'Scan this QR code in the messenger app.',
-    )
-    expect(JSON.stringify(updated.mock.calls)).not.toContain(PNG)
-    await click(root, 'Simulate QR scan')
-    expect(mocks.call).toHaveBeenCalledWith('simulator_scan', {
-      channel: 'PARTNER-1',
-      require_2fa: false,
-    })
-    expect(root.textContent).not.toContain(
-      'The messenger account is connected.',
-    )
-    expect(root.querySelector('[data-wazzup-qr]')).toBeNull()
-    expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
-  })
+  it.each(['whatsapp', 'max', 'viber'])(
+    'connects %s with QR and no default password request',
+    async (platform) => {
+      mocks.call.mockImplementation(async (method) =>
+        method === 'simulator_scan'
+          ? result('active', { channel: { platform } })
+          : result('waiting_qr', { channel: { platform } }),
+      )
+      const { root, updated } = await mount(null, { platform })
+      await start(root)
+      expect(mocks.call.mock.calls[0]).toEqual([
+        'start_connection',
+        {
+          platform,
+          custom_display_name: '',
+          client_request_id: expect.any(String),
+        },
+      ])
+      expect(root.querySelector('[data-wazzup-qr]').getAttribute('src')).toBe(
+        PNG,
+      )
+      expect(updated.mock.lastCall[0].wazzup_status).toBe('waiting_qr')
+      expect(root.textContent).toContain('Use the simulator button below')
+      expect(root.textContent).not.toContain(
+        'Scan this QR code in the messenger app.',
+      )
+      expect(JSON.stringify(updated.mock.calls)).not.toContain(PNG)
+      await click(root, 'Simulate QR scan')
+      expect(mocks.call).toHaveBeenCalledWith('simulator_scan', {
+        channel: 'PARTNER-1',
+        require_2fa: false,
+      })
+      expect(root.textContent).not.toContain(
+        'The messenger account is connected.',
+      )
+      expect(root.querySelector('[data-wazzup-qr]')).toBeNull()
+      expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+    },
+  )
 
   it('handles Telegram 2FA, clears password after rejection and after success', async () => {
     let submits = 0
@@ -286,27 +293,55 @@ describe('embedded Partner connection state and actions', () => {
     expect(root.textContent).not.toContain('correct-private-password')
   })
 
-  it('uses server capabilities for real Telegram 2FA and hides simulator controls', async () => {
-    mocks.call.mockImplementation(async (method) =>
-      result(method === 'submit_2fa' ? 'active' : 'waiting_2fa', {
-        simulator: false,
-        channel: { platform: 'telegram' },
-      }),
-    )
-    const { root } = await mount({
-      name: 'PARTNER-1',
-      platform: 'telegram',
-      wazzup_status: 'waiting_2fa',
-    })
-    expect(root.textContent).not.toContain('Local simulator')
-    await edit(root, 'Two-factor authentication password', 'fixture-2fa')
-    await click(root, 'Submit password')
-    expect(mocks.call).toHaveBeenCalledWith('submit_2fa', {
-      channel: 'PARTNER-1',
-      password: 'fixture-2fa',
-    })
-    expect(root.querySelector('[data-wazzup-2fa]')).toBeNull()
-    expect(root.textContent).not.toContain('fixture-2fa')
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
+    'uses server capabilities for conditional %s 2FA and hides simulator controls',
+    async (platform) => {
+      mocks.call.mockImplementation(async (method) =>
+        result(method === 'submit_2fa' ? 'active' : 'waiting_2fa', {
+          simulator: false,
+          channel: { platform },
+        }),
+      )
+      const { root } = await mount({
+        name: 'PARTNER-1',
+        platform,
+        wazzup_status: 'waiting_2fa',
+      })
+      expect(root.textContent).not.toContain('Local simulator')
+      await edit(root, 'Two-factor authentication password', 'fixture-2fa')
+      await click(root, 'Submit password')
+      expect(mocks.call).toHaveBeenCalledWith('submit_2fa', {
+        channel: 'PARTNER-1',
+        password: 'fixture-2fa',
+      })
+      expect(root.querySelector('[data-wazzup-2fa]')).toBeNull()
+      expect(root.textContent).not.toContain('fixture-2fa')
+    },
+  )
+
+  it.each(['max', 'viber'])(
+    'does not request a %s password without server permission',
+    async (platform) => {
+      mocks.call.mockResolvedValue(
+        result('waiting_2fa', {
+          channel: { platform },
+          onboarding: { can_submit_2fa: false },
+        }),
+      )
+      const { root } = await mount({ name: 'PARTNER-1', platform })
+      expect(root.querySelector('[data-wazzup-2fa]')).toBeNull()
+      expect(root.textContent).not.toContain('Submit password')
+      expect(mocks.call).not.toHaveBeenCalledWith(
+        'submit_2fa',
+        expect.anything(),
+      )
+    },
+  )
+
+  it('rejects an unsupported platform before starting a channel instead of defaulting to WhatsApp', async () => {
+    const { root } = await mount(null, { platform: 'unsupported' })
+    await start(root)
+    expect(mocks.call).not.toHaveBeenCalled()
   })
 
   it('disables expired QR renewal when real mutations are not authorized', async () => {
