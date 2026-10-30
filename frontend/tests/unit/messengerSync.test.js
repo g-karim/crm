@@ -222,6 +222,90 @@ describe('messenger sync', () => {
     },
   )
 
+  it.each(['telegram', 'max'])(
+    'moves a pending Wazzup %s send only after an exact source timestamp arrives',
+    async (platform) => {
+      let queued = {
+        name: 'CRM-SEND',
+        provider: 'wazzup',
+        platform,
+        direction: 'outbound',
+        status: 'accepted',
+        message_datetime: '2026-10-30 12:00:18',
+        creation: '2026-10-30 12:00:18.000001',
+        modified: '2026-10-30 12:00:19.000001',
+      }
+      let inbound = {
+        ...queued,
+        name: 'INBOUND',
+        direction: 'inbound',
+        status: 'received',
+        message_datetime: '2026-10-30 12:00:22',
+        creation: '2026-10-30 12:00:25.000001',
+      }
+      let sent = {
+        ...queued,
+        status: 'sent',
+        modified: '2026-10-30 12:01:00.000001',
+      }
+      let exactEcho = {
+        ...sent,
+        message_datetime: '2026-10-30 12:00:24',
+        provider_created_at: '2026-10-30 12:00:24',
+        sent_at: '2026-10-30 12:00:24',
+        modified: '2026-10-30 12:01:30.000001',
+      }
+      let updates = [sent, exactEcho, sent]
+      let snapshots = 0
+      let harness = createHarness({
+        get_message_page: () =>
+          snapshot([snapshots++ ? exactEcho : queued, inbound]),
+        get_message_changes: () => delta([updates.shift()]),
+      })
+
+      await harness.controller.start('LEAD-1')
+      await harness.controller.syncDelta()
+      expect(harness.controller.getMessages()).toEqual([sent, inbound])
+      await harness.controller.syncDelta()
+      expect(harness.controller.getMessages()).toEqual([inbound, exactEcho])
+      expect(harness.changes.at(-1).updated).toEqual(['CRM-SEND'])
+      expect(harness.changes.at(-1).inserted).toEqual([])
+      await harness.controller.syncDelta()
+      await harness.controller.loadSnapshot()
+      expect(harness.controller.getMessages()).toEqual([inbound, exactEcho])
+      harness.controller.stop()
+    },
+  )
+
+  it('keeps personal Telegram provisional sends before later arrivals in the same source second', () => {
+    let queued = {
+      name: 'CRM-SEND',
+      provider: 'wazzup',
+      platform: 'telegram',
+      direction: 'outbound',
+      status: 'accepted',
+      message_datetime: '2026-10-30 12:00:00',
+      creation: '2026-10-30 12:00:00.500000',
+      modified: '2026-10-30 12:00:00.600000',
+    }
+    let inbound = {
+      ...queued,
+      name: 'INBOUND',
+      direction: 'inbound',
+      status: 'received',
+      provider_created_at: '2026-10-30 12:00:00',
+      creation: '2026-10-30 12:00:00.900000',
+    }
+    let sent = {
+      ...queued,
+      status: 'sent',
+      modified: '2026-10-30 12:01:00.000000',
+    }
+    let merged = mergeMessengerMessages([inbound, queued], [sent])
+    expect(merged.messages).toEqual([sent, inbound])
+    expect(merged.messages[0].provider_created_at).toBeUndefined()
+  })
+
   it('merges an exact unloaded reply target through the shared ordering path', () => {
     let harness = createHarness()
     let older = {

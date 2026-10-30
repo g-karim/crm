@@ -30,7 +30,9 @@ const REPLY_ATTACHMENT_TYPE_ALIASES = {
 
 const REPLY_ATTACHMENT_LABELS = {
   image: ['Image', 'Images'],
+  animation: ['Animation', 'Animations'],
   video: ['Video', 'Videos'],
+  video_note: ['Video message', 'Video messages'],
   audio: ['Audio', 'Audio files'],
   voice: ['Voice message', 'Voice messages'],
   file: ['Document', 'Documents'],
@@ -43,7 +45,9 @@ const REPLY_ATTACHMENT_LABELS = {
 
 const ATTACHMENT_TITLES = {
   image: 'Image',
+  animation: 'Animation',
   video: 'Video',
+  video_note: 'Video message',
   audio: 'Audio',
   voice: 'Voice message',
   file: 'File',
@@ -98,8 +102,33 @@ export function getMessengerReplyAttachmentLabel(snapshot = {}) {
   return labels[attachmentTypes.length > 1 ? 1 : 0]
 }
 
+export function getMessengerReplyAttachmentType(attachment = {}) {
+  if (Object.hasOwn(REPLY_ATTACHMENT_LABELS, attachment.semantic_type))
+    return attachment.semantic_type
+  if (attachment.type === 'sticker') return 'sticker'
+  if (attachment.is_voice) return 'voice'
+  if (attachment.type === 'video' && attachment.is_animated) return 'animation'
+  if (
+    attachment.type === 'image' &&
+    attachment.is_animated &&
+    ['image/gif', 'image/webp', 'image/apng', 'image/png'].includes(
+      attachment.mime_type,
+    )
+  ) {
+    return 'animation'
+  }
+  return attachment.type
+}
+
 export function getMessengerAttachmentTitle(attachment = {}) {
   let provider = attachment.provider || ''
+  if (
+    provider === 'wazzup' &&
+    attachment.type === 'file' &&
+    attachment.original_file_name
+  ) {
+    return String(attachment.original_file_name)
+  }
   let genericFileTitle =
     attachment.type === 'file' &&
     /^(?:file|файл|document|документ|attachment|вложение)$/iu.test(
@@ -188,14 +217,6 @@ export function groupMessengerAttachments(attachments = []) {
 export function buildMessengerAttachmentSegments(attachments = []) {
   let segments = []
   attachments.forEach((attachment, index) => {
-    if (isCompactWazzupStickerImage(attachment)) {
-      segments.push({
-        type: 'sticker',
-        key: `${attachment.id || 'sticker-image'}-${index}`,
-        attachment,
-      })
-      return
-    }
     if (
       attachment?.is_animated &&
       ['image', 'video'].includes(attachment?.type)
@@ -234,25 +255,8 @@ export function isSingleImageAttachmentSet(attachments = []) {
   return attachments.length === 1 && attachments[0]?.type === 'image'
 }
 
-export function isCompactWazzupStickerImage(attachment = {}, provider = '') {
-  // This media hint changes presentation only: Wazzup does not
-  // distinguish static WhatsApp stickers from ordinary images in its DTO.
-  if (!attachment) return false
-  return Boolean(
-    (provider || attachment.provider) === 'wazzup' &&
-      attachment.type === 'image' &&
-      attachment.mime_type === 'image/webp' &&
-      attachment.is_sticker_candidate &&
-      !attachment.is_animated,
-  )
-}
-
-export function isSingleStickerAttachmentSet(attachments = [], provider = '') {
-  return (
-    attachments.length === 1 &&
-    (attachments[0]?.type === 'sticker' ||
-      isCompactWazzupStickerImage(attachments[0], provider))
-  )
+export function isSingleStickerAttachmentSet(attachments = []) {
+  return attachments.length === 1 && attachments[0]?.type === 'sticker'
 }
 
 export function isSingleLocationAttachmentSet(attachments = []) {
@@ -333,6 +337,8 @@ export function getAttachmentState(attachment = {}) {
 
 export function getAttachmentAction(attachment = {}) {
   if (!getAttachmentState(attachment).active) return ''
+  if (attachment.type === 'file' && attachment.download_url)
+    return attachment.download_url
   return attachment.open_url || attachment.url || attachment.download_url || ''
 }
 

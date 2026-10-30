@@ -188,8 +188,10 @@ describe('message reply quote', () => {
 
   it.each([
     ['image', 'Image'],
+    ['animation', 'Animation'],
     ['photo', 'Image'],
     ['video', 'Video'],
+    ['video_note', 'Video message'],
     ['audio', 'Audio'],
     ['audio_message', 'Voice message'],
     ['voice', 'Voice message'],
@@ -215,8 +217,10 @@ describe('message reply quote', () => {
 
   it.each([
     ['image', 'Images'],
+    ['animation', 'Animations'],
     ['photo', 'Images'],
     ['video', 'Videos'],
+    ['video_note', 'Video messages'],
     ['audio_message', 'Voice messages'],
     ['voice', 'Voice messages'],
     ['doc', 'Documents'],

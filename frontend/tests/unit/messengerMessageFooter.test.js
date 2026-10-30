@@ -136,6 +136,74 @@ describe('message footer metadata', () => {
     },
   )
 
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
+    'shows only the time for unconfirmed historical %s delivery',
+    (platform) => {
+      for (let ingestSource of ['provider_history', 'provider_webhook']) {
+        let root = mountComponent(MessageFooterMetadata, {
+          message: message({
+            provider: 'wazzup',
+            direction: 'outbound',
+            status: 'accepted',
+            delivery_status: 'accepted',
+            channel_info: { wazzup_api_mode: 'partner_api_v2', platform },
+            ingest_source: ingestSource,
+            last_update_source: 'attachment_job',
+            external_message_id: 'PROVIDER-OLD-1',
+            provider_status: 'accepted',
+            attempt_count: 0,
+            is_edited: 0,
+          }),
+        })
+
+        expect(footerOrder(root)).toEqual(['time'])
+        expect(root.querySelector('[data-message-time]').textContent).toBe(
+          '20:04',
+        )
+        expect(root.querySelector('[data-message-delivery]')).toBeNull()
+        expect(root.querySelector('svg')).toBeNull()
+      }
+    },
+  )
+
+  it('shows late confirmed delivery for a historical Wazzup message', async () => {
+    let outbound = reactive(
+      message({
+        provider: 'wazzup',
+        direction: 'outbound',
+        status: 'accepted',
+        delivery_status: 'accepted',
+        channel_info: { wazzup_api_mode: 'partner_api_v2', platform: 'max' },
+        ingest_source: 'provider_history',
+        external_message_id: 'PROVIDER-OLD-1',
+        is_edited: 0,
+      }),
+    )
+    let root = mountComponent(MessageFooterMetadata, { message: outbound })
+    expect(root.querySelector('[data-message-delivery]')).toBeNull()
+
+    for (let status of ['sent', 'delivered', 'read']) {
+      Object.assign(outbound, {
+        status,
+        delivery_status: status,
+        provider_status: status,
+      })
+      await nextTick()
+
+      let delivery = root.querySelector('[data-message-delivery]')
+      expect(delivery).not.toBeNull()
+      expect(delivery.querySelector('svg')).not.toBeNull()
+      expect(delivery.querySelector('.lucide-clock-3')).toBeNull()
+      expect(delivery.closest('[data-test-tooltip]').title).toBe(
+        {
+          sent: 'Sent',
+          delivered: 'Delivered',
+          read: 'Read by recipient',
+        }[status],
+      )
+    }
+  })
+
   it('waits for Wazzup provider status before showing the sent check', async () => {
     let outbound = reactive(
       message({

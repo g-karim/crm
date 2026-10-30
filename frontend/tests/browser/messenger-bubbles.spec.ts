@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 
 declare global {
   interface Window {
@@ -15,6 +16,72 @@ test.beforeEach(async ({ page }) => {
     return url.hostname === '127.0.0.1' ? route.continue() : route.abort()
   })
 })
+
+for (const platform of ['whatsapp', 'telegram']) {
+  test(`Wazzup ${platform} saved document click preserves the download filename`, async ({
+    page,
+    context,
+  }, testInfo) => {
+    test.setTimeout(60000)
+    const downloadPath = '/api/method/crm_messenger.api.attachments.download'
+    const streamPath = '/api/method/crm_messenger.api.attachments.stream'
+    const filename = 'Исходный договор.docx'
+    const content = Buffer.from('Synthetic saved document bytes')
+    const requests: string[] = []
+    // AttachmentCard opens a new tab. Intercept at context level so its first
+    // navigation is also a local fixture, without any site or provider I/O.
+    await page.unrouteAll()
+    await context.route('**/*', async (route) => {
+      const url = new URL(route.request().url())
+      if (url.hostname !== '127.0.0.1') return route.abort()
+      if ([downloadPath, streamPath].includes(url.pathname)) {
+        requests.push(url.pathname)
+        const name =
+          url.pathname === downloadPath
+            ? filename
+            : '0123456789abcdef0123456789abcdef01234567'
+        return route.fulfill({
+          status: 200,
+          headers: {
+            'Content-Type':
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+          },
+          body: content,
+        })
+      }
+      if (url.pathname.startsWith('/api/')) return route.abort()
+      return route.continue()
+    })
+    await page.goto(
+      `/tests/browser/messenger-bubbles.html?wazzupMedia=1&case=saved-document-download&platform=${platform}&direction=inbound`,
+      { waitUntil: 'domcontentloaded' },
+    )
+    const card = page.locator('[data-attachment-card]')
+    await expect(card).toHaveAttribute(
+      'href',
+      `${downloadPath}?attachment=SAVED-DOCUMENT`,
+    )
+    await expect(card.locator('[data-attachment-card-title]')).toHaveText(
+      filename,
+    )
+    await page.evaluate(() => window.messengerMediaFixture.delta())
+    await page.evaluate(() => window.messengerMediaFixture.refresh())
+    for (const phase of ['refresh', 'reload']) {
+      if (phase === 'reload')
+        await page.reload({ waitUntil: 'domcontentloaded' })
+      const downloadEvent = page.waitForEvent('download')
+      await card.click()
+      const download = await downloadEvent
+      expect(new URL(download.url()).pathname).toBe(downloadPath)
+      expect(download.suggestedFilename()).toBe(filename)
+      const savedPath = testInfo.outputPath(phase, filename)
+      await download.saveAs(savedPath)
+      expect(await readFile(savedPath)).toEqual(content)
+    }
+    expect(requests).toEqual([downloadPath, downloadPath])
+  })
+}
 
 test('sizes a document with two images by its content', async ({
   page,
@@ -195,7 +262,7 @@ for (const platform of ['whatsapp', 'telegram']) {
               140,
             )
       await page.goto(
-        `/tests/browser/messenger-bubbles.html?wazzupMedia=1&case=image-sticker-inferred&platform=${platform}&direction=${direction}&channelLabel=${encodeURIComponent(source)}`,
+        `/tests/browser/messenger-bubbles.html?wazzupMedia=1&case=image-sticker-webp&platform=${platform}&direction=${direction}&channelLabel=${encodeURIComponent(source)}`,
       )
       await page.evaluate(() => {
         document.documentElement.style.zoom = '1.25'
@@ -327,7 +394,7 @@ for (const platform of ['whatsapp', 'telegram']) {
         (await pendingSticker.locator('[data-message-bubble]').boundingBox())!
           .width,
       ).toBeLessThanOrEqual(184)
-      for (const key of ['image-sticker', 'image-sticker-inferred']) {
+      for (const key of ['image-sticker', 'image-sticker-webp']) {
         const container = page.locator(`[data-case="${key}"]`)
         await expect(container.locator('[data-sticker-image]')).toBeVisible()
         await expect(container.locator('[data-sticker-loading]')).toHaveCount(0)
@@ -345,15 +412,18 @@ for (const platform of ['whatsapp', 'telegram']) {
       expect(
         await sticker.evaluate((node) => node.getBoundingClientRect().width),
       ).toBeLessThanOrEqual(160)
-      const inferredSticker = page.locator(
-        '[data-case="image-sticker-inferred"] [data-sticker-attachment]',
+      const webpSticker = page.locator(
+        '[data-case="image-sticker-webp"] [data-sticker-attachment]',
       )
-      await expect(inferredSticker).toBeVisible()
+      await expect(webpSticker).toBeVisible()
       expect(
-        await inferredSticker.evaluate(
+        await webpSticker.evaluate(
           (node) => node.getBoundingClientRect().width,
         ),
       ).toBeLessThanOrEqual(160)
+      const artwork = page.locator('[data-case="transparent-webp-artwork"]')
+      await expect(artwork.locator('[data-single-image]')).toBeVisible()
+      await expect(artwork.locator('[data-sticker-attachment]')).toHaveCount(0)
       const frame = page.locator(
         '[data-case="portrait-video"] [data-video-frame]',
       )
@@ -387,7 +457,7 @@ for (const platform of ['whatsapp', 'telegram']) {
       await expect(portraitFrame.locator('[data-media-backdrop]')).toHaveCount(
         1,
       )
-      for (const key of ['image-sticker', 'image-sticker-inferred']) {
+      for (const key of ['image-sticker', 'image-sticker-webp']) {
         const container = page.locator(`[data-case="${key}"]`)
         await expect(container.locator('[data-sticker-loading]')).toHaveCount(0)
         await expect(container.locator('[data-sticker-fallback]')).toHaveCount(
@@ -428,4 +498,50 @@ for (const platform of ['whatsapp', 'telegram']) {
       })
     })
   }
+}
+
+for (const platform of ['whatsapp', 'telegram', 'max', 'viber']) {
+  test(`Wazzup ${platform} static and animated stickers keep the same compact frame`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 400, height: 900 })
+    await page.goto(
+      `/tests/browser/messenger-bubbles.html?wazzupMedia=1&platform=${platform}`,
+    )
+    for (const [key, mediaSelector] of [
+      ['image-sticker-webp', '[data-sticker-image]'],
+      ['animated-image-sticker', '[data-sticker-image]'],
+      ['video-sticker', '[data-sticker-video]'],
+      ['tgs', 'svg[viewBox="0 0 64 64"]'],
+    ]) {
+      const container = page.locator(`[data-case="${key}"]`)
+      const frame = container.locator('[data-sticker-attachment]')
+      await expect(frame.locator(mediaSelector)).toBeVisible()
+      await expect(container.locator('[data-sticker-fallback]')).toHaveCount(0)
+      await expect(container.locator('[data-sticker-loading]')).toHaveCount(0)
+      await expect(container.locator('[data-single-image]')).toHaveCount(0)
+      await expect(container.locator('[data-animated-media]')).toHaveCount(0)
+      const bounds = (await frame.boundingBox())!
+      expect(bounds.width).toBe(160)
+      expect(bounds.height).toBe(160)
+      expect(
+        (await container.locator('[data-message-bubble]').boundingBox())!.width,
+      ).toBeLessThanOrEqual(184)
+    }
+    const video = page.locator('[data-case="video-sticker"] video')
+    await expect
+      .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
+      .toBeGreaterThanOrEqual(2)
+    expect(
+      await video.evaluate((node: HTMLVideoElement) => ({
+        autoplay: node.autoplay,
+        loop: node.loop,
+        muted: node.muted,
+        controls: node.controls,
+      })),
+    ).toEqual({ autoplay: true, loop: true, muted: true, controls: false })
+    const artwork = page.locator('[data-case="transparent-webp-artwork"]')
+    await expect(artwork.locator('[data-single-image]')).toBeVisible()
+    await expect(artwork.locator('[data-sticker-attachment]')).toHaveCount(0)
+  })
 }

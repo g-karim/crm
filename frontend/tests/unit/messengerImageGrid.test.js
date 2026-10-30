@@ -523,7 +523,7 @@ describe('messenger image layout', () => {
   })
 
   it.each([false, true])(
-    'reuses the compact sticker view for a decoded Wazzup WebP with compact preview %s',
+    'keeps transparent WebP artwork in the image view with compact preview %s',
     (compactPreview) => {
       let root = mountRenderer(
         [
@@ -537,12 +537,8 @@ describe('messenger image layout', () => {
         { provider: 'wazzup', compactPreview },
       )
       let sticker = root.querySelector('[data-sticker-attachment]')
-      expect(sticker).not.toBeNull()
-      expect(sticker.className).toContain('size-40')
-      expect(root.querySelector('[data-single-image]')).toBeNull()
-      expect(
-        root.querySelector('[data-attachment-renderer]').className,
-      ).toContain('w-fit')
+      expect(sticker).toBeNull()
+      expect(root.querySelector('[data-single-image]')).not.toBeNull()
     },
   )
 

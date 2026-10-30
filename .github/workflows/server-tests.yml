@@ -16,7 +16,7 @@ on:
         - cron: "0 0 * * *"
 env:
     CRM_BRANCH: ${{ github.base_ref || github.ref_name }}
-    CRM_MESSENGER_REF: 5adb412d275485e360beaf764c98bfff30484d32
+    CRM_MESSENGER_REF: 4dff59b0aab8cda4c3e5c19135fb0f32fdfec47e
 
 concurrency:
     group: develop-crm-${{ github.event.number }}
