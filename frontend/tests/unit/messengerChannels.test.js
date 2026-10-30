@@ -28,6 +28,23 @@ vi.mock('frappe-ui', () => ({
   },
 }))
 
+function wazzupProviderMessage(overrides = {}) {
+  return {
+    provider: 'wazzup',
+    direction: 'outbound',
+    status: 'accepted',
+    delivery_status: 'accepted',
+    channel_info: {
+      wazzup_api_mode: 'partner_api_v2',
+      platform: 'telegram',
+    },
+    ingest_source: 'provider_history',
+    external_message_id: 'PROVIDER-OLD-1',
+    attempt_count: 0,
+    ...overrides,
+  }
+}
+
 describe('messengerChannels', () => {
   it('explains proven Wazzup configuration failure without changing other provider reasons', () => {
     expect(
@@ -178,6 +195,117 @@ describe('messengerChannels', () => {
           delivery_status: deliveryStatus,
         }),
       ).toBe(deliveryStatus)
+    },
+  )
+
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
+    'does not claim pending delivery for provider-origin %s history',
+    (platform) => {
+      for (let ingestSource of ['provider_history', 'provider_webhook']) {
+        let message = wazzupProviderMessage({
+          channel_info: { wazzup_api_mode: 'partner_api_v2', platform },
+          ingest_source: ingestSource,
+          provider_status: 'accepted',
+          last_update_source: 'attachment_job',
+        })
+        let original = structuredClone(message)
+
+        expect(getMessengerDeliveryState(message)).toBe('')
+        expect(getMessengerDeliveryLabel(message)).toBe('')
+        expect(message).toEqual(original)
+      }
+    },
+  )
+
+  it('does not require delivery_status to recognize existing provider history', () => {
+    expect(
+      getMessengerDeliveryState(
+        wazzupProviderMessage({ delivery_status: undefined }),
+      ),
+    ).toBe('')
+  })
+
+  it.each([
+    { client_request_id: 'CRM-REQUEST' },
+    { crm_user: 'user@example.test' },
+    { handoff: 'HANDOFF-1' },
+    { provider_request_id: 'PROVIDER-REQUEST' },
+    { attempt_count: 1 },
+    { last_attempt_at: '2026-10-30 10:00:00' },
+    { sent_at: '2026-10-30 10:00:00' },
+    { delivered_at: '2026-10-30 10:00:00' },
+    { read_at: '2026-10-30 10:00:00' },
+    { provider_status: 'sent' },
+    { provider_status: 'delivered' },
+    { provider_status: 'read' },
+    { provider_status: 'failed' },
+    { provider_status: 'unknown' },
+    { status: 'sent' },
+  ])(
+    'preserves an accepted state with send or delivery evidence: %j',
+    (evidence) => {
+      expect(getMessengerDeliveryState(wazzupProviderMessage(evidence))).toBe(
+        'accepted',
+      )
+    },
+  )
+
+  it.each([
+    'queued',
+    'sending',
+    'accepted',
+    'retrying',
+    'unknown',
+    'sent',
+    'delivered',
+    'read',
+    'failed',
+  ])('preserves CRM-created Wazzup %s delivery state', (status) => {
+    expect(
+      getMessengerDeliveryState(
+        wazzupProviderMessage({
+          status,
+          delivery_status: status,
+          client_request_id: 'CRM-REQUEST',
+          crm_user: 'user@example.test',
+          attempt_count: 1,
+        }),
+      ),
+    ).toBe(status)
+  })
+
+  it.each(['unknown', 'sent', 'delivered', 'read', 'failed'])(
+    'preserves provider-origin Wazzup %s evidence',
+    (status) => {
+      expect(
+        getMessengerDeliveryState(
+          wazzupProviderMessage({ status, delivery_status: status }),
+        ),
+      ).toBe(status)
+    },
+  )
+
+  it.each([
+    { channel_info: { wazzup_api_mode: 'user_api_v3' } },
+    { channel_info: undefined },
+    { ingest_source: undefined },
+    { ingest_source: 'crm' },
+    { external_message_id: '' },
+  ])(
+    'keeps pending state when provider origin is not proven: %j',
+    (overrides) => {
+      expect(getMessengerDeliveryState(wazzupProviderMessage(overrides))).toBe(
+        'accepted',
+      )
+    },
+  )
+
+  it.each(['avito_direct', 'telegram_bot', 'vk_direct', 'max_direct'])(
+    'does not change accepted status for %s',
+    (provider) => {
+      expect(
+        getMessengerDeliveryState(wazzupProviderMessage({ provider })),
+      ).toBe('accepted')
     },
   )
 
