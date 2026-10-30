@@ -958,9 +958,9 @@ const channelDirty = computed(() => channelState() !== channelSnapshot.value)
 const isPartnerDraft = computed(() =>
   Boolean(
     channelDraft.value.provider?.startsWith('partner_') &&
-    wazzupPartnerTransport(
-      channelDraft.value.provider.slice('partner_'.length),
-    ),
+      wazzupPartnerTransport(
+        channelDraft.value.provider.slice('partner_'.length),
+      ),
   ),
 )
 const partnerPlatform = computed(() =>

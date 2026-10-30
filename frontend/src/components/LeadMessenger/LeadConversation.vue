@@ -183,7 +183,9 @@
                       Boolean(
                         (item.message.attachments?.length ||
                           item.message.forward_context) &&
-                        !isSingleStickerAttachmentSet(item.message.attachments),
+                          !isSingleStickerAttachmentSet(
+                            item.message.attachments,
+                          ),
                       )
                     "
                     :message="item.message"

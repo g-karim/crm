@@ -10,12 +10,13 @@ on:
             - "**.csv"
             - "**.po"
             - "**.pot"
+    workflow_dispatch:
     schedule:
         # Run everday at midnight UTC / 5:30 IST
         - cron: "0 0 * * *"
 env:
     CRM_BRANCH: ${{ github.base_ref || github.ref_name }}
-    CRM_MESSENGER_REF: ed2951c5ace0a1ccf81a3dc2819186eeb144b848
+    CRM_MESSENGER_REF: 4dff59b0aab8cda4c3e5c19135fb0f32fdfec47e
 
 concurrency:
     group: develop-crm-${{ github.event.number }}
@@ -93,7 +94,7 @@ jobs:
               uses: ./.github/actions/run-server-tests
               with:
                   bench-path: "/home/runner/frappe-bench"
-                  site: "test_site"
+                  site: "test-site.localhost"
                   app: "crm"
                   enable-coverage: "true"
                   type: "server"
@@ -107,10 +108,11 @@ jobs:
                   coverage-path: /home/runner/frappe-bench/sites/coverage.xml
 
             - name: Run Messenger server tests
+              if: ${{ !cancelled() }}
               uses: ./.github/actions/run-server-tests
               with:
                   bench-path: "/home/runner/frappe-bench"
-                  site: "test_site"
+                  site: "test-site.localhost"
                   app: "crm_messenger"
                   enable-coverage: "false"
                   type: "server"

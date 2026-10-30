@@ -8,7 +8,7 @@ inputs:
     site:
         description: Bench site on which to run tests
         required: false
-        default: "test_site"
+        default: "test-site.localhost"
     app:
         description: App to test
         required: false

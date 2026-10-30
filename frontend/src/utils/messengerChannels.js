@@ -191,20 +191,24 @@ function isUnconfirmedWazzupProviderMessage(message) {
   // Their accepted lifecycle state does not mean CRM is waiting to send them.
   return Boolean(
     message.provider === 'wazzup' &&
-    message.channel_info?.wazzup_api_mode === 'partner_api_v2' &&
-    message.status === 'accepted' &&
-    ['provider_history', 'provider_webhook'].includes(message.ingest_source) &&
-    message.external_message_id &&
-    !message.client_request_id &&
-    !message.crm_user &&
-    !message.handoff &&
-    !message.provider_request_id &&
-    Number(message.attempt_count || 0) === 0 &&
-    !message.last_attempt_at &&
-    !message.sent_at &&
-    !message.delivered_at &&
-    !message.read_at &&
-    ['', 'accepted'].includes(normalizePlatform(message.provider_status || '')),
+      message.channel_info?.wazzup_api_mode === 'partner_api_v2' &&
+      message.status === 'accepted' &&
+      ['provider_history', 'provider_webhook'].includes(
+        message.ingest_source,
+      ) &&
+      message.external_message_id &&
+      !message.client_request_id &&
+      !message.crm_user &&
+      !message.handoff &&
+      !message.provider_request_id &&
+      Number(message.attempt_count || 0) === 0 &&
+      !message.last_attempt_at &&
+      !message.sent_at &&
+      !message.delivered_at &&
+      !message.read_at &&
+      ['', 'accepted'].includes(
+        normalizePlatform(message.provider_status || ''),
+      ),
   )
 }
 

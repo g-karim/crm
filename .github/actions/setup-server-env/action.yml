@@ -54,7 +54,7 @@ runs:
 
         - name: Add to hosts file
           shell: bash
-          run: echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
+          run: echo "127.0.0.1 test-site.localhost" | sudo tee -a /etc/hosts
 
         - name: Cache pip
           uses: actions/cache@v4
