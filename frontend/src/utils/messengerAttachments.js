@@ -32,6 +32,7 @@ const REPLY_ATTACHMENT_LABELS = {
   image: ['Image', 'Images'],
   animation: ['Animation', 'Animations'],
   video: ['Video', 'Videos'],
+  video_note: ['Video message', 'Video messages'],
   audio: ['Audio', 'Audio files'],
   voice: ['Voice message', 'Voice messages'],
   file: ['Document', 'Documents'],
@@ -44,7 +45,9 @@ const REPLY_ATTACHMENT_LABELS = {
 
 const ATTACHMENT_TITLES = {
   image: 'Image',
+  animation: 'Animation',
   video: 'Video',
+  video_note: 'Video message',
   audio: 'Audio',
   voice: 'Voice message',
   file: 'File',
@@ -100,8 +103,11 @@ export function getMessengerReplyAttachmentLabel(snapshot = {}) {
 }
 
 export function getMessengerReplyAttachmentType(attachment = {}) {
+  if (Object.hasOwn(REPLY_ATTACHMENT_LABELS, attachment.semantic_type))
+    return attachment.semantic_type
   if (attachment.type === 'sticker') return 'sticker'
   if (attachment.is_voice) return 'voice'
+  if (attachment.type === 'video' && attachment.is_animated) return 'animation'
   if (
     attachment.type === 'image' &&
     attachment.is_animated &&

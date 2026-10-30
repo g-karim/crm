@@ -9663,3 +9663,83 @@ msgstr "У лида не указан корректный номер телеф
 
 msgid "Select a supported personal Wazzup channel."
 msgstr "Выберите поддерживаемый личный канал Wazzup."
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Voice message"
+msgstr "Голосовое сообщение"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Voice messages"
+msgstr "Голосовые сообщения"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Video message"
+msgstr "Видеосообщение"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Video messages"
+msgstr "Видеосообщения"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Video"
+msgstr "Видео"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Videos"
+msgstr "Видео"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Audio"
+msgstr "Аудио"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Audio files"
+msgstr "Аудиофайлы"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "File"
+msgstr "Файл"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Document"
+msgstr "Документ"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Documents"
+msgstr "Документы"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Sticker"
+msgstr "Стикер"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Stickers"
+msgstr "Стикеры"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Sticker unavailable"
+msgstr "Стикер недоступен"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Animation"
+msgstr "Анимация"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Animations"
+msgstr "Анимации"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Images"
+msgstr "Изображения"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Locations"
+msgstr "Местоположения"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Attachment"
+msgstr "Вложение"
+
+#: frontend/src/utils/messengerAttachments.js
+msgid "Unsupported attachment"
+msgstr "Неподдерживаемое вложение"

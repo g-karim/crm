@@ -74,7 +74,7 @@ describe('messenger attachment contract v1', () => {
           mime_type: 'video/mp4',
           is_animated: true,
         }),
-      ).toBe('video')
+      ).toBe('animation')
       expect(
         getMessengerReplyAttachmentType({
           provider,
@@ -92,6 +92,60 @@ describe('messenger attachment contract v1', () => {
       ).toBe('voice')
     },
   )
+
+  it('prefers the shared semantic type without changing attachment rendering types', () => {
+    expect(
+      getMessengerReplyAttachmentType({
+        type: 'video',
+        semantic_type: 'video_note',
+      }),
+    ).toBe('video_note')
+    expect(
+      getMessengerReplyAttachmentType({
+        type: 'image',
+        semantic_type: 'image',
+        is_animated: true,
+      }),
+    ).toBe('image')
+    expect(
+      getMessengerReplyAttachmentType({
+        type: 'image',
+        semantic_type: 'animation',
+      }),
+    ).toBe('animation')
+    let sticker = {
+      id: 'STICKER',
+      type: 'sticker',
+      semantic_type: 'sticker',
+      is_animated: true,
+    }
+    expect(getMessengerReplyAttachmentType(sticker)).toBe('sticker')
+    expect(buildMessengerAttachmentSegments([sticker])[0].type).toBe('sticker')
+    expect(sticker.type).toBe('sticker')
+  })
+
+  it.each(['provider-specific', 'constructor', '__proto__'])(
+    'falls back to legacy attachment flags for an unknown semantic type %s',
+    (semantic_type) => {
+      expect(
+        getMessengerReplyAttachmentType({
+          type: 'audio',
+          semantic_type,
+          is_voice: true,
+        }),
+      ).toBe('voice')
+    },
+  )
+
+  it('does not infer a video message from a technical filename', () => {
+    expect(
+      getMessengerReplyAttachmentType({
+        type: 'video',
+        mime_type: 'video/mp4',
+        file_name: 'video-note.mp4',
+      }),
+    ).toBe('video')
+  })
 
   it('keeps transparent square WebP artwork as an image despite obsolete sticker hints', () => {
     let artwork = {
@@ -338,6 +392,21 @@ describe('messenger attachment contract v1', () => {
       }),
     ).toBe('Голосовое сообщение')
     expect(getMessengerMessagePreview({ message_type: 'video' })).toBe('Video')
+    expect(getMessengerMessagePreview({ message_type: 'video_note' })).toBe(
+      'Video message',
+    )
+    expect(getMessengerMessagePreview({ message_type: 'animation' })).toBe(
+      'Animation',
+    )
+    expect(
+      getMessengerMessagePreview({ message_type: 'application/x-internal' }),
+    ).toBe('Attachment')
+    expect(
+      getMessengerMessagePreview({
+        message_type: 'video_note',
+        text: 'Подпись к видео',
+      }),
+    ).toBe('Подпись к видео')
   })
 
   it('classifies only a single standalone image as single-image layout', () => {
