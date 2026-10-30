@@ -432,3 +432,49 @@ for (const platform of ['whatsapp', 'telegram']) {
     })
   }
 }
+
+for (const platform of ['whatsapp', 'telegram', 'max', 'viber']) {
+  test(`Wazzup ${platform} static and animated stickers keep the same compact frame`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 400, height: 900 })
+    await page.goto(
+      `/tests/browser/messenger-bubbles.html?wazzupMedia=1&platform=${platform}`,
+    )
+    for (const [key, mediaSelector] of [
+      ['image-sticker-webp', '[data-sticker-image]'],
+      ['animated-image-sticker', '[data-sticker-image]'],
+      ['video-sticker', '[data-sticker-video]'],
+      ['tgs', 'svg[viewBox="0 0 64 64"]'],
+    ]) {
+      const container = page.locator(`[data-case="${key}"]`)
+      const frame = container.locator('[data-sticker-attachment]')
+      await expect(frame.locator(mediaSelector)).toBeVisible()
+      await expect(container.locator('[data-sticker-fallback]')).toHaveCount(0)
+      await expect(container.locator('[data-sticker-loading]')).toHaveCount(0)
+      await expect(container.locator('[data-single-image]')).toHaveCount(0)
+      await expect(container.locator('[data-animated-media]')).toHaveCount(0)
+      const bounds = (await frame.boundingBox())!
+      expect(bounds.width).toBe(160)
+      expect(bounds.height).toBe(160)
+      expect(
+        (await container.locator('[data-message-bubble]').boundingBox())!.width,
+      ).toBeLessThanOrEqual(184)
+    }
+    const video = page.locator('[data-case="video-sticker"] video')
+    await expect
+      .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
+      .toBeGreaterThanOrEqual(2)
+    expect(
+      await video.evaluate((node: HTMLVideoElement) => ({
+        autoplay: node.autoplay,
+        loop: node.loop,
+        muted: node.muted,
+        controls: node.controls,
+      })),
+    ).toEqual({ autoplay: true, loop: true, muted: true, controls: false })
+    const artwork = page.locator('[data-case="transparent-webp-artwork"]')
+    await expect(artwork.locator('[data-single-image]')).toBeVisible()
+    await expect(artwork.locator('[data-sticker-attachment]')).toHaveCount(0)
+  })
+}

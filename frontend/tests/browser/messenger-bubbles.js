@@ -350,6 +350,34 @@ const wazzupCases = [
     ],
   },
   {
+    key: 'animated-image-sticker',
+    attachments: [
+      image('ANIMATED-STICKER', {
+        type: 'sticker',
+        mime_type: 'image/gif',
+        is_animated: true,
+        url: '/tests/browser/fixtures/messenger-animation.gif',
+        width: 512,
+        height: 512,
+      }),
+    ],
+  },
+  {
+    key: 'video-sticker',
+    attachments: [
+      {
+        id: 'VIDEO-STICKER',
+        type: 'sticker',
+        status: 'available',
+        mime_type: 'video/mp4',
+        is_animated: true,
+        playback_url: '/tests/browser/fixtures/messenger-portrait.mp4',
+        width: 512,
+        height: 512,
+      },
+    ],
+  },
+  {
     key: 'transparent-webp-artwork',
     attachments: [
       image('WEBP-ARTWORK', {
