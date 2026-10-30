@@ -303,6 +303,22 @@ const wazzupCases = [
     ],
   },
   {
+    key: 'saved-document-download',
+    attachments: [
+      {
+        ...file('0123456789abcdef0123456789abcdef01234567'),
+        id: 'SAVED-DOCUMENT',
+        status: 'available',
+        display_title: 'Исходный договор.docx',
+        mime_type:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        url: '/api/method/crm_messenger.api.attachments.stream?attachment=SAVED-DOCUMENT',
+        download_url:
+          '/api/method/crm_messenger.api.attachments.download?attachment=SAVED-DOCUMENT',
+      },
+    ],
+  },
+  {
     key: 'opus-voice',
     attachments: [
       {

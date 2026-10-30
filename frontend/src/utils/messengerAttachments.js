@@ -337,6 +337,8 @@ export function getAttachmentState(attachment = {}) {
 
 export function getAttachmentAction(attachment = {}) {
   if (!getAttachmentState(attachment).active) return ''
+  if (attachment.type === 'file' && attachment.download_url)
+    return attachment.download_url
   return attachment.open_url || attachment.url || attachment.download_url || ''
 }
 

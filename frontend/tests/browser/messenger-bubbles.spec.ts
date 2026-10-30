@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 
 declare global {
   interface Window {
@@ -15,6 +16,72 @@ test.beforeEach(async ({ page }) => {
     return url.hostname === '127.0.0.1' ? route.continue() : route.abort()
   })
 })
+
+for (const platform of ['whatsapp', 'telegram']) {
+  test(`Wazzup ${platform} saved document click preserves the download filename`, async ({
+    page,
+    context,
+  }, testInfo) => {
+    test.setTimeout(60000)
+    const downloadPath = '/api/method/crm_messenger.api.attachments.download'
+    const streamPath = '/api/method/crm_messenger.api.attachments.stream'
+    const filename = 'Исходный договор.docx'
+    const content = Buffer.from('Synthetic saved document bytes')
+    const requests: string[] = []
+    // AttachmentCard opens a new tab. Intercept at context level so its first
+    // navigation is also a local fixture, without any site or provider I/O.
+    await page.unrouteAll()
+    await context.route('**/*', async (route) => {
+      const url = new URL(route.request().url())
+      if (url.hostname !== '127.0.0.1') return route.abort()
+      if ([downloadPath, streamPath].includes(url.pathname)) {
+        requests.push(url.pathname)
+        const name =
+          url.pathname === downloadPath
+            ? filename
+            : '0123456789abcdef0123456789abcdef01234567'
+        return route.fulfill({
+          status: 200,
+          headers: {
+            'Content-Type':
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+          },
+          body: content,
+        })
+      }
+      if (url.pathname.startsWith('/api/')) return route.abort()
+      return route.continue()
+    })
+    await page.goto(
+      `/tests/browser/messenger-bubbles.html?wazzupMedia=1&case=saved-document-download&platform=${platform}&direction=inbound`,
+      { waitUntil: 'domcontentloaded' },
+    )
+    const card = page.locator('[data-attachment-card]')
+    await expect(card).toHaveAttribute(
+      'href',
+      `${downloadPath}?attachment=SAVED-DOCUMENT`,
+    )
+    await expect(card.locator('[data-attachment-card-title]')).toHaveText(
+      filename,
+    )
+    await page.evaluate(() => window.messengerMediaFixture.delta())
+    await page.evaluate(() => window.messengerMediaFixture.refresh())
+    for (const phase of ['refresh', 'reload']) {
+      if (phase === 'reload')
+        await page.reload({ waitUntil: 'domcontentloaded' })
+      const downloadEvent = page.waitForEvent('download')
+      await card.click()
+      const download = await downloadEvent
+      expect(new URL(download.url()).pathname).toBe(downloadPath)
+      expect(download.suggestedFilename()).toBe(filename)
+      const savedPath = testInfo.outputPath(phase, filename)
+      await download.saveAs(savedPath)
+      expect(await readFile(savedPath)).toEqual(content)
+    }
+    expect(requests).toEqual([downloadPath, downloadPath])
+  })
+}
 
 test('sizes a document with two images by its content', async ({
   page,

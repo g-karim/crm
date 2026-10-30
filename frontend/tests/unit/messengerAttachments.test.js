@@ -558,6 +558,62 @@ describe('messenger attachment contract v1', () => {
     ).toBe('/redirect')
   })
 
+  it.each([
+    'wazzup',
+    'max_direct',
+    'vk_direct',
+    'telegram_bot',
+    'avito_direct',
+  ])(
+    'downloads saved %s documents through the named download endpoint',
+    (provider) => {
+      let attachment = {
+        provider,
+        id: 'SAVED-DOCUMENT',
+        type: 'file',
+        file_name: 'File.docx',
+        url: '/api/method/crm_messenger.api.attachments.stream?attachment=SAVED-DOCUMENT',
+        download_url:
+          '/api/method/crm_messenger.api.attachments.download?attachment=SAVED-DOCUMENT',
+      }
+      for (let status of ['available', 'uploaded']) {
+        expect(getAttachmentAction({ ...attachment, status })).toBe(
+          attachment.download_url,
+        )
+      }
+      for (let status of ['pending', 'downloading', 'retrying', 'failed']) {
+        expect(getAttachmentAction({ ...attachment, status })).toBe('')
+      }
+    },
+  )
+
+  it('preserves source actions for external documents and streamed media', () => {
+    expect(
+      getAttachmentAction({
+        type: 'file',
+        status: 'external',
+        open_url: '/protected/external-document',
+      }),
+    ).toBe('/protected/external-document')
+    expect(
+      getAttachmentAction({
+        type: 'file',
+        status: 'available',
+        url: '/legacy-document',
+      }),
+    ).toBe('/legacy-document')
+    for (let type of ['image', 'audio', 'video', 'sticker']) {
+      expect(
+        getAttachmentAction({
+          type,
+          status: 'available',
+          url: '/protected/stream',
+          download_url: '/protected/download',
+        }),
+      ).toBe('/protected/stream')
+    }
+  })
+
   it('keeps unsupported attachments inactive', () => {
     let attachment = {
       id: 'U-1',
