@@ -249,6 +249,43 @@ describe('MessengerSettings Wazzup connection', () => {
     )
   })
 
+  it('opens an existing Instagram channel through shared settings but excludes it from New Channel', async () => {
+    setup({
+      stored: [
+        channel({
+          platform: 'instagram',
+          custom_display_name: 'Instagram Support',
+          wazzup_api_mode: 'partner_api_v2',
+          wazzup_status: 'active',
+        }),
+      ],
+      settings: { wazzup_legacy_ui_enabled: false },
+    })
+    const root = await mountSettings()
+    expect(root.textContent).toContain('Instagram Direct')
+    await clickButton(root, 'Instagram Support')
+    expect(root.querySelector('[data-label="Provider"]').value).toBe(
+      'partner_instagram',
+    )
+    expect(root.querySelector('[data-label="Provider"]').disabled).toBe(true)
+    expect(
+      root.querySelector('[data-wazzup-partner-management]').dataset.platform,
+    ).toBe('instagram')
+    expect(root.querySelector('[data-label="Wazzup API key"]')).toBeNull()
+    expect(root.querySelector('[data-label="Channel ID"]')).toBeNull()
+    expect(root.querySelector('[data-label="Platform"]')).toBeNull()
+    await editField(root, 'Channel Name', 'Renamed Instagram')
+    await clickButton(root, 'Save')
+    expect(mocks.toast.success).toHaveBeenCalledWith('Channel saved.')
+    await clickButton(root, 'Close')
+    await clickButton(root, 'New Channel')
+    expect(
+      root.querySelector(
+        '[data-label="Provider"] option[value="partner_instagram"]',
+      ),
+    ).toBeNull()
+  })
+
   it.each([
     ['WhatsApp', 'whatsapp'],
     ['Telegram personal chats', 'telegram'],

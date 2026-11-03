@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     call: vi.fn(),
     dialog: vi.fn(),
     toastError: vi.fn(),
+    toastSuccess: vi.fn(),
     route: { query: {} },
     voiceRetarget: vi.fn(),
     voiceSend: vi.fn(),
@@ -65,7 +66,7 @@ vi.mock('frappe-ui', () => ({
     format: () => '2026-08-23',
     fromNow: () => 'now',
   }),
-  toast: { error: mocks.toastError },
+  toast: { error: mocks.toastError, success: mocks.toastSuccess },
 }))
 
 vi.mock('@/stores/global', () => ({
@@ -148,7 +149,7 @@ vi.mock('@/components/LeadMessenger/ComposerAttachments.vue', () => ({
         this.$emit('change', [])
       },
     },
-    template: `<span data-attachment-policy :data-max-size="maxAttachmentSizeBytes" :data-image-max-size="maxAttachmentSizeBytesByType?.image" :data-max-files="maxFiles" :data-video-formats="acceptedFileTypesByType?.video?.join(',')">
+    template: `<span data-attachment-policy :data-max-size="maxAttachmentSizeBytes" :data-image-max-size="maxAttachmentSizeBytesByType?.image" :data-max-files="maxFiles" :data-video-formats="acceptedFileTypesByType?.video?.join(',')" :data-image-formats="acceptedFileTypesByType?.image?.join(',')" :data-accepted-file-types="acceptedFileTypes?.join(',')">
       <button data-testid="mock-attachment-draft" @click="setDraft('draft.pdf', 'application/pdf')">attachment draft</button>
       <button data-testid="mock-image-draft" @click="setDraft('photo.jpg', 'image/jpeg')">image draft</button>
       <button data-testid="mock-clear-attachments" @click="clearDraft">clear attachments</button>
@@ -1289,6 +1290,235 @@ describe('Wazzup native text replies', () => {
       channel_type: platform,
     }
   }
+
+  function instagramChannel() {
+    return {
+      ...wazzupChannel('instagram'),
+      wazzup_api_mode: 'partner_api_v2',
+      capabilities: {
+        requires_phone: false,
+        requires_inbound: true,
+        can_start_conversation: false,
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        supported_attachment_file_types_by_type: {
+          image: ['.jpg', '.jpeg', '.png', '.bmp'],
+        },
+        max_attachment_count: 1,
+        max_attachment_size_bytes: 8_000_000,
+        supports_attachment_captions: false,
+        supports_image_caption: false,
+        voice: { send: false },
+        location: { send: false },
+      },
+    }
+  }
+
+  it.each([false, true])(
+    'uses an existing Instagram dialog for handoff and blocks first contact (existing: %s)',
+    async (existingDialog) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [
+        channel('CHANNEL-1'),
+        { ...instagramChannel(), name: 'CHANNEL-2' },
+      ]
+      if (existingDialog) {
+        conversationRows.push({
+          name: 'INSTAGRAM-CHAT',
+          channel: 'CHANNEL-2',
+          provider: 'wazzup',
+          chat_type: 'instagram',
+          external_chat_id: 'ig:000123',
+          status: 'Open',
+        })
+      }
+      let root = await mountConversation()
+      let target = root.querySelector(
+        'input[placeholder="Move to another channel"]',
+      )
+      target.value = 'CHANNEL-2'
+      target.dispatchEvent(new Event('input'))
+      await nextTick()
+      ;[...root.querySelectorAll('button')]
+        .find((button) => button.textContent === 'Prepare Handoff')
+        .click()
+      await nextTick()
+
+      expect(root.querySelector('input[placeholder="Platform"]').value).toBe(
+        existingDialog ? 'CHANNEL-2' : 'CHANNEL-1',
+      )
+      if (existingDialog) {
+        expect(mocks.toastSuccess).toHaveBeenCalledWith(
+          'Switched to an existing external chat.',
+        )
+        expect(
+          root.querySelector('input[placeholder="Enter a message..."]')
+            .disabled,
+        ).toBe(false)
+      } else {
+        expect(root.textContent).toContain(
+          'An incoming message must arrive in the selected channel first.',
+        )
+      }
+      expect(root.querySelector('[data-testid="prepared-handoff"]')).toBeNull()
+      expect(
+        mocks.call.mock.calls.some(
+          ([method]) =>
+            method.endsWith('create_handoff') ||
+            method.endsWith('get_or_create_lead_conversation') ||
+            method.endsWith('send_message'),
+        ),
+      ).toBe(false)
+    },
+  )
+
+  it.each([false, true])(
+    'blocks Instagram first contact even with a lead phone (conversation stub: %s)',
+    async (hasStub) => {
+      permissions = { ...permissions, can_operate: true }
+      channelRows = [instagramChannel()]
+      conversationRows = hasStub
+        ? [{ ...conversationRows[0], external_chat_id: '', provider: 'wazzup' }]
+        : []
+      let root = await mountConversation({ phone: '+15550000000' })
+      let composer = root.querySelector(
+        'input[placeholder="Enter a message..."]',
+      )
+      let send = [...root.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Send',
+      )
+      expect(composer.disabled).toBe(true)
+      expect(send.disabled).toBe(true)
+      expect(root.textContent).toContain(
+        'An incoming message must arrive in the selected channel first.',
+      )
+      expect(root.textContent).not.toContain(
+        'Select a channel and send the first message to this lead.',
+      )
+      composer.value = 'Cannot initiate this chat'
+      composer.dispatchEvent(new Event('input'))
+      composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+      await nextTick()
+      expect(
+        mocks.call.mock.calls.some(
+          ([method]) =>
+            method.endsWith('send_message') ||
+            method.endsWith('get_or_create_lead_conversation'),
+        ),
+      ).toBe(false)
+    },
+  )
+
+  it('sends up to 1000 Instagram characters to the existing external chat without a phone', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [instagramChannel()]
+    conversationRows[0] = {
+      ...conversationRows[0],
+      provider: 'wazzup',
+      external_chat_id: 'ig:000123',
+    }
+    let root = await mountConversation()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+    let send = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Send',
+    )
+    expect(composer.disabled).toBe(false)
+    let oversized = '😀'.repeat(1001)
+    composer.value = oversized
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    expect(composer.value).toBe(oversized)
+    expect(send.disabled).toBe(true)
+    expect(
+      root.querySelector('[data-testid="composer-text-warning"]').textContent,
+    ).toBe('The message must contain at most 1000 characters.')
+    composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+    await nextTick()
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+    let text = '😀'.repeat(1000)
+    composer.value = text
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    expect(send.disabled).toBe(false)
+    expect(root.textContent).toContain('1000/1000 characters')
+    expect(
+      root.querySelector('[data-testid="composer-text-warning"]'),
+    ).toBeNull()
+    send.click()
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.messages.send_message',
+        expect.objectContaining({
+          conversation: 'CONVERSATION-1',
+          channel: 'CHANNEL-1',
+          text,
+        }),
+      ),
+    )
+    expect(
+      mocks.call.mock.calls.some(([method]) =>
+        method.endsWith('get_or_create_lead_conversation'),
+      ),
+    ).toBe(false)
+  })
+
+  it('uses the common Instagram image composer and blocks documents and captions', async () => {
+    permissions = { ...permissions, can_operate: true }
+    channelRows = [instagramChannel()]
+    conversationRows[0].provider = 'wazzup'
+    let root = await mountConversation()
+    let policy = root.querySelector('[data-attachment-policy]')
+    expect(policy.dataset.maxSize).toBe('8000000')
+    expect(policy.dataset.maxFiles).toBe('1')
+    expect(policy.dataset.imageFormats).toBe('.jpg,.jpeg,.png,.bmp')
+    expect(policy.dataset.acceptedFileTypes).toBe('.jpg,.jpeg,.png,.bmp')
+    expect(
+      root.querySelector('[aria-label="Record a Voice Message"]'),
+    ).toBeNull()
+    expect(root.querySelector('[aria-label="Add Location"]')).toBeNull()
+    let send = [...root.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Send',
+    )
+    root.querySelector('[data-testid="mock-attachment-draft"]').click()
+    await nextTick()
+    expect(send.disabled).toBe(true)
+    send.click()
+    await nextTick()
+    expect(
+      mocks.call.mock.calls.some(([method]) => method.endsWith('send_message')),
+    ).toBe(false)
+    root.querySelector('[data-testid="mock-clear-attachments"]').click()
+    await nextTick()
+    let composer = root.querySelector('input[placeholder="Enter a message..."]')
+    composer.value = 'Keep this text for a separate message'
+    composer.dispatchEvent(new Event('input'))
+    root.querySelector('[data-testid="mock-image-draft"]').click()
+    await nextTick()
+    expect(send.disabled).toBe(true)
+    expect(composer.disabled).toBe(false)
+    expect(composer.value).toBe('Keep this text for a separate message')
+    expect(
+      root.querySelector('[data-testid="image-caption-warning"]').textContent,
+    ).toContain('separate messages')
+    composer.value = ''
+    composer.dispatchEvent(new Event('input'))
+    await nextTick()
+    expect(composer.disabled).toBe(true)
+    expect(send.disabled).toBe(false)
+    send.click()
+    await vi.waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        'crm_messenger.api.messages.send_message',
+        expect.objectContaining({
+          conversation: 'CONVERSATION-1',
+          text: '',
+          attachments: ['FILE-photo.jpg'],
+        }),
+      ),
+    )
+  })
 
   it.each(['whatsapp', 'telegram'])(
     'sends to an existing Wazzup %s chat without a phone on the lead',

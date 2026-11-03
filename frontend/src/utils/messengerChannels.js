@@ -9,6 +9,7 @@ const PLATFORM_LABELS = {
   vk: 'VK',
   max: 'MAX',
   viber: 'Viber',
+  instagram: 'Instagram',
 }
 
 const DELIVERY_LABELS = {
@@ -134,7 +135,11 @@ function forwardSender(message) {
 export function getMessengerChannelType(channel = {}) {
   if (channel?.provider === 'avito_direct') return 'avito'
   return normalizePlatform(
-    channel?.platform || channel?.channel_type || channel?.chat_type || '',
+    channel?.platform ||
+      channel?.channel_type ||
+      channel?.chat_type ||
+      channel?.channel_info?.platform ||
+      '',
   )
 }
 
@@ -321,13 +326,14 @@ export function getMessengerConversationNotice(conversation = {}) {
 }
 
 export function getMessengerCapabilities(channel = {}) {
+  let instagram = getMessengerChannelType(channel) === 'instagram'
   let video = channel?.capabilities?.video || {}
   let voice = channel?.capabilities?.voice || {}
   let reactions = channel?.capabilities?.reactions || {}
   let location = channel?.capabilities?.location || {}
   let contact = channel?.capabilities?.contact || {}
   let typing = channel?.capabilities?.typing || {}
-  return {
+  let capabilities = {
     can_start_conversation:
       channel?.capabilities?.can_start_conversation ?? true,
     requires_inbound: Boolean(channel?.capabilities?.requires_inbound),
@@ -369,6 +375,7 @@ export function getMessengerCapabilities(channel = {}) {
       1,
       Number(channel?.capabilities?.max_attachment_count || 10),
     ),
+    max_text_length: Number(channel?.capabilities?.max_text_length || 0),
     voice: {
       send: Boolean(voice.send),
       max_duration_seconds: Number(voice.max_duration_seconds || 300),
@@ -382,6 +389,56 @@ export function getMessengerCapabilities(channel = {}) {
       native_send: Boolean(video.native_send),
       send_fallback: video.send_fallback || '',
     },
+  }
+  if (!instagram) return capabilities
+
+  // Older or partial DTOs must not offer first contact or unsupported Direct
+  // content. Server restrictions may narrow these UI limits further; actual
+  // media bytes and permission to reply are always checked by the backend.
+  let imageFormats = ['.jpg', '.jpeg', '.png', '.bmp']
+  let serverImageFormats =
+    channel?.capabilities?.supported_attachment_file_types_by_type?.image
+  let supportedImageFormats = Array.isArray(serverImageFormats)
+    ? serverImageFormats.filter((extension) => imageFormats.includes(extension))
+    : imageFormats
+  let supportedAttachmentTypes = (
+    channel?.capabilities?.supported_attachment_types || ['image']
+  ).filter((type) => type === 'image')
+  return {
+    ...capabilities,
+    can_start_conversation: false,
+    requires_inbound: true,
+    requires_phone: false,
+    supports_attachments: Boolean(
+      (channel?.capabilities?.supports_attachments ?? true) &&
+      supportedAttachmentTypes.length &&
+      supportedImageFormats.length,
+    ),
+    supported_attachment_types: supportedAttachmentTypes,
+    supported_attachment_file_types_by_type: {
+      image: supportedImageFormats,
+    },
+    supports_image_caption: false,
+    supports_attachment_captions: false,
+    max_attachment_size_bytes: Math.min(
+      capabilities.max_attachment_size_bytes || 8_000_000,
+      8_000_000,
+    ),
+    max_attachment_size_bytes_by_type: {
+      image: Math.min(
+        Number(capabilities.max_attachment_size_bytes_by_type.image) ||
+          8_000_000,
+        8_000_000,
+      ),
+    },
+    max_attachment_count: 1,
+    max_text_length: Math.min(capabilities.max_text_length || 1000, 1000),
+    voice: { ...capabilities.voice, send: false },
+    location: { ...capabilities.location, send: false },
+    contact: { ...capabilities.contact, send: false },
+    reactions: { ...capabilities.reactions, send: false },
+    typing: { ...capabilities.typing, send: false },
+    video: { ...capabilities.video, native_send: false },
   }
 }
 

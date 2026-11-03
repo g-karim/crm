@@ -194,6 +194,36 @@ describe('persisted Partner conversation conflicts', () => {
   }
   const scope = { conversation, channel, leadName: 'LEAD-NEW' }
 
+  it('preserves an Instagram worker conflict after refresh within the selected Lead and chat', () => {
+    let instagramChannel = { ...channel, platform: 'instagram' }
+    let instagramScope = { ...scope, channel: instagramChannel }
+    let notice = messengerPersistedConversationConflict({
+      ...instagramScope,
+      messages: [message],
+    })
+    expect(notice).toEqual(bindingConflict)
+    expect(messengerConversationConflictTarget(notice)).toEqual({
+      name: 'Lead',
+      params: { leadId: 'LEAD-OLD' },
+    })
+
+    for (let altered of [
+      { leadName: 'LEAD-OTHER' },
+      { conversation: { ...conversation, name: 'OTHER-CONVERSATION' } },
+      { conversation: { ...conversation, reference_name: 'LEAD-OTHER' } },
+      { channel: { ...instagramChannel, name: 'OTHER-CHANNEL' } },
+      { channel: { ...instagramChannel, wazzup_api_mode: 'user_api_v3' } },
+    ]) {
+      expect(
+        messengerPersistedConversationConflict({
+          ...instagramScope,
+          ...altered,
+          messages: [message],
+        }),
+      ).toBeNull()
+    }
+  })
+
   it('reacts to an exact echo conflict arriving in a delta or loaded history', () => {
     let messages = ref([{ ...message, binding_conflict: null }])
     let notice = computed(() =>

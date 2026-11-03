@@ -120,9 +120,14 @@
             <div class="max-w-md text-base text-ink-gray-5">
               {{
                 permissions.can_operate
-                  ? __(
-                      'Select a channel and send the first message to this lead.',
-                    )
+                  ? selectedChannelType === 'instagram' &&
+                    selectedRequiresInbound
+                    ? __(
+                        'An incoming message must arrive in the selected channel first.',
+                      )
+                    : __(
+                        'Select a channel and send the first message to this lead.',
+                      )
                   : __('There are no available messages for this lead yet.')
               }}
             </div>
@@ -468,6 +473,13 @@
           @change="handleAttachmentsChange"
         />
         <div
+          v-if="composerTextState.error"
+          data-testid="composer-text-warning"
+          class="mb-2 text-sm text-ink-amber-8"
+        >
+          {{ composerTextState.error }}
+        </div>
+        <div
           v-if="attachmentCaptionState.error"
           data-testid="image-caption-warning"
           class="mb-2 text-sm text-ink-amber-8"
@@ -668,6 +680,7 @@ import {
 import {
   getComposerAttachmentPolicy,
   getComposerCaptionState,
+  getComposerTextState,
   isVideoFile,
   validateComposerFileMix,
 } from '@/utils/messengerComposer'
@@ -941,6 +954,12 @@ const attachmentCaptionState = computed(() =>
     attachmentPolicy.value,
   ),
 )
+const composerTextState = computed(() =>
+  getComposerTextState(
+    preparedHandoff.value?.message || draftText.value.trim(),
+    selectedCapabilities.value,
+  ),
+)
 const conversationNotice = computed(() =>
   getMessengerConversationNotice(selectedConversation.value || {}),
 )
@@ -961,8 +980,10 @@ const needsConversationChoice = computed(
 const selectedRequiresInbound = computed(
   () =>
     selectedCapabilities.value.requires_inbound &&
-    !conversationCandidates.value.length &&
-    !selectedConversation.value?.external_chat_id,
+    (selectedChannelType.value === 'instagram'
+      ? !selectedConversation.value?.external_chat_id
+      : !conversationCandidates.value.length &&
+        !selectedConversation.value?.external_chat_id),
 )
 const baseSendDisabled = computed(
   () =>
@@ -981,6 +1002,7 @@ const baseSendDisabled = computed(
 const sendDisabled = computed(
   () =>
     baseSendDisabled.value ||
+    Boolean(composerTextState.value.error) ||
     Boolean(attachmentMixError.value) ||
     Boolean(attachmentCaptionState.value.error) ||
     pendingAttachments.value.some((item) => item.status !== 'uploaded'),
@@ -1043,6 +1065,12 @@ const composerHint = computed(() => {
   }
   if (missingPhone.value) return __('Add a phone number to the lead record.')
   if (!channels.value.length) return __('No sending channel is available.')
+  if (composerTextState.value.maxLength) {
+    return __('{0}/{1} characters', [
+      composerTextState.value.length,
+      composerTextState.value.maxLength,
+    ])
+  }
   if (
     selectedCapabilities.value.video.send_fallback === 'document' &&
     pendingAttachments.value.some((item) => isVideoFile(item.file))
@@ -1966,6 +1994,16 @@ async function prepareHandoff() {
     return
   }
   if (
+    getMessengerChannelType(
+      channelByName.value[handoffTargetChannel.value],
+    ) === 'instagram'
+  ) {
+    genericError.value = __(
+      'An incoming message must arrive in the selected channel first.',
+    )
+    return
+  }
+  if (
     draftText.value.trim() ||
     pendingAttachments.value.length ||
     pendingLocation.value ||
@@ -2043,6 +2081,12 @@ function integrationWarningMessage(result = {}) {
   ) {
     return __(
       'The Avito integration is not configured. Enter the Client ID and Client Secret in the Avito channel settings, then connect the channel. The message was saved locally with an error status.',
+    )
+  }
+
+  if (isWazzupPartnerChannel(channel) && type === 'instagram') {
+    return __(
+      'The Instagram channel is not configured. Ask your system administrator to check the connection in the channel settings. The message was saved locally with an error status.',
     )
   }
 

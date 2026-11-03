@@ -22,13 +22,13 @@ export const MESSENGER_PROVIDER_OPTIONS = [
 
 export function messengerChannelCreationOptions(legacyEnabled = false) {
   return [
-    ...Object.entries(WAZZUP_PARTNER_TRANSPORTS).map(
-      ([platform, transport]) => ({
+    ...Object.entries(WAZZUP_PARTNER_TRANSPORTS)
+      .filter(([, transport]) => transport.connectionMethod)
+      .map(([platform, transport]) => ({
         label: transport.label,
         value: `partner_${platform}`,
         platform,
-      }),
-    ),
+      })),
     ...MESSENGER_PROVIDER_OPTIONS.filter(
       (option) => option.value !== 'wazzup' || legacyEnabled,
     ).map((option) => ({
@@ -264,7 +264,7 @@ export function messengerChannelState(channel = {}) {
   if (isWazzupPartnerChannel(channel)) {
     return channel.enabled === false || channel.enabled === 0
       ? { label: 'Channel Disabled', theme: 'gray' }
-      : wazzupPartnerStatus(channel.wazzup_status)
+      : wazzupPartnerStatus(channel.wazzup_status, channel.platform)
   }
   if (!channel.enabled) {
     return { label: 'Channel Disabled', theme: 'gray' }

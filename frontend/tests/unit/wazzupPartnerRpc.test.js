@@ -398,6 +398,61 @@ describe('Wazzup Partner onboarding RPC privacy', () => {
     },
   )
 
+  it.each(['active', 'waiting_qr', 'waiting_2fa'])(
+    'preserves existing Instagram channels in %s state without QR connection capabilities',
+    (status) => {
+      const result = normalizePartnerConnection(
+        response({
+          channel: { name: 'INSTAGRAM-1', platform: 'instagram' },
+          onboarding: {
+            status,
+            qr_code: PNG,
+            qr_expires_at: '2026-10-07T23:00:00Z',
+            can_submit_2fa: true,
+            can_reconnect: true,
+          },
+        }),
+      )
+      expect(wazzupPartnerTransport('instagram')).toMatchObject({
+        label: 'Instagram Direct',
+        connectionMethod: null,
+      })
+      expect(result.channel.platform).toBe('instagram')
+      expect(result.onboarding).toMatchObject({
+        status,
+        qr_code: '',
+        qr_expires_at: '',
+        can_submit_2fa: false,
+        can_reconnect: false,
+      })
+    },
+  )
+
+  it.each(['provisioning', 'waiting_qr', 'waiting_2fa', 'reconnecting'])(
+    'keeps Instagram %s provider observations but uses general attention copy',
+    (status) => {
+      const diagnostics = {
+        status,
+        reconciliation: { status: 'verified' },
+        account: { status: 'ready', enabled: true },
+        webhook_subscription: { status: 'configured' },
+      }
+      expect(
+        wazzupPartnerDiagnosticRows(diagnostics, 'instagram')[0],
+      ).toMatchObject({
+        label: 'Needs Attention',
+      })
+      expect(wazzupPartnerConnectionWarning(diagnostics, 'instagram')).toBe(
+        'Connection management for this platform is not available in CRM yet.',
+      )
+      expect(diagnostics.status).toBe(status)
+      expect(wazzupPartnerStatus(status, 'telegram')).not.toEqual({
+        label: 'Needs Attention',
+        theme: 'red',
+      })
+    },
+  )
+
   it('accepts only PNG data URI and removes QR data from other lifecycle states', () => {
     expect(safeWazzupQrImage(PNG)).toBe(PNG)
     for (const value of [

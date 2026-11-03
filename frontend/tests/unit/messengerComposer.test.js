@@ -2,6 +2,7 @@ import {
   createComposerAttachmentController,
   getComposerAttachmentPolicy,
   getComposerCaptionState,
+  getComposerTextState,
   isVideoFile,
   retargetComposerTemporaryFiles,
   validateComposerFileMix,
@@ -36,6 +37,30 @@ function harness(
 }
 
 describe('messenger composer attachments', () => {
+  it('counts message limits like the backend and leaves an oversized draft intact', () => {
+    let draft = '😀'.repeat(1000)
+    expect(getComposerTextState(draft, { max_text_length: 1000 })).toEqual({
+      length: 1000,
+      maxLength: 1000,
+      error: '',
+    })
+    let oversized = `${draft}a`
+    expect(getComposerTextState(oversized, { max_text_length: 1000 })).toEqual({
+      length: 1001,
+      maxLength: 1000,
+      error: 'The message must contain at most 1000 characters.',
+    })
+    expect(oversized).toBe(`${draft}a`)
+    expect(getComposerTextState(' text ').length).toBe(6)
+    expect(getComposerTextState(oversized).error).toBe('')
+    expect(getComposerTextState(oversized, { max_text_length: 0 }).error).toBe(
+      '',
+    )
+    expect(
+      getComposerTextState('a'.repeat(501), { max_text_length: 500 }).error,
+    ).toContain('500')
+  })
+
   it('recognizes VK document fallback video formats by MIME or extension', () => {
     expect(isVideoFile(file('clip.bin', 'video/mp4'))).toBe(true)
     expect(isVideoFile(file('clip.MOV'))).toBe(true)
@@ -549,6 +574,100 @@ describe('messenger composer attachments', () => {
       platform,
     )
   }
+
+  function instagramPolicy() {
+    return getComposerAttachmentPolicy(
+      {
+        supports_attachments: true,
+        supported_attachment_types: ['image'],
+        supported_attachment_file_types_by_type: {
+          image: ['.jpg', '.jpeg', '.png', '.bmp'],
+        },
+        max_attachment_count: 1,
+        max_attachment_size_bytes: 8_000_000,
+        supports_attachment_captions: false,
+        supports_image_caption: false,
+      },
+      'instagram',
+    )
+  }
+
+  it('derives the Instagram picker formats from image capabilities only', () => {
+    expect(instagramPolicy().acceptedFileTypes).toEqual([
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.bmp',
+    ])
+    expect(wazzupPolicy().acceptedFileTypes).toEqual([])
+  })
+
+  it.each([
+    ['photo.jpg', 'image/jpeg'],
+    ['photo.JPEG', 'image/jpeg'],
+    ['photo.png', 'image/png'],
+    ['photo.bmp', 'image/bmp'],
+    ['photo.bmp', 'image/x-ms-bmp'],
+    ['photo.BMP', ''],
+  ])('accepts one Instagram %s image up to 8 MB', (name, type) => {
+    let policy = instagramPolicy()
+    let image = { name, type, size: 8_000_000 }
+    expect(validateComposerFileMix([image], [], policy)).toEqual({
+      files: [image],
+    })
+    expect(
+      validateComposerFileMix([{ ...image, size: 8_000_001 }], [], policy)
+        .error,
+    ).toContain('8 MB')
+    expect(
+      validateComposerFileMix([image], [{ file: image }], policy).error,
+    ).toContain('at most 1')
+    expect(
+      getComposerCaptionState('Keep this text', [{ file: image }], policy)
+        .error,
+    ).toContain('separate messages')
+  })
+
+  it.each([
+    ['image.gif', 'image/gif', 'picker'],
+    ['image.webp', 'image/webp', 'paste'],
+    ['image.svg', 'image/svg+xml', 'drop'],
+    ['clip.mp4', 'video/mp4', 'picker'],
+    ['voice.ogg', 'audio/ogg', 'paste'],
+    ['document.pdf', 'application/pdf', 'drop'],
+    ['disguised.jpg', 'video/mp4', 'picker'],
+    ['disguised.png', 'image/gif', 'paste'],
+    ['disguised.bmp', 'image/svg+xml', 'drop'],
+  ])(
+    'rejects Instagram %s (%s) before uploading from %s',
+    (name, type, source) => {
+      let upload = vi.fn()
+      let onError = vi.fn()
+      let policy = instagramPolicy()
+      let controller = createComposerAttachmentController({
+        upload,
+        maxFiles: 1,
+        onError,
+        validateFiles: (files, existing) =>
+          validateComposerFileMix(files, existing, policy),
+      })
+      let attachment = file(name, type)
+      let event = { preventDefault: vi.fn() }
+      if (source === 'paste') {
+        event.clipboardData = {
+          items: [{ kind: 'file', getAsFile: () => attachment }],
+        }
+        expect(controller.handlePaste(event)).toBe(true)
+      } else if (source === 'drop') {
+        event.dataTransfer = { files: [attachment] }
+        expect(controller.handleDrop(event)).toBe(true)
+      } else expect(controller.addFiles([attachment])).toEqual([])
+
+      expect(upload).not.toHaveBeenCalled()
+      expect(onError).toHaveBeenCalledOnce()
+      expect(controller.getItems()).toEqual([])
+    },
+  )
 
   it.each([
     ['photo.jpg', 'image/jpeg'],

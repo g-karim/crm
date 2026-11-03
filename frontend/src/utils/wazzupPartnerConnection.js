@@ -1,10 +1,28 @@
 const API_PREFIX = 'crm_messenger.api.wazzup_partner'
 
 export const WAZZUP_PARTNER_TRANSPORTS = {
-  whatsapp: { label: 'WhatsApp', simulatorRequires2fa: false },
-  telegram: { label: 'Telegram personal chats', simulatorRequires2fa: true },
-  max: { label: 'MAX personal chats', simulatorRequires2fa: false },
-  viber: { label: 'Viber', simulatorRequires2fa: false },
+  whatsapp: {
+    label: 'WhatsApp',
+    connectionMethod: 'qr',
+    simulatorRequires2fa: false,
+  },
+  telegram: {
+    label: 'Telegram personal chats',
+    connectionMethod: 'qr',
+    simulatorRequires2fa: true,
+  },
+  max: {
+    label: 'MAX personal chats',
+    connectionMethod: 'qr',
+    simulatorRequires2fa: false,
+  },
+  viber: {
+    label: 'Viber',
+    connectionMethod: 'qr',
+    simulatorRequires2fa: false,
+  },
+  // Existing channels are usable; the Wazzup iframe connection flow is separate.
+  instagram: { label: 'Instagram Direct', connectionMethod: null },
 }
 
 export function wazzupPartnerTransport(platform) {
@@ -55,7 +73,14 @@ export function isWazzupPartnerChannel(channel) {
   )
 }
 
-export function wazzupPartnerStatus(status) {
+export function wazzupPartnerStatus(status, platform = '') {
+  if (
+    wazzupPartnerTransport(platform)?.connectionMethod === null &&
+    ['provisioning', 'waiting_qr', 'waiting_2fa', 'reconnecting'].includes(
+      status,
+    )
+  )
+    return STATUS_PRESENTATION.error
   return Object.hasOwn(STATUS_PRESENTATION, status)
     ? STATUS_PRESENTATION[status]
     : status
@@ -122,7 +147,7 @@ export function normalizePartnerDiagnostics(integration) {
   }
 }
 
-export function wazzupPartnerDiagnosticRows(diagnostics) {
+export function wazzupPartnerDiagnosticRows(diagnostics, platform = '') {
   const value = diagnostics || {}
   const reconciliation = value.reconciliation?.status
   const subscription = value.webhook_subscription?.status
@@ -133,7 +158,7 @@ export function wazzupPartnerDiagnosticRows(diagnostics) {
       key: 'remote_channel',
       title: 'Provider channel status',
       ...(reconciliation === 'verified'
-        ? wazzupPartnerStatus(value.status)
+        ? wazzupPartnerStatus(value.status, platform)
         : reconciliation === 'unverified' &&
             value.reconciliation?.reason === 'channel_not_returned'
           ? { label: 'No channel data', theme: 'gray' }
@@ -180,7 +205,7 @@ export function wazzupPartnerDiagnosticRows(diagnostics) {
   ]
 }
 
-export function wazzupPartnerConnectionWarning(diagnostics) {
+export function wazzupPartnerConnectionWarning(diagnostics, platform = '') {
   if (
     diagnostics?.reconciliation?.status === 'unverified' &&
     diagnostics.reconciliation.reason === 'channel_not_returned'
@@ -188,6 +213,11 @@ export function wazzupPartnerConnectionWarning(diagnostics) {
     return 'The provider returned no channel information. Refresh the status and test the connection again.'
   if (diagnostics?.reconciliation?.status !== 'verified')
     return 'The channel could not be verified. Test the connection again.'
+  if (
+    wazzupPartnerTransport(platform)?.connectionMethod === null &&
+    diagnostics.status !== 'active'
+  )
+    return 'Connection management for this platform is not available in CRM yet.'
   if (!['active', 'waiting_qr', 'waiting_2fa'].includes(diagnostics.status))
     return 'Refresh the channel status or restore the connection to regain access.'
   if (diagnostics.account?.status !== 'ready' || !diagnostics.account.enabled)
@@ -208,6 +238,7 @@ export function safeWazzupQrImage(value) {
 export function normalizePartnerConnection(value = {}) {
   const channel = value.channel || {}
   const transport = wazzupPartnerTransport(channel.platform)
+  const supportsQrConnection = transport?.connectionMethod === 'qr'
   const onboarding = value.onboarding || {}
   const candidate = onboarding.status || channel.wazzup_status
   const status = Object.hasOwn(STATUS_PRESENTATION, candidate)
@@ -257,18 +288,23 @@ export function normalizePartnerConnection(value = {}) {
     onboarding: {
       status,
       qr_code:
-        status === 'waiting_qr' && Number.isFinite(expiry)
+        supportsQrConnection &&
+        status === 'waiting_qr' &&
+        Number.isFinite(expiry)
           ? safeWazzupQrImage(onboarding.qr_code)
           : '',
-      qr_expires_at: Number.isFinite(expiry)
-        ? new Date(expiry).toISOString()
-        : '',
+      qr_expires_at:
+        supportsQrConnection && Number.isFinite(expiry)
+          ? new Date(expiry).toISOString()
+          : '',
       qr_expired: Boolean(onboarding.qr_expired),
       has_error: Boolean(onboarding.error),
       can_submit_2fa: Boolean(
-        status === 'waiting_2fa' && transport && onboarding.can_submit_2fa,
+        supportsQrConnection &&
+        status === 'waiting_2fa' &&
+        onboarding.can_submit_2fa,
       ),
-      can_reconnect: Boolean(onboarding.can_reconnect),
+      can_reconnect: Boolean(supportsQrConnection && onboarding.can_reconnect),
     },
     simulator: value.simulator === true,
     integration,

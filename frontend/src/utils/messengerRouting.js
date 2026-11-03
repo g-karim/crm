@@ -1,6 +1,9 @@
 import { avitoConversationLabel } from '@/utils/messengerAvitoContext'
 import { getMessengerMessagePreview } from '@/utils/messengerAttachments'
-import { isWazzupPartnerChannel } from '@/utils/wazzupPartnerConnection'
+import {
+  isWazzupPartnerChannel,
+  wazzupPartnerTransport,
+} from '@/utils/wazzupPartnerConnection'
 
 export function messengerConversationsForChannel(
   conversations = [],
@@ -39,6 +42,8 @@ export function messengerConversationOption(
     conversation.channel_info?.label ||
     conversation.platform ||
     conversation.chat_type ||
+    wazzupPartnerTransport(conversation.channel_info?.platform)?.label ||
+    conversation.channel_info?.platform ||
     conversation.provider
   let channel = conversation.channel_info?.name || conversation.channel
   let externalId =
@@ -119,7 +124,7 @@ export function messengerPersistedConversationConflict({
   if (
     !leadName ||
     !isWazzupPartnerChannel(channel) ||
-    !['whatsapp', 'telegram'].includes(channel.platform) ||
+    !['whatsapp', 'telegram', 'instagram'].includes(channel.platform) ||
     conversation?.provider !== 'wazzup' ||
     conversation.channel !== channel.name ||
     conversation.reference_doctype !== 'CRM Lead' ||

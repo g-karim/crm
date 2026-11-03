@@ -253,6 +253,29 @@ export function validateComposerFileMix(files, existing, context = {}) {
 
   let supportedTypes = new Set(context.supportedAttachmentTypes || [])
   if (
+    context.channelType === 'instagram' &&
+    combined.some((file) => {
+      let mime = String(file.type || '').toLowerCase()
+      return (
+        mime &&
+        ![
+          'image/jpeg',
+          'image/png',
+          'image/bmp',
+          'image/x-ms-bmp',
+          'application/octet-stream',
+        ].includes(mime)
+      )
+    })
+  ) {
+    return {
+      files: [],
+      error: translate(
+        'This file format is not supported by the selected channel.',
+      ),
+    }
+  }
+  if (
     supportedTypes.size &&
     combined.some((file) => !supportedTypes.has(composerAttachmentType(file)))
   ) {
@@ -370,6 +393,23 @@ export function getComposerAttachmentPolicy(
   )
     ? capabilities.supported_attachment_file_types
     : []
+  let acceptedFileTypesByType =
+    capabilities.supported_attachment_file_types_by_type || {}
+  if (
+    !acceptedFileTypes.length &&
+    supportedAttachmentTypes.length &&
+    supportedAttachmentTypes.every(
+      (type) => acceptedFileTypesByType[type]?.length,
+    )
+  ) {
+    acceptedFileTypes = [
+      ...new Set(
+        supportedAttachmentTypes.flatMap(
+          (type) => acceptedFileTypesByType[type],
+        ),
+      ),
+    ]
+  }
   if (!acceptedFileTypes.length && channelType === 'avito') {
     acceptedFileTypes = AVITO_IMAGE_FILE_TYPES
   }
@@ -383,8 +423,7 @@ export function getComposerAttachmentPolicy(
     ),
     supportedAttachmentTypes,
     acceptedFileTypes,
-    acceptedFileTypesByType:
-      capabilities.supported_attachment_file_types_by_type || {},
+    acceptedFileTypesByType,
     maxAttachmentSizeBytes: Number(capabilities.max_attachment_size_bytes || 0),
     maxAttachmentSizeBytesByType:
       capabilities.max_attachment_size_bytes_by_type || {},
@@ -400,6 +439,23 @@ export function getComposerAttachmentPolicy(
       channelType === 'avito'
         ? 'Avito supports JPEG, PNG, GIF, BMP, and HEIC images.'
         : 'This file format is not supported by the selected channel.',
+  }
+}
+
+export function getComposerTextState(text, capabilities = {}) {
+  let limit = Number(capabilities.max_text_length || 0)
+  let maxLength = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0
+  // The backend validates Python string length, which counts Unicode code points.
+  let length = Array.from(String(text || '')).length
+  return {
+    length,
+    maxLength,
+    error:
+      maxLength && length > maxLength
+        ? translate('The message must contain at most {0} characters.', [
+            maxLength,
+          ])
+        : '',
   }
 }
 

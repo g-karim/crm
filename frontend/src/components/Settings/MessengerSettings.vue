@@ -1013,11 +1013,20 @@ const wazzupPlatforms = computed(() => [
   { label: __('WhatsApp'), value: 'whatsapp' },
   { label: __('Telegram personal chats'), value: 'telegram' },
 ])
-const providerOptions = computed(() =>
-  messengerChannelCreationOptions(settings.wazzup_legacy_ui_enabled).map(
-    (option) => ({ value: option.value, label: __(option.label) }),
-  ),
-)
+const providerOptions = computed(() => {
+  const options = messengerChannelCreationOptions(
+    settings.wazzup_legacy_ui_enabled,
+  ).map((option) => ({ value: option.value, label: __(option.label) }))
+  const selected = channelDraft.value.provider
+  if (
+    channelDraft.value.channel &&
+    isPartnerDraft.value &&
+    !options.some((option) => option.value === selected)
+  ) {
+    options.push({ value: selected, label: localizedProviderLabel(selected) })
+  }
+  return options
+})
 
 const settingsDirty = computed(
   () => settingsSnapshot.value && settingsSnapshot.value !== settingsState(),

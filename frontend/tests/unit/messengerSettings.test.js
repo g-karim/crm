@@ -229,6 +229,40 @@ describe('messengerSettings', () => {
       expect(messengerProviderLabel(option.value)).toBe(option.label)
   })
 
+  it('labels existing Instagram channels without offering unsupported creation', () => {
+    expect(messengerProviderLabel('partner_instagram')).toBe('Instagram Direct')
+    for (const legacyEnabled of [false, true]) {
+      expect(
+        messengerChannelCreationOptions(legacyEnabled).some(
+          (option) => option.platform === 'instagram',
+        ),
+      ).toBe(false)
+    }
+    expect(
+      makeMessengerChannelDraft({
+        name: 'instagram-1',
+        provider: 'wazzup',
+        platform: 'instagram',
+        wazzup_api_mode: 'partner_api_v2',
+      }).platform,
+    ).toBe('instagram')
+  })
+
+  it.each(['provisioning', 'waiting_qr', 'waiting_2fa', 'reconnecting'])(
+    'does not present unsupported Instagram authorization state %s as a CRM action',
+    (wazzup_status) => {
+      expect(
+        messengerChannelState({
+          provider: 'wazzup',
+          platform: 'instagram',
+          wazzup_api_mode: 'partner_api_v2',
+          wazzup_status,
+          enabled: true,
+        }),
+      ).toEqual({ label: 'Needs Attention', theme: 'red' })
+    },
+  )
+
   it('creates provider-aware drafts without exposing saved secrets', () => {
     expect(
       makeMessengerChannelDraft({

@@ -19,8 +19,19 @@
     </div>
 
     <template v-else>
+      <p
+        v-if="!supportsQrConnection && !connectionWarning"
+        class="text-p-sm text-ink-gray-6"
+        role="status"
+      >
+        {{
+          __(
+            'Connection management for this platform is not available in CRM yet.',
+          )
+        }}
+      </p>
       <section
-        v-if="onboarding.status === 'waiting_qr'"
+        v-if="supportsQrConnection && onboarding.status === 'waiting_qr'"
         class="flex flex-col items-center gap-3 rounded-lg border border-outline-gray-1 p-4"
       >
         <template v-if="qrExpired">
@@ -86,6 +97,7 @@
 
       <p
         v-if="
+          supportsQrConnection &&
           !connectionWarning &&
           ['unauthorized', 'disabled', 'error', 'unknown'].includes(
             onboarding.status,
@@ -110,7 +122,12 @@
       </p>
 
       <div
-        v-if="simulator && onboarding.status === 'waiting_qr' && !qrExpired"
+        v-if="
+          supportsQrConnection &&
+          simulator &&
+          onboarding.status === 'waiting_qr' &&
+          !qrExpired
+        "
         class="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-gray-1 p-3"
       >
         <span class="text-p-sm text-ink-gray-6">{{
@@ -134,6 +151,7 @@
           @click="checkConnection"
         />
         <Button
+          v-if="supportsQrConnection"
           :label="__('Connect / Restore')"
           variant="solid"
           :disabled="busy"
@@ -148,7 +166,7 @@
           @click="refresh"
         />
         <Button
-          v-if="currentChannel.enabled"
+          v-if="supportsQrConnection && currentChannel.enabled"
           :label="__('Disconnect')"
           variant="subtle"
           theme="red"
@@ -338,19 +356,28 @@ let disposed = false
 let pollTimer = null
 
 const busy = computed(() => Boolean(action.value))
+const supportsQrConnection = computed(
+  () =>
+    wazzupPartnerTransport(currentChannel.value.platform || props.platform)
+      ?.connectionMethod === 'qr',
+)
 watch(busy, (value) => emit('busy', value), { flush: 'sync' })
 const connectionWarning = computed(() =>
   checkedConnection.value || diagnostics.value?.last_checked_at
-    ? wazzupPartnerConnectionWarning(diagnostics.value)
+    ? wazzupPartnerConnectionWarning(
+        diagnostics.value,
+        currentChannel.value.platform,
+      )
     : '',
 )
 const diagnosticRows = computed(() =>
-  wazzupPartnerDiagnosticRows(diagnostics.value),
+  wazzupPartnerDiagnosticRows(diagnostics.value, currentChannel.value.platform),
 )
 const preparing = computed(
   () =>
-    action.value === 'start_connection' ||
-    ['provisioning', 'reconnecting'].includes(onboarding.value.status),
+    supportsQrConnection.value &&
+    (action.value === 'start_connection' ||
+      ['provisioning', 'reconnecting'].includes(onboarding.value.status)),
 )
 const qrExpired = computed(
   () =>
@@ -404,7 +431,7 @@ async function operate(method, args, polling = false) {
     simulator.value = result.simulator
     if (result.onboarding.has_error) {
       error.value = wazzupPartnerError(
-        result.onboarding.status === 'waiting_2fa'
+        supportsQrConnection.value && result.onboarding.status === 'waiting_2fa'
           ? 'two_factor_rejected'
           : result.onboarding.status === 'unknown'
             ? 'provider_unknown'
@@ -432,7 +459,11 @@ async function operate(method, args, polling = false) {
 }
 
 function startConnection() {
-  if (!props.available || !wazzupPartnerTransport(props.platform)) return false
+  if (
+    !props.available ||
+    wazzupPartnerTransport(props.platform)?.connectionMethod !== 'qr'
+  )
+    return false
   return operate('start_connection', {
     platform: props.platform,
     custom_display_name: props.displayName.trim(),
@@ -455,6 +486,8 @@ function showConfirmation(action) {
 }
 
 function reconnect() {
+  if (!supportsQrConnection.value || !onboarding.value.can_reconnect)
+    return false
   password.value = ''
   confirmDelete.value = false
   confirmReauthorize.value = false
@@ -470,11 +503,13 @@ function saveSettings() {
 }
 
 function connectChannel() {
+  if (!supportsQrConnection.value) return false
   password.value = ''
   return operate('connect_channel', { channel: currentChannel.value.name })
 }
 
 function disconnect() {
+  if (!supportsQrConnection.value) return false
   password.value = ''
   return operate('disconnect', { channel: currentChannel.value.name })
 }
@@ -510,6 +545,7 @@ async function submitTwoFactor() {
 }
 
 function simulateScan() {
+  if (!supportsQrConnection.value) return false
   return operate('simulator_scan', {
     channel: currentChannel.value.name,
     require_2fa: Boolean(
