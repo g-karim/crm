@@ -9743,3 +9743,19 @@ msgstr "Вложение"
 #: frontend/src/utils/messengerAttachments.js
 msgid "Unsupported attachment"
 msgstr "Неподдерживаемое вложение"
+
+#: frontend/src/components/Settings/WazzupPartnerConnection.vue
+msgid "Connection management for this platform is not available in CRM yet."
+msgstr "Управление подключением этой платформы пока недоступно в CRM."
+
+#: frontend/src/utils/messengerComposer.js
+msgid "The message must contain at most {0} characters."
+msgstr "Сообщение должно содержать не более {0} символов."
+
+#: frontend/src/components/LeadMessenger/LeadConversation.vue
+msgid "{0}/{1} characters"
+msgstr "{0}/{1} символов"
+
+#: frontend/src/components/LeadMessenger/LeadConversation.vue
+msgid "The Instagram channel is not configured. Ask your system administrator to check the connection in the channel settings. The message was saved locally with an error status."
+msgstr "Канал Instagram не настроен. Попросите системного администратора проверить подключение в настройках канала. Сообщение сохранено локально со статусом ошибки."
