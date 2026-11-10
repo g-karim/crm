@@ -134,7 +134,11 @@ function forwardSender(message) {
 export function getMessengerChannelType(channel = {}) {
   if (channel?.provider === 'avito_direct') return 'avito'
   return normalizePlatform(
-    channel?.platform || channel?.channel_type || channel?.chat_type || '',
+    channel?.platform ||
+      channel?.channel_type ||
+      channel?.chat_type ||
+      channel?.channel_info?.platform ||
+      '',
   )
 }
 

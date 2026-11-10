@@ -104,6 +104,56 @@ describe('messengerChannels', () => {
     expect(getMessengerChannelType({ chat_type: 'whatsapp' })).toBe('whatsapp')
   })
 
+  it.each([
+    ['whatsapp', 'WhatsApp'],
+    ['telegram', 'Telegram'],
+    ['max', 'MAX'],
+    ['viber', 'Viber'],
+  ])('reads %s from a partial conversation channel DTO', (platform, label) => {
+    const channel = {
+      provider: 'wazzup',
+      channel_info: { platform: ` ${platform.toUpperCase()} ` },
+    }
+    const original = structuredClone(channel)
+
+    expect(getMessengerChannelType(channel)).toBe(platform)
+    expect(getMessengerPlatformLabel(channel)).toBe(label)
+    expect(
+      buildMessengerChannelOptions([
+        { ...channel, name: 'CHANNEL-1' },
+        { ...channel, name: 'CHANNEL-2' },
+      ]),
+    ).toEqual([
+      { label, value: 'CHANNEL-1' },
+      { label: `${label} 2`, value: 'CHANNEL-2' },
+    ])
+    expect(channel).toEqual(original)
+  })
+
+  it.each(['platform', 'channel_type', 'chat_type'])(
+    'keeps explicit %s ahead of the nested channel platform',
+    (field) => {
+      expect(
+        getMessengerChannelType({
+          [field]: 'whatsapp',
+          channel_info: { platform: 'telegram' },
+        }),
+      ).toBe('whatsapp')
+    },
+  )
+
+  it('preserves direct Avito identity and handles absent channel metadata', () => {
+    expect(
+      getMessengerChannelType({
+        provider: 'avito_direct',
+        channel_info: { platform: 'whatsapp' },
+      }),
+    ).toBe('avito')
+    for (const channel of [{}, { channel_info: null }, { channel_info: {} }]) {
+      expect(getMessengerChannelType(channel)).toBe('')
+    }
+  })
+
   it('builds unique select labels without technical names', () => {
     expect(
       buildMessengerChannelOptions([

@@ -680,57 +680,63 @@ describe('embedded Partner connection state and actions', () => {
     expect(mocks.call).toHaveBeenCalledTimes(calls)
   })
 
-  it('shows the common actions, keeps diagnostics collapsed and disconnects without deleting remotely', async () => {
-    mocks.call.mockImplementation(async (method) =>
-      result('active', { channel: { enabled: method !== 'disconnect' } }),
-    )
-    const { root, updated } = await mount({
-      name: 'PARTNER-1',
-      wazzup_status: 'active',
-      enabled: true,
-    })
-    const details = root.querySelector('[data-wazzup-partner-diagnostics]')
-    expect(details.tagName).toBe('DETAILS')
-    expect(details.open).toBe(false)
-    expect(details.querySelector('summary').textContent.trim()).toBe(
-      'Connection details',
-    )
-    const actions = [
-      ...details.previousElementSibling.querySelectorAll('button'),
-    ].map((button) => button.textContent)
-    expect(actions).toEqual([
-      'Test',
-      'Connect / Restore',
-      'Refresh Status',
-      'Disconnect',
-    ])
-    expect(root.textContent).not.toContain(
-      'The messenger account is connected.',
-    )
-    await click(root, 'Connect / Restore')
-    expect(mocks.call).toHaveBeenLastCalledWith('connect_channel', {
-      channel: 'PARTNER-1',
-    })
-    expect(
-      mocks.call.mock.calls.some(([method]) => method === 'reconnect'),
-    ).toBe(false)
-    await click(root, 'Disconnect')
-    expect(mocks.call).toHaveBeenLastCalledWith('disconnect', {
-      channel: 'PARTNER-1',
-    })
-    expect(updated.mock.lastCall[0]).toMatchObject({
-      enabled: false,
-      wazzup_status: 'active',
-    })
-    expect(
-      mocks.call.mock.calls.some(([method]) => method === 'delete_channel'),
-    ).toBe(false)
-    expect(
-      [...root.querySelectorAll('button')].some(
-        (button) => button.textContent === 'Disconnect',
-      ),
-    ).toBe(false)
-  })
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
+    'shows the common %s actions, keeps diagnostics collapsed and disconnects without deleting remotely',
+    async (platform) => {
+      mocks.call.mockImplementation(async (method) =>
+        result('active', {
+          channel: { platform, enabled: method !== 'disconnect' },
+        }),
+      )
+      const { root, updated } = await mount({
+        name: 'PARTNER-1',
+        platform,
+        wazzup_status: 'active',
+        enabled: true,
+      })
+      const details = root.querySelector('[data-wazzup-partner-diagnostics]')
+      expect(details.tagName).toBe('DETAILS')
+      expect(details.open).toBe(false)
+      expect(details.querySelector('summary').textContent.trim()).toBe(
+        'Connection details',
+      )
+      const actions = [
+        ...details.previousElementSibling.querySelectorAll('button'),
+      ].map((button) => button.textContent)
+      expect(actions).toEqual([
+        'Test',
+        'Connect / Restore',
+        'Refresh Status',
+        'Disconnect',
+      ])
+      expect(root.textContent).not.toContain(
+        'The messenger account is connected.',
+      )
+      await click(root, 'Connect / Restore')
+      expect(mocks.call).toHaveBeenLastCalledWith('connect_channel', {
+        channel: 'PARTNER-1',
+      })
+      expect(
+        mocks.call.mock.calls.some(([method]) => method === 'reconnect'),
+      ).toBe(false)
+      await click(root, 'Disconnect')
+      expect(mocks.call).toHaveBeenLastCalledWith('disconnect', {
+        channel: 'PARTNER-1',
+      })
+      expect(updated.mock.lastCall[0]).toMatchObject({
+        enabled: false,
+        wazzup_status: 'active',
+      })
+      expect(
+        mocks.call.mock.calls.some(([method]) => method === 'delete_channel'),
+      ).toBe(false)
+      expect(
+        [...root.querySelectorAll('button')].some(
+          (button) => button.textContent === 'Disconnect',
+        ),
+      ).toBe(false)
+    },
+  )
 
   it('requires explicit confirmation before starting account authorization again', async () => {
     mocks.call.mockResolvedValue(result('active'))
