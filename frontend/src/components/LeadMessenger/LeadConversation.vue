@@ -1994,9 +1994,8 @@ async function prepareHandoff() {
     return
   }
   if (
-    getMessengerChannelType(
-      channelByName.value[handoffTargetChannel.value],
-    ) === 'instagram'
+    getMessengerChannelType(channelByName.value[handoffTargetChannel.value]) ===
+    'instagram'
   ) {
     genericError.value = __(
       'An incoming message must arrive in the selected channel first.',

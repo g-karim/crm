@@ -301,8 +301,8 @@ export function normalizePartnerConnection(value = {}) {
       has_error: Boolean(onboarding.error),
       can_submit_2fa: Boolean(
         supportsQrConnection &&
-        status === 'waiting_2fa' &&
-        onboarding.can_submit_2fa,
+          status === 'waiting_2fa' &&
+          onboarding.can_submit_2fa,
       ),
       can_reconnect: Boolean(supportsQrConnection && onboarding.can_reconnect),
     },

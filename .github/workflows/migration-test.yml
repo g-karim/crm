@@ -78,7 +78,7 @@ jobs:
               uses: actions/checkout@v6
               with:
                   repository: g-karim/crm_messenger
-                  ref: 4dff59b0aab8cda4c3e5c19135fb0f32fdfec47e
+                  ref: 021685cd7cc7429a3948e0cf09d36924f4a9eb6b
                   token: ${{ secrets.CRM_MESSENGER_READ_TOKEN }}
                   path: pr-crm-messenger
 

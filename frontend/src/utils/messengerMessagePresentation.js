@@ -1,3 +1,5 @@
+import { getMessengerAttachmentTitle } from '@/utils/messengerAttachments'
+
 export function getMessengerMessageTextPresentation(message = {}) {
   let text = String(message?.text || '')
   let normalizedText = text.trim().toLowerCase()
@@ -13,6 +15,27 @@ export function getMessengerMessageTextPresentation(message = {}) {
     text.trim() === attachments[0].file_name
   ) {
     return { text: '', translate: false }
+  }
+
+  if (
+    message?.provider === 'wazzup' &&
+    message.direction === 'inbound' &&
+    attachments.length === 1 &&
+    attachments[0].type === 'file'
+  ) {
+    let attachment = attachments[0]
+    let filename = getMessengerAttachmentTitle({
+      ...attachment,
+      provider: message.provider,
+    })
+    // Wazzup does not identify filename text separately from an equal caption.
+    // Collapse exact duplicates only when that name is shown in the file card.
+    if (
+      text === filename &&
+      [attachment.original_file_name, attachment.file_name].includes(filename)
+    ) {
+      return { text: '', translate: false }
+    }
   }
 
   if (message?.message_type === 'image' && normalizedText === '[image]') {

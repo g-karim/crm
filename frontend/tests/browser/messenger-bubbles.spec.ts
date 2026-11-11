@@ -17,6 +17,47 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
+for (const [provider, platform] of [
+  ['wazzup', 'whatsapp'],
+  ['wazzup', 'telegram'],
+  ['wazzup', 'max'],
+  ['wazzup', 'viber'],
+  ['telegram_bot', 'telegram'],
+  ['max_direct', 'max'],
+  ['vk_direct', 'vk'],
+  ['avito_direct', 'avito'],
+]) {
+  for (const direction of ['inbound', 'outbound']) {
+    test(`document filename presentation survives sync and reload: ${provider} ${platform} ${direction}`, async ({
+      page,
+    }) => {
+      await page.goto(
+        `/tests/browser/messenger-bubbles.html?wazzupMedia=1&case=document-native-filename&provider=${provider}&platform=${platform}&direction=${direction}`,
+      )
+      const bubble = page.locator('[data-message-bubble]')
+      const hidden = provider === 'wazzup' && direction === 'inbound'
+      for (const phase of ['initial', 'delta', 'refresh', 'reload']) {
+        if (phase === 'delta')
+          await page.evaluate(() => window.messengerMediaFixture.delta())
+        if (phase === 'refresh')
+          await page.evaluate(() => window.messengerMediaFixture.refresh())
+        if (phase === 'reload') await page.reload()
+        await expect(bubble.locator('[data-attachment-card-title]')).toHaveText(
+          'Требования к оформлению проекта (1).pptx',
+        )
+        await expect(bubble.locator('[data-message-text]')).toHaveCount(
+          hidden ? 0 : 1,
+        )
+        expect(
+          (await bubble.textContent())!.split(
+            'Требования к оформлению проекта (1).pptx',
+          ).length,
+        ).toBe(hidden ? 2 : 3)
+      }
+    })
+  }
+}
+
 for (const platform of ['whatsapp', 'telegram']) {
   test(`Wazzup ${platform} saved document click preserves the download filename`, async ({
     page,

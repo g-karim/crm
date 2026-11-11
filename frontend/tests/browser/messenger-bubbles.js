@@ -293,6 +293,20 @@ const wazzupCases = [
     attachments: [file('Договор.pdf')],
   },
   {
+    // Native callback DTO, without the legacy text_is_attachment_filename flag.
+    // An intentionally equal caption has the same shape and display policy.
+    key: 'document-native-filename',
+    text: 'Требования к оформлению проекта (1).pptx',
+    attachments: [
+      {
+        ...file('Требования к оформлению проекта (1).pptx'),
+        original_file_name: 'Требования к оформлению проекта (1).pptx',
+        mime_type:
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      },
+    ],
+  },
+  {
     key: 'opaque-file',
     attachments: [
       {

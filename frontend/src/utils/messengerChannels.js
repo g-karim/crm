@@ -411,8 +411,8 @@ export function getMessengerCapabilities(channel = {}) {
     requires_phone: false,
     supports_attachments: Boolean(
       (channel?.capabilities?.supports_attachments ?? true) &&
-      supportedAttachmentTypes.length &&
-      supportedImageFormats.length,
+        supportedAttachmentTypes.length &&
+        supportedImageFormats.length,
     ),
     supported_attachment_types: supportedAttachmentTypes,
     supported_attachment_file_types_by_type: {
