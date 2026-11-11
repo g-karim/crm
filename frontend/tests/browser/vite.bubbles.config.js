@@ -19,7 +19,10 @@ export default {
   },
   optimizeDeps: {
     ...config.optimizeDeps,
-    entries: ['tests/browser/messenger-bubbles.html'],
+    entries: [
+      'tests/browser/messenger-bubbles.html',
+      'tests/browser/messenger-voice.html',
+    ],
     // The real frappe-ui Button imports reka-ui's barrel. Prebundle it so a
     // cold layout test does not request hundreds of individual modules.
     include: [

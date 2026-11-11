@@ -838,7 +838,10 @@
 <script setup>
 import SettingsLayoutBase from '@/components/Layouts/SettingsLayoutBase.vue'
 import WazzupPartnerConnection from '@/components/Settings/WazzupPartnerConnection.vue'
-import { isWazzupPartnerChannel } from '@/utils/wazzupPartnerConnection'
+import {
+  isWazzupPartnerChannel,
+  wazzupPartnerTransport,
+} from '@/utils/wazzupPartnerConnection'
 import {
   applyMessengerProviderDefaults,
   buildMessengerChannelPayload,
@@ -953,12 +956,17 @@ const channelBusy = computed(
 )
 const channelDirty = computed(() => channelState() !== channelSnapshot.value)
 const isPartnerDraft = computed(() =>
-  ['partner_whatsapp', 'partner_telegram'].includes(
-    channelDraft.value.provider,
+  Boolean(
+    channelDraft.value.provider?.startsWith('partner_') &&
+      wazzupPartnerTransport(
+        channelDraft.value.provider.slice('partner_'.length),
+      ),
   ),
 )
 const partnerPlatform = computed(() =>
-  channelDraft.value.provider === 'partner_telegram' ? 'telegram' : 'whatsapp',
+  isPartnerDraft.value
+    ? channelDraft.value.provider.slice('partner_'.length)
+    : '',
 )
 const draftChannelState = computed(() =>
   isPartnerDraft.value
@@ -1173,11 +1181,7 @@ function openChannel(channel) {
   resetWazzupChannels()
   channelDraft.value = {
     ...makeMessengerChannelDraft(channel),
-    provider: partner
-      ? channel.platform === 'telegram'
-        ? 'partner_telegram'
-        : 'partner_whatsapp'
-      : channel.provider,
+    provider: partner ? `partner_${channel.platform}` : channel.provider,
     state: channel.state,
     auth_error: channel.auth_error,
     provider_display_name: channel.provider_display_name,
@@ -1645,9 +1649,7 @@ function channelTitle(channel) {
     channel.provider_display_name ||
     (channel.provider === 'wazzup' &&
       __(
-        channel.platform === 'telegram'
-          ? 'Telegram personal chats'
-          : 'WhatsApp',
+        wazzupPartnerTransport(channel.platform)?.label || channel.platform,
       )) ||
     channel.label ||
     localizedProviderLabel(channel.provider)
@@ -1657,7 +1659,7 @@ function channelTitle(channel) {
 function providerDescription(channel) {
   if (channel.provider === 'wazzup')
     return __(
-      channel.platform === 'telegram' ? 'Telegram personal chats' : 'WhatsApp',
+      wazzupPartnerTransport(channel.platform)?.label || channel.platform,
     )
   let parts = [localizedProviderLabel(channel.provider)]
   if (channel.platform) parts.push(channel.platform)
@@ -1669,9 +1671,9 @@ function providerDescription(channel) {
 function providerInitial(channel) {
   let label =
     channel.provider === 'wazzup'
-      ? channel.platform === 'telegram'
-        ? 'Telegram'
-        : 'WhatsApp'
+      ? wazzupPartnerTransport(channel.platform)?.label ||
+        channel.platform ||
+        ''
       : messengerProviderLabel(channel.provider)
   return label === 'Telegram Bot' ? 'TG' : label.slice(0, 2).toUpperCase()
 }

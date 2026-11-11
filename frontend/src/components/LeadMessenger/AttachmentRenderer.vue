@@ -108,7 +108,7 @@ const singleImage = computed(() =>
   isSingleImageAttachmentSet(props.attachments),
 )
 const singleSticker = computed(() =>
-  isSingleStickerAttachmentSet(props.attachments, props.provider),
+  isSingleStickerAttachmentSet(props.attachments),
 )
 const singleLocation = computed(() =>
   isSingleLocationAttachmentSet(props.attachments),

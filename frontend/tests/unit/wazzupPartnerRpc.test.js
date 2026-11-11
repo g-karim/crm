@@ -5,6 +5,7 @@ import {
   wazzupPartnerConnectionWarning,
   wazzupPartnerDiagnosticRows,
   wazzupPartnerStatus,
+  wazzupPartnerTransport,
 } from '@/utils/wazzupPartnerConnection'
 
 const PNG = 'data:image/png;base64,aGVsbG8='
@@ -360,6 +361,42 @@ describe('Wazzup Partner onboarding RPC privacy', () => {
       'X-Frappe-CSRF-Token',
     )
   })
+
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
+    'preserves %s transport and permits additional authorization only from explicit onboarding capability',
+    (platform) => {
+      const result = normalizePartnerConnection(
+        response({
+          channel: { name: 'PARTNER-1', platform },
+          onboarding: { status: 'waiting_2fa', can_submit_2fa: true },
+        }),
+      )
+      expect(result.channel.platform).toBe(platform)
+      expect(result.onboarding.can_submit_2fa).toBe(true)
+      const notRequested = normalizePartnerConnection(
+        response({
+          channel: { name: 'PARTNER-1', platform },
+          onboarding: { status: 'waiting_qr', can_submit_2fa: true },
+        }),
+      )
+      expect(notRequested.onboarding.can_submit_2fa).toBe(false)
+    },
+  )
+
+  it.each(['unsupported', '__proto__', 'max_api'])(
+    'does not reinterpret unknown transport %s as WhatsApp',
+    (platform) => {
+      expect(wazzupPartnerTransport(platform)).toBeNull()
+      const result = normalizePartnerConnection(
+        response({
+          channel: { name: 'PARTNER-1', platform },
+          onboarding: { status: 'waiting_2fa', can_submit_2fa: true },
+        }),
+      )
+      expect(result.channel.platform).toBe('')
+      expect(result.onboarding.can_submit_2fa).toBe(false)
+    },
+  )
 
   it('accepts only PNG data URI and removes QR data from other lifecycle states', () => {
     expect(safeWazzupQrImage(PNG)).toBe(PNG)

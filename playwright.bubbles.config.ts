@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./frontend/tests/browser",
-  testMatch: /messenger-bubbles\.spec\.ts/,
+  testMatch: /messenger-(?:bubbles|voice)\.spec\.ts/,
   workers: 1,
   retries: 0,
   reporter: "line",

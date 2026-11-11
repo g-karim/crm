@@ -53,6 +53,8 @@ describe('common messenger sticker', () => {
   it.each([
     ['wazzup', 'whatsapp'],
     ['wazzup', 'telegram'],
+    ['wazzup', 'max'],
+    ['wazzup', 'viber'],
     ['max_direct', 'max'],
     ['vk_direct', 'vk'],
     ['telegram_bot', 'telegram'],
@@ -122,6 +124,43 @@ describe('common messenger sticker', () => {
     await vi.advanceTimersByTimeAsync(20000)
     expect(root.querySelector('[data-sticker-video]')).not.toBeNull()
     expect(root.querySelector('[data-sticker-loading]')).toBeNull()
+  })
+
+  it.each(['image/gif', 'image/webp', 'image/apng', 'image/png'])(
+    'keeps an animated %s sticker in the compact image renderer',
+    async (mime_type) => {
+      let root = mountSticker(sticker({ mime_type, is_animated: true }))
+      expect(root.firstElementChild.className).toContain('size-40')
+      expect(root.querySelector('[data-sticker-image]')).not.toBeNull()
+      expect(root.querySelector('video')).toBeNull()
+      root.querySelector('img').dispatchEvent(new Event('load'))
+      await nextTick()
+      expect(root.querySelector('[data-sticker-loading]')).toBeNull()
+    },
+  )
+
+  it('uses the video playback rendition and resets browser failure when it changes', async () => {
+    let attachment = reactive(
+      sticker({
+        mime_type: 'video/webm',
+        is_animated: true,
+        url: null,
+        playback_url: '/api/sticker-playback',
+      }),
+    )
+    let root = mountSticker(attachment)
+    let video = root.querySelector('[data-sticker-video]')
+    expect(video.getAttribute('src')).toBe('/api/sticker-playback')
+    video.dispatchEvent(new Event('error'))
+    await nextTick()
+    expect(root.querySelector('[data-sticker-fallback]')).not.toBeNull()
+
+    attachment.playback_url = '/api/refreshed-sticker-playback'
+    await nextTick()
+    expect(root.querySelector('[data-sticker-video]').getAttribute('src')).toBe(
+      '/api/refreshed-sticker-playback',
+    )
+    expect(root.querySelector('[data-sticker-fallback]')).toBeNull()
   })
 
   it('keeps a loaded static sticker ready when realtime refresh replaces its DTO', async () => {

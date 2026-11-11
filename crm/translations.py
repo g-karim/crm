@@ -415,6 +415,7 @@ RUSSIAN_TRANSLATIONS = {
 	"Open chat in Avito": "Открыть чат в Avito",
 	"Open Animation": "Открыть анимацию",
 	"Animation": "Анимация",
+	"Animations": "Анимации",
 	"Send Location": "Отправить геолокацию",
 	"Add Location": "Добавить геолокацию",
 	"Remove Location": "Удалить геолокацию",

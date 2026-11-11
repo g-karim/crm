@@ -86,6 +86,118 @@ describe('messenger routing', () => {
     })
   })
 
+  it.each([
+    ['whatsapp', 'WhatsApp'],
+    ['telegram', 'Telegram personal chats'],
+    ['max', 'MAX personal chats'],
+    ['viber', 'Viber'],
+  ])(
+    'labels a partial %s conversation through its channel',
+    (platform, label) => {
+      const conversation = {
+        name: 'CHAT-1',
+        provider: 'wazzup',
+        channel: 'CHANNEL-1',
+        channel_info: { name: 'CHANNEL-1', platform },
+        external_chat_id: 'opaque-thread:0001',
+      }
+      const original = structuredClone(conversation)
+
+      expect(messengerConversationOption(conversation)).toEqual({
+        label: `${label} · CHANNEL-1 · …0001 · CHAT-1`,
+        value: 'CHAT-1',
+      })
+      expect(conversation).toEqual(original)
+    },
+  )
+
+  it('preserves explicit labels and safely falls back for unknown or absent nested platforms', () => {
+    const conversation = {
+      name: 'CHAT-1',
+      provider: 'wazzup',
+      channel: 'CHANNEL-1',
+      channel_info: { platform: 'telegram' },
+    }
+    for (const [overrides, label] of [
+      [{ channel_info: { platform: 'telegram', label: 'Support' } }, 'Support'],
+      [{ platform: 'whatsapp' }, 'whatsapp'],
+      [{ chat_type: 'viber' }, 'viber'],
+      [{ channel_info: { platform: 'custom_platform' } }, 'custom_platform'],
+      [{ channel_info: {} }, 'wazzup'],
+      [{ channel_info: null }, 'wazzup'],
+    ]) {
+      expect(
+        messengerConversationOption({ ...conversation, ...overrides }),
+      ).toEqual({
+        label: `${label} · CHANNEL-1 · CHAT-1`,
+        value: 'CHAT-1',
+      })
+    }
+  })
+
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
+    'keeps partial %s DTO selection scoped to the exact channel and conversation',
+    (platform) => {
+      const first = {
+        name: 'CHAT-1',
+        provider: 'wazzup',
+        channel: 'CHANNEL-A',
+        channel_info: { platform },
+        external_chat_id: 'opaque-thread:0001',
+        status: 'Open',
+      }
+      const second = {
+        ...first,
+        name: 'CHAT-2',
+        external_chat_id: 'opaque-thread:0002',
+      }
+      const otherChannel = {
+        ...first,
+        name: 'OTHER-CHAT',
+        channel: 'CHANNEL-B',
+      }
+      const archived = { ...first, name: 'ARCHIVED', status: 'Archived' }
+      const rows = [first, second, otherChannel, archived]
+
+      expect(messengerConversationsForChannel(rows, 'CHANNEL-A')).toEqual([
+        first,
+        second,
+      ])
+      for (const selectedConversation of ['', 'OTHER-CHAT']) {
+        expect(
+          resolveMessengerConversationSelection({
+            conversations: rows,
+            channel: 'CHANNEL-A',
+            selectedConversation,
+          }),
+        ).toMatchObject({ state: 'ambiguous', conversation: null })
+      }
+      expect(
+        resolveMessengerConversationSelection({
+          conversations: rows,
+          channel: 'CHANNEL-A',
+          selectedConversation: 'CHAT-2',
+        }).conversation,
+      ).toBe(second)
+      expect(
+        resolveMessengerConversationSelection({
+          conversations: rows,
+          channel: 'MISSING-CHANNEL',
+        }),
+      ).toMatchObject({ state: 'missing', conversation: null })
+      expect(
+        resolveMessengerHandoffAction(
+          [first, otherChannel, archived],
+          'CHANNEL-A',
+        ),
+      ).toMatchObject({ state: 'switch', conversation: first })
+      expect(resolveMessengerHandoffAction(rows, 'CHANNEL-A')).toMatchObject({
+        state: 'ambiguous',
+        conversation: null,
+      })
+    },
+  )
+
   it('uses a human attachment preview instead of a technical type marker', () => {
     expect(
       messengerConversationOption({

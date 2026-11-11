@@ -177,10 +177,7 @@
                   />
                   <MessageMetadata
                     :wrap-source="
-                      isSingleStickerAttachmentSet(
-                        item.message.attachments,
-                        item.message.provider,
-                      )
+                      isSingleStickerAttachmentSet(item.message.attachments)
                     "
                     :constrain-intrinsic-width="
                       Boolean(
@@ -188,7 +185,6 @@
                           item.message.forward_context) &&
                           !isSingleStickerAttachmentSet(
                             item.message.attachments,
-                            item.message.provider,
                           ),
                       )
                     "
@@ -658,12 +654,12 @@ import {
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 import {
+  getMessengerReplyAttachmentType,
   getSingleImageBubbleWidthClass,
   isSingleAudioAttachmentSet,
   isSingleImageAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
-  isCompactWazzupStickerImage,
 } from '@/utils/messengerAttachments'
 import {
   countNewMessengerMessages,
@@ -1069,11 +1065,7 @@ const replyComposerContext = computed(() => {
       text: `${replyTarget.value.text || ''}`.slice(0, 500) || null,
       message_type: replyTarget.value.message_type || 'text',
       attachment_types: (replyTarget.value.attachments || []).map((item) =>
-        isCompactWazzupStickerImage(item, replyTarget.value.provider)
-          ? 'sticker'
-          : item.is_voice
-            ? 'voice'
-            : item.type,
+        getMessengerReplyAttachmentType(item),
       ),
       forwarded_content_kind: replyTarget.value.forward_context
         ? getForwardedContentKind(replyTarget.value.forward_context)
@@ -2452,7 +2444,7 @@ function messageSource(message) {
 }
 
 function messageBubbleWidthClass(message) {
-  if (isSingleStickerAttachmentSet(message.attachments, message.provider)) {
+  if (isSingleStickerAttachmentSet(message.attachments)) {
     return 'w-[11.5rem] !max-w-[94%]'
   }
   if (isStickerOnlyForwardContext(message.forward_context)) {
