@@ -79,13 +79,32 @@ export function historyImportTimezone() {
   )
 }
 
-export function newHistoryImportForm() {
+export function newHistoryImportForm(previous = null) {
+  const date = (value) =>
+    dayjs(value).tz(historyImportTimezone()).format('YYYY-MM-DD')
   return {
-    from: '',
-    through: dayjs().tz(historyImportTimezone()).format('YYYY-MM-DD'),
-    createConversations: true,
-    createLeads: false,
+    from: previous ? date(previous.start_at) : '',
+    through: date(previous?.end_at),
+    mode: 'existing',
   }
+}
+
+export function historyImportPolicy(mode) {
+  if (!['existing', 'contacts'].includes(mode)) throw new Error()
+  return {
+    create_conversations: mode === 'contacts',
+    create_leads: mode === 'contacts',
+  }
+}
+
+export function historyImportPolicyLabel(policy) {
+  if (policy.create_conversations)
+    return policy.create_leads
+      ? 'Existing and new contacts'
+      : 'Conversations without new leads'
+  return policy.create_leads
+    ? 'New leads without new conversations'
+    : 'Existing conversations only'
 }
 
 export function historyImportPeriod(
@@ -113,7 +132,7 @@ export function historyImportPeriod(
 }
 
 export function formatHistoryImportTime(value) {
-  return dayjs(value).tz(historyImportTimezone()).format('DD.MM.YYYY HH:mm')
+  return dayjs(value).tz(historyImportTimezone()).format('DD.MM.YYYY')
 }
 
 export function canResumeHistoryImport(status) {

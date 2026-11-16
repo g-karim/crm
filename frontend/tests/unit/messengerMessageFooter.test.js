@@ -204,6 +204,47 @@ describe('message footer metadata', () => {
     }
   })
 
+  it('does not show a failure icon or claim delivery for an imported CSV unknown', async () => {
+    const outbound = reactive(
+      message({
+        provider: 'wazzup',
+        direction: 'outbound',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        ingest_source: 'provider_history',
+        channel_info: {
+          wazzup_api_mode: 'partner_api_v2',
+          platform: 'whatsapp',
+        },
+        external_message_id: 'CSV-OUTBOUND-1',
+        attempt_count: 0,
+        is_edited: 0,
+      }),
+    )
+    const root = mountComponent(MessageFooterMetadata, { message: outbound })
+    expect(footerOrder(root)).toEqual(['time'])
+    expect(root.querySelector('[data-message-delivery]')).toBeNull()
+    expect(outbound.status).toBe('unknown')
+    for (const status of ['failed', 'sent', 'delivered', 'read']) {
+      Object.assign(outbound, {
+        status,
+        delivery_status: status,
+        provider_status: status,
+      })
+      await nextTick()
+      const delivery = root.querySelector('[data-message-delivery]')
+      expect(delivery).not.toBeNull()
+      expect(delivery.closest('[data-test-tooltip]').title).toBe(
+        {
+          failed: 'Delivery failed',
+          sent: 'Sent',
+          delivered: 'Delivered',
+          read: 'Read by recipient',
+        }[status],
+      )
+    }
+  })
+
   it('waits for Wazzup provider status before showing the sent check', async () => {
     let outbound = reactive(
       message({

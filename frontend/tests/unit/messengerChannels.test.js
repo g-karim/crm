@@ -324,7 +324,7 @@ describe('messengerChannels', () => {
     ).toBe(status)
   })
 
-  it.each(['unknown', 'sent', 'delivered', 'read', 'failed'])(
+  it.each(['sent', 'delivered', 'read', 'failed'])(
     'preserves provider-origin Wazzup %s evidence',
     (status) => {
       expect(
@@ -334,6 +334,70 @@ describe('messengerChannels', () => {
       ).toBe(status)
     },
   )
+
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
+    'does not imply delivery or failure for CSV history on %s',
+    (platform) => {
+      const message = wazzupProviderMessage({
+        status: 'unknown',
+        delivery_status: 'unknown',
+        provider_status: null,
+        channel_info: { wazzup_api_mode: 'partner_api_v2', platform },
+      })
+      const original = structuredClone(message)
+      expect(getMessengerDeliveryState(message)).toBe('')
+      expect(getMessengerDeliveryLabel(message)).toBe('')
+      expect(message).toEqual(original)
+    },
+  )
+
+  it.each([
+    { ingest_source: 'provider_webhook' },
+    { client_request_id: 'CRM-REQUEST' },
+    { crm_user: 'user@example.test' },
+    { handoff: 'HANDOFF-1' },
+    { provider_request_id: 'PROVIDER-REQUEST' },
+    { attempt_count: 1 },
+    { last_attempt_at: '2026-11-07 10:00:00' },
+    { sent_at: '2026-11-07 10:00:00' },
+    { delivered_at: '2026-11-07 10:00:00' },
+    { read_at: '2026-11-07 10:00:00' },
+    { provider_status: 'unknown' },
+    { provider_status: 'failed' },
+    { failure_reason: 'send_failed' },
+    { error: 'send_failed' },
+    { status: 'failed' },
+    { channel_info: { wazzup_api_mode: 'user_api_v3' } },
+    { channel_info: undefined },
+    { provider: 'avito_direct' },
+    { provider: 'vk_direct' },
+    { external_message_id: '' },
+  ])(
+    'preserves a real unknown send or explicit provider evidence: %j',
+    (evidence) => {
+      expect(
+        getMessengerDeliveryState(
+          wazzupProviderMessage({
+            status: 'unknown',
+            delivery_status: 'unknown',
+            ...evidence,
+          }),
+        ),
+      ).toBe('unknown')
+    },
+  )
+
+  it('preserves an explicit webhook unknown over an accepted lifecycle status', () => {
+    expect(
+      getMessengerDeliveryState(
+        wazzupProviderMessage({
+          status: 'accepted',
+          delivery_status: 'unknown',
+          ingest_source: 'provider_webhook',
+        }),
+      ),
+    ).toBe('unknown')
+  })
 
   it.each([
     { channel_info: { wazzup_api_mode: 'user_api_v3' } },

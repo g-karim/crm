@@ -31,6 +31,9 @@ import {
   callWazzupHistory,
   canResumeHistoryImport,
   historyImportPeriod,
+  historyImportPolicy,
+  historyImportPolicyLabel,
+  formatHistoryImportTime,
   newHistoryImportForm,
   normalizeHistoryImport,
 } from '@/utils/wazzupHistoryImport'
@@ -371,6 +374,8 @@ describe('history RPC and public DTO contract', () => {
     { channel: 'OTHER' },
     { import_id: 'OTHER' },
     { active: false },
+    { policy: { create_conversations: 'false' } },
+    { policy: { create_leads: undefined } },
     { progress: progress({ counts: counts({ created: -1 }) }) },
     { result: { ...result(), outcome: 'invented' } },
   ])(
@@ -438,11 +443,9 @@ describe('history message period and explicit Lead approval', () => {
       translate(dictionary[message] || message, args),
     )
     const { root } = await mount()
-    expect(root.textContent).toContain(
-      'Будут загружены сообщения, доступные в Wazzup за выбранный период. Некоторые старые переписки могут отсутствовать',
-    )
-    expect(root.textContent).toContain('Создавать отсутствующие переписки')
-    expect(root.textContent).toContain('Создавать новые лиды')
+    expect(root.textContent).toContain('Wazzup может вернуть не всю историю.')
+    expect(root.textContent).toContain('Только существующие переписки')
+    expect(root.textContent).toContain('Существующие и новые контакты')
     expect(button(root, 'Запустить импорт истории')).toBeTruthy()
     remote = ready()
     await click(root, 'Обновить статус')
@@ -458,14 +461,58 @@ describe('history message period and explicit Lead approval', () => {
     expect(newHistoryImportForm()).toEqual({
       from: '',
       through: '2026-11-14',
-      createConversations: true,
-      createLeads: false,
+      mode: 'existing',
     })
     expect(historyImportPeriod('2026-11-02', '2026-11-03')).toEqual({
       start_at: '2026-11-01T21:00:00.000Z',
       end_at: '2026-11-03T20:59:59.999Z',
     })
   })
+
+  it('maps only the two explicit new-import modes and rejects an invented mode', () => {
+    expect(historyImportPolicy('existing')).toEqual({
+      create_conversations: false,
+      create_leads: false,
+    })
+    expect(historyImportPolicy('contacts')).toEqual({
+      create_conversations: true,
+      create_leads: true,
+    })
+    expect(() => historyImportPolicy('other')).toThrow()
+  })
+
+  it('formats the saved period and a repeat-import draft in the site timezone', () => {
+    window.timezone = { system: 'Asia/Kolkata' }
+    const previous = dto({
+      start_at: '2026-11-06T18:30:00Z',
+      end_at: '2026-11-07T18:29:59.999Z',
+      policy: { create_leads: true },
+    })
+    expect(formatHistoryImportTime(previous.start_at)).toBe('07.11.2026')
+    expect(formatHistoryImportTime(previous.end_at)).toBe('07.11.2026')
+    expect(newHistoryImportForm(previous)).toEqual({
+      from: '2026-11-07',
+      through: '2026-11-07',
+      mode: 'existing',
+    })
+  })
+
+  it.each([
+    [false, false, 'Existing conversations only'],
+    [true, false, 'Conversations without new leads'],
+    [true, true, 'Existing and new contacts'],
+    [false, true, 'New leads without new conversations'],
+  ])(
+    'preserves saved policy flags %s/%s in the DTO and label',
+    (conversations, leads, label) => {
+      const policy = {
+        create_conversations: conversations,
+        create_leads: leads,
+      }
+      expect(normalizeHistoryImport(dto({ policy })).policy).toEqual(policy)
+      expect(historyImportPolicyLabel(policy)).toBe(label)
+    },
+  )
 
   it.each([
     ['', '2026-11-01'],
@@ -496,14 +543,14 @@ describe('history message period and explicit Lead approval', () => {
       const { root } = await mount({ channel: channel({ platform }) })
       expect(root.textContent).toContain('Wazzup history import')
       expect(root.textContent).toContain(
-        'Some older conversations may be missing.',
+        'Wazzup may return an incomplete history.',
       )
       expect(
-        root.querySelector('[data-wazzup-history-conversations]').checked,
+        root.querySelector('[data-wazzup-history-mode="existing"]').checked,
       ).toBe(true)
-      expect(root.querySelector('[data-wazzup-history-leads]').checked).toBe(
-        false,
-      )
+      expect(
+        root.querySelector('[data-wazzup-history-mode="contacts"]').checked,
+      ).toBe(false)
       expect(requests('get_channel_import')).toEqual([{ channel: 'PARTNER-1' }])
       expect(requests('start_import')).toEqual([])
       expect(requests('start_processing')).toEqual([])
@@ -538,40 +585,43 @@ describe('history message period and explicit Lead approval', () => {
   })
 
   it.each([false, true])(
-    'sends create_leads=%s only from the import checkbox',
+    'sends the exact paired policy for the explicitly selected contacts mode=%s',
     async (optIn) => {
       const { root } = await mount()
       await selectPeriod(root)
-      if (optIn) await toggle(root, '[data-wazzup-history-leads]')
+      if (optIn) await toggle(root, '[data-wazzup-history-mode="contacts"]')
       handlers.start_import = () =>
-        (remote = dto({ policy: { create_leads: optIn } }))
+        (remote = dto({
+          policy: { create_conversations: optIn, create_leads: optIn },
+        }))
       await click(root, 'Start history import')
       expect(requests('start_import')).toEqual([
         {
           channel: 'PARTNER-1',
           start_at: '2026-11-01T21:00:00.000Z',
           end_at: '2026-11-03T20:59:59.999Z',
-          create_conversations: true,
+          create_conversations: optIn,
           create_leads: optIn,
         },
       ])
       expect(root.querySelector('form')).toBeNull()
       expect(
         root.querySelector('[data-testid="wazzup-history-policy"]').textContent,
-      ).toContain(`Create new leads: ${optIn ? 'Yes' : 'No'}`)
+      ).toContain(
+        optIn ? 'Existing and new contacts' : 'Existing conversations only',
+      )
     },
   )
 
-  it('clears Lead approval when conversation creation is switched off and keeps it off when reenabled', async () => {
+  it('clears Lead approval when returning to existing conversations only', async () => {
     const { root } = await mount()
-    await toggle(root, '[data-wazzup-history-leads]')
-    await toggle(root, '[data-wazzup-history-conversations]')
-    expect(root.querySelector('[data-wazzup-history-leads]').checked).toBe(
-      false,
-    )
-    expect(root.querySelector('[data-wazzup-history-leads]').disabled).toBe(
-      true,
-    )
+    await toggle(root, '[data-wazzup-history-mode="contacts"]')
+    await toggle(root, '[data-wazzup-history-mode="existing"]')
+    expect(
+      root.querySelector('[data-wazzup-history-mode="contacts"]').checked,
+    ).toBe(false)
+    expect(root.querySelectorAll('input[type="radio"]')).toHaveLength(2)
+    expect(root.querySelector('input[type="checkbox"]')).toBeNull()
     await selectPeriod(root)
     handlers.start_import = () =>
       dto({ policy: { create_conversations: false } })
@@ -630,14 +680,15 @@ describe('history polling, recovery and saved results', () => {
       })
     const { root } = await mount()
     await selectPeriod(root)
-    await toggle(root, '[data-wazzup-history-leads]')
+    await toggle(root, '[data-wazzup-history-mode="contacts"]')
     await click(root, 'Start history import')
     expect(root.textContent).toContain(
       'An import already exists for this channel.',
     )
-    expect(root.textContent).toContain('01.10.2026 03:00')
-    expect(root.textContent).toContain('Create missing conversations: No')
-    expect(root.textContent).toContain('Create new leads: No')
+    expect(root.textContent).toContain('01.10.2026')
+    expect(
+      root.querySelector('[data-testid="wazzup-history-policy"]').textContent,
+    ).toContain('Existing conversations only')
     expect(root.querySelector('form')).toBeNull()
     expect(requests('start_import')).toHaveLength(1)
   })
@@ -927,9 +978,9 @@ describe('history polling, recovery and saved results', () => {
     expect(state.status).toBeNull()
     expect(busy).toHaveBeenLastCalledWith(false)
     expect(button(root, 'Start history import').disabled).toBe(false)
-    expect(root.querySelector('[data-wazzup-history-leads]').checked).toBe(
-      false,
-    )
+    expect(
+      root.querySelector('[data-wazzup-history-mode="contacts"]').checked,
+    ).toBe(false)
   })
 
   it('ignores pending reads after unmount and clears every polling timer', async () => {
@@ -999,11 +1050,97 @@ describe('history polling, recovery and saved results', () => {
     const { root } = await mount()
     expect(root.querySelector('form')).toBeNull()
     await click(root, 'New history import')
-    expect(root.querySelector('[data-label="From date"]').value).toBe('')
-    expect(root.querySelector('[data-wazzup-history-leads]').checked).toBe(
-      false,
+    expect(root.querySelector('[data-label="From date"]').value).toBe(
+      '2026-11-02',
     )
+    expect(root.querySelector('[data-label="Through date"]').value).toBe(
+      '2026-11-03',
+    )
+    expect(
+      root.querySelector('[data-wazzup-history-mode="contacts"]').checked,
+    ).toBe(false)
     expect(requests('start_import')).toEqual([])
+    expect(
+      root.querySelector('[data-testid="wazzup-history-period"]'),
+    ).toBeNull()
+    await click(root, 'Cancel')
+    expect(root.querySelector('form')).toBeNull()
+    expect(
+      root.querySelector('[data-testid="wazzup-history-policy"]').textContent,
+    ).toContain('Existing and new contacts')
+    await click(root, 'New history import')
+    handlers.start_import = () =>
+      dto({
+        import_id: 'IMPORT-2',
+        policy: { create_conversations: false, create_leads: false },
+      })
+    await click(root, 'Start history import')
+    expect(requests('start_import')[0]).toEqual({
+      channel: 'PARTNER-1',
+      start_at: '2026-11-01T21:00:00.000Z',
+      end_at: '2026-11-03T20:59:59.999Z',
+      create_conversations: false,
+      create_leads: false,
+    })
+  })
+
+  it.each(['queued', 'completed'])(
+    'restores a legacy conversation-only %s import without changing its policy',
+    async (state) => {
+      remote = dto({ state, result: state === 'completed' ? result() : null })
+      const { root } = await mount()
+      expect(
+        root.querySelector('[data-testid="wazzup-history-policy"]').textContent,
+      ).toContain('Conversations without new leads')
+      expect(root.querySelector('form')).toBeNull()
+      await poll()
+      expect(requests('start_import')).toEqual([])
+      expect(requests('start_processing')).toEqual([])
+      if (state === 'completed') {
+        await click(root, 'New history import')
+        expect(
+          root.querySelector('[data-wazzup-history-mode="existing"]').checked,
+        ).toBe(true)
+        expect(remote.policy).toEqual({
+          create_conversations: true,
+          create_leads: false,
+        })
+      }
+    },
+  )
+
+  it('keeps the successful result compact while preserving nonzero duplicate and unresolved counts', async () => {
+    remote = dto({
+      state: 'completed',
+      result: { ...result(), conversations_created: 0 },
+    })
+    const { root } = await mount()
+    const counterText = root.querySelector(
+      '[data-testid="wazzup-history-counts"]',
+    ).textContent
+    expect(counterText).toContain('Messages imported: 6')
+    for (const label of [
+      'CSV rows',
+      'Duplicate messages',
+      'Messages awaiting resolution',
+      'Conversations created',
+      'Leads created',
+    ]) {
+      expect(counterText).not.toContain(label)
+    }
+    remote = dto({
+      state: 'completed',
+      generation: 2,
+      result: {
+        ...result('partial'),
+        counts: counts({ duplicate: 2, unresolved: 4 }),
+        conversations_created: 0,
+      },
+    })
+    await click(root, 'Refresh import status')
+    expect(root.textContent).toContain('Duplicate messages: 2')
+    expect(root.textContent).toContain('Messages awaiting resolution: 4')
+    expect(root.textContent).toContain('Messages imported: 0')
   })
 })
 

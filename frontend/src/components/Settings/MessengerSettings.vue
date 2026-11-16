@@ -616,15 +616,23 @@
             <FormControl
               v-model="channelDraft.avito_import_from_date"
               type="date"
+              format="DD.MM.YYYY"
+              :placeholder="__('DD.MM.YYYY')"
+              align="start"
               :label="__('From date')"
               data-avito-import-date
+              data-messenger-import-date
               required
             />
             <FormControl
               v-model="channelDraft.avito_import_to_date"
               type="date"
+              format="DD.MM.YYYY"
+              :placeholder="__('DD.MM.YYYY')"
+              align="end"
               :label="__('Through date')"
               data-avito-import-date
+              data-messenger-import-date
               required
             />
           </div>
@@ -971,9 +979,9 @@ const channelDirty = computed(() => channelState() !== channelSnapshot.value)
 const isPartnerDraft = computed(() =>
   Boolean(
     channelDraft.value.provider?.startsWith('partner_') &&
-      wazzupPartnerTransport(
-        channelDraft.value.provider.slice('partner_'.length),
-      ),
+    wazzupPartnerTransport(
+      channelDraft.value.provider.slice('partner_'.length),
+    ),
   ),
 )
 const partnerPlatform = computed(() =>
@@ -1010,8 +1018,8 @@ const wazzupKeySources = computed(() => [
 const hasWazzupKey = computed(() =>
   Boolean(
     channelDraft.value.api_token.trim() ||
-      channelDraft.value.api_token_configured ||
-      channelDraft.value.api_token_source_channel,
+    channelDraft.value.api_token_configured ||
+    channelDraft.value.api_token_source_channel,
   ),
 )
 const wazzupRemoteChannelOptions = computed(() => [

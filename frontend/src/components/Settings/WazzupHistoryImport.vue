@@ -2,7 +2,7 @@
   <section
     v-if="supported"
     data-testid="wazzup-history-import"
-    class="rounded-lg border border-outline-gray-1 bg-surface-gray-1 p-4"
+    class="min-w-0 rounded-lg border border-outline-gray-1 bg-surface-gray-1 p-3 sm:p-4"
   >
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="text-base-medium text-ink-gray-8">
@@ -17,22 +17,13 @@
       />
     </div>
     <p class="mt-2 text-p-sm text-ink-gray-5">
-      {{
-        __(
-          'Messages available in Wazzup for the selected period will be imported. Some older conversations may be missing.',
-        )
-      }}
-    </p>
-    <p class="mt-2 text-p-sm text-ink-gray-5">
-      {{
-        __(
-          'Dates use the CRM time zone: {0}. Both selected dates are included.',
-          [timezone],
-        )
-      }}
+      {{ __('Wazzup may return an incomplete history.') }}
     </p>
 
-    <div v-if="status" class="mt-4 border-t border-outline-gray-2 pt-3">
+    <div
+      v-if="status && !showForm"
+      class="mt-4 border-t border-outline-gray-2 pt-3"
+    >
       <p
         data-testid="wazzup-history-phase"
         class="text-p-medium text-ink-gray-8"
@@ -42,27 +33,25 @@
         {{ __(historyImportStatusLabel(status)) }}
       </p>
       <p
-        class="mt-2 text-p-sm text-ink-gray-6"
+        class="mt-1 text-p-sm text-ink-gray-6"
         data-testid="wazzup-history-period"
+        :title="timezone"
       >
         {{ formatHistoryImportTime(status.start_at) }} —
         {{ formatHistoryImportTime(status.end_at) }}
       </p>
       <p
-        class="mt-2 text-p-sm text-ink-gray-6"
+        class="mt-1 text-p-sm text-ink-gray-6"
         data-testid="wazzup-history-policy"
       >
-        {{ __('Create missing conversations') }}:
-        {{ status.policy.create_conversations ? __('Yes') : __('No') }} ·
-        {{ __('Create new leads') }}:
-        {{ status.policy.create_leads ? __('Yes') : __('No') }}
+        {{ __(historyImportPolicyLabel(status.policy)) }}
       </p>
       <div
         v-if="summary"
         data-testid="wazzup-history-counts"
-        class="mt-3 grid gap-1 text-p-sm text-ink-gray-6 sm:grid-cols-2"
+        class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-p-sm text-ink-gray-6"
       >
-        <p v-if="summary.total !== null">
+        <p v-if="!status.result && summary.total !== null">
           {{
             __('CSV rows processed: {0} of {1}', [
               summary.processed,
@@ -70,12 +59,14 @@
             ])
           }}
         </p>
-        <p v-else>{{ __('CSV rows processed: {0}', [summary.processed]) }}</p>
+        <p v-else-if="!status.result">
+          {{ __('CSV rows processed: {0}', [summary.processed]) }}
+        </p>
         <p
           v-if="
             !status.result &&
             status.progress?.replay_total !== null &&
-            status.progress?.replay_total !== undefined
+            status.progress?.replay_total > 0
           "
         >
           {{
@@ -85,15 +76,17 @@
             ])
           }}
         </p>
-        <p v-for="(label, key) in HISTORY_COUNTERS" :key="key">
-          {{ __(label, [summary.counts[key]]) }}
+        <p v-for="counter in visibleCounters" :key="counter.key">
+          {{ __(counter.label, [counter.value]) }}
         </p>
-        <p>
+        <p v-if="summary.conversations_created">
           {{
             __('Conversations created: {0}', [summary.conversations_created])
           }}
         </p>
-        <p>{{ __('Leads created: {0}', [summary.leads_created]) }}</p>
+        <p v-if="summary.leads_created">
+          {{ __('Leads created: {0}', [summary.leads_created]) }}
+        </p>
       </div>
       <p
         v-if="status.result?.outcome === 'partial'"
@@ -161,59 +154,63 @@
       class="mt-4 border-t border-outline-gray-2 pt-3"
       @submit.prevent="start"
     >
-      <div class="grid gap-3 md:grid-cols-2">
+      <div class="grid gap-3 sm:grid-cols-2">
         <FormControl
           v-model="form.from"
           type="date"
+          format="DD.MM.YYYY"
+          :placeholder="__('DD.MM.YYYY')"
+          align="start"
           :label="__('From date')"
           :disabled="formDisabled"
           required
           data-wazzup-history-from
+          data-messenger-import-date
         />
         <FormControl
           v-model="form.through"
           type="date"
+          format="DD.MM.YYYY"
+          :placeholder="__('DD.MM.YYYY')"
+          align="end"
           :label="__('Through date')"
           :disabled="formDisabled"
           required
           data-wazzup-history-through
+          data-messenger-import-date
         />
       </div>
-      <div class="mt-3 grid gap-2">
+      <fieldset class="mt-3 grid gap-2" :disabled="formDisabled">
+        <legend class="sr-only">{{ __('History import mode') }}</legend>
         <label
-          class="flex items-start gap-3 rounded-lg border border-outline-gray-2 bg-surface-cards p-3"
+          v-for="mode in modes"
+          :key="mode.value"
+          class="flex cursor-pointer items-start gap-3 rounded-lg border bg-surface-cards p-2.5"
+          :class="
+            form.mode === mode.value
+              ? 'border-outline-gray-4'
+              : 'border-outline-gray-2'
+          "
         >
           <input
-            v-model="form.createConversations"
-            type="checkbox"
-            class="mt-1 accent-blue-600"
+            v-model="form.mode"
+            type="radio"
+            :name="`wazzup-history-mode-${channel.name}`"
+            :value="mode.value"
+            class="mt-0.5 accent-blue-600"
             :disabled="formDisabled"
-            data-wazzup-history-conversations
-          />
-          <span class="text-p-medium text-ink-gray-8">{{
-            __('Create missing conversations')
-          }}</span>
-        </label>
-        <label
-          class="flex items-start gap-3 rounded-lg border border-outline-gray-2 bg-surface-cards p-3"
-        >
-          <input
-            v-model="form.createLeads"
-            type="checkbox"
-            class="mt-1 accent-blue-600"
-            :disabled="formDisabled || !form.createConversations"
-            data-wazzup-history-leads
+            :data-wazzup-history-mode="mode.value"
           />
           <span>
             <span class="block text-p-medium text-ink-gray-8">{{
-              __('Create new leads')
+              __(mode.label)
             }}</span>
             <span class="mt-0.5 block text-p-sm text-ink-gray-5">{{
-              __('Only with explicit administrator approval for this import.')
+              __(mode.description)
             }}</span>
           </span>
         </label>
-      </div>
+      </fieldset>
       <p
         v-if="validationError"
         class="mt-2 text-p-sm text-ink-red-7"
@@ -228,6 +225,13 @@
         :loading="action === 'start'"
         :disabled="formDisabled"
         @click="start"
+      />
+      <Button
+        v-if="status && !status.active"
+        class="ml-2 mt-3"
+        :label="__('Cancel')"
+        :disabled="Boolean(action) || recoveryRequired"
+        @click="showForm = false"
       />
     </form>
     <p v-if="!ready && !action" class="mt-3 text-p-sm text-ink-orange-7">
@@ -271,6 +275,8 @@ import {
   formatHistoryImportTime,
   historyImportError,
   historyImportPeriod,
+  historyImportPolicy,
+  historyImportPolicyLabel,
   historyImportRpcError,
   historyImportStatusLabel,
   historyImportTimezone,
@@ -300,6 +306,23 @@ const ready = computed(
 const timezone = historyImportTimezone()
 const status = ref(null)
 const summary = computed(() => status.value?.result || status.value?.progress)
+const visibleCounters = computed(() =>
+  Object.entries(HISTORY_COUNTERS)
+    .filter(([key]) => key === 'created' || summary.value?.counts[key] > 0)
+    .map(([key, label]) => ({ key, label, value: summary.value?.counts[key] })),
+)
+const modes = [
+  {
+    value: 'existing',
+    label: 'Existing conversations only',
+    description: 'Import messages into existing conversations.',
+  },
+  {
+    value: 'contacts',
+    label: 'Existing and new contacts',
+    description: 'Create missing conversations and leads.',
+  },
+]
 const savedError = computed(() =>
   status.value?.processing.error
     ? historyImportError(status.value.processing.error)
@@ -403,7 +426,7 @@ function refresh(discover = false) {
 
 function openNewImport() {
   if (status.value?.active || loading.value || action.value) return
-  form.value = newHistoryImportForm()
+  form.value = newHistoryImportForm(status.value)
   validationError.value = actionError.value = ''
   showForm.value = true
 }
@@ -457,8 +480,7 @@ function start() {
   return mutate('start', {
     channel: props.channel.name,
     ...period,
-    create_conversations: form.value.createConversations,
-    create_leads: form.value.createConversations && form.value.createLeads,
+    ...historyImportPolicy(form.value.mode),
   })
 }
 
@@ -476,14 +498,6 @@ function resume() {
     expected_generation: status.value.generation,
   })
 }
-
-watch(
-  () => form.value.createConversations,
-  (enabled) => {
-    if (!enabled) form.value.createLeads = false
-  },
-  { flush: 'sync' },
-)
 
 watch(
   () =>

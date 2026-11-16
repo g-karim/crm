@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 // Real Vue controls with mocked RPC, separate from authenticated CRM E2E tests.
 export default defineConfig({
   testDir: "./frontend/tests/browser",
-  testMatch: /messenger-settings\.spec\.ts/,
+  testMatch: /(?:messenger-settings|wazzup-history)\.spec\.ts/,
   workers: 1,
   retries: 0,
   timeout: 60000,
