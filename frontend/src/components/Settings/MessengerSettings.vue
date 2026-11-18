@@ -359,6 +359,15 @@
           @deleted="deletePartnerChannel"
         />
 
+        <WazzupHistoryImport
+          v-if="showChannelDialog && isPartnerDraft && partnerChannel?.name"
+          :key="partnerChannel.name"
+          :channel="partnerChannel"
+          :enabled="settings.enabled"
+          :disabled="channelBusy || channelDirty || settingsDirty"
+          @busy="historyBusy = $event"
+        />
+
         <section
           v-if="channelDraft.provider === 'wazzup'"
           data-testid="wazzup-settings"
@@ -607,15 +616,23 @@
             <FormControl
               v-model="channelDraft.avito_import_from_date"
               type="date"
+              format="DD.MM.YYYY"
+              :placeholder="__('DD.MM.YYYY')"
+              align="start"
               :label="__('From date')"
               data-avito-import-date
+              data-messenger-import-date
               required
             />
             <FormControl
               v-model="channelDraft.avito_import_to_date"
               type="date"
+              format="DD.MM.YYYY"
+              :placeholder="__('DD.MM.YYYY')"
+              align="end"
               :label="__('Through date')"
               data-avito-import-date
+              data-messenger-import-date
               required
             />
           </div>
@@ -823,6 +840,7 @@
           variant="solid"
           :loading="isPartnerDraft ? partnerBusy : savingChannel"
           :disabled="
+            historyBusy ||
             Boolean(channelAction) ||
             (isPartnerDraft &&
               (partnerBusy ||
@@ -838,6 +856,7 @@
 <script setup>
 import SettingsLayoutBase from '@/components/Layouts/SettingsLayoutBase.vue'
 import WazzupPartnerConnection from '@/components/Settings/WazzupPartnerConnection.vue'
+import WazzupHistoryImport from '@/components/Settings/WazzupHistoryImport.vue'
 import {
   isWazzupPartnerChannel,
   wazzupPartnerTransport,
@@ -895,6 +914,7 @@ const showChannelDialog = ref(false)
 const partnerChannel = ref(null)
 const partnerConnection = ref(null)
 const partnerBusy = ref(false)
+const historyBusy = ref(false)
 const visibleChannels = computed(() =>
   channels.value.filter(
     (channel) =>
@@ -952,15 +972,16 @@ const channelBusy = computed(
     savingChannel.value ||
     Boolean(channelAction.value) ||
     loadingWazzupChannels.value ||
-    partnerBusy.value,
+    partnerBusy.value ||
+    historyBusy.value,
 )
 const channelDirty = computed(() => channelState() !== channelSnapshot.value)
 const isPartnerDraft = computed(() =>
   Boolean(
     channelDraft.value.provider?.startsWith('partner_') &&
-      wazzupPartnerTransport(
-        channelDraft.value.provider.slice('partner_'.length),
-      ),
+    wazzupPartnerTransport(
+      channelDraft.value.provider.slice('partner_'.length),
+    ),
   ),
 )
 const partnerPlatform = computed(() =>
@@ -997,8 +1018,8 @@ const wazzupKeySources = computed(() => [
 const hasWazzupKey = computed(() =>
   Boolean(
     channelDraft.value.api_token.trim() ||
-      channelDraft.value.api_token_configured ||
-      channelDraft.value.api_token_source_channel,
+    channelDraft.value.api_token_configured ||
+    channelDraft.value.api_token_source_channel,
   ),
 )
 const wazzupRemoteChannelOptions = computed(() => [
