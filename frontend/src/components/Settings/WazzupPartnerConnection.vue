@@ -58,7 +58,7 @@
       </section>
 
       <form
-        v-if="onboarding.status === 'waiting_2fa'"
+        v-if="onboarding.status === 'waiting_2fa' && onboarding.can_submit_2fa"
         class="flex flex-col gap-3 rounded-lg border border-outline-gray-1 p-4"
         @submit.prevent="submitTwoFactor"
       >
@@ -310,6 +310,7 @@ import {
   wazzupPartnerDiagnosticRows,
   wazzupPartnerConnectionWarning,
   wazzupPartnerError,
+  wazzupPartnerTransport,
 } from '@/utils/wazzupPartnerConnection'
 
 const props = defineProps({
@@ -431,9 +432,9 @@ async function operate(method, args, polling = false) {
 }
 
 function startConnection() {
-  if (!props.available) return false
+  if (!props.available || !wazzupPartnerTransport(props.platform)) return false
   return operate('start_connection', {
-    platform: props.platform === 'telegram' ? 'telegram' : 'whatsapp',
+    platform: props.platform,
     custom_display_name: props.displayName.trim(),
     client_request_id: requestId,
   })
@@ -511,7 +512,10 @@ async function submitTwoFactor() {
 function simulateScan() {
   return operate('simulator_scan', {
     channel: currentChannel.value.name,
-    require_2fa: currentChannel.value.platform === 'telegram',
+    require_2fa: Boolean(
+      wazzupPartnerTransport(currentChannel.value.platform)
+        ?.simulatorRequires2fa,
+    ),
   })
 }
 

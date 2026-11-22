@@ -8,6 +8,7 @@ const PLATFORM_LABELS = {
   telegram: 'Telegram',
   vk: 'VK',
   max: 'MAX',
+  viber: 'Viber',
 }
 
 const DELIVERY_LABELS = {
@@ -133,7 +134,11 @@ function forwardSender(message) {
 export function getMessengerChannelType(channel = {}) {
   if (channel?.provider === 'avito_direct') return 'avito'
   return normalizePlatform(
-    channel?.platform || channel?.channel_type || channel?.chat_type || '',
+    channel?.platform ||
+      channel?.channel_type ||
+      channel?.chat_type ||
+      channel?.channel_info?.platform ||
+      '',
   )
 }
 
@@ -179,7 +184,36 @@ export function getMessengerDeliveryState(message = {}) {
   let status = normalizePlatform(
     message?.delivery_status || message?.status || '',
   )
+  if (status === 'accepted' && isUnconfirmedWazzupProviderMessage(message)) {
+    return ''
+  }
   return DELIVERY_STATES.includes(status) ? status : ''
+}
+
+function isUnconfirmedWazzupProviderMessage(message) {
+  // Partner history and external sends may lack delivery confirmation.
+  // Their accepted lifecycle state does not mean CRM is waiting to send them.
+  return Boolean(
+    message.provider === 'wazzup' &&
+      message.channel_info?.wazzup_api_mode === 'partner_api_v2' &&
+      message.status === 'accepted' &&
+      ['provider_history', 'provider_webhook'].includes(
+        message.ingest_source,
+      ) &&
+      message.external_message_id &&
+      !message.client_request_id &&
+      !message.crm_user &&
+      !message.handoff &&
+      !message.provider_request_id &&
+      Number(message.attempt_count || 0) === 0 &&
+      !message.last_attempt_at &&
+      !message.sent_at &&
+      !message.delivered_at &&
+      !message.read_at &&
+      ['', 'accepted'].includes(
+        normalizePlatform(message.provider_status || ''),
+      ),
+  )
 }
 
 export function getMessengerFailureReason(message = {}) {

@@ -252,6 +252,8 @@ describe('MessengerSettings Wazzup connection', () => {
   it.each([
     ['WhatsApp', 'whatsapp'],
     ['Telegram personal chats', 'telegram'],
+    ['MAX personal chats', 'max'],
+    ['Viber', 'viber'],
   ])(
     'opens %s Partner onboarding from New Channel even before server configuration',
     async (label, platform) => {
@@ -264,11 +266,7 @@ describe('MessengerSettings Wazzup connection', () => {
       const root = await mountSettings()
       await clickButton(root, 'New Channel')
       expect(root.textContent).not.toContain('Wazzup User API v3 (legacy)')
-      await editField(
-        root,
-        'Provider',
-        platform === 'telegram' ? 'partner_telegram' : 'partner_whatsapp',
-      )
+      await editField(root, 'Provider', `partner_${platform}`)
       expect(
         root.querySelector('[data-wazzup-partner-management]').textContent,
       ).toContain('new-partner')
@@ -1497,9 +1495,11 @@ describe('MessengerSettings ordinary channel creation', () => {
     expect([...provider.options].map((option) => option.textContent)).toEqual([
       'WhatsApp',
       'Telegram personal chats',
+      'MAX personal chats',
+      'Viber',
       'Telegram Bot',
       'VK',
-      'MAX',
+      'MAX bot',
       'Avito',
     ])
     expect(provider.value).toBe('partner_whatsapp')
@@ -1533,7 +1533,7 @@ describe('MessengerSettings ordinary channel creation', () => {
 
   it.each([
     ['VK', 'vk_direct', 'Community Access Token'],
-    ['MAX', 'max_direct', 'Bot Token'],
+    ['MAX bot', 'max_direct', 'Bot Token'],
     ['Telegram Bot', 'telegram_bot', 'Bot Token'],
     ['Avito', 'avito_direct', 'Client ID'],
   ])(
@@ -1559,6 +1559,8 @@ describe('MessengerSettings ordinary channel creation', () => {
   it.each([
     ['WhatsApp', 'whatsapp'],
     ['Telegram personal chats', 'telegram'],
+    ['MAX personal chats', 'max'],
+    ['Viber', 'viber'],
   ])(
     'uses the same ordinary %s entry with the simulator available',
     async (label, platform) => {
@@ -1568,11 +1570,7 @@ describe('MessengerSettings ordinary channel creation', () => {
       })
       const root = await mountSettings()
       await clickButton(root, 'New Channel')
-      await editField(
-        root,
-        'Provider',
-        platform === 'telegram' ? 'partner_telegram' : 'partner_whatsapp',
-      )
+      await editField(root, 'Provider', `partner_${platform}`)
       const dialog = root.querySelector('[data-wazzup-partner-management]')
       expect(dialog.dataset.platform).toBe(platform)
       expect(dialog.dataset.available).toBe('true')
@@ -1620,6 +1618,47 @@ describe('MessengerSettings ordinary channel creation', () => {
     expect(root.querySelector('[data-dialog]')).toBeNull()
     expect(root.textContent).not.toContain('Support WhatsApp')
   })
+
+  it.each([
+    ['max', 'MAX personal chats'],
+    ['viber', 'Viber'],
+  ])(
+    'opens existing %s channels with their own transport and lifecycle controls',
+    async (platform, label) => {
+      mocks.call.mockResolvedValue({
+        settings: { wazzup_partner_available: true },
+        channels: [
+          {
+            name: `partner-${platform}`,
+            provider: 'wazzup',
+            platform,
+            wazzup_api_mode: 'partner_api_v2',
+            wazzup_status: 'unauthorized',
+            enabled: true,
+            state: 'disconnected',
+          },
+        ],
+      })
+      const root = await mountSettings()
+      const channelButton = [...root.querySelectorAll('button')].find((item) =>
+        item.textContent.includes(label),
+      )
+      expect(channelButton).toBeTruthy()
+      channelButton.click()
+      await nextTick()
+      const management = root.querySelector('[data-wazzup-partner-management]')
+      expect(management.dataset.platform).toBe(platform)
+      expect(management.textContent).toContain(`partner-${platform}`)
+      expect(root.querySelector('[data-label="Provider"]').value).toBe(
+        `partner_${platform}`,
+      )
+      expect(root.querySelector('[data-label="Provider"]').disabled).toBe(true)
+      expect(root.querySelector('[data-label="Bot Token"]')).toBeNull()
+      await clickButton(root, 'Delete Channel')
+      expect(root.querySelector('[data-dialog]')).toBeNull()
+      expect(root.textContent).not.toContain('Authorization expired')
+    },
+  )
 
   it('preserves an unsaved Partner name across polling and resets dirty state only after saving', async () => {
     const channel = {

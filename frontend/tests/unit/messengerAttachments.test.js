@@ -5,6 +5,7 @@ import {
   getAttachmentAction,
   getAttachmentState,
   getMessengerAttachmentTitle,
+  getMessengerReplyAttachmentType,
   getMessengerMessagePreview,
   getCompactMediaDimensions,
   getCompactPreviewDimensions,
@@ -15,7 +16,6 @@ import {
   getSingleImageMediaWidthClass,
   groupMessengerAttachments,
   isSingleImageAttachmentSet,
-  isCompactWazzupStickerImage,
   isSingleFileAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
@@ -24,8 +24,131 @@ import {
 import { describe, expect, it } from 'vitest'
 
 describe('messenger attachment contract v1', () => {
-  it('uses compact presentation only for decoded Wazzup sticker candidates', () => {
-    let candidate = {
+  it.each(['wazzup', 'max_direct', 'telegram_bot', 'vk_direct'])(
+    'labels decoded animated images in %s reply previews without guessing from MIME',
+    (provider) => {
+      for (let mime_type of [
+        'image/gif',
+        'image/webp',
+        'image/apng',
+        'image/png',
+      ]) {
+        expect(
+          getMessengerReplyAttachmentType({
+            provider,
+            type: 'image',
+            mime_type,
+            is_animated: true,
+          }),
+        ).toBe('animation')
+        expect(
+          getMessengerReplyAttachmentType({
+            provider,
+            type: 'image',
+            mime_type,
+          }),
+        ).toBe('image')
+      }
+      for (let mime_type of ['image/png', 'image/jpeg', 'image/webp']) {
+        expect(
+          getMessengerReplyAttachmentType({
+            provider,
+            type: 'image',
+            mime_type,
+            is_animated: false,
+          }),
+        ).toBe('image')
+      }
+      expect(
+        getMessengerReplyAttachmentType({
+          provider,
+          type: 'image',
+          mime_type: 'image/jpeg',
+          is_animated: true,
+        }),
+      ).toBe('image')
+      expect(
+        getMessengerReplyAttachmentType({
+          provider,
+          type: 'video',
+          mime_type: 'video/mp4',
+          is_animated: true,
+        }),
+      ).toBe('animation')
+      expect(
+        getMessengerReplyAttachmentType({
+          provider,
+          type: 'sticker',
+          mime_type: 'image/webp',
+          is_animated: true,
+        }),
+      ).toBe('sticker')
+      expect(
+        getMessengerReplyAttachmentType({
+          provider,
+          type: 'audio',
+          is_voice: true,
+        }),
+      ).toBe('voice')
+    },
+  )
+
+  it('prefers the shared semantic type without changing attachment rendering types', () => {
+    expect(
+      getMessengerReplyAttachmentType({
+        type: 'video',
+        semantic_type: 'video_note',
+      }),
+    ).toBe('video_note')
+    expect(
+      getMessengerReplyAttachmentType({
+        type: 'image',
+        semantic_type: 'image',
+        is_animated: true,
+      }),
+    ).toBe('image')
+    expect(
+      getMessengerReplyAttachmentType({
+        type: 'image',
+        semantic_type: 'animation',
+      }),
+    ).toBe('animation')
+    let sticker = {
+      id: 'STICKER',
+      type: 'sticker',
+      semantic_type: 'sticker',
+      is_animated: true,
+    }
+    expect(getMessengerReplyAttachmentType(sticker)).toBe('sticker')
+    expect(buildMessengerAttachmentSegments([sticker])[0].type).toBe('sticker')
+    expect(sticker.type).toBe('sticker')
+  })
+
+  it.each(['provider-specific', 'constructor', '__proto__'])(
+    'falls back to legacy attachment flags for an unknown semantic type %s',
+    (semantic_type) => {
+      expect(
+        getMessengerReplyAttachmentType({
+          type: 'audio',
+          semantic_type,
+          is_voice: true,
+        }),
+      ).toBe('voice')
+    },
+  )
+
+  it('does not infer a video message from a technical filename', () => {
+    expect(
+      getMessengerReplyAttachmentType({
+        type: 'video',
+        mime_type: 'video/mp4',
+        file_name: 'video-note.mp4',
+      }),
+    ).toBe('video')
+  })
+
+  it('keeps transparent square WebP artwork as an image despite obsolete sticker hints', () => {
+    let artwork = {
       id: 'TRANSPARENT-WEBP',
       provider: 'wazzup',
       type: 'image',
@@ -34,25 +157,26 @@ describe('messenger attachment contract v1', () => {
       height: 512,
       is_sticker_candidate: true,
     }
-    expect(isCompactWazzupStickerImage(candidate)).toBe(true)
-    expect(isSingleStickerAttachmentSet([candidate])).toBe(true)
-    expect(buildMessengerAttachmentSegments([candidate])[0]).toMatchObject({
-      type: 'sticker',
-      attachment: { type: 'image' },
+    expect(isSingleStickerAttachmentSet([artwork])).toBe(false)
+    expect(getMessengerReplyAttachmentType(artwork)).toBe('image')
+    expect(buildMessengerAttachmentSegments([artwork])[0]).toMatchObject({
+      type: 'images',
+      items: [{ type: 'image' }],
     })
-    for (let override of [
-      { is_sticker_candidate: false },
-      { is_sticker_candidate: undefined },
-      { provider: 'telegram_bot' },
-      { mime_type: 'image/jpeg' },
-      { type: 'file' },
-      { is_animated: true },
-    ]) {
-      expect(isCompactWazzupStickerImage({ ...candidate, ...override })).toBe(
-        false,
-      )
-    }
   })
+
+  it.each(['wazzup', 'max_direct', 'telegram_bot', 'vk_direct'])(
+    'uses the common compact renderer for explicit %s stickers',
+    (provider) => {
+      let sticker = { provider, type: 'sticker', mime_type: 'image/webp' }
+      expect(isSingleStickerAttachmentSet([sticker])).toBe(true)
+      expect(getMessengerReplyAttachmentType(sticker)).toBe('sticker')
+      expect(buildMessengerAttachmentSegments([sticker])[0]).toMatchObject({
+        type: 'sticker',
+        attachment: sticker,
+      })
+    },
+  )
 
   it('routes explicit voice DTOs to the common audio player', () => {
     expect(
@@ -67,6 +191,21 @@ describe('messenger attachment contract v1', () => {
       isSingleFileAttachmentSet([{ type: 'file' }, { type: 'image' }]),
     ).toBe(false)
   })
+
+  it.each(['File.docx', '0123456789abcdef0123456789abcdef.docx'])(
+    'preserves the confirmed Wazzup original filename %s',
+    (original_file_name) => {
+      expect(
+        getMessengerAttachmentTitle({
+          provider: 'wazzup',
+          type: 'file',
+          original_file_name,
+          display_title: 'File',
+          file_name: '0123456789abcdef0123456789abcdef.docx',
+        }),
+      ).toBe(original_file_name)
+    },
+  )
 
   it('uses the original display filename and hides opaque storage names', () => {
     let hash = '0123456789abcdef0123456789abcdef.pdf'
@@ -253,6 +392,21 @@ describe('messenger attachment contract v1', () => {
       }),
     ).toBe('Голосовое сообщение')
     expect(getMessengerMessagePreview({ message_type: 'video' })).toBe('Video')
+    expect(getMessengerMessagePreview({ message_type: 'video_note' })).toBe(
+      'Video message',
+    )
+    expect(getMessengerMessagePreview({ message_type: 'animation' })).toBe(
+      'Animation',
+    )
+    expect(
+      getMessengerMessagePreview({ message_type: 'application/x-internal' }),
+    ).toBe('Attachment')
+    expect(
+      getMessengerMessagePreview({
+        message_type: 'video_note',
+        text: 'Подпись к видео',
+      }),
+    ).toBe('Подпись к видео')
   })
 
   it('classifies only a single standalone image as single-image layout', () => {
@@ -402,6 +556,62 @@ describe('messenger attachment contract v1', () => {
         open_url: '/redirect',
       }),
     ).toBe('/redirect')
+  })
+
+  it.each([
+    'wazzup',
+    'max_direct',
+    'vk_direct',
+    'telegram_bot',
+    'avito_direct',
+  ])(
+    'downloads saved %s documents through the named download endpoint',
+    (provider) => {
+      let attachment = {
+        provider,
+        id: 'SAVED-DOCUMENT',
+        type: 'file',
+        file_name: 'File.docx',
+        url: '/api/method/crm_messenger.api.attachments.stream?attachment=SAVED-DOCUMENT',
+        download_url:
+          '/api/method/crm_messenger.api.attachments.download?attachment=SAVED-DOCUMENT',
+      }
+      for (let status of ['available', 'uploaded']) {
+        expect(getAttachmentAction({ ...attachment, status })).toBe(
+          attachment.download_url,
+        )
+      }
+      for (let status of ['pending', 'downloading', 'retrying', 'failed']) {
+        expect(getAttachmentAction({ ...attachment, status })).toBe('')
+      }
+    },
+  )
+
+  it('preserves source actions for external documents and streamed media', () => {
+    expect(
+      getAttachmentAction({
+        type: 'file',
+        status: 'external',
+        open_url: '/protected/external-document',
+      }),
+    ).toBe('/protected/external-document')
+    expect(
+      getAttachmentAction({
+        type: 'file',
+        status: 'available',
+        url: '/legacy-document',
+      }),
+    ).toBe('/legacy-document')
+    for (let type of ['image', 'audio', 'video', 'sticker']) {
+      expect(
+        getAttachmentAction({
+          type,
+          status: 'available',
+          url: '/protected/stream',
+          download_url: '/protected/download',
+        }),
+      ).toBe('/protected/stream')
+    }
   })
 
   it('keeps unsupported attachments inactive', () => {

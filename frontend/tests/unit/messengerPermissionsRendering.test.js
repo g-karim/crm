@@ -1592,10 +1592,11 @@ describe('Wazzup native text replies', () => {
   )
 
   it.each([
+    ['static sticker', { type: 'sticker', mime_type: 'image/webp' }, 'Sticker'],
     [
-      'static sticker',
+      'transparent WebP artwork with an obsolete sticker hint',
       { type: 'image', mime_type: 'image/webp', is_sticker_candidate: true },
-      'Sticker',
+      'Image',
     ],
     [
       'ordinary WebP image',

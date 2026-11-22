@@ -1,4 +1,18 @@
 const API_PREFIX = 'crm_messenger.api.wazzup_partner'
+
+export const WAZZUP_PARTNER_TRANSPORTS = {
+  whatsapp: { label: 'WhatsApp', simulatorRequires2fa: false },
+  telegram: { label: 'Telegram personal chats', simulatorRequires2fa: true },
+  max: { label: 'MAX personal chats', simulatorRequires2fa: false },
+  viber: { label: 'Viber', simulatorRequires2fa: false },
+}
+
+export function wazzupPartnerTransport(platform) {
+  return Object.hasOwn(WAZZUP_PARTNER_TRANSPORTS, platform)
+    ? WAZZUP_PARTNER_TRANSPORTS[platform]
+    : null
+}
+
 const REQUEST_FIELDS = {
   start_connection: ['platform', 'custom_display_name', 'client_request_id'],
   get_onboarding_state: ['channel'],
@@ -193,6 +207,7 @@ export function safeWazzupQrImage(value) {
 
 export function normalizePartnerConnection(value = {}) {
   const channel = value.channel || {}
+  const transport = wazzupPartnerTransport(channel.platform)
   const onboarding = value.onboarding || {}
   const candidate = onboarding.status || channel.wazzup_status
   const status = Object.hasOwn(STATUS_PRESENTATION, candidate)
@@ -220,7 +235,7 @@ export function normalizePartnerConnection(value = {}) {
     channel: {
       name: typeof channel.name === 'string' ? channel.name.slice(0, 140) : '',
       provider: 'wazzup',
-      platform: channel.platform === 'telegram' ? 'telegram' : 'whatsapp',
+      platform: transport ? channel.platform : '',
       custom_display_name:
         typeof channel.custom_display_name === 'string'
           ? channel.custom_display_name.slice(0, 140)
@@ -250,7 +265,9 @@ export function normalizePartnerConnection(value = {}) {
         : '',
       qr_expired: Boolean(onboarding.qr_expired),
       has_error: Boolean(onboarding.error),
-      can_submit_2fa: Boolean(onboarding.can_submit_2fa),
+      can_submit_2fa: Boolean(
+        status === 'waiting_2fa' && transport && onboarding.can_submit_2fa,
+      ),
       can_reconnect: Boolean(onboarding.can_reconnect),
     },
     simulator: value.simulator === true,

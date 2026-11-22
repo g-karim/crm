@@ -56,6 +56,8 @@ const constrainMetadata = new Function(
 )(...Object.values(sizingBindings))
 const picture = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="380" height="380"><rect width="380" height="380" fill="#334155"/><rect x="24" y="30" width="332" height="28" fill="#64748b"/><rect x="24" y="80" width="240" height="18" fill="#94a3b8"/><rect x="24" y="120" width="300" height="200" fill="#475569"/></svg>')}`
 const portraitPicture = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="900"><rect width="100" height="900" fill="#334155"/></svg>')}`
+const transparentWebpPicture =
+  'data:image/webp;base64,UklGRjwAAABXRUJQVlA4TC8AAAAv/8F/EA8wgmM0tEMb8FDUtpE0wx/0vK5dAo7o/wQE//f1ffIf//Ef//Ef/x25PQA='
 const file = (
   title = 'ТПР-1-23_Хайруллин_Ильназ_Документ_с_длинным_названием_для_проверки.pdf',
 ) => ({
@@ -291,12 +293,42 @@ const wazzupCases = [
     attachments: [file('Договор.pdf')],
   },
   {
+    // Native callback DTO, without the legacy text_is_attachment_filename flag.
+    // An intentionally equal caption has the same shape and display policy.
+    key: 'document-native-filename',
+    text: 'Требования к оформлению проекта (1).pptx',
+    attachments: [
+      {
+        ...file('Требования к оформлению проекта (1).pptx'),
+        original_file_name: 'Требования к оформлению проекта (1).pptx',
+        mime_type:
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      },
+    ],
+  },
+  {
     key: 'opaque-file',
     attachments: [
       {
         ...file(),
         display_title: '0123456789abcdef0123456789abcdef.pdf',
         file_name: '0123456789abcdef0123456789abcdef.pdf',
+      },
+    ],
+  },
+  {
+    key: 'saved-document-download',
+    attachments: [
+      {
+        ...file('0123456789abcdef0123456789abcdef01234567'),
+        id: 'SAVED-DOCUMENT',
+        status: 'available',
+        display_title: 'Исходный договор.docx',
+        mime_type:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        url: '/api/method/crm_messenger.api.attachments.stream?attachment=SAVED-DOCUMENT',
+        download_url:
+          '/api/method/crm_messenger.api.attachments.download?attachment=SAVED-DOCUMENT',
       },
     ],
   },
@@ -339,9 +371,49 @@ const wazzupCases = [
     ],
   },
   {
-    key: 'image-sticker-inferred',
+    key: 'image-sticker-webp',
     attachments: [
-      image('STICKER-INFERRED', {
+      image('STICKER-WEBP', {
+        type: 'sticker',
+        mime_type: 'image/webp',
+      }),
+    ],
+  },
+  {
+    key: 'animated-image-sticker',
+    attachments: [
+      image('ANIMATED-STICKER', {
+        type: 'sticker',
+        mime_type: 'image/gif',
+        is_animated: true,
+        url: '/tests/browser/fixtures/messenger-animation.gif',
+        width: 512,
+        height: 512,
+      }),
+    ],
+  },
+  {
+    key: 'video-sticker',
+    attachments: [
+      {
+        id: 'VIDEO-STICKER',
+        type: 'sticker',
+        status: 'available',
+        mime_type: 'video/mp4',
+        is_animated: true,
+        playback_url: '/tests/browser/fixtures/messenger-portrait.mp4',
+        width: 512,
+        height: 512,
+      },
+    ],
+  },
+  {
+    key: 'transparent-webp-artwork',
+    attachments: [
+      image('WEBP-ARTWORK', {
+        url: transparentWebpPicture,
+        width: 512,
+        height: 512,
         mime_type: 'image/webp',
         is_sticker_candidate: true,
       }),
@@ -351,12 +423,12 @@ const wazzupCases = [
     key: 'image-sticker-pending',
     attachments: [
       image('STICKER-PENDING', {
+        type: 'sticker',
         status: 'pending',
         url: null,
         width: null,
         height: null,
         mime_type: 'image/webp',
-        is_sticker_candidate: true,
       }),
     ],
   },
@@ -515,7 +587,6 @@ const app = createApp({
                     constrainIntrinsicWidth: constrainMetadata({ message }),
                     wrapSource: attachments.isSingleStickerAttachmentSet(
                       message.attachments,
-                      message.provider,
                     ),
                   }),
                   message.reply_context &&

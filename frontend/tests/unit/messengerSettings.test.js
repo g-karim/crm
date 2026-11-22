@@ -4,6 +4,8 @@ import {
   makeMessengerChannelDraft,
   MESSENGER_PROVIDER_OPTIONS,
   messengerChannelState,
+  messengerChannelCreationOptions,
+  messengerProviderLabel,
   validateMessengerChannelDraft,
   wazzupConnectionMessage,
   wazzupConnectionRows,
@@ -200,9 +202,31 @@ describe('messengerSettings', () => {
     ).toEqual([
       { label: 'Telegram Bot', value: 'telegram_bot' },
       { label: 'VK', value: 'vk_direct' },
-      { label: 'MAX', value: 'max_direct' },
+      { label: 'MAX bot', value: 'max_direct' },
       { label: 'Avito', value: 'avito_direct' },
     ])
+  })
+
+  it('keeps personal MAX and Viber QR entries separate from MAX bot credentials', () => {
+    const options = messengerChannelCreationOptions()
+    expect(options.filter((option) => option.platform)).toEqual([
+      { label: 'WhatsApp', value: 'partner_whatsapp', platform: 'whatsapp' },
+      {
+        label: 'Telegram personal chats',
+        value: 'partner_telegram',
+        platform: 'telegram',
+      },
+      { label: 'MAX personal chats', value: 'partner_max', platform: 'max' },
+      { label: 'Viber', value: 'partner_viber', platform: 'viber' },
+    ])
+    expect(
+      options.find((option) => option.value === 'max_direct'),
+    ).toMatchObject({
+      label: 'MAX bot',
+      provider: 'max_direct',
+    })
+    for (const option of options)
+      expect(messengerProviderLabel(option.value)).toBe(option.label)
   })
 
   it('creates provider-aware drafts without exposing saved secrets', () => {

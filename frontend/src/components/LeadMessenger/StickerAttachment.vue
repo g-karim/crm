@@ -11,7 +11,7 @@
       v-else-if="videoSticker && playable"
       ref="mediaElement"
       data-sticker-video
-      :src="attachment.url"
+      :src="source"
       :aria-label="__(title)"
       class="size-full object-contain"
       autoplay
@@ -26,7 +26,7 @@
       v-else-if="imageSticker && playable"
       ref="mediaElement"
       data-sticker-image
-      :src="attachment.url"
+      :src="source"
       :alt="__(title)"
       class="size-full object-contain"
       @load="finishLoading"
@@ -54,7 +54,7 @@
         }}
       </span>
       <button
-        v-if="localFailed && state.active && attachment.url"
+        v-if="localFailed && state.active && source"
         type="button"
         class="min-h-8 rounded px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
         @click.stop="retryLocal"
@@ -99,11 +99,16 @@ const videoSticker = computed(() =>
 const imageSticker = computed(() =>
   String(props.attachment.mime_type || '').startsWith('image/'),
 )
+const source = computed(() =>
+  videoSticker.value
+    ? props.attachment.playback_url || props.attachment.url || ''
+    : props.attachment.url || '',
+)
 const localFailed = ref(false)
 const localLoading = ref(false)
 const mediaElement = ref(null)
 const playable = computed(
-  () => state.value.active && props.attachment.url && !localFailed.value,
+  () => state.value.active && source.value && !localFailed.value,
 )
 function finishLoading() {
   localLoading.value = false
@@ -119,7 +124,7 @@ async function retryLocal() {
   localFailed.value = false
   if (
     !state.value.active ||
-    !props.attachment.url ||
+    !source.value ||
     (!videoSticker.value && !imageSticker.value)
   )
     return
@@ -139,7 +144,7 @@ async function retryLocal() {
 watch(
   [
     () => props.attachment.id,
-    () => props.attachment.url,
+    () => source.value,
     () => state.value.status,
     () => props.attachment.mime_type,
   ],
