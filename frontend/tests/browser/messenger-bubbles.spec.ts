@@ -420,6 +420,7 @@ for (const platform of ['whatsapp', 'telegram']) {
           width: node.getBoundingClientRect().width,
           height: node.getBoundingClientRect().height,
         }))
+      await portraitFrame.scrollIntoViewIfNeeded()
       const portraitInitial = await portraitGeometry()
       expect(portraitInitial.height).toBeLessThanOrEqual(360)
       await expect(portraitFrame.locator('[data-media-backdrop]')).toHaveCount(

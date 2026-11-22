@@ -16,12 +16,15 @@
       />
       <Button
         v-if="isAdmin()"
-        class="min-h-11 !text-ink-gray-9"
+        class="min-h-11 min-w-11 !text-ink-gray-9"
         icon-left="lucide-plug"
-        :label="__('Каналы')"
+        :aria-label="__('Каналы')"
+        :tooltip="__('Каналы')"
         variant="ghost"
         @click="showAccounts = true"
-      />
+      >
+        <span class="hidden sm:inline">{{ __('Каналы') }}</span>
+      </Button>
     </template>
   </LayoutHeader>
   <main
@@ -344,6 +347,33 @@
                     : 'bg-surface-base'
                 "
               >
+                <MessageMetadata
+                  v-if="
+                    message.provider === 'wazzup' &&
+                    !detail.thread.demo &&
+                    detail.thread.can_operate
+                  "
+                  :message="message"
+                  :sender="
+                    message.direction === 'outbound'
+                      ? __('You')
+                      : detail.thread.title
+                  "
+                  :source="detail.thread.account_label"
+                  :editing="messageActionState.editingMessage === message.name"
+                  :loading="messageActionState.pendingMessage === message.name"
+                  :delete-blocked="
+                    Boolean(messageActionState.blockedDeletes[message.name])
+                  "
+                  :edit-blocked="
+                    Boolean(messageActionState.blockedEdits[message.name])
+                  "
+                  @reply="selectReply(message)"
+                  @start-edit="messageActions.startEdit(message)"
+                  @delete="confirmMessageAction(message, 'delete')"
+                  @retry-delete="confirmMessageAction(message, 'retry-delete')"
+                  @retry="confirmMessageAction(message, 'retry')"
+                />
                 <p
                   v-if="detail.thread.kind === 'email'"
                   class="mb-2 break-words text-xs text-ink-gray-6"
@@ -358,6 +388,17 @@
                 <h3 v-if="message.subject" class="mb-2 text-sm font-semibold">
                   {{ message.subject }}
                 </h3>
+                <MessageReplyQuote
+                  v-if="
+                    message.reply_context &&
+                    message.status !== 'deleted' &&
+                    !message.content_unavailable
+                  "
+                  class="mb-2"
+                  :context="visibleReplyContext(message.reply_context)"
+                  :client-name="detail.thread.title"
+                  @navigate="showQuotedMessage"
+                />
                 <p
                   v-if="message.content_unavailable"
                   class="text-sm text-ink-gray-6"
@@ -367,10 +408,34 @@
                 <MessageContent
                   v-else
                   :message="message"
-                  :should-show-text="true"
+                  :editing="messageActionState.editingMessage === message.name"
+                  :draft="messageActionState.draft"
+                  :loading="messageActionState.pendingMessage === message.name"
+                  :delete-unconfirmed="
+                    messageActionState.blockedDeletes[message.name] ===
+                    'unknown'
+                  "
+                  :delete-blocked="
+                    Boolean(messageActionState.blockedDeletes[message.name])
+                  "
+                  :edit-blocked="
+                    Boolean(messageActionState.blockedEdits[message.name])
+                  "
+                  :error="messageActionState.errors[message.name] || ''"
+                  @update:draft="messageActions.setDraft"
+                  @save-edit="messageActions.saveEdit(message)"
+                  @cancel-edit="messageActions.cancelEdit"
+                  :should-show-text="
+                    detail.thread.kind === 'email' ||
+                    shouldShowMessengerText(message)
+                  "
                 />
                 <template v-if="detail.thread.kind === 'messenger'"
                   ><AttachmentRenderer
+                    v-if="
+                      message.status !== 'deleted' &&
+                      !message.content_unavailable
+                    "
                     :attachments="message.attachments || []"
                     :provider="message.provider"
                     :outbound="message.direction === 'outbound'"
@@ -410,8 +475,8 @@
                   class="mt-2 flex flex-wrap items-center justify-end gap-2 text-xs text-ink-gray-6"
                 >
                   <time>{{ fullTime(message.message_datetime) }}</time
-                  ><span v-if="message.direction === 'outbound'">{{
-                    deliveryLabel(message, detail.thread.demo)
+                  ><span v-if="messageDeliveryLabel(message)">{{
+                    messageDeliveryLabel(message)
                   }}</span
                   ><button
                     v-if="detail.thread.kind === 'email'"
@@ -420,6 +485,19 @@
                   >
                     {{ __('Цитировать') }}
                   </button>
+                  <Button
+                    v-else-if="
+                      message.provider !== 'wazzup' &&
+                      detail.can_send &&
+                      detail.capabilities?.supports_replies &&
+                      message.status !== 'deleted' &&
+                      !message.content_unavailable
+                    "
+                    variant="ghost"
+                    type="button"
+                    :label="__('Reply')"
+                    @click="selectReply(message)"
+                  />
                 </footer>
               </div>
             </article>
@@ -484,6 +562,21 @@
                 />
               </div>
             </details>
+            <div
+              v-if="replyTarget && draft.mode === 'reply'"
+              class="mb-2 flex items-center justify-between gap-2 rounded bg-surface-gray-2 px-3 py-2 text-sm"
+            >
+              <span class="truncate">{{
+                replyTarget.text || __('Reply')
+              }}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                icon="lucide-x"
+                :aria-label="__('Cancel reply')"
+                @click="replyTarget = null"
+              />
+            </div>
             <FormControl
               v-model="draft.text"
               type="textarea"
@@ -540,10 +633,37 @@
                 @click="resolveDraft(false)"
               />
             </div>
+            <p
+              v-if="captionState.error"
+              class="mt-2 text-sm text-ink-amber-8"
+              role="status"
+            >
+              {{ __(captionState.error) }}
+            </p>
+            <ComposerVoiceRecorder
+              v-if="canRecordVoice"
+              :key="selectedId"
+              ref="voiceRecorder"
+              :conversation="detail.thread.name"
+              :channel="detail.thread.account"
+              :reference-doctype="detail.thread.reference_doctype"
+              :reference-name="detail.thread.reference_name"
+              :reply-to-message="replyTarget?.name || ''"
+              :disabled="
+                sending || workSaving || Boolean(draft.attachments.length)
+              "
+              :max-duration-seconds="capabilities.voice.max_duration_seconds"
+              :max-size-bytes="capabilities.voice.max_size_bytes"
+              :scope-key="selectedId"
+              @active-change="voiceActive = $event"
+              @send-requested="voiceRecorder?.send()"
+              @queued="voiceQueued"
+            />
             <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
               <div class="flex items-center gap-1">
                 <FileUploader
                   v-if="canAttach"
+                  :validate-file="validateAttachment"
                   :upload-args="{
                     type: detail.thread.kind,
                     docname: detail.thread.name,
@@ -551,8 +671,7 @@
                     is_private: true,
                   }"
                   @success="attach"
-                  @error="uploadError"
-                  ><template #default="{ openFileSelector, uploading }"
+                  ><template #default="{ openFileSelector, uploading, error }"
                     ><Button
                       type="button"
                       icon="lucide-paperclip"
@@ -560,8 +679,13 @@
                       variant="ghost"
                       :aria-label="__('Прикрепить файл')"
                       :loading="uploading"
-                      @click="openFileSelector" /></template
-                ></FileUploader>
+                      @click="openFileSelector"
+                    />
+                    <p v-if="error" class="text-sm text-ink-red-4" role="alert">
+                      {{ typeof error === 'string' ? error : error.message }}
+                    </p></template
+                  ></FileUploader
+                >
                 <Button
                   type="button"
                   icon="lucide-text"
@@ -886,7 +1010,7 @@
         <p class="text-sm leading-5 text-ink-gray-6">
           {{
             __(
-              'Отправка идёт через аккаунт выбранного диалога. Доступ к аккаунту и доступ к карточке клиента проверяются отдельно.',
+              'Подключайте почту и мессенджеры, чтобы переписываться с клиентами из CRM.',
             )
           }}
         </p>
@@ -909,64 +1033,103 @@
         </p>
         <div class="flex flex-wrap gap-2">
           <Button
-            class="min-h-11"
             :label="__('Настроить мессенджеры')"
+            icon-left="lucide-messages-square"
             @click="openSettings('messenger')"
           /><Button
-            class="min-h-11"
             :label="__('Настроить почту')"
+            icon-left="lucide-mail"
             @click="openSettings('email')"
           />
         </div>
-        <details>
-          <summary class="cursor-pointer py-2 text-sm">
-            {{ __('Доступ сотрудников к аккаунту') }}
-          </summary>
-          <form class="mt-3 space-y-3" @submit.prevent="saveAccess">
+        <p v-if="!allAccounts.length" class="text-sm leading-5 text-ink-gray-6">
+          {{
+            __(
+              'Сначала подключите канал или почтовый ящик. После этого здесь можно выдать доступ сотрудникам.',
+            )
+          }}
+        </p>
+        <section v-else class="border-t border-outline-gray-2 pt-3">
+          <Button
+            variant="ghost"
+            :label="__('Доступ сотрудников к аккаунту')"
+            :icon-left="
+              accessOpen ? 'lucide-chevron-down' : 'lucide-chevron-right'
+            "
+            :aria-expanded="accessOpen"
+            aria-controls="inbox-account-access"
+            @click="accessOpen = !accessOpen"
+          />
+          <form
+            v-if="accessOpen"
+            id="inbox-account-access"
+            class="mt-3 space-y-4"
+            @submit.prevent="saveAccess"
+          >
             <FormControl
               v-model="accessAccount"
               type="select"
               :label="__('Аккаунт')"
-              :options="
-                allAccounts.map((a) => ({
+              :placeholder="__('Выберите аккаунт')"
+              :options="[
+                { value: '', label: __('Выберите аккаунт') },
+                ...allAccounts.map((a) => ({
                   value: `${a.kind}:${a.name}`,
                   label: a.label,
-                }))
-              "
-            /><FormControl
+                })),
+              ]"
+              required
+              :disabled="accessSaving"
+            />
+            <FormControl
               v-model="accessUser"
               :label="__('Email сотрудника')"
               type="email"
-            /><label class="flex min-h-11 items-center gap-2 text-sm"
-              ><input v-model="accessRead" type="checkbox" />{{
-                __('Чтение')
-              }}</label
-            ><label class="flex min-h-11 items-center gap-2 text-sm"
-              ><input
+              required
+              :disabled="accessSaving"
+              autocomplete="off"
+            />
+            <div class="flex flex-col gap-3">
+              <Checkbox
+                v-model="accessRead"
+                :label="__('Чтение')"
+                :disabled="accessSaving"
+              />
+              <Checkbox
                 v-model="accessSend"
-                type="checkbox"
-                :disabled="!accessRead"
-              />{{ __('Ответы и обработка') }}</label
-            >
-            <p class="text-xs leading-5 text-ink-gray-6">
+                :label="__('Ответы и обработка')"
+                :disabled="!accessRead || accessSaving"
+                :description="
+                  !accessRead
+                    ? __('Для ответов сначала включите чтение.')
+                    : undefined
+                "
+              />
+            </div>
+            <p class="text-sm leading-5 text-ink-gray-6">
               {{
                 __(
-                  'Права на лид или сделку по-прежнему обязательны. Администратор видит все аккаунты; личная почта доступна также через штатные настройки пользователя.',
+                  'Права на лид или сделку по-прежнему обязательны. Личная почта также доступна через настройки пользователя.',
                 )
               }}
             </p>
             <Button
               type="submit"
-              class="min-h-11"
+              variant="solid"
               :label="__('Сохранить доступ')"
               :loading="accessSaving"
-              :disabled="!accessAccount || !accessUser"
+              :disabled="!accessAccount || !accessUser.trim() || accessSaving"
             />
-            <p v-if="accessResult" role="status" class="text-sm">
+            <p
+              v-if="accessResult"
+              :role="accessFailed ? 'alert' : 'status'"
+              class="text-sm"
+              :class="accessFailed ? 'text-ink-red-4' : 'text-ink-gray-7'"
+            >
               {{ accessResult }}
             </p>
           </form>
-        </details>
+        </section>
       </div></template
     ></Dialog
   >
@@ -975,6 +1138,7 @@
 <script setup>
 import {
   Button,
+  Checkbox,
   Dialog,
   FormControl,
   FeatherIcon,
@@ -988,7 +1152,25 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import MessageContent from '@/components/LeadMessenger/MessageContent.vue'
+import MessageMetadata from '@/components/LeadMessenger/MessageMetadata.vue'
+import MessageReplyQuote from '@/components/LeadMessenger/MessageReplyQuote.vue'
+import {
+  createMessengerMessageActions,
+  getMessengerDeleteRetryConfirmation,
+} from '@/utils/messengerMessageActions'
 import AttachmentRenderer from '@/components/LeadMessenger/AttachmentRenderer.vue'
+import ComposerVoiceRecorder from '@/components/LeadMessenger/ComposerVoiceRecorder.vue'
+import {
+  getMessengerCapabilities,
+  getMessengerDeliveryLabel,
+  getMessengerDeliveryState,
+  shouldShowMessengerText,
+} from '@/utils/messengerChannels'
+import {
+  getComposerAttachmentPolicy,
+  getComposerCaptionState,
+  validateComposerFileMix,
+} from '@/utils/messengerComposer'
 import { usersStore } from '@/stores/users'
 import { globalStore } from '@/stores/global'
 import { callbackDeadline } from '@/utils/callFollowups'
@@ -1009,7 +1191,7 @@ import {
 const route = useRoute(),
   router = useRouter()
 const { isAdmin } = usersStore()
-const { prepareCall } = globalStore()
+const { prepareCall, $dialog } = globalStore()
 const viewer = ref(''),
   items = ref([]),
   counts = ref({}),
@@ -1029,6 +1211,28 @@ const draft = ref(blankDraft()),
   draftConflict = ref(false),
   sending = ref(false),
   sendError = ref('')
+const replyTarget = ref(null)
+const voiceRecorder = ref(null)
+const voiceActive = ref(false)
+const messageActionState = ref({})
+const messageActions = createMessengerMessageActions({
+  call,
+  getMessage: (name) =>
+    detail.value?.messages.find((message) => message.name === name),
+  sync: () => loadDetail(true),
+  onChange: (state) => {
+    messageActionState.value = state
+  },
+})
+messageActionState.value = messageActions.getState()
+watch(
+  () => detail.value?.messages,
+  (messages) => {
+    messageActions.reconcileDeleteStates(messages)
+    messageActions.reconcileEditStates(messages)
+  },
+)
+
 const historyEl = ref(null),
   listEl = ref(null),
   workSaving = ref(false),
@@ -1042,6 +1246,8 @@ const taskOpen = ref(false),
   taskAssignee = ref(''),
   taskError = ref(''),
   taskSaving = ref(false)
+const accessOpen = ref(false),
+  accessFailed = ref(false)
 const showAccounts = ref(false),
   accessAccount = ref(''),
   accessUser = ref(''),
@@ -1090,11 +1296,47 @@ const peopleOptions = computed(() => [
   { value: '', label: 'Без ответственного' },
   ...(detail.value?.people || []),
 ])
+const capabilities = computed(() => getMessengerCapabilities(detail.value))
+const attachmentPolicy = computed(() =>
+  getComposerAttachmentPolicy(
+    {
+      ...capabilities.value,
+      max_attachment_count: Math.min(
+        10,
+        capabilities.value.max_attachment_count,
+      ),
+    },
+    detail.value?.thread.channel,
+  ),
+)
+const captionState = computed(() =>
+  detail.value?.thread.kind === 'messenger' && draft.value.mode === 'reply'
+    ? getComposerCaptionState(
+        draft.value.text,
+        draft.value.attachments.map((file) => ({ name: file.file_name })),
+        attachmentPolicy.value,
+      )
+    : {},
+)
+const canRecordVoice = computed(
+  () =>
+    detail.value?.thread.kind === 'messenger' &&
+    !detail.value.thread.demo &&
+    draft.value.mode === 'reply' &&
+    detail.value.can_send &&
+    capabilities.value.voice.send,
+)
 const canSubmit = computed(
   () =>
     !!(
       detail.value &&
-      draft.value.text?.trim() &&
+      (draft.value.text?.trim() ||
+        (draft.value.mode === 'reply' &&
+          detail.value.thread.kind === 'messenger' &&
+          !detail.value.thread.demo &&
+          draft.value.attachments.length)) &&
+      !captionState.value.error &&
+      !voiceActive.value &&
       !sending.value &&
       !workSaving.value &&
       !draftConflict.value &&
@@ -1505,6 +1747,9 @@ async function submit() {
           cc: content.cc,
           bcc: content.bcc,
           attachments: content.attachments.map((f) => f.name),
+          ...(replyTarget.value
+            ? { reply_to_message: replyTarget.value.name }
+            : {}),
         }
   lastSend = stableRequest(lastSend, { id, mode: content.mode, ...payload })
   sending.value = true
@@ -1523,6 +1768,7 @@ async function submit() {
     if (selectedId.value === id) {
       draft.value.text = ''
       draft.value.attachments = []
+      replyTarget.value = null
       lastSend = null
       await nextTick()
       await flushDraft()
@@ -1580,13 +1826,108 @@ async function saveTask() {
     taskSaving.value = false
   }
 }
+function confirmMessageAction(message, action) {
+  const id = selectedId.value
+  const inThread = () =>
+    id === selectedId.value && detail.value?.thread.can_operate
+  if (!inThread()) return
+  const retryDelete = action === 'retry-delete'
+  const retrySend = action === 'retry'
+  if (retrySend && getMessengerDeliveryState(message) === 'unknown') return
+  const confirm = retryDelete
+    ? getMessengerDeleteRetryConfirmation(message)
+    : retrySend
+      ? { title: 'Retry Sending', message: 'Retry sending this message?' }
+      : {
+          title: 'Delete the message for everyone?',
+          message:
+            'The message will be deleted for all participants. CRM will keep a deletion marker.',
+        }
+  $dialog({
+    title: __(confirm.title),
+    message: __(confirm.message),
+    actions: [
+      {
+        label: __(
+          retryDelete
+            ? 'Retry Deletion'
+            : retrySend
+              ? 'Retry Sending'
+              : 'Delete for Everyone',
+        ),
+        variant: 'solid',
+        theme: retrySend ? 'gray' : 'red',
+        onClick: async (close) => {
+          if (!inThread()) return close()
+          if (
+            retryDelete &&
+            messageActions.getDeleteRetryAfterSeconds(message) > 0
+          )
+            return close()
+          close()
+          if (retryDelete)
+            await messageActions.retryDeleteMessage(message, true)
+          else if (retrySend) await messageActions.retryMessage(message)
+          else await messageActions.deleteMessage(message)
+        },
+      },
+    ],
+  })
+}
+function messageDeliveryLabel(message) {
+  return detail.value.thread.kind === 'messenger' && !detail.value.thread.demo
+    ? __(getMessengerDeliveryLabel(message))
+    : deliveryLabel(message, detail.value.thread.demo)
+}
+function visibleReplyContext(context) {
+  if (
+    context.state !== 'available' ||
+    detail.value.messages.some((message) => message.name === context.message)
+  )
+    return context
+  return { ...context, state: 'unavailable' }
+}
+function showQuotedMessage(name) {
+  historyEl.value
+    ?.querySelector(`[data-message-id="${CSS.escape(name)}"]`)
+    ?.scrollIntoView({ block: 'center' })
+}
+function selectReply(message) {
+  if (voiceActive.value || sending.value) return
+  draft.value.mode = 'reply'
+  replyTarget.value = message
+}
+async function voiceQueued() {
+  replyTarget.value = null
+  await loadDetail(true)
+  await loadList(false, true)
+}
+function validateAttachment(file) {
+  if (detail.value?.thread.kind !== 'messenger') return
+  const existing = draft.value.attachments.map((attachment) => ({
+    file: { name: attachment.file_name, type: attachment.content_type || '' },
+  }))
+  return validateComposerFileMix([file], existing, attachmentPolicy.value).error
+}
+watch(canRecordVoice, (enabled) => {
+  if (!enabled) voiceActive.value = false
+})
+watch(selectedId, () => {
+  messageActions.cancelEdit()
+  replyTarget.value = null
+  voiceActive.value = false
+})
 function quoteMail(message) {
   draft.value.mode = 'reply'
   draft.value.text = quoteMessage(message.text) + draft.value.text
 }
 function attach(file) {
-  if (draft.value.attachments.length >= 10) {
-    sendError.value = 'Можно прикрепить до 10 файлов.'
+  const limit =
+    detail.value?.thread.kind === 'messenger'
+      ? attachmentPolicy.value.maxAttachmentCount
+      : 10
+  if (draft.value.attachments.length >= limit) {
+    sendError.value = __('Maximum attachments: {0}', [limit])
     return
   }
   draft.value.attachments.push({
@@ -1599,9 +1940,6 @@ function removeAttachment(name) {
   draft.value.attachments = draft.value.attachments.filter(
     (f) => f.name !== name,
   )
-}
-function uploadError(error) {
-  sendError.value = errorText(error, 'Не удалось загрузить файл.')
 }
 function saveTemplate() {
   templates.value.push({
@@ -1624,7 +1962,14 @@ function openSettings(kind) {
     kind === 'messenger' ? __('Message Channels') : __('Email Accounts')
   showSettings.value = true
 }
+watch(accessRead, (value) => {
+  if (!value) accessSend.value = false
+})
+
 async function saveAccess() {
+  if (!accessAccount.value || !accessUser.value.trim() || accessSaving.value)
+    return
+  accessFailed.value = false
   accessSaving.value = true
   accessResult.value = ''
   try {
@@ -1633,12 +1978,13 @@ async function saveAccess() {
       kind,
       expected_viewer: viewer.value,
       account: rest.join(':'),
-      user: accessUser.value,
+      user: accessUser.value.trim(),
       can_read: accessRead.value,
-      can_send: accessSend.value,
+      can_send: accessRead.value && accessSend.value,
     })
     accessResult.value = 'Доступ сохранён.'
   } catch (e) {
+    accessFailed.value = true
     accessResult.value = errorText(e, 'Не удалось сохранить доступ.')
   } finally {
     accessSaving.value = false

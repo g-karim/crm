@@ -239,7 +239,10 @@ def _messages(kind, rows):
 		return frappe.get_all(
 			"Messenger Message",
 			filters={"conversation": rows[0].name, "status": ["!=", "deleted"]},
-			fields=["name", "creation", "message_datetime", "direction", "text", "message_type", "status"],
+			fields=[
+				"name", "creation", "message_datetime", "direction", "text",
+				"message_type", "status", "provider", "ingest_source",
+			],
 			order_by="message_datetime asc, creation asc, name asc",
 		)
 	return [
@@ -271,14 +274,21 @@ def _cursor(m):
 	return [str(m.creation), m.name]
 
 
+def _is_wazzup_history(message):
+	return message.get("provider") == "wazzup" and message.get("ingest_source") == "provider_history"
+
+
 def _project(kind, name, rows):
 	source = rows[0] if kind == "messenger" else next(r for r in rows if r.name == name)
 	msgs = _messages(kind, rows)
 	latest = msgs[-1] if msgs else None
+	operational = [m for m in msgs if not _is_wazzup_history(m)]
+	latest_live = operational[-1] if operational else None
+	inbound = [m for m in operational if m.direction == "inbound"]
 	work, private = _work(kind, name), _private(kind, name)
-	watermark = frappe.as_json(max((_cursor(m) for m in msgs if m.direction == "inbound"), default=[]))
+	watermark = frappe.as_json(max((_cursor(m) for m in inbound), default=[]))
 	status = work["status"] or (
-		"needs_reply" if latest and latest.direction == "inbound" else "waiting_customer"
+		"needs_reply" if latest_live and latest_live.direction == "inbound" else "waiting_customer"
 	)
 	if (
 		status in {"closed", "waiting_customer", "snoozed"}
@@ -292,7 +302,7 @@ def _project(kind, name, rows):
 		and get_datetime(work["snoozed_until"]) <= now_datetime()
 	):
 		status = "needs_reply"
-	unread = sum(1 for m in msgs if m.direction == "inbound" and _cursor(m) > private["read_cursor"])
+	unread = sum(1 for m in inbound if _cursor(m) > private["read_cursor"])
 	account = source.channel if kind == "messenger" else source.email_account
 	channel = (
 		frappe.db.get_value(
@@ -577,7 +587,11 @@ def get_thread(kind, name, before_cursor=None):
 		None,
 	)
 	materials = _materials(kind, name, selected)
-	read = max(([str(m["creation"]), m["name"]] for m in messages if m["direction"] == "inbound"), default=[])
+	read = max(
+		([str(m["creation"]), m["name"]] for m in messages
+		 if m["direction"] == "inbound" and not _is_wazzup_history(m)),
+		default=[],
+	)
 	return {
 		"thread": thread,
 		"messages": messages,
@@ -902,14 +916,15 @@ def _addresses(value):
 
 @frappe.whitelist(methods=["POST"])
 def send_reply(
-	kind, name, text, mutation_id, subject="", to="", cc="", bcc="", attachments=None, expected_viewer=None
+	kind, name, text, mutation_id, subject="", to="", cc="", bcc="", attachments=None,
+	expected_viewer=None, reply_to_message=None,
 ):
 	_expect_viewer(expected_viewer)
 	source, rows = _load(kind, name, write=True, lock=True)
 	attachments = _json(attachments, [])
 	if (
 		not isinstance(text, str)
-		or not text.strip()
+		or (not text.strip() and not (kind == "messenger" and attachments and not _is_demo(kind, source)))
 		or len(text) > 100000
 		or not isinstance(attachments, list)
 		or len(attachments) > 10
@@ -924,6 +939,7 @@ def send_reply(
 			channel=source.channel,
 			client_request_id="crm-inbox-" + _key(frappe.session.user, mutation_id),
 			attachments=attachments,
+			**({"reply_to_message": reply_to_message} if reply_to_message else {}),
 			reference_doctype=source.reference_doctype,
 			reference_name=source.reference_name,
 		)
