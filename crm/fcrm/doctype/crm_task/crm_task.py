@@ -31,7 +31,7 @@ class CRMTask(Document):
 		self.assign_to()
 
 	def validate(self):
-		if self.is_new() or not self.assigned_to:
+		if self.is_new():
 			return
 
 		if self.get_doc_before_save().assigned_to != self.assigned_to:

@@ -139,12 +139,14 @@ before_uninstall = "crm.uninstall.before_uninstall"
 # Permissions evaluated in scripted ways
 
 permission_query_conditions = {
+	"CRM Task": "crm.permissions.celio_tasks.task_query",
 	"CRM Lead": "crm.permissions.org_hierarchy.get_lead_permission_query_conditions",
 	"CRM Deal": "crm.permissions.org_hierarchy.get_deal_permission_query_conditions",
 	"CRM Notification": "crm.fcrm.doctype.crm_notification.crm_notification.get_permission_query_conditions",
 }
 
 has_permission = {
+	"CRM Task": "crm.permissions.celio_tasks.task_permission",
 	"CRM Lead": "crm.permissions.org_hierarchy.has_lead_permission",
 	"CRM Deal": "crm.permissions.org_hierarchy.has_deal_permission",
 	"CRM Notification": "crm.fcrm.doctype.crm_notification.crm_notification.has_permission",
@@ -164,6 +166,7 @@ override_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
+	"CRM Task": {"on_update": "crm.task_operations.changed"},
 	"Contact": {
 		"validate": ["crm.api.contact.validate"],
 	},
@@ -285,7 +288,7 @@ before_tests = "crm.tests.before_tests"
 # Ignore links to specified DocTypes when deleting documents
 # -----------------------------------------------------------
 
-ignore_links_on_delete = ["Failed Lead Sync Log"]
+ignore_links_on_delete = ["Failed Lead Sync Log", "CRM Task Operation"]
 
 # Request Events
 # ----------------
