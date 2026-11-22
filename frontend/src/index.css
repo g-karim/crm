@@ -30,29 +30,29 @@
   z-index: 101;
 }
 
-/* Avito import dates use a fixed calendar layout. DatePicker portals its
+/* Messenger import dates share a fixed calendar layout. DatePicker portals its
    panel to body, so the visible dialog marks the scope. */
-body:has([data-avito-import-date]) [data-slot='content-body'].w-56 {
-  width: 16rem;
+body:has([data-messenger-import-date]) [data-slot='content-body'].w-56 {
+  width: min(16rem, calc(100vw - 2rem));
 }
 
-body:has([data-avito-import-date])
+body:has([data-messenger-import-date])
   [data-slot='content-body'].w-56
   > .flex
   > div {
   width: 100%;
 }
 
-body:has([data-avito-import-date])
+body:has([data-messenger-import-date])
   [data-slot='content-body'].w-56
   [aria-label='Today'],
-body:has([data-avito-import-date])
+body:has([data-messenger-import-date])
   [data-slot='content-body'].w-56
   [aria-label='Сегодня'] {
   display: none;
 }
 
-body:has([data-avito-import-date])
+body:has([data-messenger-import-date])
   [data-slot='content-body'].w-56
   div:has(> button[aria-label='cycle-calendar-view']) {
   display: grid;
@@ -60,7 +60,7 @@ body:has([data-avito-import-date])
   align-items: center;
 }
 
-body:has([data-avito-import-date])
+body:has([data-messenger-import-date])
   [data-slot='content-body'].w-56
   div:has(> button[aria-label='cycle-calendar-view'])
   > button {
@@ -69,7 +69,7 @@ body:has([data-avito-import-date])
   white-space: nowrap;
 }
 
-body:has([data-avito-import-date])
+body:has([data-messenger-import-date])
   [data-slot='content-body'].w-56
   div:has(> button[aria-label='cycle-calendar-view'])
   > div {
@@ -77,7 +77,7 @@ body:has([data-avito-import-date])
   grid-template-columns: repeat(2, 2rem);
 }
 
-body:has([data-avito-import-date])
+body:has([data-messenger-import-date])
   [data-slot='content-body'].w-56
   [role='grid'][aria-label='Calendar dates'] {
   width: max-content;

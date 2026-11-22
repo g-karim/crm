@@ -184,7 +184,11 @@ export function getMessengerDeliveryState(message = {}) {
   let status = normalizePlatform(
     message?.delivery_status || message?.status || '',
   )
-  if (status === 'accepted' && isUnconfirmedWazzupProviderMessage(message)) {
+  if (
+    (status === 'accepted' ||
+      (status === 'unknown' && message.ingest_source === 'provider_history')) &&
+    isUnconfirmedWazzupProviderMessage(message)
+  ) {
     return ''
   }
   return DELIVERY_STATES.includes(status) ? status : ''
@@ -192,27 +196,27 @@ export function getMessengerDeliveryState(message = {}) {
 
 function isUnconfirmedWazzupProviderMessage(message) {
   // Partner history and external sends may lack delivery confirmation.
-  // Their accepted lifecycle state does not mean CRM is waiting to send them.
+  // CSV history has no delivery evidence: its unknown state is not a failed send.
   return Boolean(
     message.provider === 'wazzup' &&
-      message.channel_info?.wazzup_api_mode === 'partner_api_v2' &&
-      message.status === 'accepted' &&
-      ['provider_history', 'provider_webhook'].includes(
-        message.ingest_source,
-      ) &&
-      message.external_message_id &&
-      !message.client_request_id &&
-      !message.crm_user &&
-      !message.handoff &&
-      !message.provider_request_id &&
-      Number(message.attempt_count || 0) === 0 &&
-      !message.last_attempt_at &&
-      !message.sent_at &&
-      !message.delivered_at &&
-      !message.read_at &&
-      ['', 'accepted'].includes(
-        normalizePlatform(message.provider_status || ''),
-      ),
+    message.channel_info?.wazzup_api_mode === 'partner_api_v2' &&
+    (message.status === 'accepted' ||
+      (message.status === 'unknown' &&
+        message.ingest_source === 'provider_history' &&
+        !message.failure_reason &&
+        !message.error)) &&
+    ['provider_history', 'provider_webhook'].includes(message.ingest_source) &&
+    message.external_message_id &&
+    !message.client_request_id &&
+    !message.crm_user &&
+    !message.handoff &&
+    !message.provider_request_id &&
+    Number(message.attempt_count || 0) === 0 &&
+    !message.last_attempt_at &&
+    !message.sent_at &&
+    !message.delivered_at &&
+    !message.read_at &&
+    ['', 'accepted'].includes(normalizePlatform(message.provider_status || '')),
   )
 }
 
@@ -256,11 +260,11 @@ export function isGenericFileOnlyMessage(message = {}) {
     : []
   return Boolean(
     message?.status !== 'deleted' &&
-      attachments.length &&
-      attachments.every((attachment) => attachment?.type === 'file') &&
-      !shouldShowMessengerMessageText(message) &&
-      !message?.reply_context &&
-      !message?.forward_context,
+    attachments.length &&
+    attachments.every((attachment) => attachment?.type === 'file') &&
+    !shouldShowMessengerMessageText(message) &&
+    !message?.reply_context &&
+    !message?.forward_context,
   )
 }
 
@@ -284,12 +288,10 @@ export function getMessengerDeliveryLabel(message = {}) {
 export function isMaxVideoProcessingMessage(message = {}) {
   return Boolean(
     message?.provider === 'max_direct' &&
-      getMessengerDeliveryState(message) === 'retrying' &&
-      message?.provider_status === 'attachment.not.ready' &&
-      (message?.message_type === 'video' ||
-        message?.attachments?.some(
-          (attachment) => attachment?.type === 'video',
-        )),
+    getMessengerDeliveryState(message) === 'retrying' &&
+    message?.provider_status === 'attachment.not.ready' &&
+    (message?.message_type === 'video' ||
+      message?.attachments?.some((attachment) => attachment?.type === 'video')),
   )
 }
 

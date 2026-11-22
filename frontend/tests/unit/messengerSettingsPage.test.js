@@ -106,6 +106,15 @@ vi.mock('@/components/Settings/WazzupPartnerConnection.vue', () => ({
   },
 }))
 
+vi.mock('@/components/Settings/WazzupHistoryImport.vue', () => ({
+  default: {
+    props: ['channel', 'enabled', 'disabled'],
+    emits: ['busy'],
+    template:
+      '<div data-history-import :data-channel="channel.name" :data-enabled="enabled" :data-disabled="disabled"><button @click="$emit(\'busy\', true)">History busy</button></div>',
+  },
+}))
+
 vi.mock('@/utils/messengerSettings', async (importOriginal) => ({
   ...(await importOriginal()),
   callWazzupSettings: (...args) => {
@@ -225,6 +234,59 @@ describe('MessengerSettings Wazzup connection', () => {
       return extra(method, params)
     })
   }
+
+  it.each(['whatsapp', 'telegram', 'max', 'viber'])(
+    'embeds history import for a saved %s Partner channel',
+    async (platform) => {
+      setup({
+        stored: [
+          channel({
+            platform,
+            wazzup_api_mode: 'partner_api_v2',
+            wazzup_status: 'active',
+            state: 'connected',
+          }),
+        ],
+        settings: { enabled: true, auto_create_lead: true },
+      })
+      const root = await mountSettings()
+      await clickButton(root, 'Wazzup Sales')
+      const history = root.querySelector('[data-history-import]')
+      expect(history.dataset.channel).toBe('wazzup-1')
+      expect(history.dataset.enabled).toBe('true')
+      expect(history.dataset.disabled).toBe('false')
+      await editField(root, 'Channel Name', 'Unsaved name')
+      expect(history.dataset.disabled).toBe('true')
+      await editField(root, 'Channel Name', 'Wazzup Sales')
+      expect(history.dataset.disabled).toBe('false')
+      await clickButton(root, 'History busy')
+      expect(history.dataset.disabled).toBe('true')
+      expect(
+        [...root.querySelectorAll('button')].find(
+          (item) => item.textContent === 'Save',
+        ).disabled,
+      ).toBe(true)
+      await clickButton(root, 'Close')
+      expect(root.querySelector('[data-history-import]')).toBeNull()
+    },
+  )
+
+  it('keeps Wazzup history controls out of the Avito import section', async () => {
+    setup({
+      stored: [
+        channel({
+          name: 'avito-1',
+          provider: 'avito_direct',
+          platform: 'avito',
+          state: 'unchecked',
+        }),
+      ],
+    })
+    const root = await mountSettings()
+    await clickButton(root, 'Wazzup Sales')
+    expect(root.textContent).toContain('Avito chat import')
+    expect(root.querySelector('[data-history-import]')).toBeNull()
+  })
 
   it('routes Partner v2 rows to onboarding without opening the legacy key form', async () => {
     setup({
