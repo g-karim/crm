@@ -27,7 +27,7 @@ export function getCallLogDetail(row, log, columns = []) {
     }
   } else if (row === 'type') {
     return {
-      label: log.type,
+      label: incoming ? __('Incoming Call') : __('Outgoing Call'),
       icon: incoming ? 'phone-incoming' : 'phone-outgoing',
     }
   } else if (row === 'status') {

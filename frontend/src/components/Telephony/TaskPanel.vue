@@ -17,7 +17,7 @@
       <div class="flex gap-2">
         <Dropdown :options="taskStatusOptions(updateTaskStatus)">
           <Button
-            :label="task.status"
+            :label="__(task.status)"
             class="bg-surface-gray-9 text-ink-base hover:bg-surface-gray-8"
           >
             <template #prefix>
@@ -27,7 +27,7 @@
         </Dropdown>
         <Dropdown :options="taskPriorityOptions(updateTaskPriority)">
           <Button
-            :label="task.priority"
+            :label="__(task.priority)"
             class="bg-surface-gray-9 text-ink-base hover:bg-surface-gray-8"
           >
             <template #prefix>
@@ -40,7 +40,7 @@
         class="user"
         :value="getUser(task.assigned_to).full_name"
         doctype="User"
-        :placeholder="__('John Doe')"
+        :placeholder="__('Choose assignee')"
         :filters="{
           name: ['in', users.data?.crmUsers?.map((user) => user.name)],
           ignore_user_type: 1,
@@ -65,7 +65,7 @@
       <DateTimePicker
         v-model="task.due_date"
         class="datepicker w-36"
-        :placeholder="__('01/04/2024 11:30 PM')"
+        :placeholder="__('Select date and time')"
         :formatter="(date) => getFormat(date, '', true, true)"
         input-class="border-none"
       />

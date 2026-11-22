@@ -216,7 +216,7 @@ msgstr "Принять"
 
 #: frontend/src/components/Telephony/TwilioCallUI.vue:155
 msgid "Accept Call"
-msgstr ""
+msgstr "Принять звонок"
 
 #: crm/fcrm/doctype/crm_invitation/crm_invitation.js:7
 msgid "Accept Invitation"
@@ -401,7 +401,7 @@ msgstr ""
 
 #: frontend/src/components/Modals/CallLogDetailModal.vue:20
 msgid "Add Note"
-msgstr ""
+msgstr "Добавить заметку"
 
 #: frontend/src/components/Calendar/EventNotifications.vue:67
 #: frontend/src/components/Calendar/EventNotifications.vue:128
@@ -440,7 +440,7 @@ msgstr "Добавить Закладку"
 
 #: frontend/src/components/Modals/CallLogDetailModal.vue:25
 msgid "Add Task"
-msgstr ""
+msgstr "Добавить задачу"
 
 #: frontend/src/components/Settings/Hierarchy/Hierarchy.vue:36
 msgid "Add User"
@@ -471,7 +471,7 @@ msgstr "Добавить заметку"
 
 #: frontend/src/components/Telephony/ExotelCallUI.vue:191
 msgid "Add a Task"
-msgstr ""
+msgstr "Добавить задачу"
 
 #: frontend/src/components/Settings/LeadSyncing/leadSyncSourceConfig.js:25
 msgid "Add a name for your source"
@@ -2531,7 +2531,7 @@ msgstr "Тип документа"
 
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:242
 msgid "Document created successfully"
-msgstr ""
+msgstr "Запись создана"
 
 #: frontend/src/data/document.js:41
 msgid "Document does not exist"
@@ -2906,7 +2906,7 @@ msgstr "Включить"
 
 #: frontend/src/components/Settings/Telephony/ExotelSettings.vue:112
 msgid "Enable Exotel integration to make and receive calls directly from your CRM"
-msgstr ""
+msgstr "Подключите Exotel, чтобы звонить и принимать вызовы из CRM"
 
 #. Label of the enable_forecasting (Check) field in DocType 'FCRM Settings'
 #: crm/fcrm/doctype/fcrm_settings/fcrm_settings.json
@@ -2933,12 +2933,12 @@ msgstr ""
 
 #: frontend/src/components/Settings/Telephony/TwilioSettings.vue:119
 msgid "Enable Twilio integration to make and receive calls directly from your CRM"
-msgstr ""
+msgstr "Подключите Twilio, чтобы звонить и принимать вызовы из CRM"
 
 #: frontend/src/components/Settings/Telephony/ExotelSettings.vue:90
 #: frontend/src/components/Settings/Telephony/TwilioSettings.vue:97
 msgid "Enable call recording for incoming and outgoing calls"
-msgstr ""
+msgstr "Записывать входящие и исходящие звонки"
 
 #: frontend/src/components/Settings/ERPNextSettings.vue:278
 msgid "Enable the integration to create quotations and auto create customers in ERPNext."
@@ -3023,7 +3023,7 @@ msgstr ""
 
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:109
 msgid "Enter Exotel Number"
-msgstr ""
+msgstr "Введите номер Exotel"
 
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:134
 msgid "Enter Personal Mobile No."
@@ -3035,7 +3035,7 @@ msgstr "Введите название источника"
 
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:84
 msgid "Enter Twilio Number"
-msgstr ""
+msgstr "Введите номер Twilio"
 
 #: frontend/src/components/Filter.vue:609
 msgid "Enter Value"
@@ -3047,7 +3047,7 @@ msgstr "Введите Ваш токен доступа Facebook"
 
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:124
 msgid "Enter your personal mobile number used by Exotel to make calls"
-msgstr ""
+msgstr "Введите личный номер, который Exotel использует для звонков"
 
 #: frontend/src/components/FieldLayout/Field.vue:576
 msgid "Enter {0}"
@@ -3193,7 +3193,7 @@ msgstr "Исключение Exotel"
 
 #: frontend/src/components/Settings/Telephony/ExotelSettings.vue:108
 msgid "Exotel Integration Disabled"
-msgstr ""
+msgstr "Подключение Exotel отключено"
 
 #. Label of the exotel_number (Data) field in DocType 'CRM Telephony Agent'
 #: crm/fcrm/doctype/crm_telephony_agent/crm_telephony_agent.json
@@ -3211,7 +3211,7 @@ msgstr "Номер Exotel {0} недействителен"
 
 #: frontend/src/components/Settings/Telephony/ExotelSettings.vue:8
 msgid "Exotel Settings"
-msgstr ""
+msgstr "Настройки Exotel"
 
 #: frontend/src/components/Layouts/AppSidebar.vue:120
 msgid "Expand"
@@ -6171,7 +6171,7 @@ msgstr "Отклонить"
 
 #: frontend/src/components/Telephony/TwilioCallUI.vue:163
 msgid "Reject Call"
-msgstr ""
+msgstr "Отклонить звонок"
 
 #. Option for the 'Timeline Timestamp Format' (Select) field in DocType 'FCRM
 #. Settings'
@@ -6747,7 +6747,7 @@ msgstr ""
 
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:54
 msgid "Select Medium"
-msgstr ""
+msgstr "Выберите провайдера"
 
 #: frontend/src/components/Settings/Sla/EditResponseResolutionModal.vue:10
 msgid "Select Priority"
@@ -6929,11 +6929,11 @@ msgstr ""
 
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:102
 msgid "Set the Exotel number to be used for outgoing calls."
-msgstr ""
+msgstr "Укажите номер Exotel для исходящих звонков."
 
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:77
 msgid "Set the Twilio number to be used for outgoing calls."
-msgstr ""
+msgstr "Укажите номер Twilio для исходящих звонков."
 
 #: frontend/src/components/Settings/BrandSettings.vue:33
 msgid "Set the name of your brand. Appears in the left sidebar."
@@ -7767,7 +7767,7 @@ msgstr "Ошибка создания учетных данных API Twilio."
 
 #: frontend/src/components/Settings/Telephony/TwilioSettings.vue:68
 msgid "Twilio App Name"
-msgstr ""
+msgstr "Название приложения Twilio"
 
 #. Label of the twilio_apps (Data) field in DocType 'CRM Twilio Settings'
 #: crm/fcrm/doctype/crm_twilio_settings/crm_twilio_settings.json
@@ -7776,7 +7776,7 @@ msgstr ""
 
 #: frontend/src/components/Settings/Telephony/TwilioSettings.vue:115
 msgid "Twilio Integration Disabled"
-msgstr ""
+msgstr "Подключение Twilio отключено"
 
 #. Label of the twilio_number (Data) field in DocType 'CRM Telephony Agent'
 #: crm/fcrm/doctype/crm_telephony_agent/crm_telephony_agent.json
@@ -7786,7 +7786,7 @@ msgstr "Номер Twilio"
 
 #: frontend/src/components/Settings/Telephony/TwilioSettings.vue:8
 msgid "Twilio Settings"
-msgstr ""
+msgstr "Настройки Twilio"
 
 #: crm/integrations/twilio/api.py:15
 msgid "Twilio configuration is missing"
@@ -7933,7 +7933,7 @@ msgstr "Обновить учетную запись"
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:163
 #: frontend/src/components/Settings/Telephony/TelephonySettings.vue:190
 msgid "Update Configuration"
-msgstr ""
+msgstr "Обновить настройки"
 
 #. Description of the 'Update timestamp on new communication' (Check) field in
 #. DocType 'FCRM Settings'
@@ -11216,3 +11216,138 @@ msgstr "Вложение"
 #: frontend/src/utils/messengerAttachments.js
 msgid "Unsupported attachment"
 msgstr "Неподдерживаемое вложение"
+
+msgid "Answer"
+msgstr "Принять"
+
+msgid "Call connected, but the call log could not be saved. Please contact your administrator."
+msgstr "Звонок начался, но запись в журнале создать не удалось. Обратитесь к администратору."
+
+msgid "Call ended"
+msgstr "Звонок завершён"
+
+msgid "Call history is being updated. Try again shortly."
+msgstr "Журнал звонков обновляется. Повторите попытку чуть позже."
+
+msgid "Choose a lead or deal"
+msgstr "Выберите лид или сделку"
+
+msgid "Configure telephony settings for your CRM"
+msgstr "Настройте телефонию для работы в CRM"
+
+msgid "Configure your Exotel telephony integration settings here"
+msgstr "Настройте подключение Exotel"
+
+msgid "Configure your Twilio telephony integration settings here"
+msgstr "Настройте подключение Twilio"
+
+msgid "Could not download the Exolve recording."
+msgstr "Не удалось загрузить запись Exolve."
+
+msgid "Could not prepare the Exolve recording for playback."
+msgstr "Не удалось подготовить запись Exolve к воспроизведению."
+
+msgid "Decline"
+msgstr "Отклонить"
+
+msgid "Default calling medium for logged-in user"
+msgstr "Провайдер по умолчанию для ваших звонков"
+
+msgid "Each user and SIP resource can be mapped only once."
+msgstr "Каждого сотрудника и каждый SIP-ресурс можно указать только один раз."
+
+msgid "Enter Personal Mobile Number"
+msgstr "Введите личный номер телефона"
+
+msgid "Enter a note title and text."
+msgstr "Введите заголовок и текст заметки."
+
+msgid "Enter a valid Exolve application ID."
+msgstr "Введите корректный ID приложения Exolve."
+
+msgid "Enter a valid phone number"
+msgstr "Введите корректный номер телефона"
+
+msgid "Exolve call details are updated only from provider statistics."
+msgstr "Данные о звонке Exolve обновляются только из статистики провайдера."
+
+msgid "Exolve is not installed on this site."
+msgstr "Интеграция Exolve на этом сайте не установлена."
+
+msgid "Exolve recording exceeds the local preview limit."
+msgstr "Размер записи Exolve превышает лимит воспроизведения в CRM."
+
+msgid "Exolve recording playback requires ffmpeg on this CRM server."
+msgstr "Для воспроизведения записи Exolve на сервере CRM нужен FFmpeg."
+
+msgid "History start date cannot be in the future."
+msgstr "Дата начала истории не может быть в будущем."
+
+msgid "In progress"
+msgstr "Идёт разговор"
+
+msgid "Incoming Call"
+msgstr "Входящий звонок"
+
+msgid "Incoming call"
+msgstr "Входящий звонок"
+
+msgid "Invalid Exolve agent mappings."
+msgstr "Проверьте привязку SIP-аккаунтов к сотрудникам."
+
+msgid "Invalid Exolve call identifier."
+msgstr "Некорректный идентификатор звонка Exolve."
+
+msgid "Invalid Exolve recording redirect."
+msgstr "Exolve вернул некорректную ссылку на запись."
+
+msgid "Invalid call note changes."
+msgstr "Не удалось применить изменения заметки к звонку."
+
+msgid "Invalid call work item."
+msgstr "Некорректные данные заметки или задачи к звонку."
+
+msgid "Outgoing Call"
+msgstr "Исходящий звонок"
+
+msgid "Personal Mobile Number"
+msgstr "Личный номер телефона"
+
+msgid "Recording not available"
+msgstr "Запись недоступна"
+
+msgid "Saved call work cannot be moved to another customer."
+msgstr "Сохранённые заметки и задачи нельзя перенести к другому клиенту."
+
+msgid "Select a Twilio app for your CRM"
+msgstr "Выберите приложение Twilio для CRM"
+
+msgid "Select a user and a valid SIP resource ID."
+msgstr "Выберите сотрудника и укажите корректный ID SIP-ресурса."
+
+msgid "Select an enabled user."
+msgstr "Выберите активного сотрудника."
+
+msgid "Select date and time"
+msgstr "Выберите дату и время"
+
+msgid "The Exolve recording is not available yet."
+msgstr "Запись Exolve ещё недоступна."
+
+msgid "The SIP account does not belong to this Exolve application or has no outgoing number."
+msgstr "SIP-аккаунт не принадлежит этому приложению Exolve или у него нет номера для исходящих звонков."
+
+msgid "This note changed in another window. Your draft is kept."
+msgstr "Заметку изменили в другом окне. Ваш черновик сохранён."
+
+msgid "This note is not available in your call workspace."
+msgstr "Эта заметка недоступна в окне звонка."
+
+msgid "This task is not available in your call workspace."
+msgstr "Эта задача недоступна в окне звонка."
+
+msgid "Unsupported Exolve recording format."
+msgstr "Формат записи Exolve не поддерживается."
+
+msgid "Your account changed or calling is unavailable. Reload before saving."
+msgstr "Учётная запись изменилась или телефония недоступна. Обновите страницу перед сохранением."

@@ -119,6 +119,7 @@
             v-model="assignee"
             type="select"
             :label="__('Assigned to')"
+            :placeholder="__('Choose assignee')"
             :options="peopleOptions"
             :disabled="blocked || !contextKey"
           />

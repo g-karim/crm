@@ -293,7 +293,7 @@ const detailFields = computed(() => {
   let data = JSON.parse(JSON.stringify(callLog.value?.data))
 
   for (const key in data) {
-    data[key] = getCallLogDetail(key, data)
+    data[key] = getCallLogDetail(key, callLog.value.data)
   }
   let details = [
     {
@@ -302,7 +302,7 @@ const detailFields = computed(() => {
         class: 'h-3.5 w-3.5',
       }),
       name: 'type',
-      value: data.type.label + ' Call',
+      value: data.type.label,
     },
     {
       icon: ContactsIcon,
@@ -315,7 +315,7 @@ const detailFields = computed(() => {
     {
       icon: data._lead ? LeadsIcon : Dealsicon,
       name: 'reference_doc',
-      value: data._lead ? 'Lead' : 'Deal',
+      value: data._lead ? __('Lead') : __('Deal'),
       link: () => {
         if (data._lead) {
           router.push({

@@ -92,6 +92,7 @@
             v-model="fields.assigned_to"
             type="select"
             :label="__('Task assignee')"
+            :placeholder="__('Choose assignee')"
             :options="people"
             :disabled="!options"
           />
@@ -100,12 +101,14 @@
               v-model="fields.priority"
               type="select"
               :label="__('Priority')"
+              :placeholder="__('Select')"
               :options="priorities"
             />
             <FormControl
               v-model="fields.status"
               type="select"
               :label="__('Status')"
+              :placeholder="__('Select')"
               :options="statuses"
             />
           </div>
