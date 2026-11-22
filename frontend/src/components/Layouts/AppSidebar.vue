@@ -137,10 +137,6 @@
     </Sidebar>
     <Notifications v-if="!mobile" />
   </div>
-
-  <template v-if="!mobile">
-    <Settings />
-  </template>
 </template>
 
 <script setup>
@@ -159,7 +155,6 @@ import { getNavigationItems } from '@/utils/navigation'
 import CollapseSidebar from '@/components/Icons/CollapseSidebar.vue'
 import NotificationsIcon from '@/components/Icons/NotificationsIcon.vue'
 import Notifications from '@/components/Notifications.vue'
-import Settings from '@/components/Settings/Settings.vue'
 import { viewsStore } from '@/stores/views'
 import {
   unreadNotificationsCount,

@@ -8,7 +8,7 @@
     "
   >
     <template #header-actions>
-      <div class="flex items-center gap-2">
+      <div class="flex max-w-full flex-wrap items-center gap-2">
         <Button
           :label="__('Save Settings')"
           variant="subtle"

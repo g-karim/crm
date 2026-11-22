@@ -49,19 +49,12 @@
             />
           </div>
           <div v-else class="ml-2">
-            <select
+            <FormControl
               v-model="row[column.key]"
-              class="w-full h-7 text-base hover:bg-surface-gray-3 rounded-md p-0 pl-2 pr-5 bg-transparent -ml-2 border-0 text-ink-gray-8 focus-visible:!ring-0 bg-none truncate"
-            >
-              <option
-                v-for="option in priorityOptions"
-                :key="option.value"
-                :value="option.value"
-                class="bg-surface-gray-3"
-              >
-                {{ option.label }}
-              </option>
-            </select>
+              type="select"
+              :aria-label="column.label"
+              :options="priorityOptions"
+            />
           </div>
         </div>
         <div class="flex justify-end">
@@ -113,6 +106,7 @@
 <script setup>
 import {
   Button,
+  FormControl,
   Checkbox,
   createResource,
   Dropdown,

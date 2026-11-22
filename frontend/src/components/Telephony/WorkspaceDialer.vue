@@ -100,6 +100,13 @@
               : __('Review the number and confirm the call in telephony.')
         }}
       </p>
+      <Button
+        v-if="!enabled"
+        type="button"
+        :label="__('Настройки телефонии')"
+        icon-left="lucide-settings"
+        @click="emit('settings')"
+      />
     </form>
   </div>
 </template>
@@ -109,8 +116,8 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import { hasActiveCall } from '@/composables/telephony'
 import { customerTypeKey, dialNumber, displayPhone } from '@/utils/telephony'
 
-defineProps({ enabled: { type: Boolean, default: false } })
-const emit = defineEmits(['call'])
+const props = defineProps({ enabled: { type: Boolean, default: false } })
+const emit = defineEmits(['call', 'settings'])
 const input = ref('')
 const selected = ref(null)
 const candidates = ref([])
@@ -157,6 +164,7 @@ function press(digit) {
   if (digit !== '+' || !input.value) input.value += digit
 }
 function openCall() {
+  if (!props.enabled || hasActiveCall.value) return
   if (dialNumber(input.value))
     emit(
       'call',

@@ -97,34 +97,33 @@
         <fieldset :disabled="inactive || saving" class="space-y-6">
           <section class="space-y-3">
             <h3 class="text-base-medium">{{ __('Record changes') }}</h3>
-            <label class="flex items-center gap-2 text-p-base"
-              ><input type="checkbox" checked disabled />{{
-                __('Record created')
-              }}</label
-            >
-            <label class="flex items-center gap-2 text-p-base"
-              ><input
-                v-model="form[`${active}_status_changes`]"
-                type="checkbox"
-              />{{ __('Status changed') }}</label
-            >
+            <Checkbox
+              :modelValue="true"
+              disabled
+              :label="__('Record created')"
+            />
+            <Checkbox
+              v-model="form[`${active}_status_changes`]"
+              :label="__('Status changed')"
+              :disabled="inactive || saving"
+            />
             <FormControl
               v-model="search"
               type="text"
               :placeholder="__('Search fields')"
             />
             <div class="grid gap-3 sm:grid-cols-2">
-              <label
+              <Checkbox
                 v-for="field in filteredFields"
                 :key="field.value"
-                class="flex items-center gap-2 text-p-base"
-              >
-                <input
-                  v-model="form[`${active}_fields`]"
-                  type="checkbox"
-                  :value="field.value"
-                />{{ __(field.label) }}
-              </label>
+                :modelValue="form[`${active}_fields`].includes(field.value)"
+                :label="__(field.label)"
+                :disabled="inactive || saving"
+                @update:modelValue="
+                  (checked) =>
+                    toggleSelection(`${active}_fields`, field.value, checked)
+                "
+              />
             </div>
             <p v-if="!filteredFields.length" class="text-p-sm text-ink-gray-5">
               {{ __('No matching fields') }}
@@ -142,17 +141,17 @@
               }}
             </p>
             <div class="grid gap-3 sm:grid-cols-2">
-              <label
+              <Checkbox
                 v-for="event in data.events"
                 :key="event.value"
-                class="flex items-center gap-2 text-p-base"
-              >
-                <input
-                  v-model="form[`${active}_events`]"
-                  type="checkbox"
-                  :value="event.value"
-                />{{ __(event.label) }}
-              </label>
+                :modelValue="form[`${active}_events`].includes(event.value)"
+                :label="__(event.label)"
+                :disabled="inactive || saving"
+                @update:modelValue="
+                  (checked) =>
+                    toggleSelection(`${active}_events`, event.value, checked)
+                "
+              />
             </div>
           </section>
           <section class="space-y-3 border-t border-outline-gray-1 pt-5">
@@ -164,12 +163,11 @@
                 )
               }}
             </p>
-            <label class="flex items-center gap-2 text-p-base"
-              ><input
-                v-model="form[`${active}_allow_automation`]"
-                type="checkbox"
-              />{{ __('Allow automated field and internal changes') }}</label
-            >
+            <Checkbox
+              v-model="form[`${active}_allow_automation`]"
+              :label="__('Allow automated field and internal changes')"
+              :disabled="inactive || saving"
+            />
           </section>
         </fieldset>
         <section class="space-y-4 border-t border-outline-gray-1 pt-5">
@@ -204,44 +202,39 @@
               }}
             </p>
             <div class="grid gap-3 sm:grid-cols-2">
-              <label
+              <Checkbox
                 v-for="rule in channel.rules"
                 :key="rule.value"
-                class="flex items-center gap-2 text-p-base"
-                ><input
-                  v-model="form[`${active}_channels`]"
-                  type="checkbox"
-                  :value="rule.value"
-                  :disabled="
-                    inactive ||
-                    saving ||
-                    (!rule.available &&
-                      !form[`${active}_channels`].includes(rule.value))
-                  "
-                />{{ __(rule.label) }}</label
-              >
-            </div>
-            <label
-              v-if="channel.automation"
-              class="flex items-center gap-2 text-p-base"
-            >
-              <input
-                v-model="form[`${active}_${channel.automation}`]"
-                type="checkbox"
+                :modelValue="form[`${active}_channels`].includes(rule.value)"
+                :label="__(rule.label)"
                 :disabled="
                   inactive ||
                   saving ||
-                  !form[`${active}_channels`].includes(
-                    channel.key === 'email' ? 'email_sent' : 'message_sent',
-                  )
+                  (!rule.available &&
+                    !form[`${active}_channels`].includes(rule.value))
+                "
+                @update:modelValue="
+                  (checked) =>
+                    toggleSelection(`${active}_channels`, rule.value, checked)
                 "
               />
-              {{
+            </div>
+            <Checkbox
+              v-if="channel.automation"
+              v-model="form[`${active}_${channel.automation}`]"
+              :label="
                 channel.key === 'email'
                   ? __('Automated outgoing emails')
                   : __('Automated outgoing messages')
-              }}
-            </label>
+              "
+              :disabled="
+                inactive ||
+                saving ||
+                !form[`${active}_channels`].includes(
+                  channel.key === 'email' ? 'email_sent' : 'message_sent',
+                )
+              "
+            />
           </div>
         </section>
         <p class="text-p-sm text-ink-gray-5">
@@ -260,6 +253,7 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   Badge,
+  Checkbox,
   call,
   ErrorMessage,
   FormControl,
@@ -269,6 +263,13 @@ import {
 } from 'frappe-ui'
 import SettingsLayoutBase from '@/components/Layouts/SettingsLayoutBase.vue'
 import { touchSettingsDirty, withTouchTimeout } from '@/utils/touchTracking'
+
+function toggleSelection(field, value, checked) {
+  const values = form.value[field] || []
+  form.value[field] = checked
+    ? [...new Set([...values, value])]
+    : values.filter((item) => item !== value)
+}
 
 const data = ref(null)
 const form = ref(null)

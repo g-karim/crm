@@ -13,11 +13,16 @@
       >
         <template #target="{ togglePopover }">
           <Button
-            class="max-w-56"
-            :label="selectedPipelineLabel"
+            class="min-h-11 w-11 shrink-0 md:min-h-0 md:w-auto md:max-w-56"
+            :aria-label="selectedPipelineLabel"
+            :tooltip="selectedPipelineLabel"
             iconLeft="git-branch"
             @click="togglePopover()"
-          />
+          >
+            <span class="hidden truncate md:inline">{{
+              selectedPipelineLabel
+            }}</span>
+          </Button>
         </template>
       </Autocomplete>
       <CustomActions

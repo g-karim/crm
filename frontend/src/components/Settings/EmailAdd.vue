@@ -11,18 +11,21 @@
     </div>
     <!-- email service provider selection -->
     <div class="flex flex-wrap items-center">
-      <div
+      <Button
         v-for="s in services"
         :key="s.name"
-        class="flex flex-col items-center gap-1 mt-4 w-[70px]"
+        variant="ghost"
+        class="mt-4 !h-auto min-h-20 w-20 shrink-0 p-2"
+        :aria-label="s.name"
+        :aria-pressed="selectedService?.name === s.name"
         @click="handleSelect(s)"
       >
         <EmailProviderIcon
           :label="s.name"
           :logo="s.icon"
-          :selected="selectedService?.name === s?.name"
+          :selected="selectedService?.name === s.name"
         />
-      </div>
+      </Button>
     </div>
     <div v-if="selectedService" class="flex flex-col gap-4">
       <!-- email service provider info -->
@@ -75,7 +78,7 @@
       </div>
     </div>
     <!-- action button -->
-    <div v-if="selectedService" class="flex justify-between mt-auto">
+    <div class="mt-auto flex justify-between gap-2">
       <Button
         :label="__('Back')"
         variant="outline"
@@ -83,6 +86,7 @@
         @click="emit('update:step', 'email-list')"
       />
       <Button
+        v-if="selectedService"
         :label="__('Create')"
         variant="solid"
         :loading="addEmailRes.loading"

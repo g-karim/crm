@@ -11,7 +11,7 @@
     <EditorFixedMenu
       v-if="fixedMenu && !disabled"
       :items="fullToolbar"
-      class="w-full overflow-x-auto rounded-t-lg border border-outline-gray-2 p-1"
+      class="w-full min-w-0 flex-wrap rounded-t-lg border border-outline-gray-2 p-1"
     />
     <EditorBubbleMenu v-if="bubbleMenu" :items="bubbleToolbar" />
     <EditorContent :class="editorClasses" />
@@ -55,7 +55,8 @@ const props = defineProps({
 const emit = defineEmits(['change'])
 
 const editorClasses = computed(() => {
-  const defaultClass = 'max-h-[40vh] overflow-y-auto min-w-full'
+  const defaultClass =
+    'max-h-[40dvh] w-full min-w-0 overflow-y-auto [overflow-wrap:anywhere]'
 
   const variantMap = {
     outline: props.disabled

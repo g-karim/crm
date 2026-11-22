@@ -50,13 +50,14 @@
         maxlength="140"
         class="mb-3"
       />
-      <textarea
+      <Textarea
         :id="`call-note-${item.key}`"
         v-model="fields.text"
         :aria-label="__('Note text')"
         :placeholder="__('Write down the essentials of the conversation…')"
-        rows="9"
-        class="min-h-56 w-full flex-1 resize-y rounded-lg border border-outline-gray-2 bg-surface-base p-4 text-base leading-6 text-ink-gray-9 placeholder:text-ink-gray-4 focus:border-outline-gray-5 focus:outline-none focus:ring-2 focus:ring-outline-gray-3"
+        variant="outline"
+        :rows="9"
+        class="min-h-56 w-full flex-1 resize-y text-base leading-6"
       />
     </template>
     <template v-else-if="expanded">
@@ -182,7 +183,7 @@
 </template>
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { Button, FormControl } from 'frappe-ui'
+import { Button, FormControl, Textarea } from 'frappe-ui'
 import { callWorkStore } from '@/stores/callWork'
 import { itemDirty } from '@/utils/callWork'
 

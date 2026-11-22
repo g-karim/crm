@@ -1,4 +1,5 @@
 <template>
+  <Settings />
   <CreateDocumentModal
     v-if="showCreateDocumentModal"
     v-model="showCreateDocumentModal"
@@ -19,6 +20,7 @@
   <CommandPalette />
 </template>
 <script setup>
+import Settings from '@/components/Settings/Settings.vue'
 import CommandPalette from '@/components/CommandPalette/CommandPalette.vue'
 import FieldLayoutDialogContainer from '@/components/Modals/FieldLayoutDialogContainer.vue'
 import ChangePasswordModal from '@/components/Modals/ChangePasswordModal.vue'

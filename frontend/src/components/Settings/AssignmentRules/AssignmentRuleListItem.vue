@@ -12,20 +12,18 @@
       </div>
     </div>
     <div class="w-3/12">
-      <select
+      <FormControl
         v-model="localData.priority"
-        class="w-full h-7 text-base hover:bg-surface-gray-3 rounded-md p-0 pl-2 pr-5 bg-transparent -ml-2 border-0 text-ink-gray-8 focus-visible:!ring-0 bg-none truncate"
+        type="select"
+        :aria-label="__('Priority')"
+        :options="
+          priorityOptions.map((option) => ({
+            ...option,
+            label: __(option.label),
+          }))
+        "
         @update:modelValue="onPriorityChange"
-        @change="onPriorityChange"
-      >
-        <option
-          v-for="option in priorityOptions"
-          :key="option.value"
-          :value="option.value"
-        >
-          {{ __(option.label) }}
-        </option>
-      </select>
+      />
     </div>
     <div class="flex justify-between items-center w-2/12">
       <Switch

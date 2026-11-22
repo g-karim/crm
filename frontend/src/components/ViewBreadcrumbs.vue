@@ -1,8 +1,8 @@
 <template>
-  <div class="flex items-center">
+  <div class="flex min-w-0 items-center">
     <router-link
       :to="{ name: routeName }"
-      class="px-0.5 py-1 text-lg-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
+      class="shrink-0 px-0.5 py-1 text-lg-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-outline-gray-3"
       :class="[
         viewControls && viewControls.viewsDropdownOptions
           ? 'text-ink-gray-5 hover:text-ink-gray-7'
@@ -13,7 +13,7 @@
     </router-link>
     <span
       v-if="viewControls && viewControls.viewsDropdownOptions"
-      class="mx-0.5 text-base text-ink-gray-4"
+      class="mx-0.5 hidden text-base text-ink-gray-4 md:inline"
       aria-hidden="true"
     >
       /
@@ -25,11 +25,16 @@
       <template #default="{ open }">
         <Button
           variant="ghost"
-          class="text-lg-medium text-nowrap"
+          class="min-h-11 min-w-11 text-lg-medium text-nowrap md:min-h-0 md:min-w-0"
           :label="__(viewControls.currentView?.label)"
-          :iconRight="open ? 'chevron-up' : 'chevron-down'"
+          :iconRight="
+            isMobileView ? undefined : open ? 'chevron-up' : 'chevron-down'
+          "
         >
-          <template #prefix>
+          <template v-if="isMobileView" #icon>
+            <Icon :icon="viewControls.currentView?.icon" class="h-4" />
+          </template>
+          <template v-else #prefix>
             <Icon :icon="viewControls.currentView?.icon" class="h-4" />
           </template>
         </Button>
@@ -62,6 +67,7 @@
 </template>
 <script setup>
 import Icon from '@/components/Icon.vue'
+import { isMobileView } from '@/composables/settings'
 import { Dropdown } from 'frappe-ui'
 
 defineProps({

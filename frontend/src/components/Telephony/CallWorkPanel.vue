@@ -9,32 +9,34 @@
       data-testid="call-customer"
     >
       <div class="flex items-start justify-between gap-3">
-        <div v-if="work.context" class="flex min-w-0 items-center gap-3">
+        <div v-if="work.context" class="flex min-w-0 flex-1 items-start gap-3">
           <span
-            class="grid size-10 shrink-0 place-items-center rounded-full bg-surface-gray-2"
+            class="hidden size-10 shrink-0 place-items-center rounded-full bg-surface-gray-2 sm:grid"
             aria-hidden="true"
           >
             <span class="lucide-contact-round size-5 text-ink-gray-6" />
           </span>
-          <div class="min-w-0">
-            <p class="mb-1 text-sm text-ink-gray-6">
-              {{ __('Save to') }} ·
-              {{ work.context.kind === 'lead' ? __('Lead') : __('Deal') }}
-            </p>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <p class="min-w-0 text-sm text-ink-gray-6">
+                {{ __('Save to') }} ·
+                {{ work.context.kind === 'lead' ? __('Lead') : __('Deal') }}
+              </p>
+              <Button
+                v-if="!locked"
+                :label="__('Change customer record')"
+                variant="ghost"
+                class="min-h-11 shrink-0"
+                @click="picker = !picker"
+              />
+            </div>
             <RouterLink
               :to="work.context.path"
-              class="break-words text-base font-medium hover:underline underline-offset-2"
+              class="mt-1 block break-words text-base font-medium [overflow-wrap:anywhere] hover:underline underline-offset-2"
               @click="emit('navigate')"
               >{{ work.context.title }}</RouterLink
             >
           </div>
-          <Button
-            v-if="!locked"
-            :label="__('Change customer record')"
-            variant="ghost"
-            class="min-h-11"
-            @click="picker = !picker"
-          />
         </div>
         <div v-else>
           <h2 class="text-base font-semibold">{{ __('Customer record') }}</h2>

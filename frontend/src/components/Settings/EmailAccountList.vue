@@ -1,9 +1,11 @@
 <template>
   <div class="flex flex-col h-full">
     <!-- header -->
-    <div class="flex justify-between text-ink-gray-8">
-      <div class="flex flex-col gap-1 w-9/12">
-        <h2 class="flex gap-2 text-2xl-semibold leading-none h-5">
+    <div class="flex flex-wrap justify-between gap-4 text-ink-gray-8">
+      <div
+        class="flex min-w-0 basis-full flex-col gap-1 md:basis-auto md:flex-1"
+      >
+        <h2 class="flex gap-2 text-2xl-semibold leading-6">
           {{ __('Email Accounts') }}
         </h2>
         <p class="text-p-base text-ink-gray-6">
@@ -14,7 +16,7 @@
           }}
         </p>
       </div>
-      <div class="flex item-center space-x-2 w-3/12 justify-end">
+      <div class="flex shrink-0 items-center gap-2">
         <Button
           :label="__('Add Account')"
           theme="gray"

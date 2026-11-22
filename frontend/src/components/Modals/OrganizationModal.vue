@@ -1,14 +1,16 @@
 <template>
   <Dialog v-model:open="show" :size="'xl'">
     <template #body>
-      <div class="px-4 pt-5 pb-6 bg-surface-elevation-2 sm:px-6">
-        <div class="flex items-center justify-between mb-5">
+      <div class="crm-entry-body bg-surface-elevation-2 px-4 pb-4 pt-5 sm:px-6">
+        <div
+          class="crm-entry-header mb-5 flex items-center justify-between gap-3"
+        >
           <div>
             <h3 class="text-3xl-semibold leading-6 text-ink-gray-9">
               {{ __('New Organization') }}
             </h3>
           </div>
-          <div class="flex items-center gap-1">
+          <div class="flex shrink-0 items-center gap-1">
             <Button
               v-if="isManager() && !isMobileView"
               variant="ghost"
@@ -21,19 +23,24 @@
               variant="ghost"
               class="w-7"
               icon="lucide-x"
+              :aria-label="__('Close')"
               @click="show = false"
             />
           </div>
         </div>
-        <FieldLayout
-          v-if="tabs.data?.length"
-          :tabs="tabs.data"
-          :data="organization.doc"
-          doctype="CRM Organization"
-        />
-        <ErrorMessage v-if="error" class="mt-8" :message="__(error)" />
+        <div class="crm-entry-fields">
+          <FieldLayout
+            v-if="tabs.data?.length"
+            :tabs="tabs.data"
+            :data="organization.doc"
+            doctype="CRM Organization"
+          />
+          <ErrorMessage v-if="error" class="mt-8" :message="__(error)" />
+        </div>
       </div>
-      <div class="px-4 pt-4 pb-7 sm:px-6">
+      <div
+        class="crm-entry-footer border-t border-outline-gray-2 px-4 py-4 sm:px-6"
+      >
         <div class="space-y-2">
           <Button
             class="w-full"

@@ -6,48 +6,86 @@
     @close="activeSettingsPage = ''"
   >
     <template #body>
-      <div class="flex h-[calc(100vh_-_8rem)] min-h-0 bg-surface-gray-1">
-        <div
-          ref="sidebarContainer"
-          class="m-1 flex min-h-0 w-56 shrink-0 flex-col overflow-y-auto rounded-l-lg bg-surface-gray-1"
+      <section
+        class="flex h-[calc(100dvh-2rem)] min-h-0 flex-col bg-surface-elevation-2 md:h-[calc(100dvh-8rem)]"
+        data-testid="crm-settings"
+      >
+        <header
+          class="flex shrink-0 items-center gap-3 border-b border-outline-gray-2 px-4 py-2"
         >
-          <template v-for="(tab, i) in tabs" :key="tab.label">
-            <div v-if="!tab.hideLabel && i != 0" class="mx-1 mb-0.5 mt-[5px]" />
-            <div
-              v-if="!tab.hideLabel"
-              class="h-7.5 px-2 py-[7px] my-[3px] flex cursor-pointer gap-1.5 text-xs-medium text-ink-gray-5 transition-all duration-300 ease-in-out sticky top-0 z-10 bg-surface-gray-1"
-            >
-              <span>{{ __(tab.label) }}</span>
-            </div>
-            <nav class="space-y-[3px] px-1">
-              <SidebarItem
-                v-for="item in tab.items"
-                :key="item.label"
-                :label="__(item.label)"
-                :data-page="item.label"
-                :active="activeTab?.label == item.label"
-                class="w-full"
-                :class="
-                  activeTab?.label != item.label && 'hover:!bg-surface-gray-3'
-                "
-                @click="activeSettingsPage = item.label"
+          <h2
+            class="hidden flex-1 text-base font-semibold text-ink-gray-9 md:block"
+          >
+            {{ __('Settings') }}
+          </h2>
+          <FormControl
+            class="min-w-0 flex-1 md:hidden"
+            type="select"
+            :aria-label="__('Settings section')"
+            :modelValue="activeTab?.label"
+            :options="
+              settingItems.map((item) => ({
+                value: item.label,
+                label: item.label,
+              }))
+            "
+            @update:modelValue="activeSettingsPage = $event"
+          />
+          <Button
+            icon="lucide-x"
+            variant="ghost"
+            class="min-h-11 min-w-11 shrink-0 md:min-h-7 md:min-w-7"
+            :aria-label="__('Close settings')"
+            @click="closeSettings"
+          />
+        </header>
+        <div class="flex min-h-0 min-w-0 flex-1">
+          <div
+            ref="sidebarContainer"
+            class="m-1 hidden min-h-0 w-56 shrink-0 flex-col overflow-y-auto rounded-l-lg bg-surface-gray-1 md:flex"
+          >
+            <template v-for="(tab, i) in tabs" :key="tab.label">
+              <div
+                v-if="!tab.hideLabel && i != 0"
+                class="mx-1 mb-0.5 mt-[5px]"
+              />
+              <div
+                v-if="!tab.hideLabel"
+                class="sticky top-0 z-10 my-[3px] flex min-h-7.5 items-center gap-1.5 bg-surface-gray-1 px-2 py-1.5 text-xs-medium text-ink-gray-5"
               >
-                <template #prefix>
-                  <Icon :icon="item.icon" class="size-4 text-ink-gray-7" />
-                </template>
-              </SidebarItem>
-            </nav>
-          </template>
+                <span>{{ __(tab.label) }}</span>
+              </div>
+              <nav class="space-y-[3px] px-1">
+                <SidebarItem
+                  v-for="item in tab.items"
+                  :key="item.label"
+                  :label="__(item.label)"
+                  :data-page="item.label"
+                  :active="activeTab?.label == item.label"
+                  class="w-full"
+                  :class="
+                    activeTab?.label != item.label && 'hover:!bg-surface-gray-3'
+                  "
+                  @click="activeSettingsPage = item.label"
+                >
+                  <template #prefix
+                    ><Icon :icon="item.icon" class="size-4 text-ink-gray-7"
+                  /></template>
+                </SidebarItem>
+              </nav>
+            </template>
+          </div>
+          <div
+            class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-surface-elevation-2"
+          >
+            <component :is="activeTab.component" v-if="activeTab" />
+          </div>
         </div>
-        <div
-          class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-elevation-2"
-        >
-          <component :is="activeTab.component" v-if="activeTab" />
-        </div>
-      </div>
+      </section>
     </template>
   </Dialog>
 </template>
+
 <script setup>
 import LucideLayoutDashboard from '~icons/lucide/layout-dashboard'
 import LucideNetwork from '~icons/lucide/network'
@@ -90,7 +128,7 @@ import {
 } from '@/composables/settings'
 import { isWhatsappInstalled } from '@/composables/whatsapp'
 import { isMessengerInstalled } from '@/composables/messenger'
-import { Dialog, Avatar, SidebarItem } from 'frappe-ui'
+import { Dialog, Avatar, SidebarItem, FormControl, Button } from 'frappe-ui'
 import { ref, markRaw, computed, watch, h, nextTick } from 'vue'
 import AssignmentRulePage from './AssignmentRules/AssignmentRulePage.vue'
 import ShieldCheck from '~icons/lucide/shield-check'
@@ -273,6 +311,15 @@ const tabs = computed(() => {
   })
 })
 
+function closeSettings() {
+  if (
+    disableSettingModalOutsideClick.value &&
+    !window.confirm(__('You have unsaved changes. Close without saving?'))
+  )
+    return
+  showSettings.value = false
+}
+
 const activeTab = ref()
 const sidebarContainer = ref(null)
 
@@ -294,7 +341,13 @@ function scrollActiveIntoView() {
     const el = sidebarContainer.value?.querySelector(
       `[data-page="${activeTab.value?.label}"]`,
     )
-    el?.scrollIntoView({ block: 'nearest' })
+    const container = sidebarContainer.value
+    if (!el || !container?.clientHeight) return
+    const item = el.getBoundingClientRect()
+    const bounds = container.getBoundingClientRect()
+    if (item.top < bounds.top) container.scrollTop += item.top - bounds.top
+    else if (item.bottom > bounds.bottom)
+      container.scrollTop += item.bottom - bounds.bottom
   })
 }
 

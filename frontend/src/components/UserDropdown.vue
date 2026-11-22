@@ -54,7 +54,7 @@ import BrandLogo from '@/components/BrandLogo.vue'
 import { sessionStore } from '@/stores/session'
 import { usersStore } from '@/stores/users'
 import { getSettings } from '@/stores/settings'
-import { showSettings, isMobileView } from '@/composables/settings'
+import { showSettings, mobileSidebarOpened } from '@/composables/settings'
 import { Dropdown } from 'frappe-ui'
 import { computed, h, markRaw } from 'vue'
 
@@ -132,8 +132,10 @@ function getStandardItem(item) {
       return {
         icon: item.icon,
         label: __(item.label),
-        onClick: () => (showSettings.value = true),
-        condition: () => !isMobileView.value,
+        onClick: () => {
+          mobileSidebarOpened.value = false
+          showSettings.value = true
+        },
       }
     case 'logout':
       return {

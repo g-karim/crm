@@ -83,3 +83,51 @@ body:has([data-messenger-import-date])
   width: max-content;
   margin-inline: auto;
 }
+
+/* Keep CRM dialogs inside the current viewport, including short laptops and
+   mobile browsers. Entry forms scroll their fields, leaving actions visible. */
+.dialog-scroll-container > div {
+  min-height: 100dvh;
+}
+
+.dialog-content {
+  max-height: calc(100dvh - 2rem);
+  margin-block: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.dialog-content:has(> .crm-entry-body) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.crm-entry-body {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.crm-entry-header,
+.crm-entry-footer {
+  flex-shrink: 0;
+}
+
+.crm-entry-header > :first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.crm-entry-fields {
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.crm-entry-fields .prose-f {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}

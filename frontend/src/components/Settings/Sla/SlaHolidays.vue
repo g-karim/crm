@@ -119,19 +119,12 @@
               {{ formatTime(row[column.key]) }}
             </div>
             <div v-else class="ml-2">
-              <select
+              <FormControl
                 v-model="row[column.key]"
-                class="w-full h-7 text-base hover:bg-surface-gray-3 rounded-md p-0 pl-2 pr-5 bg-transparent -ml-2 border-0 text-ink-gray-8 focus-visible:!ring-0 bg-none truncate"
-              >
-                <option
-                  v-for="option in workDayOptions"
-                  :key="option.value"
-                  :value="option.value"
-                  class="text-ink-gray-8"
-                >
-                  {{ option.label }}
-                </option>
-              </select>
+                type="select"
+                :aria-label="column.label"
+                :options="workDayOptions"
+              />
             </div>
           </div>
           <div class="flex justify-end">
@@ -173,6 +166,7 @@
 <script setup>
 import {
   Button,
+  FormControl,
   createListResource,
   Dropdown,
   ErrorMessage,

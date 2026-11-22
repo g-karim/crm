@@ -1,14 +1,16 @@
 <template>
   <Dialog v-model:open="show" :size="'3xl'">
     <template #body>
-      <div class="bg-surface-elevation-2 px-4 pb-6 pt-5 sm:px-6">
-        <div class="mb-5 flex items-center justify-between">
+      <div class="crm-entry-body bg-surface-elevation-2 px-4 pb-4 pt-5 sm:px-6">
+        <div
+          class="crm-entry-header mb-5 flex items-center justify-between gap-3"
+        >
           <div>
             <h3 class="text-3xl-semibold leading-6 text-ink-gray-9">
               {{ __('Create Deal') }}
             </h3>
           </div>
-          <div class="flex items-center gap-1">
+          <div class="flex shrink-0 items-center gap-1">
             <Button
               v-if="isManager() && !isMobileView"
               variant="ghost"
@@ -21,11 +23,12 @@
               variant="ghost"
               class="w-7"
               icon="lucide-x"
+              :aria-label="__('Close')"
               @click="show = false"
             />
           </div>
         </div>
-        <div>
+        <div class="crm-entry-fields">
           <div
             v-if="hasOrganizationSections || hasContactSections"
             class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3"
@@ -58,7 +61,9 @@
           <ErrorMessage v-if="error" class="mt-4" :message="__(error)" />
         </div>
       </div>
-      <div class="px-4 pb-7 pt-4 sm:px-6">
+      <div
+        class="crm-entry-footer border-t border-outline-gray-2 px-4 py-4 sm:px-6"
+      >
         <div class="flex flex-row-reverse gap-2">
           <Button
             variant="solid"

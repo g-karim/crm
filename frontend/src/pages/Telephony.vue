@@ -351,6 +351,7 @@
           v-if="!selectedName"
           :enabled="isAnyEnabled"
           @call="openCall"
+          @settings="openTelephonySettings"
         />
         <div
           v-else-if="detailLoading"
@@ -487,6 +488,7 @@ import LayoutHeader from '@/components/LayoutHeader.vue'
 import CallInsightsPanel from '@/components/Telephony/CallInsightsPanel.vue'
 import TelephonyAnalytics from '@/components/Telephony/TelephonyAnalytics.vue'
 import CallbackProof from '@/components/Telephony/CallbackProof.vue'
+import { showSettings, activeSettingsPage } from '@/composables/settings'
 import WorkspaceDialer from '@/components/Telephony/WorkspaceDialer.vue'
 import WorkspaceRecording from '@/components/Telephony/WorkspaceRecording.vue'
 import CallOutcomePanel from '@/components/Telephony/CallOutcomePanel.vue'
@@ -710,6 +712,11 @@ function closePanel() {
   const query = { ...route.query }
   delete query.open
   router.replace({ query })
+}
+function openTelephonySettings() {
+  closePanel()
+  activeSettingsPage.value = __('Telephony')
+  showSettings.value = true
 }
 function showDialer() {
   if (preferredIntegration.value === 'exolve') {
