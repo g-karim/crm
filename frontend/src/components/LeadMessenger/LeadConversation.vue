@@ -20,7 +20,7 @@
     </div>
 
     <div
-      v-if="loading && !messages.length"
+      v-if="loading && !messages.length && !isComposerDirty()"
       class="flex flex-1 flex-col items-center justify-center gap-3 text-xl font-medium text-ink-gray-4"
     >
       <LoadingIndicator class="h-6 w-6" />
@@ -29,10 +29,17 @@
 
     <div v-else class="relative flex min-h-0 flex-1 flex-col">
       <div
-        v-if="genericError"
+        v-if="conversationError"
         class="mx-4 mt-4 rounded border border-outline-gray-1 bg-surface-gray-1 px-3 py-2 text-sm text-ink-red-6 sm:mx-10"
       >
-        {{ genericError }}
+        {{ conversationError }}
+        <RouterLink
+          v-if="conversationErrorTarget"
+          :to="conversationErrorTarget"
+          class="ml-2 underline"
+        >
+          {{ __('Open existing lead') }}
+        </RouterLink>
       </div>
       <div
         v-if="sendWarning"
@@ -75,13 +82,13 @@
       </div>
 
       <AvitoItemCard
-        v-if="!selectedAvitoRestricted"
+        v-if="!selectedAvitoConversationRestricted"
         :conversation="selectedConversation"
       />
 
       <div class="relative min-h-0 flex-1">
         <div
-          v-if="selectedAvitoRestricted"
+          v-if="selectedAvitoConversationRestricted"
           class="flex h-full flex-col items-center overflow-y-auto px-4 py-6 sm:px-10"
           data-testid="avito-restricted-panel"
         >
@@ -169,8 +176,21 @@
                     aria-hidden="true"
                   />
                   <MessageMetadata
+                    :wrap-source="
+                      isSingleStickerAttachmentSet(
+                        item.message.attachments,
+                        item.message.provider,
+                      )
+                    "
                     :constrain-intrinsic-width="
-                      isGenericFileOnlyMessage(item.message)
+                      Boolean(
+                        (item.message.attachments?.length ||
+                          item.message.forward_context) &&
+                          !isSingleStickerAttachmentSet(
+                            item.message.attachments,
+                            item.message.provider,
+                          ),
+                      )
                     "
                     :message="item.message"
                     :sender="messageSender(item.message)"
@@ -182,13 +202,27 @@
                     :loading="
                       messageActionState.pendingMessage === item.message.name
                     "
+                    :delete-blocked="
+                      Boolean(
+                        messageActionState.blockedDeletes[item.message.name],
+                      )
+                    "
+                    :edit-blocked="
+                      Boolean(
+                        messageActionState.blockedEdits[item.message.name],
+                      )
+                    "
                     @start-edit="startMessageEdit(item.message)"
                     @delete="confirmDeleteMessage(item.message)"
+                    @retry-delete="confirmRetryDeleteMessage(item.message)"
                     @retry="retryMessage(item.message)"
                     @reply="startReply(item.message)"
                   />
                   <MessageReplyQuote
-                    v-if="item.message.reply_context"
+                    v-if="
+                      item.message.status !== 'deleted' &&
+                      item.message.reply_context
+                    "
                     class="mb-2"
                     :context="item.message.reply_context"
                     :client-name="clientDisplayName"
@@ -211,6 +245,20 @@
                       messageActionState.editingMessage === item.message.name
                     "
                     :draft="messageActionState.draft"
+                    :delete-unconfirmed="
+                      messageActionState.blockedDeletes[item.message.name] ===
+                      'unknown'
+                    "
+                    :edit-blocked="
+                      Boolean(
+                        messageActionState.blockedEdits[item.message.name],
+                      )
+                    "
+                    :delete-blocked="
+                      Boolean(
+                        messageActionState.blockedDeletes[item.message.name],
+                      )
+                    "
                     :loading="
                       messageActionState.pendingMessage === item.message.name
                     "
@@ -389,11 +437,13 @@
           :disabled="
             baseSendDisabled ||
             Boolean(pendingLocation) ||
-            (imageCaptionState.blocked && !draftText)
+            (attachmentCaptionState.blocked && !draftText)
           "
           :placeholder="
-            imageCaptionState.blocked && !draftText
-              ? __('Image captions are unavailable for Avito.')
+            attachmentCaptionState.blocked && !draftText
+              ? selectedChannelType === 'avito'
+                ? __('Image captions are unavailable for Avito.')
+                : __('Text and attachments must be sent separately.')
               : __('Enter a message...')
           "
           @keydown.enter.stop="sendOnEnter"
@@ -407,7 +457,12 @@
           :channelType="selectedChannelType"
           :maxFiles="attachmentPolicy.maxAttachmentCount"
           :supportedAttachmentTypes="attachmentPolicy.supportedAttachmentTypes"
+          :maxAttachmentSizeBytes="attachmentPolicy.maxAttachmentSizeBytes"
+          :maxAttachmentSizeBytesByType="
+            attachmentPolicy.maxAttachmentSizeBytesByType
+          "
           :acceptedFileTypes="attachmentPolicy.acceptedFileTypes"
+          :acceptedFileTypesByType="attachmentPolicy.acceptedFileTypesByType"
           :unsupportedFileMessage="attachmentPolicy.unsupportedFileMessage"
           :unsupportedFormatMessage="attachmentPolicy.unsupportedFormatMessage"
           :conversation="selectedConversation?.name || ''"
@@ -417,11 +472,11 @@
           @change="handleAttachmentsChange"
         />
         <div
-          v-if="imageCaptionState.error"
+          v-if="attachmentCaptionState.error"
           data-testid="image-caption-warning"
           class="mb-2 text-sm text-ink-amber-8"
         >
-          {{ __(imageCaptionState.error) }}
+          {{ __(attachmentCaptionState.error) }}
         </div>
         <div
           v-if="pendingLocation"
@@ -530,6 +585,7 @@
               "
               variant="ghost"
               icon="paperclip"
+              :aria-label="__('Attachments')"
               :disabled="
                 baseSendDisabled ||
                 voiceActive ||
@@ -599,7 +655,6 @@ import {
   getMessengerDeliveryState,
   getMessengerFailureReason,
   getMessengerPlatformLabel,
-  isGenericFileOnlyMessage,
   shouldShowMessengerText,
 } from '@/utils/messengerChannels'
 import {
@@ -608,6 +663,7 @@ import {
   isSingleImageAttachmentSet,
   isSingleLocationAttachmentSet,
   isSingleStickerAttachmentSet,
+  isCompactWazzupStickerImage,
 } from '@/utils/messengerAttachments'
 import {
   countNewMessengerMessages,
@@ -615,7 +671,7 @@ import {
 } from '@/utils/messengerSync'
 import {
   getComposerAttachmentPolicy,
-  getComposerImageCaptionState,
+  getComposerCaptionState,
   isVideoFile,
   validateComposerFileMix,
 } from '@/utils/messengerComposer'
@@ -626,13 +682,18 @@ import {
 import { createMessengerReadController } from '@/utils/messengerRead'
 import { createMessengerTypingController } from '@/utils/messengerTyping'
 import { getMessengerClientDisplayName } from '@/utils/messengerClientIdentity'
+import { isWazzupPartnerChannel } from '@/utils/wazzupPartnerConnection'
 import {
+  canRetryMessengerMessage,
   createMessengerMessageActions,
   getMessengerRetryConfirmation,
+  getMessengerDeleteRetryConfirmation,
   openMessengerMessageEditor,
 } from '@/utils/messengerMessageActions'
 import {
   messengerConversationOption,
+  messengerConversationConflictTarget,
+  messengerPersistedConversationConflict,
   messengerConversationsForChannel,
   resolveMessengerHandoffAction,
   resolveMessengerConversationSelection,
@@ -643,8 +704,16 @@ import {
   shouldFollowMessengerTyping,
 } from '@/utils/messengerViewport'
 import { Button, FormControl, Textarea, call, toast } from 'frappe-ui'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  provide,
+  ref,
+  watch,
+} from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 
 const props = defineProps({
   leadName: { type: String, required: true },
@@ -652,6 +721,10 @@ const props = defineProps({
   phone: { type: String, default: '' },
   active: { type: Boolean, default: true },
 })
+
+// Refresh the authorized DTO only; this never retries an outbound send or
+// resets the provider's bounded attachment download attempts.
+provide('refreshMessengerAttachments', loadAll)
 
 const loadingConversation = ref(false)
 const loadingMessages = ref(false)
@@ -679,6 +752,7 @@ const voiceActive = ref(false)
 const voiceDraft = ref(null)
 const sendWarning = ref('')
 const genericError = ref('')
+const conversationConflictTarget = ref(null)
 const routingError = ref('')
 const permissions = ref({
   can_read: false,
@@ -700,6 +774,8 @@ const messageActionState = ref({
   pendingMessage: '',
   pendingAction: '',
   errors: {},
+  blockedDeletes: {},
+  blockedEdits: {},
 })
 const messageEditorElements = new Map()
 const reactionComponents = new Map()
@@ -778,8 +854,34 @@ const latestInboundConversation = computed(() => {
 const selectedChannelDoc = computed(
   () => channelByName.value[selectedChannel.value] || null,
 )
+const persistedConversationConflict = computed(() =>
+  messengerPersistedConversationConflict({
+    messages: messages.value,
+    conversation: selectedConversation.value,
+    channel: selectedChannelDoc.value,
+    leadName: props.leadName,
+  }),
+)
+const conversationError = computed(() =>
+  persistedConversationConflict.value
+    ? __(
+        persistedConversationConflict.value.message ||
+          'This chat is already linked to another lead.',
+      )
+    : genericError.value,
+)
+const conversationErrorTarget = computed(() =>
+  persistedConversationConflict.value
+    ? messengerConversationConflictTarget(persistedConversationConflict.value)
+    : conversationConflictTarget.value,
+)
 const restrictedAvitoConversations = computed(() =>
   restrictedAvitoChats(conversations.value, channels.value),
+)
+const selectedAvitoConversationRestricted = computed(() =>
+  restrictedAvitoConversations.value.some(
+    (conversation) => conversation.name === selectedConversation.value?.name,
+  ),
 )
 const selectedAvitoRestricted = computed(() =>
   isAvitoChatRestricted(
@@ -836,8 +938,8 @@ const attachmentPolicy = computed(() =>
     selectedChannelType.value,
   ),
 )
-const imageCaptionState = computed(() =>
-  getComposerImageCaptionState(
+const attachmentCaptionState = computed(() =>
+  getComposerCaptionState(
     draftText.value,
     pendingAttachments.value,
     attachmentPolicy.value,
@@ -850,7 +952,12 @@ const missingPhone = computed(
   () =>
     Boolean(selectedChannelType.value) &&
     selectedCapabilities.value.requires_phone &&
-    !leadPhone.value,
+    !leadPhone.value &&
+    !(
+      (selectedChannelDoc.value?.provider ||
+        selectedConversation.value?.provider) === 'wazzup' &&
+      selectedConversation.value?.external_chat_id
+    ),
 )
 const needsConversationChoice = computed(
   () => conversationCandidates.value.length > 1 && !selectedConversation.value,
@@ -866,6 +973,8 @@ const baseSendDisabled = computed(
     !permissions.value.can_operate ||
     sendingMessage.value ||
     selectedAvitoRestricted.value ||
+    selectedChannelDoc.value?.enabled === false ||
+    selectedChannelDoc.value?.enabled === 0 ||
     missingPhone.value ||
     selectedRequiresInbound.value ||
     needsConversationChoice.value ||
@@ -877,7 +986,7 @@ const sendDisabled = computed(
   () =>
     baseSendDisabled.value ||
     Boolean(attachmentMixError.value) ||
-    Boolean(imageCaptionState.value.error) ||
+    Boolean(attachmentCaptionState.value.error) ||
     pendingAttachments.value.some((item) => item.status !== 'uploaded'),
 )
 const attachmentMixError = computed(() => {
@@ -960,7 +1069,11 @@ const replyComposerContext = computed(() => {
       text: `${replyTarget.value.text || ''}`.slice(0, 500) || null,
       message_type: replyTarget.value.message_type || 'text',
       attachment_types: (replyTarget.value.attachments || []).map((item) =>
-        item.is_voice ? 'voice' : item.type,
+        isCompactWazzupStickerImage(item, replyTarget.value.provider)
+          ? 'sticker'
+          : item.is_voice
+            ? 'voice'
+            : item.type,
       ),
       forwarded_content_kind: replyTarget.value.forward_context
         ? getForwardedContentKind(replyTarget.value.forward_context)
@@ -991,6 +1104,12 @@ const messageSync = createMessengerSyncController({
   },
   async onChange(change) {
     messages.value = change.messages
+    let refreshedNames = new Set([...change.inserted, ...change.updated])
+    let refreshed = change.messages.filter((message) =>
+      refreshedNames.has(message.name),
+    )
+    messageActions.reconcileDeleteStates(refreshed)
+    messageActions.reconcileEditStates(refreshed)
     await nextTick()
     if (change.kind === 'snapshot') {
       scrollToBottom()
@@ -1072,6 +1191,8 @@ const readController = createMessengerReadController({
 const messageActions = createMessengerMessageActions({
   call,
   sync: () => messageSync.syncDelta(),
+  getMessage: (name) =>
+    messageSync.getMessages().find((item) => item.name === name),
   onChange(state) {
     messageActionState.value = state
   },
@@ -1132,6 +1253,7 @@ async function initialize(leadChanged = false) {
   contextGeneration += 1
   let context = captureLeadContext()
   genericError.value = ''
+  conversationConflictTarget.value = null
   routingError.value = ''
   sendWarning.value = ''
   newMessageCount.value = 0
@@ -1171,7 +1293,7 @@ async function initialize(leadChanged = false) {
 function confirmDeleteMessage(message) {
   if (
     !permissions.value.can_operate ||
-    !message?.can_delete ||
+    !messageActions.canDeleteMessage(message) ||
     messageActionState.value.pendingMessage
   )
     return
@@ -1186,7 +1308,68 @@ function confirmDeleteMessage(message) {
         variant: 'solid',
         theme: 'red',
         onClick: async (close) => {
-          if (await messageActions.deleteMessage(message)) close()
+          let deleted = await messageActions.deleteMessage(message)
+          let current = messageSync
+            .getMessages()
+            .find((item) => item.name === message.name)
+          if (
+            deleted ||
+            messageActions.getState().blockedDeletes[message.name] ||
+            messageActions.canRetryDeleteMessage(current)
+          )
+            close()
+        },
+      },
+    ],
+  })
+}
+
+function confirmRetryDeleteMessage(message) {
+  if (
+    !permissions.value.can_operate ||
+    !messageActions.canRetryDeleteMessage(message) ||
+    messageActionState.value.pendingMessage
+  )
+    return
+  let remaining = messageActions.getDeleteRetryAfterSeconds(message)
+  if (remaining > 0) {
+    $dialog({
+      title: __('Retry deletion?'),
+      message: __(
+        'You can retry deletion in {0} seconds. No new request has been sent.',
+        [remaining],
+      ),
+      actions: [],
+    })
+    return
+  }
+  let context = captureLeadContext()
+  let conversation = selectedConversation.value?.name
+  let channel = selectedChannel.value
+  let expected = { ...message }
+  let confirmation = getMessengerDeleteRetryConfirmation(expected)
+  $dialog({
+    title: __(confirmation.title),
+    message: __(confirmation.message),
+    actions: [
+      {
+        label: __('Retry Deletion'),
+        variant: 'solid',
+        theme: 'red',
+        onClick: async (close) => {
+          if (
+            !context.isCurrent() ||
+            !permissions.value.can_operate ||
+            conversation !== selectedConversation.value?.name ||
+            channel !== selectedChannel.value
+          )
+            return close()
+          let deleted = await messageActions.retryDeleteMessage(expected, true)
+          if (
+            deleted ||
+            messageActions.getState().blockedDeletes[expected.name]
+          )
+            close()
         },
       },
     ],
@@ -1595,6 +1778,15 @@ function requestVoiceSend(metadata) {
   else send()
 }
 
+function handleConversationLinkConflict(result) {
+  if (result?.reason !== 'conversation_link_conflict') return false
+  conversationConflictTarget.value = messengerConversationConflictTarget(result)
+  genericError.value = __(
+    result.message || 'This chat is already linked to another lead.',
+  )
+  return true
+}
+
 async function sendMessage() {
   if (!permissions.value.can_operate) return
   let context = captureLeadContext()
@@ -1619,6 +1811,7 @@ async function sendMessage() {
 
   genericError.value = ''
   sendWarning.value = ''
+  conversationConflictTarget.value = null
   sendingMessage.value = true
   let attachmentNames = composerAttachments.value?.freeze() || []
   let accepted = false
@@ -1667,7 +1860,10 @@ async function sendMessage() {
     }
 
     if (result?.name && handoff) preparedHandoff.value = null
-    if (result?.reason === 'not_configured') {
+    if (handleConversationLinkConflict(result)) {
+      clientRequestId.value = ''
+      clientRequestFingerprint.value = ''
+    } else if (result?.reason === 'not_configured') {
       clientRequestId.value = ''
       clientRequestFingerprint.value = ''
       cancelReply()
@@ -1713,6 +1909,7 @@ async function resolveConversationForSend(context) {
     },
   )
   if (!context.isCurrent()) return null
+  if (handleConversationLinkConflict(result)) return null
   if (result?.ok && result.conversation?.name) {
     preserveComposerDuringScopeChange(() => {
       selectedChannel.value =
@@ -1857,6 +2054,12 @@ function integrationWarningMessage(result = {}) {
     )
   }
 
+  if (isWazzupPartnerChannel(channel)) {
+    return __(
+      'The WhatsApp or Telegram channel is not configured. Ask your system administrator to check the connection in the channel settings. The message was saved locally with an error status.',
+    )
+  }
+
   if (provider === 'wazzup' || resultMessage.includes('wazzup')) {
     return __(
       'The WhatsApp or Telegram channel is not configured. Enable the integration and enter an API token. The message was saved locally with an error status.',
@@ -1886,8 +2089,13 @@ async function createConversation(context) {
   )
   if (!context.isCurrent()) return null
 
+  if (handleConversationLinkConflict(result)) return null
   if (result?.reason === 'missing_phone') {
-    genericError.value = __('This lead has no phone number.')
+    genericError.value = __(
+      isWazzupPartnerChannel(selectedChannelDoc.value)
+        ? result.message || 'This lead has no phone number.'
+        : 'This lead has no phone number.',
+    )
     return null
   }
   if (!result?.ok) {
@@ -1932,7 +2140,7 @@ function handleComposerDragOver(event) {
     return
   if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return
   event.preventDefault()
-  draggingFiles.value = true
+  draggingFiles.value = attachmentPolicy.value.supportsAttachments
 }
 
 function handleComposerDrop(event) {
@@ -2076,7 +2284,7 @@ function selectLocation(location) {
 function retryMessage(message) {
   if (
     !permissions.value.can_operate ||
-    !message?.can_retry ||
+    !canRetryMessengerMessage(message) ||
     messageActionState.value.pendingMessage
   )
     return
@@ -2182,6 +2390,8 @@ watch(
 watch(
   () => selectedConversation.value?.name,
   (conversationName, previousConversation) => {
+    if (conversationName !== previousConversation)
+      conversationConflictTarget.value = null
     if (
       previousConversation !== undefined &&
       conversationName !== previousConversation &&
@@ -2203,6 +2413,7 @@ watch(
 watch(
   () => selectedChannel.value,
   (channel, previousChannel) => {
+    if (channel !== previousChannel) conversationConflictTarget.value = null
     if (
       previousChannel !== undefined &&
       channel !== previousChannel &&
@@ -2241,8 +2452,8 @@ function messageSource(message) {
 }
 
 function messageBubbleWidthClass(message) {
-  if (isSingleStickerAttachmentSet(message.attachments)) {
-    return 'w-[14.5rem] !max-w-[94%] sm:!max-w-[14.5rem]'
+  if (isSingleStickerAttachmentSet(message.attachments, message.provider)) {
+    return 'w-[11.5rem] !max-w-[94%]'
   }
   if (isStickerOnlyForwardContext(message.forward_context)) {
     return 'w-64 !max-w-[94%] sm:!max-w-64'
@@ -2252,6 +2463,9 @@ function messageBubbleWidthClass(message) {
   }
   if (isSingleAudioAttachmentSet(message.attachments)) {
     return 'w-[24rem] !max-w-[94%] sm:!max-w-[24rem]'
+  }
+  if (message.status !== 'deleted' && message.reply_context) {
+    return 'w-fit min-w-[min(18rem,94%)] sm:min-w-[min(18rem,78%)]'
   }
   if (!isSingleImageAttachmentSet(message.attachments)) return 'w-fit'
   return getSingleImageBubbleWidthClass(message.attachments[0])
@@ -2325,6 +2539,7 @@ async function resetComposer() {
   draggingFiles.value = false
   sendWarning.value = ''
   routingError.value = ''
+  conversationConflictTarget.value = null
   cancelReply()
   clearTyping()
   composerTyping.reset()

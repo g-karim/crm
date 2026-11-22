@@ -26,13 +26,47 @@
           :label="__('Save')"
           variant="solid"
           :loading="loading"
-          :disabled="!canSaveMessengerMessageEdit(message, draft)"
+          :disabled="
+            !canSaveMessengerMessageEdit(message, draft, {
+              editBlocked,
+              deleteBlocked,
+            })
+          "
           @click="$emit('save-edit')"
         />
       </div>
     </div>
 
     <template v-else>
+      <div
+        v-if="message.template_context && !display.tombstone"
+        data-message-template
+        class="mb-2 space-y-1 break-words [overflow-wrap:anywhere]"
+      >
+        <div class="text-sm font-medium">{{ __('Template message') }}</div>
+        <div v-if="!message.text?.trim()" class="text-xs text-ink-gray-5">
+          {{ __('The provider did not include the template text.') }}
+        </div>
+        <div v-if="message.template_context.values?.length" class="space-y-1">
+          <div class="text-xs text-ink-gray-5">{{ __('Template values') }}</div>
+          <MessageText
+            v-for="(value, index) in message.template_context.values"
+            :key="`value:${index}`"
+            :text="value"
+          />
+        </div>
+        <div
+          v-if="message.template_context.buttons?.length"
+          class="flex flex-wrap gap-1"
+        >
+          <span
+            v-for="(button, index) in message.template_context.buttons"
+            :key="`button:${index}`"
+            class="rounded border border-outline-gray-2 px-2 py-1 text-sm"
+            >{{ button.text }}</span
+          >
+        </div>
+      </div>
       <div
         v-if="display.tombstone || shouldShowText"
         class="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
@@ -42,11 +76,13 @@
           __('Message deleted')
         }}</template>
         <template v-else>
-          {{
-            textPresentation.translate
-              ? __(textPresentation.text)
-              : textPresentation.text
-          }}
+          <MessageText
+            :text="
+              textPresentation.translate
+                ? __(textPresentation.text)
+                : textPresentation.text
+            "
+          />
           <a
             v-if="
               textPresentation.action === 'open_provider_chat' &&
@@ -65,8 +101,20 @@
       </div>
     </template>
 
-    <div v-if="error" class="mt-2 text-xs text-ink-red-8">
+    <div v-if="shortDeleteNotice" class="mt-2 text-xs text-ink-gray-6">
+      {{ __(deleteNotice) }}
+    </div>
+    <div
+      v-else-if="error && !display.tombstone"
+      class="mt-2 text-xs text-ink-red-8"
+    >
       {{ __(error) }}
+    </div>
+    <div v-else-if="deleteNotice" class="mt-2 text-xs text-ink-gray-6">
+      {{ __(deleteNotice) }}
+    </div>
+    <div v-else-if="editNotice" class="mt-2 text-xs text-ink-gray-6">
+      {{ __(editNotice) }}
     </div>
   </div>
 </template>
@@ -77,16 +125,23 @@ import { getProviderExternalChatUrl } from '@/utils/messengerExternalLinks'
 import {
   canSaveMessengerMessageEdit,
   getMessengerMessageDisplay,
+  getMessengerMessageDeleteNotice,
+  getMessengerMessageEditNotice,
+  isPartnerMessengerMessage,
 } from '@/utils/messengerMessageActions'
 import { getMessengerMessageTextPresentation } from '@/utils/messengerMessagePresentation'
 import { Button, Textarea } from 'frappe-ui'
 import { computed } from 'vue'
+import MessageText from './MessageText.vue'
 
 const props = defineProps({
   message: { type: Object, required: true },
   editing: { type: Boolean, default: false },
   draft: { type: String, default: '' },
   loading: { type: Boolean, default: false },
+  editBlocked: { type: Boolean, default: false },
+  deleteBlocked: { type: Boolean, default: false },
+  deleteUnconfirmed: { type: Boolean, default: false },
   error: { type: String, default: '' },
   shouldShowText: { type: Boolean, default: false },
 })
@@ -103,6 +158,16 @@ function setEditorElement(element) {
 }
 
 const display = computed(() => getMessengerMessageDisplay(props.message))
+const deleteNotice = computed(() =>
+  getMessengerMessageDeleteNotice(props.message, props.deleteUnconfirmed),
+)
+const shortDeleteNotice = computed(
+  () =>
+    isPartnerMessengerMessage(props.message) &&
+    (props.message.delete_state === 'unknown' || props.deleteUnconfirmed) &&
+    Boolean(deleteNotice.value),
+)
+const editNotice = computed(() => getMessengerMessageEditNotice(props.message))
 const textPresentation = computed(() =>
   getMessengerMessageTextPresentation(props.message),
 )

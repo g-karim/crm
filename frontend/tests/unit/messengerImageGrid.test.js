@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file */
-import { createApp, nextTick } from 'vue'
+import { createApp, h, nextTick, reactive } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/LeadMessenger/MediaLightbox.vue', () => ({
@@ -75,6 +75,7 @@ afterEach(() => {
     root.remove()
   })
   mounted = []
+  vi.useRealTimers()
 })
 
 function image(id, overrides = {}) {
@@ -89,13 +90,16 @@ function image(id, overrides = {}) {
   }
 }
 
-function mountGrid(images, props = {}) {
+function mountGrid(images, props = {}, refreshAttachments = null) {
   let root = document.createElement('div')
   document.body.appendChild(root)
-  let app = createApp(ImageGrid, { images, ...props })
+  let liveProps = reactive({ images, ...props })
+  let app = createApp({ render: () => h(ImageGrid, liveProps) })
+  if (refreshAttachments)
+    app.provide('refreshMessengerAttachments', refreshAttachments)
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
-  mounted.push({ app, root })
+  mounted.push({ app, root, props: liveProps })
   return root
 }
 
@@ -110,6 +114,245 @@ function mountRenderer(attachments, props = {}) {
 }
 
 describe('messenger image layout', () => {
+  it.each(['pending', 'processing', 'downloading', 'retrying'])(
+    'bounds the %s indicator without adding a message refresh action',
+    async (status) => {
+      vi.useFakeTimers()
+      let refresh = vi.fn(async () => {})
+      let root = mountGrid(
+        [image('WAITING', { status, url: null })],
+        {},
+        refresh,
+      )
+      expect(root.querySelector('[data-image-loading]')).not.toBeNull()
+      expect(root.querySelector('[data-image-refresh]')).toBeNull()
+
+      await vi.advanceTimersByTimeAsync(29999)
+      expect(root.querySelector('[data-image-loading]')).not.toBeNull()
+      expect(root.querySelector('[data-image-refresh]')).toBeNull()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(root.querySelector('[data-image-loading]')).toBeNull()
+      expect(root.querySelector('[role="status"]').textContent).not.toBe('')
+      expect(root.querySelector('[data-image-refresh]')).toBeNull()
+      expect(refresh).not.toHaveBeenCalled()
+    },
+  )
+
+  it('does not extend a pending image spinner when other album metadata updates', async () => {
+    vi.useFakeTimers()
+    let waiting = image('WAITING', { status: 'pending', url: null })
+    let root = mountGrid([waiting, image('READY')])
+    let liveProps = mounted.at(-1).props
+
+    await vi.advanceTimersByTimeAsync(20000)
+    liveProps.images = [waiting, image('READY', { width: 1280 })]
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(root.querySelector('[data-image-loading]')).toBeNull()
+    expect(root.textContent).toContain('Pending download')
+  })
+
+  it('shows a safe local image failure and retries only its existing media GET', async () => {
+    let opened = vi.fn()
+    let refresh = vi.fn()
+    let root = mountGrid(
+      [image('BROKEN', { error: 'https://secret.invalid/token=private' })],
+      { onOpenImage: opened },
+      refresh,
+    )
+    root.querySelector('img').dispatchEvent(new Event('error'))
+    await nextTick()
+
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.textContent).toContain('Image unavailable')
+    expect(root.textContent).not.toContain('secret.invalid')
+    expect(root.querySelector('[data-single-image]').disabled).toBe(true)
+    expect(root.querySelector('button button')).toBeNull()
+    root.querySelector('[data-single-image]').click()
+    expect(opened).not.toHaveBeenCalled()
+    root.querySelector('[data-image-retry]').click()
+    await nextTick()
+
+    expect(root.querySelector('img').getAttribute('src')).toBe(
+      '/media/BROKEN.jpg',
+    )
+    expect(root.querySelector('[data-image-retry]')).toBeNull()
+    expect(refresh).not.toHaveBeenCalled()
+    root.querySelector('[data-single-image]').click()
+    expect(opened).toHaveBeenCalledOnce()
+  })
+
+  it('clears a local image failure when delta replaces the source for the same id', async () => {
+    let root = mountGrid([image('IMAGE')])
+    let liveProps = mounted.at(-1).props
+    root.querySelector('img').dispatchEvent(new Event('error'))
+    await nextTick()
+    expect(root.querySelector('[data-image-retry]')).not.toBeNull()
+
+    liveProps.images = [image('IMAGE', { url: '/api/refreshed-image' })]
+    await nextTick()
+
+    expect(root.querySelector('img').getAttribute('src')).toBe(
+      '/api/refreshed-image',
+    )
+    expect(root.querySelector('[data-image-retry]')).toBeNull()
+    expect(root.querySelector('[data-single-image]').disabled).toBe(false)
+  })
+
+  it('isolates an album image failure while preserving available image selection', async () => {
+    let opened = vi.fn()
+    let root = mountGrid([image('FIRST'), image('SECOND')], {
+      onOpenImage: opened,
+    })
+    let media = root.querySelectorAll('img')
+    media[1].dispatchEvent(new Event('error'))
+    await nextTick()
+
+    expect(root.querySelectorAll('img')).toHaveLength(1)
+    expect(root.querySelector('[data-image-retry]')).not.toBeNull()
+    root.querySelector('img').closest('button').click()
+    expect(opened.mock.calls[0][0].id).toBe('FIRST')
+    root.querySelector('[data-image-retry]').click()
+    await nextTick()
+    expect(root.querySelectorAll('img')).toHaveLength(2)
+    expect(root.querySelector('button button')).toBeNull()
+  })
+
+  it('keeps failed and unsupported media terminal without tile refresh actions', () => {
+    let refresh = vi.fn()
+    let root = mountGrid(
+      [image('FAILED', { status: 'failed', url: null })],
+      {},
+      refresh,
+    )
+    expect(root.textContent).toContain('Attachment unavailable')
+    expect(root.querySelector('[data-image-refresh]')).toBeNull()
+    expect(root.querySelector('[data-image-retry]')).toBeNull()
+
+    let unsupported = mountGrid(
+      [image('UNSUPPORTED', { status: 'unsupported', url: null })],
+      {},
+      refresh,
+    )
+    expect(unsupported.textContent).toContain('Unsupported')
+    expect(unsupported.querySelector('[data-image-refresh]')).toBeNull()
+    expect(unsupported.querySelector('[data-image-retry]')).toBeNull()
+    expect(unsupported.querySelector('[data-image-loading]')).toBeNull()
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('does not overlay pending or failed album tiles with refresh actions', async () => {
+    vi.useFakeTimers()
+    let refresh = vi.fn()
+    let root = mountGrid(
+      [
+        image('WAITING', { status: 'retrying', url: null }),
+        image('FAILED', { status: 'failed', url: null }),
+        image('READY'),
+      ],
+      {},
+      refresh,
+    )
+    await vi.advanceTimersByTimeAsync(30000)
+
+    expect(root.querySelector('[data-image-refresh]')).toBeNull()
+    expect(root.querySelectorAll('img')).toHaveLength(1)
+    expect(root.textContent).toContain('Retrying download')
+    expect(root.textContent).toContain('Attachment unavailable')
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['wazzup', 'whatsapp'],
+    ['wazzup', 'telegram'],
+    ['max_direct', 'max'],
+    ['vk_direct', 'vk'],
+    ['telegram_bot', 'telegram'],
+    ['avito_direct', 'avito'],
+  ])(
+    'keeps %s %s image metadata stable through initial, delta and reload',
+    async (provider, platform) => {
+      let canonical = image('IMAGE', { width: 1080, height: 1920, platform })
+      let root = mountGrid([canonical], { provider })
+      let liveProps = mounted.at(-1).props
+      let initialStyle = root
+        .querySelector('[data-single-image]')
+        .getAttribute('style')
+      let media = root.querySelector('img:not([data-media-backdrop])')
+      Object.defineProperties(media, {
+        naturalWidth: { value: 400, configurable: true },
+        naturalHeight: { value: 400, configurable: true },
+      })
+      media.dispatchEvent(new Event('load'))
+      await nextTick()
+      expect(
+        root.querySelector('[data-single-image]').getAttribute('style'),
+      ).toBe(initialStyle)
+
+      liveProps.images = [{ ...canonical }]
+      await nextTick()
+      expect(
+        root.querySelector('[data-single-image]').getAttribute('style'),
+      ).toBe(initialStyle)
+      let reloaded = mountGrid([{ ...canonical }], { provider })
+      expect(
+        reloaded.querySelector('[data-single-image]').getAttribute('style'),
+      ).toBe(initialStyle)
+    },
+  )
+
+  it.each(['pending', 'available'])(
+    'renders a canonical Wazzup image with %s download status',
+    async (status) => {
+      let ready = status === 'available'
+      let root = mountRenderer(
+        [
+          image('WAZZUP-IMAGE', {
+            status,
+            url: ready ? '/api/private-wazzup-image' : null,
+            download_url: ready ? '/api/private-wazzup-download' : null,
+          }),
+        ],
+        { provider: 'wazzup' },
+      )
+      let imageButton = root.querySelector('[data-single-image]')
+
+      expect(imageButton.disabled).toBe(!ready)
+      expect(root.querySelector('img')?.getAttribute('src') ?? null).toBe(
+        ready ? '/api/private-wazzup-image' : null,
+      )
+      expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+      imageButton.click()
+      await nextTick()
+      expect(Boolean(root.querySelector('[data-test-lightbox]'))).toBe(ready)
+    },
+  )
+
+  it.each([
+    ['audio', 'data-test-audio'],
+    ['video', 'data-test-video'],
+    ['file', 'data-test-attachment-card'],
+  ])(
+    'routes a canonical Wazzup %s attachment to the shared component',
+    (type, selector) => {
+      let root = mountRenderer(
+        [
+          {
+            id: 'WAZZUP-MEDIA',
+            type,
+            status: 'available',
+            file_name: 'document.pdf',
+          },
+        ],
+        { provider: 'wazzup' },
+      )
+      expect(root.querySelector(`[${selector}]`)).not.toBeNull()
+      if (type !== 'file')
+        expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+      else expect(root.textContent).toContain('document.pdf')
+    },
+  )
+
   it('scales a small single-image preview inside the compact media bounds', () => {
     let root = mountGrid([image('I-1')])
     let wrapper = root.querySelector('[data-single-image]')
@@ -144,7 +387,8 @@ describe('messenger image layout', () => {
     let document = root.querySelector('[data-test-attachment-card]')
 
     expect(renderer.className).toContain('max-w-[20rem]')
-    expect(renderer.className).toContain('w-fit')
+    expect(renderer.className).toContain('grid-cols-1')
+    expect(renderer.className).not.toContain('max-w-full')
     expect(root.querySelector('[data-mixed-single-image-row]')).toBeNull()
     expect(root.querySelector('[data-media-side-line]')).toBeNull()
     expect(media.style.width).toBe('320px')
@@ -191,8 +435,8 @@ describe('messenger image layout', () => {
     let renderer = root.querySelector('[data-attachment-renderer]')
 
     expect(renderer.className).toContain('max-w-[20rem]')
-    expect(renderer.className).toContain('max-w-full')
-    expect(renderer.className.split(/\s+/)).toContain('w-fit')
+    expect(renderer.className).toContain('grid-cols-1')
+    expect(renderer.className).not.toContain('max-w-full')
     expect(root.querySelector('[data-test-video]')).not.toBeNull()
   })
 
@@ -273,9 +517,48 @@ describe('messenger image layout', () => {
     expect(renderer.className).toContain('w-fit')
     expect(renderer.className.split(/\s+/)).not.toContain('w-full')
     expect(wrapper.className).toContain('justify-self-start')
-    expect(wrapper.className).toContain('size-52')
+    expect(wrapper.className).toContain('size-40')
     expect(wrapper.className).not.toContain('w-fit')
     expect(root.querySelector('img').className).toContain('size-full')
+  })
+
+  it.each([false, true])(
+    'reuses the compact sticker view for a decoded Wazzup WebP with compact preview %s',
+    (compactPreview) => {
+      let root = mountRenderer(
+        [
+          image('WAZZUP-WEBP', {
+            width: 512,
+            height: 512,
+            mime_type: 'image/webp',
+            is_sticker_candidate: true,
+          }),
+        ],
+        { provider: 'wazzup', compactPreview },
+      )
+      let sticker = root.querySelector('[data-sticker-attachment]')
+      expect(sticker).not.toBeNull()
+      expect(sticker.className).toContain('size-40')
+      expect(root.querySelector('[data-single-image]')).toBeNull()
+      expect(
+        root.querySelector('[data-attachment-renderer]').className,
+      ).toContain('w-fit')
+    },
+  )
+
+  it('keeps an ordinary Wazzup WebP photo in the shared image view', () => {
+    let root = mountRenderer(
+      [
+        image('WEBP-PHOTO', {
+          mime_type: 'image/webp',
+          width: 512,
+          height: 512,
+        }),
+      ],
+      { provider: 'wazzup' },
+    )
+    expect(root.querySelector('[data-single-image]')).not.toBeNull()
+    expect(root.querySelector('[data-sticker-attachment]')).toBeNull()
   })
 
   it('keeps pending media disabled and opens available media in lightbox', async () => {
@@ -314,7 +597,7 @@ describe('messenger image layout', () => {
       outbound: true,
     })
     expect(otherProvider.querySelector('img')).toBeNull()
-    expect(otherProvider.textContent).toContain('Upload failed')
+    expect(otherProvider.textContent).toContain('Attachment unavailable')
     expect(
       otherProvider.querySelector('[data-vk-image-send-failed]'),
     ).toBeNull()
@@ -484,12 +767,16 @@ describe('messenger image layout', () => {
     expect(root.querySelector('[data-test-lightbox]')).not.toBeNull()
   })
 
-  it('uses loaded image dimensions when provider metadata is missing', async () => {
+  it('keeps a portrait frame stable while decoding, refreshing and reloading without initial dimensions', async () => {
     let root = mountGrid([image('UNKNOWN', { width: null, height: null })])
+    let liveProps = mounted.at(-1).props
     let preview = root.querySelector('[data-single-image]')
     let media = preview.querySelector('img:not([data-media-backdrop])')
+    let initialStyle = preview.getAttribute('style')
 
-    expect(preview.style.aspectRatio).toBe('')
+    expect(preview.style.aspectRatio).toBe(`${320 / 360} / 1`)
+    expect(media.className).toContain('absolute')
+    expect(media.className).toContain('inset-0')
     Object.defineProperty(media, 'naturalWidth', {
       configurable: true,
       value: 900,
@@ -503,7 +790,29 @@ describe('messenger image layout', () => {
 
     expect(preview.style.width).toBe('320px')
     expect(preview.style.aspectRatio).toBe(`${320 / 360} / 1`)
+    expect(preview.getAttribute('style')).toBe(initialStyle)
     expect(preview.querySelector('[data-media-backdrop]')).not.toBeNull()
+
+    // Full chat refresh replaces attachment objects without replacing the
+    // already-loaded <img>. Its natural dimensions must survive that update.
+    liveProps.images = [image('UNKNOWN', { width: null, height: null })]
+    await nextTick()
+    expect(preview.getAttribute('style')).toBe(initialStyle)
+    expect(preview.querySelector('[data-media-backdrop]')).not.toBeNull()
+    expect(preview.querySelector('img:not([data-media-backdrop])')).toBe(media)
+
+    let refreshed = image('UNKNOWN', {
+      url: '/api/refreshed-portrait',
+      width: 900,
+      height: 1600,
+    })
+    liveProps.images = [refreshed]
+    await nextTick()
+    expect(preview.getAttribute('style')).toBe(initialStyle)
+    let reloaded = mountGrid([refreshed])
+    expect(
+      reloaded.querySelector('[data-single-image]').getAttribute('style'),
+    ).toBe(initialStyle)
   })
 
   it('caps a forwarded album grid at 320 by 280 pixels', () => {

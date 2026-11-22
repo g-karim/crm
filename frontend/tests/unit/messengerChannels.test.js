@@ -10,6 +10,7 @@ import {
   getMessengerDeliveryLabel,
   getMessengerDeliveryState,
   getMessengerFailureReason,
+  getMessengerUnknownResultHint,
   getMessengerConversationNotice,
   getMessengerCapabilities,
   getMessengerPlatformLabel,
@@ -28,6 +29,20 @@ vi.mock('frappe-ui', () => ({
 }))
 
 describe('messengerChannels', () => {
+  it('explains proven Wazzup configuration failure without changing other provider reasons', () => {
+    expect(
+      getMessengerFailureReason({
+        provider: 'wazzup',
+        failure_reason: 'wazzup_configuration_invalid',
+      }),
+    ).toBe('Wazzup configuration is invalid. Check the saved channel settings.')
+    expect(
+      getMessengerFailureReason({
+        provider: 'telegram_bot',
+        failure_reason: 'wazzup_configuration_invalid',
+      }),
+    ).toBe('wazzup_configuration_invalid')
+  })
   it('normalizes known platform labels', () => {
     expect(
       getMessengerPlatformLabel({
@@ -152,7 +167,7 @@ describe('messengerChannels', () => {
     ).toBe('')
   })
 
-  it.each(['sent', 'delivered', 'read', 'failed'])(
+  it.each(['accepted', 'unknown', 'sent', 'delivered', 'read', 'failed'])(
     'uses canonical delivery_status for %s',
     (deliveryStatus) => {
       expect(
@@ -194,9 +209,40 @@ describe('messengerChannels', () => {
     ).toBe('Could not upload the image to VK. Try sending it again.')
   })
 
-  it('shows text only for content or a deleted placeholder', () => {
-    expect(shouldShowMessengerText({ text: null })).toBe(false)
-    expect(shouldShowMessengerText({ text: '   ' })).toBe(false)
+  it.each([
+    '',
+    'VK photo upload failed: timeout',
+    'VK photo upload was rejected (HTTP 504).',
+    'VK image upload result is unknown. Automatic resend is disabled.',
+    'VK message delivery result is unknown. Automatic resend is disabled.',
+  ])(
+    'never suggests sending again for an unknown VK image result: %s',
+    (reason) => {
+      let message = {
+        provider: 'vk_direct',
+        direction: 'outbound',
+        status: 'unknown',
+        delivery_status: 'unknown',
+        failure_reason: reason,
+      }
+
+      expect(getMessengerDeliveryLabel(message)).toBe('Result unknown')
+      expect(getMessengerFailureReason(message)).toBe(
+        'VK message result is unknown. Automatic resend is disabled.',
+      )
+      expect(getMessengerFailureReason(message)).not.toContain('Try sending')
+      expect(getMessengerUnknownResultHint(message)).toBe(
+        getMessengerFailureReason(message),
+      )
+      expect(
+        getMessengerUnknownResultHint({ ...message, provider: 'telegram_bot' }),
+      ).toBe('')
+    },
+  )
+
+  it('shows content, unavailable-content and deleted placeholders', () => {
+    expect(shouldShowMessengerText({ text: null })).toBe(true)
+    expect(shouldShowMessengerText({ text: '   ' })).toBe(true)
     expect(shouldShowMessengerText({ text: 'caption' })).toBe(true)
     expect(shouldShowMessengerText({ status: 'deleted', text: null })).toBe(
       true,
@@ -253,6 +299,15 @@ describe('messengerChannels', () => {
   it('returns delivery labels', () => {
     expect(
       getMessengerDeliveryLabel({
+        provider: 'wazzup',
+        direction: 'outbound',
+        status: 'accepted',
+        provider_request_id: 'REQUEST-1',
+      }),
+    ).toBe('Awaiting provider status')
+
+    expect(
+      getMessengerDeliveryLabel({
         direction: 'outbound',
         delivery_status: 'failed',
       }),
@@ -306,7 +361,11 @@ describe('messengerChannels', () => {
       supports_attachments: false,
       supported_attachment_types: [],
       supported_attachment_file_types: [],
+      supported_attachment_file_types_by_type: {},
       supports_image_caption: undefined,
+      supports_attachment_captions: undefined,
+      max_attachment_size_bytes: 0,
+      max_attachment_size_bytes_by_type: {},
       max_attachment_count: 10,
       reactions: { receive: false, send: false },
       location: { receive: false, send: false },
@@ -335,7 +394,11 @@ describe('messengerChannels', () => {
           supports_attachments: true,
           supported_attachment_types: ['image', 'file'],
           supported_attachment_file_types: ['image/jpeg', '.pdf'],
+          supported_attachment_file_types_by_type: { video: ['.mp4'] },
           supports_image_caption: false,
+          supports_attachment_captions: false,
+          max_attachment_size_bytes: 10_000_000,
+          max_attachment_size_bytes_by_type: { image: 5_000_000 },
           reactions: { receive: true, send: true },
           location: { receive: true, send: true },
           contact: { receive: true, send: false },
@@ -355,7 +418,11 @@ describe('messengerChannels', () => {
       supports_attachments: true,
       supported_attachment_types: ['image', 'file'],
       supported_attachment_file_types: ['image/jpeg', '.pdf'],
+      supported_attachment_file_types_by_type: { video: ['.mp4'] },
       supports_image_caption: false,
+      supports_attachment_captions: false,
+      max_attachment_size_bytes: 10_000_000,
+      max_attachment_size_bytes_by_type: { image: 5_000_000 },
       max_attachment_count: 10,
       reactions: { receive: true, send: true },
       location: { receive: true, send: true },
@@ -424,6 +491,73 @@ describe('messengerChannels', () => {
     expect(items.slice(1).map((item) => item.messages.length)).toEqual([
       1, 1, 1,
     ])
+  })
+
+  function wazzupPhoto(index, overrides = {}) {
+    return {
+      name: `WAZZUP-${index}`,
+      provider: 'wazzup',
+      conversation: 'WAZZUP-CHAT',
+      channel: 'WAZZUP-CHANNEL',
+      direction: 'inbound',
+      sender_name: 'Клиент',
+      status: 'received',
+      message_type: 'image',
+      message_datetime: `2026-07-16 08:00:${String(index).padStart(2, '0')}`,
+      attachments: [{ id: `IMAGE-${index}`, type: 'image', status: 'pending' }],
+      can_reply: true,
+      ...overrides,
+    }
+  }
+
+  it.each(['whatsapp', 'telegram'])(
+    'keeps Wazzup %s photos separate without a provider album identity',
+    (platform) => {
+      let messages = [0, 1, 2].map((index) =>
+        wazzupPhoto(index, {
+          channel_info: { platform },
+          message_datetime: `2026-07-16 08:00:00.00${index + 1}`,
+          creation: `2026-07-16 08:00:${String(index * 9).padStart(2, '0')}`,
+        }),
+      )
+      let before = JSON.stringify(messages)
+      let items = buildMessengerMessageItems(messages, '2026-07-16 09:00:00')
+
+      expect(items).toHaveLength(3)
+      expect(items.map((item) => item.messages.length)).toEqual([1, 1, 1])
+      expect(items.map((item) => item.message)).toEqual(messages)
+      expect(items.every((item) => !item.kind && !item.attachments)).toBe(true)
+      expect(items[0].dateLabel).toBe('Today')
+      expect(JSON.stringify(messages)).toBe(before)
+    },
+  )
+
+  it('does not infer a Wazzup album from equal timestamps or nearby arrival times', () => {
+    let items = buildMessengerMessageItems(
+      [0, 1].map((index) =>
+        wazzupPhoto(index, {
+          message_datetime: '2026-07-16 08:00:00',
+          creation: `2026-07-16 08:00:00.${index ? '450' : '000'}`,
+        }),
+      ),
+    )
+
+    expect(items.map((item) => item.messages.length)).toEqual([1, 1])
+  })
+
+  it('retains an actual multi-image message for the shared image grid', () => {
+    let message = wazzupPhoto(0, {
+      attachments: [0, 1, 2].map((index) => ({
+        id: `IMAGE-${index}`,
+        type: 'image',
+        status: 'available',
+      })),
+    })
+    let items = buildMessengerMessageItems([message])
+
+    expect(items).toHaveLength(1)
+    expect(items[0].message.attachments).toBe(message.attachments)
+    expect(items[0].messages).toEqual([message])
   })
 
   it('caps one visual MAX forwarding group at twenty provider messages', () => {

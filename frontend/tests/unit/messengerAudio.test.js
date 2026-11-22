@@ -4,6 +4,7 @@ import {
   createAudioSeekDrag,
   downsampleWaveform,
   formatAudioTime,
+  getAudioDuration,
   normalizeWaveform,
   normalizeAudioVolume,
   prepareWaveform,
@@ -72,11 +73,22 @@ describe('messenger audio player helpers', () => {
   it('formats time and clamps seek and volume', () => {
     expect(formatAudioTime(0)).toBe('0:00')
     expect(formatAudioTime(65.9)).toBe('1:05')
+    expect(formatAudioTime(Infinity)).toBe('0:00')
+    expect(formatAudioTime(-Infinity)).toBe('0:00')
     expect(clampAudioFraction(-1)).toBe(0)
     expect(clampAudioFraction(1.5)).toBe(1)
     expect(normalizeAudioVolume(-0.1)).toBe(0)
     expect(normalizeAudioVolume(0.45)).toBe(0.45)
     expect(normalizeAudioVolume(4)).toBe(1)
+  })
+
+  it('uses finite browser duration with Opus provider metadata as fallback', () => {
+    expect(getAudioDuration(5.5, 4250)).toBe(5.5)
+    expect(getAudioDuration(Infinity, 4250)).toBe(4.25)
+    expect(getAudioDuration(NaN, 4250)).toBe(4.25)
+    expect(getAudioDuration(0, 4250)).toBe(4.25)
+    expect(getAudioDuration(-1, Infinity)).toBe(0)
+    expect(getAudioDuration(undefined, 'bad')).toBe(0)
   })
 
   it('supports the complete pointer drag lifecycle in both directions', () => {

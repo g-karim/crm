@@ -84,9 +84,60 @@ afterEach(() => {
   })
   mounted = []
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 describe('VK Lottie sticker', () => {
+  it('ignores a stale TGS download which finishes after the loading deadline', async () => {
+    vi.useFakeTimers()
+    let resolveDownload
+    fetch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveDownload = resolve
+        }),
+    )
+    let root = mountSticker({ id: 'WAZZUP-TGS', preview_url: null })
+    await vi.advanceTimersByTimeAsync(20000)
+    resolveDownload({ ok: true, json: async () => animationData() })
+    await settle()
+    expect(loadAnimation).not.toHaveBeenCalled()
+    expect(root.textContent).toContain('Sticker unavailable')
+  })
+
+  it('shows the safe label for a broken TGS poster with reduced motion', async () => {
+    matchMedia.mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })
+    let root = mountSticker({ id: 'WAZZUP-TGS' })
+    await nextTick()
+    root.querySelector('img').dispatchEvent(new Event('error'))
+    await nextTick()
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.textContent).toContain('Sticker unavailable')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+  it('bounds a stalled TGS download and allows an explicit safe retry', async () => {
+    vi.useFakeTimers()
+    fetch.mockImplementationOnce(() => new Promise(() => {}))
+    let root = mountSticker({ id: 'WAZZUP-TGS', preview_url: null })
+    await nextTick()
+    expect(root.textContent).toContain('Loading...')
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(root.textContent).toContain('Sticker unavailable')
+    expect(root.textContent).not.toContain('Loading...')
+    root.querySelector('button').click()
+    await settle()
+    await vi.advanceTimersByTimeAsync(0)
+    await settle()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls[1][1]).toMatchObject({
+      credentials: 'same-origin',
+      redirect: 'error',
+    })
+  })
   it('loads same-origin JSON with the light renderer and hides the preview', async () => {
     let root = mountSticker()
     await settle()

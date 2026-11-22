@@ -1,7 +1,7 @@
 import {
   createComposerAttachmentController,
   getComposerAttachmentPolicy,
-  getComposerImageCaptionState,
+  getComposerCaptionState,
   isVideoFile,
   retargetComposerTemporaryFiles,
   validateComposerFileMix,
@@ -472,7 +472,7 @@ describe('messenger composer attachments', () => {
     )
     let attachment = { file: file('photo.jpg', 'image/jpeg') }
 
-    expect(getComposerImageCaptionState(draft, [attachment], policy)).toEqual({
+    expect(getComposerCaptionState(draft, [attachment], policy)).toEqual({
       blocked: true,
       message:
         'Avito API does not support image captions. Send the text as a separate message.',
@@ -480,7 +480,7 @@ describe('messenger composer attachments', () => {
         'Avito API does not support image captions. Send the text as a separate message.',
     })
     expect(draft).toBe('Send this after the image')
-    expect(getComposerImageCaptionState(draft, [], policy).blocked).toBe(false)
+    expect(getComposerCaptionState(draft, [], policy).blocked).toBe(false)
   })
 
   it('disables Avito caption input without warning for an empty draft', () => {
@@ -494,7 +494,7 @@ describe('messenger composer attachments', () => {
     )
 
     expect(
-      getComposerImageCaptionState(
+      getComposerCaptionState(
         '',
         [{ file: file('photo.jpg', 'image/jpeg') }],
         policy,
@@ -525,11 +525,165 @@ describe('messenger composer attachments', () => {
       ).error,
     ).toBeUndefined()
     expect(
-      getComposerImageCaptionState(
+      getComposerCaptionState(
         'caption',
         [{ file: file('photo.webp', 'image/webp') }],
         policy,
       ).blocked,
     ).toBe(false)
+  })
+
+  function wazzupPolicy(platform = 'whatsapp') {
+    return getComposerAttachmentPolicy(
+      {
+        supports_attachments: true,
+        supported_attachment_types: ['image', 'file', 'audio', 'video'],
+        supported_attachment_file_types_by_type: { video: ['.mp4'] },
+        max_attachment_count: 1,
+        max_attachment_size_bytes: 10_000_000,
+        max_attachment_size_bytes_by_type:
+          platform === 'telegram' ? { image: 5_000_000 } : {},
+        supports_attachment_captions: false,
+        supports_image_caption: false,
+      },
+      platform,
+    )
+  }
+
+  it.each([
+    ['photo.jpg', 'image/jpeg'],
+    ['document.pdf', 'application/pdf'],
+    ['audio.mp3', 'audio/mpeg'],
+    ['video.mp4', 'video/mp4'],
+  ])('keeps a Wazzup text draft separate from %s', (name, type) => {
+    let attachment = { file: file(name, type) }
+    let policy = wazzupPolicy()
+    let message =
+      'This channel cannot send text and an attachment together. Send them as separate messages.'
+
+    expect(getComposerCaptionState('Draft text', [attachment], policy)).toEqual(
+      {
+        blocked: true,
+        message,
+        error: message,
+      },
+    )
+    expect(getComposerCaptionState('', [attachment], policy)).toEqual({
+      blocked: true,
+      message,
+      error: '',
+    })
+    expect(getComposerCaptionState('Draft text', [], policy).blocked).toBe(
+      false,
+    )
+  })
+
+  it.each([
+    ['whatsapp', 'image/jpeg', 10_000_000, 10],
+    ['telegram', 'image/jpeg', 5_000_000, 5],
+    ['telegram', 'application/pdf', 10_000_000, 10],
+    ['telegram', 'audio/mpeg', 10_000_000, 10],
+    ['telegram', 'video/mp4', 10_000_000, 10],
+  ])(
+    'enforces the Wazzup %s %s size boundary before upload',
+    (platform, type, limit, megabytes) => {
+      let policy = wazzupPolicy(platform)
+      let upload = vi.fn(async () => ({ name: 'FILE-1' }))
+      let onError = vi.fn()
+      let controller = createComposerAttachmentController({
+        upload,
+        maxFiles: policy.maxAttachmentCount,
+        validateFiles: (files, existing) =>
+          validateComposerFileMix(files, existing, policy),
+        onError,
+      })
+      let oversized = {
+        name: type === 'video/mp4' ? 'clip.mp4' : 'attachment',
+        type,
+        size: limit + 1,
+      }
+
+      expect(controller.addFiles([oversized])).toEqual([])
+      expect(upload).not.toHaveBeenCalled()
+      expect(onError).toHaveBeenCalledWith(
+        `The attachment exceeds the selected channel size limit of ${megabytes} MB.`,
+      )
+      let accepted = { ...oversized, size: limit }
+      expect(controller.addFiles([accepted])).toHaveLength(1)
+      expect(upload).toHaveBeenCalledWith(accepted, expect.any(Function))
+      upload.mockClear()
+      expect(controller.addFiles([accepted])).toEqual([])
+      expect(upload).not.toHaveBeenCalled()
+      expect(onError).toHaveBeenLastCalledWith(
+        'You can select at most 1 attachments.',
+      )
+    },
+  )
+
+  it('applies the stricter global limit when a type limit is larger', () => {
+    let policy = {
+      ...wazzupPolicy(),
+      maxAttachmentSizeBytesByType: { file: 20_000_000 },
+    }
+    expect(
+      validateComposerFileMix(
+        [{ name: 'document.pdf', type: 'application/pdf', size: 10_000_001 }],
+        [],
+        policy,
+      ).error,
+    ).toContain('10 MB')
+  })
+
+  it.each([
+    ['clip.webm', 'video/webm', 'picker'],
+    ['clip.mov', 'video/quicktime', 'paste'],
+    ['clip.avi', 'video/x-msvideo', 'drop'],
+    ['clip.avi', '', 'picker'],
+    ['clip.mkv', 'application/octet-stream', 'picker'],
+  ])('rejects a Wazzup %s %s before uploading', (name, type, source) => {
+    let upload = vi.fn()
+    let onError = vi.fn()
+    let policy = wazzupPolicy()
+    let controller = createComposerAttachmentController({
+      upload,
+      onError,
+      validateFiles: (files, existing) =>
+        validateComposerFileMix(files, existing, policy),
+    })
+    let video = file(name, type)
+    let event = { preventDefault: vi.fn() }
+    if (source === 'paste') {
+      event.clipboardData = {
+        items: [{ kind: 'file', getAsFile: () => video }],
+      }
+      expect(controller.handlePaste(event)).toBe(true)
+    } else if (source === 'drop') {
+      event.dataTransfer = { files: [video] }
+      expect(controller.handleDrop(event)).toBe(true)
+    } else expect(controller.addFiles([video])).toEqual([])
+
+    expect(controller.getItems()).toEqual([])
+    expect(upload).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledWith(
+      'The selected channel supports MP4 video files only.',
+    )
+    expect(
+      validateComposerFileMix(
+        [video],
+        [],
+        getComposerAttachmentPolicy({ supports_attachments: true }, 'telegram'),
+      ).error,
+    ).toBeUndefined()
+    expect(
+      validateComposerFileMix([file('clip.MP4', 'video/mp4')], [], policy)
+        .error,
+    ).toBeUndefined()
+    expect(
+      validateComposerFileMix(
+        [file('document.pdf', 'application/pdf')],
+        [],
+        policy,
+      ).error,
+    ).toBeUndefined()
   })
 })

@@ -231,7 +231,7 @@ const tabs = computed(() => {
           label: __('Message Channels'),
           icon: LucideMessagesSquare,
           component: markRaw(MessengerSettings),
-          condition: () => isMessengerInstalled.value && isManager(),
+          condition: () => isMessengerInstalled.value && isAdmin(),
         },
         {
           label: __('Email Accounts'),

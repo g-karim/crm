@@ -4,6 +4,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createDialog } from './utils/dialogs'
 import { setupCalendarLocalization } from './utils/calendarLocalization'
+import { initializeTelemetry } from './utils/telemetry'
 import { initSocket } from './socket'
 import router from './router'
 import translationPlugin from './translation'
@@ -23,6 +24,7 @@ import {
   frappeRequest,
   FeatherIcon,
   toast,
+  call,
 } from 'frappe-ui'
 
 import { telemetryPlugin } from 'frappe-ui/frappe'
@@ -72,11 +74,12 @@ app.use(translationPlugin)
 for (let key in globalComponents) {
   app.component(key, globalComponents[key])
 }
-app.use(telemetryPlugin, { app_name: 'crm' })
-
 app.config.globalProperties.$dialog = createDialog
 
 function mountApp() {
+  initializeTelemetry(app, telemetryPlugin, () =>
+    call('frappe.utils.telemetry.pulse.client.boot_config'),
+  )
   app.mount('#app')
   calendarLocalizationObserver = setupCalendarLocalization()
 }

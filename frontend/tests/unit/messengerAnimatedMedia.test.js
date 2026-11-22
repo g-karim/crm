@@ -1,4 +1,4 @@
-import { createApp, nextTick } from 'vue'
+import { createApp, nextTick, reactive } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
@@ -52,6 +52,35 @@ function animation(overrides = {}) {
 }
 
 describe('animated messenger media', () => {
+  it('retries a failed browser GET and accepts refreshed media on the same message', async () => {
+    let attachment = reactive(
+      animation({
+        type: 'image',
+        mime_type: 'image/gif',
+        url: '/api/first.gif',
+      }),
+    )
+    let root = mountAnimation(attachment)
+    root
+      .querySelector('[data-animated-image]')
+      .dispatchEvent(new Event('error'))
+    await nextTick()
+    expect(root.querySelector('[data-animated-image]')).toBeNull()
+    root.querySelector('button').click()
+    await nextTick()
+    expect(
+      root.querySelector('[data-animated-image]').getAttribute('src'),
+    ).toBe('/api/first.gif')
+    root
+      .querySelector('[data-animated-image]')
+      .dispatchEvent(new Event('error'))
+    await nextTick()
+    attachment.url = '/api/refreshed.gif'
+    await nextTick()
+    expect(
+      root.querySelector('[data-animated-image]').getAttribute('src'),
+    ).toBe('/api/refreshed.gif')
+  })
   it('autoplays an MP4 animation without inline controls or a file card', () => {
     let root = mountAnimation(animation())
     let video = root.querySelector('[data-animated-video]')

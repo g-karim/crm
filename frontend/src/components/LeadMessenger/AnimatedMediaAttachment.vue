@@ -47,7 +47,17 @@
         @error="failed = true"
       />
     </button>
-    <AttachmentCard v-else :attachment="fallbackAttachment" />
+    <template v-else>
+      <AttachmentCard :attachment="fallbackAttachment" />
+      <button
+        v-if="failed && source && getAttachmentState(attachment).active"
+        type="button"
+        class="mt-1 min-h-8 rounded px-2 text-sm text-ink-blue-6 focus-visible:ring-2"
+        @click.stop="failed = false"
+      >
+        {{ __('Try Again') }}
+      </button>
+    </template>
   </div>
 </template>
 
@@ -89,6 +99,7 @@ const playable = computed(
 )
 const fallbackAttachment = computed(() => ({
   ...props.attachment,
+  status: failed.value ? 'failed' : props.attachment.status,
   open_url:
     props.attachment.open_url ||
     props.attachment.download_url ||
@@ -147,11 +158,13 @@ function captureBackdropFrame(event) {
 }
 
 watch(
-  () => props.attachment.id,
-  () => {
+  () => [props.attachment.id, source.value, props.attachment.status],
+  ([id], [previousId]) => {
     failed.value = false
-    actualWidth.value = 0
-    actualHeight.value = 0
+    if (id !== previousId) {
+      actualWidth.value = 0
+      actualHeight.value = 0
+    }
     generatedBackdropUrl.value = ''
   },
 )

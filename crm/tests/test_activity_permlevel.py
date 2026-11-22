@@ -5,7 +5,8 @@ import frappe
 from frappe.permissions import add_permission, update_permission_property
 from frappe.tests import IntegrationTestCase
 
-from crm.api.activities import get_activities
+from crm.api.activities import get_activities, get_readable_fields
+from crm.fcrm.doctype.crm_fields_layout.crm_fields_layout import get_permlevel_access
 
 RESTRICTED_FIELD = "permlevel_secret"
 RESTRICTED_VALUE = "salary is 100000"
@@ -39,7 +40,14 @@ class TestActivityPermlevel(IntegrationTestCase):
 
 		# only Sales Manager gets permlevel 1 on CRM Lead
 		add_permission("CRM Lead", "Sales Manager", 1)
+		# add_permission leaves an existing rule untouched. Declare both fixture
+		# permissions explicitly instead of inheriting another suite's read flag.
+		update_permission_property("CRM Lead", "Sales Manager", 1, "read", 1)
 		update_permission_property("CRM Lead", "Sales Manager", 1, "write", 1)
+		# A worker can refill shared metadata while these fixture permissions are
+		# still uncommitted. Publish the class fixture before invalidating that
+		# cache, so another process cannot replace it with the old permission set.
+		frappe.db.commit()
 		frappe.clear_cache(doctype="CRM Lead")
 
 	def setUp(self):
@@ -64,6 +72,27 @@ class TestActivityPermlevel(IntegrationTestCase):
 	def activities_as(self, user, name):
 		frappe.set_user(user)
 		try:
+			if user == "mgr@permlevel.test":
+				self.assertIn(
+					RESTRICTED_FIELD,
+					get_readable_fields("CRM Lead"),
+					frappe.as_json(
+						{
+							"roles": frappe.get_roles(),
+							"read_permlevels": get_permlevel_access("read", "CRM Lead"),
+							"permissions": [
+								{
+									"role": p.role,
+									"permlevel": p.permlevel,
+									"read": p.read,
+									"write": p.write,
+								}
+								for p in frappe.get_meta("CRM Lead").permissions
+							],
+						},
+						indent=2,
+					),
+				)
 			activities, *_ = get_activities(name)
 		finally:
 			frappe.set_user("Administrator")
@@ -90,6 +119,45 @@ class TestActivityPermlevel(IntegrationTestCase):
 		activities = self.activities_as("rep@permlevel.test", lead.name)
 		self.assertIn("status", changed_fields(activities))
 		self.assertNotIn(RESTRICTED_FIELD, changed_fields(activities))
+
+	def test_readable_change_after_a_restricted_change_is_visible(self):
+		lead = self.make_lead_with_restricted_change()
+		self.add_version(
+			lead,
+			[
+				[RESTRICTED_FIELD, None, RESTRICTED_VALUE],
+				["first_name", "Permlevel", "Updated name"],
+			],
+		)
+
+		activities = self.activities_as("rep@permlevel.test", lead.name)
+
+		self.assertIn("first_name", changed_fields(activities))
+		self.assertNotIn(RESTRICTED_FIELD, changed_fields(activities))
+		self.assertNotIn(RESTRICTED_VALUE, frappe.as_json(activities))
+
+	def test_permitted_change_after_an_ignored_change_is_visible(self):
+		lead = self.make_lead_with_restricted_change()
+		frappe.db.delete("Version", {"ref_doctype": "CRM Lead", "docname": lead.name})
+		self.add_version(
+			lead,
+			[["sla", None, "Ignored SLA"], [RESTRICTED_FIELD, None, RESTRICTED_VALUE]],
+		)
+
+		activities = self.activities_as("mgr@permlevel.test", lead.name)
+
+		self.assertIn(RESTRICTED_FIELD, changed_fields(activities))
+		self.assertNotIn("sla", changed_fields(activities))
+
+	def add_version(self, lead, changes):
+		frappe.get_doc(
+			{
+				"doctype": "Version",
+				"ref_doctype": "CRM Lead",
+				"docname": lead.name,
+				"data": frappe.as_json({"changed": changes}),
+			}
+		).insert(ignore_permissions=True)
 
 
 def changed_fields(activities):

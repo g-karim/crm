@@ -1,5 +1,6 @@
 import { avitoConversationLabel } from '@/utils/messengerAvitoContext'
 import { getMessengerMessagePreview } from '@/utils/messengerAttachments'
+import { isWazzupPartnerChannel } from '@/utils/wazzupPartnerConnection'
 
 export function messengerConversationsForChannel(
   conversations = [],
@@ -95,4 +96,46 @@ export function maskExternalChatId(value) {
   let text = `${value || ''}`
   if (!text) return ''
   return text.length <= 4 ? text : `…${text.slice(-4)}`
+}
+
+export function messengerConversationConflictTarget(result = {}) {
+  let reference = result?.existing_reference
+  if (
+    result?.reason !== 'conversation_link_conflict' ||
+    reference?.doctype !== 'CRM Lead' ||
+    typeof reference.name !== 'string' ||
+    !reference.name.trim()
+  )
+    return null
+  return { name: 'Lead', params: { leadId: reference.name } }
+}
+
+export function messengerPersistedConversationConflict({
+  messages = [],
+  conversation,
+  channel,
+  leadName,
+} = {}) {
+  if (
+    !leadName ||
+    !isWazzupPartnerChannel(channel) ||
+    !['whatsapp', 'telegram'].includes(channel.platform) ||
+    conversation?.provider !== 'wazzup' ||
+    conversation.channel !== channel.name ||
+    conversation.reference_doctype !== 'CRM Lead' ||
+    conversation.reference_name !== leadName
+  )
+    return null
+  for (let index = messages.length - 1; index >= 0; index--) {
+    let message = messages[index]
+    if (
+      message?.provider === 'wazzup' &&
+      message.channel === channel.name &&
+      message.conversation === conversation.name &&
+      message.direction === 'outbound' &&
+      message.binding_conflict?.reason === 'conversation_link_conflict'
+    )
+      return message.binding_conflict
+  }
+  return null
 }

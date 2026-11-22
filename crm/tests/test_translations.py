@@ -1,9 +1,37 @@
 from unittest import TestCase
 
-from crm.translations import RUSSIAN_TRANSLATIONS, get_crm_translations
+from crm.translations import get_crm_translations
 
 
 class TestCRMTranslations(TestCase):
+	def test_message_deletion_confirmation_and_unknown_are_translated(self):
+		translations = get_crm_translations("ru")
+		self.assertEqual(translations["Delete for Everyone"], "Удалить у всех")
+		for source in (
+			"The message deletion result is unknown. Automatic retry is disabled.",
+			"The message editing result is unknown. Automatic retry is disabled.",
+			"Message editing is pending. Refresh messages to check its status.",
+			"Message deletion is pending. Refresh messages to check its status.",
+			"Provider rejected the message deletion.",
+			"Provider rejected the message edit.",
+			"Only WhatsApp messages sent through CRM can be edited.",
+			"A newer message change was received while the edit was in progress.",
+			"The provider no longer allows this message to be edited.",
+			"The provider no longer allows this message to be deleted.",
+			"Provider message ID is required.",
+			"Message does not belong to this conversation channel.",
+		):
+			with self.subTest(source=source):
+				self.assertIn(source, translations)
+				self.assertNotEqual(translations[source], source)
+
+	def test_empty_and_template_messages_are_translated(self):
+		translations = get_crm_translations("ru")
+		self.assertEqual(translations["Content unavailable"], "Содержимое недоступно")
+		self.assertEqual(translations["Template message"], "Шаблонное сообщение")
+		self.assertEqual(translations["Template values"], "Параметры шаблона")
+		self.assertIn("The provider did not include the template text.", translations)
+
 	def test_crm_runtime_translations_are_russian_only(self):
 		self.assertEqual(get_crm_translations("en"), {})
 		self.assertEqual(get_crm_translations(None), {})
@@ -35,9 +63,107 @@ class TestCRMTranslations(TestCase):
 			"Интеграция Avito не настроена. Укажите Client ID и Client Secret в настройках канала Avito, затем подключите канал. Сообщение сохранено локально со статусом ошибки.",
 		)
 
-	def test_gateway_brand_is_not_exposed_in_customer_translations(self):
-		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS))
-		self.assertNotIn("Wazzup", " ".join(RUSSIAN_TRANSLATIONS.values()))
+	def test_wazzup_administration_and_unknown_delivery_are_translated(self):
+		translations = get_crm_translations("ru")
+		self.assertEqual(translations["Wazzup"], "Wazzup")
+		self.assertEqual(translations["Connection Not Checked"], "Подключение не проверено")
+		self.assertEqual(
+			translations["Awaiting provider status"],
+			"Ожидание статуса от провайдера",
+		)
+		self.assertEqual(
+			translations["Partner API channels are managed by the server."],
+			"Каналы Partner API управляются сервером.",
+		)
+		self.assertEqual(
+			translations["Wazzup partner credentials cannot be stored in a channel."],
+			"Партнёрские данные доступа Wazzup нельзя хранить в канале.",
+		)
+		self.assertEqual(
+			translations[
+				"The provider may have accepted the message, but CRM did not receive a definitive result. Retrying may create a duplicate."
+			],
+			"Провайдер мог уже принять сообщение, но CRM не получила однозначный результат. Повторная отправка может создать дубликат.",
+		)
+		user_facing = {
+			"Provider message delivery result is unknown.",
+			"Provider rejected the message.",
+			"Provider authentication failed.",
+			"The messenger channel is unavailable.",
+			"The message text is too long.",
+			"The recipient is not configured.",
+			"This channel supports text messages only.",
+			"This channel supports individual chats only.",
+			"The message text is required.",
+			"Provider rate limit reached.",
+			"Message accepted by provider.",
+			"Channel can send messages.",
+			"The provider reported a message delivery failure.",
+		}
+		for source in user_facing:
+			with self.subTest(source=source):
+				self.assertIn(source, translations)
+				self.assertNotEqual(translations[source], source)
+
+	def test_wazzup_partner_onboarding_has_runtime_translations(self):
+		user_facing = {
+			"Connection status",
+			"Connect",
+			"Preparing connection",
+			"Select a messenger and complete its connection.",
+			"Wazzup User API v3 (legacy)",
+			"Connection is not configured. Ask your system administrator to enable it.",
+			"Waiting for QR scan",
+			"Two-factor authentication required",
+			"Authorization expired",
+			"Reconnecting",
+			"Reconnect",
+			"Channel Deleted",
+			"Delete Channel",
+			"QR code has expired. Request a new code.",
+			"Refresh QR code",
+			"Channel QR code",
+			"Scan this QR code in the messenger app.",
+			"Use the simulator button below to test the QR scan.",
+			"Waiting for QR code.",
+			"Enter the two-factor authentication password for this account.",
+			"Two-factor authentication password",
+			"Submit password",
+			"The messenger account is connected.",
+			"Refresh the channel status or reconnect to restore access.",
+			"Local simulator",
+			"Simulate QR scan",
+			"Delete this channel? Existing messages will remain in CRM.",
+			"The two-factor authentication password was rejected. Try again.",
+			"The connection result is unknown. Refresh its status before trying again.",
+			"Could not submit the password. Refresh the connection status.",
+			"Could not delete the channel. Refresh its status.",
+			"Could not update the connection. Refresh its status and try again.",
+			"Connection diagnostics",
+			"Check connection",
+			"Provider channel status",
+			"Connection details",
+			"Connect / Restore",
+			"Reauthorize account",
+			"Start authorization again? You may need to scan a new QR code.",
+			"Delete this channel from the provider? Existing messages will remain in CRM. Connecting it again will require authorization.",
+			"Refresh the channel status or restore the connection to regain access.",
+			"Could not disconnect the channel. Refresh its status.",
+			"The channel could not be verified. Test the connection again.",
+			"The provider returned no channel information. Refresh the status and test the connection again.",
+			"No channel data",
+			"The connected account could not be verified. Test the connection again.",
+			"Incoming events are not configured or could not be verified. Test the connection again.",
+			"Connection settings verified.",
+			"Account connection",
+			"Account webhook subscription",
+			"Configured",
+			"Channel Disabled",
+			"The channel status is checked in its connected account. A successful check does not confirm webhook or message delivery.",
+		}
+		translations = get_crm_translations("ru")
+		self.assertEqual(user_facing - translations.keys(), set())
+		self.assertTrue(all(translations[source] != source for source in user_facing))
 
 	def test_user_facing_avito_errors_have_runtime_translations(self):
 		user_facing = {
@@ -57,5 +183,80 @@ class TestCRMTranslations(TestCase):
 			"Avito delete result is unknown.",
 		}
 		translations = get_crm_translations("ru_RU")
+		self.assertEqual(user_facing - translations.keys(), set())
+		self.assertTrue(all(translations[source] != source for source in user_facing))
+
+	def test_attachment_caption_and_size_limits_have_runtime_translations(self):
+		user_facing = {
+			"This channel cannot send text and an attachment together. Send them as separate messages.",
+			"Text and attachments must be sent separately.",
+			"The attachment exceeds the selected channel size limit of {0} MB.",
+			"Send the text and attachment as separate messages.",
+			"Send one Wazzup attachment without text.",
+			"The attachment is unavailable for Wazzup.",
+			"This attachment type cannot be sent.",
+			"This channel cannot send voice messages.",
+			"Wazzup supports MP4 video files only.",
+			"The selected channel supports MP4 video files only.",
+			"The attachment exceeds the Wazzup size limit.",
+			"A public HTTPS site URL is required to send Wazzup attachments.",
+			"Site encryption key is not configured.",
+			"Reply target is unavailable for this conversation.",
+			"Attachment content was rejected.",
+			"Attachment could not be stored.",
+		}
+		translations = get_crm_translations("ru")
+		self.assertEqual(user_facing - translations.keys(), set())
+		self.assertTrue(all(translations[source] != source for source in user_facing))
+
+	def test_wazzup_connection_and_diagnostic_labels_are_translated(self):
+		user_facing = {
+			"Telegram personal chats",
+			"Wazzup API key",
+			"Wazzup channel UUID",
+			"API key source",
+			"Load Wazzup channels",
+			"Available Wazzup channels",
+			"Active in CRM",
+			"Check saved configuration",
+			"Saved configuration diagnostics",
+			"Configuration Checked",
+			"Wazzup diagnostics refreshed.",
+			"API access",
+			"Selected Wazzup channel",
+			"Webhook subscription",
+			"CRM webhook configuration",
+			"Actual incoming event",
+			"No event observed",
+			"Event received",
+			"Not checked",
+			"Could not verify",
+			"Verified",
+			"The Wazzup API key is invalid.",
+			"The Wazzup API request is not permitted.",
+			"The Wazzup API is temporarily unavailable. Try checking again.",
+			"The Wazzup API rate limit was reached. Try checking again.",
+			"The Wazzup API returned an unexpected response.",
+			"The Wazzup API endpoint is not supported.",
+			"Enter the Wazzup channel UUID, not its phone number or username.",
+			"The selected channel is not available for this Wazzup API key.",
+			"The selected Wazzup channel uses a different messenger.",
+			"The selected Wazzup channel is not active.",
+			"The Wazzup channel state could not be verified.",
+			"The Wazzup webhook address or message subscription does not match this CRM.",
+			"Configure a public HTTPS site URL and webhook secret before receiving Wazzup events.",
+			"Channel settings changed during verification. Check the channel again.",
+			"Configuration verified. Webhook delivery has not been verified.",
+			"Select a Wazzup channel.",
+			"Select a Wazzup channel for the API key.",
+			"Enter a Wazzup channel UUID.",
+			"Wazzup channels support API keys only.",
+			"The messenger identity of a Wazzup channel with conversations cannot be changed. Create a separate channel.",
+			"Wazzup configuration is invalid. Check the saved channel settings.",
+			"Webhook events: {0} pending, {1} failed.",
+			"Attachments: {0} pending, {1} failed.",
+			"The Shared Webhook Secret must match the crmKey configured for the Wazzup integration; it is different from the Wazzup API key.",
+		}
+		translations = get_crm_translations("ru")
 		self.assertEqual(user_facing - translations.keys(), set())
 		self.assertTrue(all(translations[source] != source for source in user_facing))

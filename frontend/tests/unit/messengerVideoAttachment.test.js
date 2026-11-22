@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, nextTick, reactive } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/LeadMessenger/AttachmentCard.vue', () => ({
@@ -30,12 +30,15 @@ afterEach(() => {
   })
   mounted = []
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
-function mountVideo(attachment, provider = '', props = {}) {
+function mountVideo(attachment, provider = '', props = {}, refreshAttachments) {
   let root = document.createElement('div')
   document.body.appendChild(root)
   let app = createApp(VideoAttachment, { attachment, provider, ...props })
+  if (refreshAttachments)
+    app.provide('refreshMessengerAttachments', refreshAttachments)
   app.config.globalProperties.__ = globalThis.__
   app.mount(root)
   mounted.push({ app, root })
@@ -43,6 +46,388 @@ function mountVideo(attachment, provider = '', props = {}) {
 }
 
 describe('external messenger video', () => {
+  it.each(['pending', 'failed'])(
+    'waits for a %s video snapshot without per-media refresh controls',
+    async (status) => {
+      vi.useFakeTimers()
+      let refresh = vi.fn().mockResolvedValue(undefined)
+      let attachment = reactive({
+        id: 'PARTNER-POSTER-ONLY',
+        type: 'video',
+        status,
+        preview_url: '/api/private-poster',
+        width: 1080,
+        height: 1920,
+      })
+      let root = mountVideo(attachment, 'wazzup', {}, refresh)
+      expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+      expect(root.querySelector('video[controls]')).toBeNull()
+      if (status === 'pending') {
+        expect(root.querySelector('[data-video-refresh]')).toBeNull()
+        await vi.advanceTimersByTimeAsync(30000)
+      }
+      expect(root.querySelector('[data-video-refresh]')).toBeNull()
+      expect(refresh).not.toHaveBeenCalled()
+      expect(root.querySelector('[data-video-loading]')).toBeNull()
+
+      Object.assign(attachment, {
+        status: 'available',
+        mime_type: 'video/mp4',
+        playback_url: '/api/private-video',
+      })
+      await nextTick()
+      expect(root.querySelector('[data-video-refresh]')).toBeNull()
+      root.querySelector('button[aria-label="Play Video"]').click()
+      await nextTick()
+      expect(
+        root.querySelector('video[controls]').getAttribute('aria-label'),
+      ).toBe('Video')
+    },
+  )
+
+  it('keeps poster-only failure safe without adding a refresh action', async () => {
+    let refresh = vi
+      .fn()
+      .mockRejectedValue(new Error('https://provider.test/?secret=private'))
+    let root = mountVideo(
+      {
+        id: 'PARTNER-REFRESH-ERROR',
+        type: 'video',
+        status: 'failed',
+        preview_url: '/api/private-poster',
+      },
+      'wazzup',
+      {},
+      refresh,
+    )
+    expect(root.querySelector('[data-video-refresh]')).toBeNull()
+    expect(refresh).not.toHaveBeenCalled()
+    expect(root.textContent).not.toContain('secret=private')
+  })
+
+  it('keeps pending VK external-only video on its existing source action', () => {
+    let refresh = vi.fn()
+    let root = mountVideo(
+      {
+        id: 'VK-PENDING-EXTERNAL-POSTER',
+        type: 'video',
+        status: 'pending',
+        video_source: 'provider_embed',
+        preview_url: '/api/private-poster',
+        open_url: '/api/open-vk',
+      },
+      'vk_direct',
+      {},
+      refresh,
+    )
+    expect(root.querySelector('[data-video-refresh]')).toBeNull()
+    expect(root.textContent).toContain('Available only on VK')
+    expect(
+      root.querySelector('[data-video-external-action]').getAttribute('href'),
+    ).toBe('/api/open-vk')
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it.each(['whatsapp', 'telegram'])(
+    'keeps %s Partner geometry across initial load, delta, refresh and reload',
+    async (platform) => {
+      let attachment = reactive({
+        id: `PARTNER-${platform}-VIDEO`,
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        playback_url: '/api/private-partner-video',
+        preview_url: '/api/private-partner-poster',
+        width: 1080,
+        height: 1920,
+        duration_ms: 4500,
+      })
+      let root = mountVideo(attachment, 'wazzup')
+      let geometry = () => ({
+        width: root.firstElementChild.style.width,
+        maxWidth: root.firstElementChild.style.maxWidth,
+        ratio: root.querySelector('[data-video-frame]').style.aspectRatio,
+      })
+      let initialGeometry = geometry()
+
+      // A landscape poster must not replace the portrait video's geometry.
+      let poster = root.querySelector('img:not([data-media-backdrop])')
+      Object.defineProperties(poster, {
+        naturalWidth: { configurable: true, value: 640 },
+        naturalHeight: { configurable: true, value: 360 },
+      })
+      poster.dispatchEvent(new Event('load'))
+      await nextTick()
+      expect(geometry()).toEqual(initialGeometry)
+
+      Object.assign(attachment, { duration_ms: 4600, status: 'available' })
+      await nextTick()
+      expect(geometry()).toEqual(initialGeometry)
+
+      root.querySelector('button[aria-label="Play Video"]').click()
+      await nextTick()
+      let video = root.querySelector('video[controls]')
+      Object.defineProperties(video, {
+        videoWidth: { configurable: true, value: 1080 },
+        videoHeight: { configurable: true, value: 1920 },
+        duration: { configurable: true, value: 4.6 },
+      })
+      video.dispatchEvent(new Event('loadedmetadata'))
+      video.dispatchEvent(new Event('playing'))
+      await nextTick()
+      expect(geometry()).toEqual(initialGeometry)
+
+      // Reload/refresh changes the projection, not the media identity.
+      attachment.playback_url = '/api/private-partner-video?refresh=1'
+      await nextTick()
+      expect(root.querySelector('video[controls]')).toBeNull()
+      expect(
+        root.querySelector('button[aria-label="Play Video"]'),
+      ).not.toBeNull()
+      expect(geometry()).toEqual(initialGeometry)
+
+      let reloaded = mountVideo({ ...attachment }, 'wazzup')
+      expect(reloaded.firstElementChild.style.width).toBe(initialGeometry.width)
+      expect(
+        reloaded.querySelector('[data-video-frame]').style.aspectRatio,
+      ).toBe(initialGeometry.ratio)
+      expect(root.firstElementChild.className).toContain('min-w-0')
+    },
+  )
+
+  it.each(['whatsapp', 'telegram'])(
+    'recovers a %s Partner video when a pending delta becomes available',
+    async (platform) => {
+      let attachment = reactive({
+        id: `PARTNER-${platform}-PENDING`,
+        type: 'video',
+        status: 'downloading',
+        mime_type: 'video/mp4',
+      })
+      let root = mountVideo(attachment, 'wazzup')
+      expect(root.querySelector('button[aria-label="Play Video"]')).toBeNull()
+      Object.assign(attachment, {
+        status: 'available',
+        playback_url: '/api/downloaded-video',
+        width: 720,
+        height: 720,
+      })
+      await nextTick()
+
+      expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+      expect(root.querySelector('[data-video-frame]').style.aspectRatio).toBe(
+        '1 / 1',
+      )
+      root.querySelector('button[aria-label="Play Video"]').click()
+      await nextTick()
+      expect(root.querySelector('video[controls]').getAttribute('src')).toBe(
+        '/api/downloaded-video',
+      )
+    },
+  )
+
+  it('renders generic square video notes with native video controls', async () => {
+    let root = mountVideo(
+      {
+        id: 'PARTNER-GENERIC-NOTE',
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        playback_url: '/api/private-note',
+        width: 384,
+        height: 384,
+      },
+      'wazzup',
+    )
+    root.querySelector('button[aria-label="Play Video"]').click()
+    await nextTick()
+
+    expect(root.querySelector('[data-video-frame]').style.aspectRatio).toBe(
+      '1 / 1',
+    )
+    expect(
+      root.querySelector('video[controls]').hasAttribute('playsinline'),
+    ).toBe(true)
+    expect(root.querySelector('video[controls]').className).toContain(
+      'object-contain',
+    )
+  })
+
+  it('ends stalled browser loading and retries only on a user action', async () => {
+    vi.useFakeTimers()
+    let play = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockResolvedValue(undefined)
+    let root = mountVideo(
+      {
+        id: 'PARTNER-STALLED',
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        playback_url: '/api/private-video',
+      },
+      'wazzup',
+    )
+    root.querySelector('button[aria-label="Play Video"]').click()
+    await nextTick()
+    expect(root.querySelector('[data-video-loading]')).not.toBeNull()
+
+    await vi.advanceTimersByTimeAsync(15000)
+    root.querySelector('video[controls]').dispatchEvent(new Event('stalled'))
+    await vi.advanceTimersByTimeAsync(5000)
+    await nextTick()
+    expect(root.querySelector('[data-video-loading]')).toBeNull()
+    expect(root.textContent).toContain('Video unavailable')
+    expect(root.textContent).toContain('Try Again')
+    expect(play).toHaveBeenCalledTimes(1)
+
+    root.querySelector('button').click()
+    await nextTick()
+    expect(play).toHaveBeenCalledTimes(2)
+    expect(root.querySelector('video[controls]')).not.toBeNull()
+    root.querySelector('video[controls]').dispatchEvent(new Event('playing'))
+    await vi.advanceTimersByTimeAsync(20000)
+    expect(root.querySelector('[data-video-loading]')).toBeNull()
+    expect(root.textContent).not.toContain('Video unavailable')
+  })
+
+  it('clears a failed local player after the same attachment receives a fresh projection', async () => {
+    let attachment = reactive({
+      id: 'PARTNER-FAILED-PLAYER',
+      type: 'video',
+      status: 'available',
+      mime_type: 'video/mp4',
+      playback_url: '/api/private-video',
+    })
+    let root = mountVideo(attachment, 'wazzup')
+    root.querySelector('button[aria-label="Play Video"]').click()
+    await nextTick()
+    root.querySelector('video[controls]').dispatchEvent(new Event('error'))
+    await nextTick()
+    expect(root.querySelector('button[aria-label="Play Video"]')).toBeNull()
+    expect(root.textContent).toContain('Try Again')
+
+    attachment.playback_url = '/api/private-video?refresh=1'
+    await nextTick()
+    expect(root.querySelector('button[aria-label="Play Video"]')).not.toBeNull()
+    expect(root.textContent).not.toContain('Try Again')
+  })
+
+  it('leaves native controls available when the browser blocks programmatic playback', async () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockRejectedValue(
+      new DOMException('Playback blocked', 'NotAllowedError'),
+    )
+    let root = mountVideo(
+      {
+        id: 'PARTNER-BROWSER-POLICY',
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        playback_url: '/api/private-video',
+      },
+      'wazzup',
+    )
+    root.querySelector('button[aria-label="Play Video"]').click()
+    await nextTick()
+    await Promise.resolve()
+    await nextTick()
+
+    expect(root.querySelector('[data-video-loading]')).toBeNull()
+    expect(root.querySelector('video[controls]')).not.toBeNull()
+    expect(root.textContent).not.toContain('Try Again')
+  })
+
+  it('shows a safe retry after a rejected codec without exposing browser diagnostics', async () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockRejectedValue(
+      new DOMException(
+        'Secret provider URL in browser diagnostics',
+        'NotSupportedError',
+      ),
+    )
+    let root = mountVideo(
+      {
+        id: 'PARTNER-CODEC-FAILURE',
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        playback_url: '/api/private-video',
+      },
+      'wazzup',
+    )
+    root.querySelector('button[aria-label="Play Video"]').click()
+    await nextTick()
+    await Promise.resolve()
+    await nextTick()
+
+    expect(root.querySelector('[data-video-loading]')).toBeNull()
+    expect(root.querySelector('video[controls]')).toBeNull()
+    expect(root.textContent).toContain('Video unavailable')
+    expect(root.textContent).toContain('Try Again')
+    expect(root.textContent).not.toContain('Secret provider URL')
+  })
+
+  it.each(['max_direct', 'vk_direct', 'telegram_bot'])(
+    'preserves %s local playback after buffering and a browser error',
+    async (provider) => {
+      let root = mountVideo(
+        {
+          id: `${provider}-LOCAL`,
+          type: 'video',
+          status: 'available',
+          video_source: 'local_file',
+          mime_type: 'video/mp4',
+          playback_url: '/api/private-video',
+          width: 1920,
+          height: 1080,
+        },
+        provider,
+      )
+      let ratio = root.querySelector('[data-video-frame]').style.aspectRatio
+      root.querySelector('button[aria-label="Play Video"]').click()
+      await nextTick()
+      let video = root.querySelector('video[controls]')
+      video.dispatchEvent(new Event('waiting'))
+      video.dispatchEvent(new Event('playing'))
+      await nextTick()
+      expect(root.querySelector('[data-video-loading]')).toBeNull()
+      expect(root.querySelector('[data-video-frame]').style.aspectRatio).toBe(
+        ratio,
+      )
+
+      video.dispatchEvent(new Event('error'))
+      await nextTick()
+      expect(root.textContent).toContain('Try Again')
+      root.querySelector('button').click()
+      await nextTick()
+      expect(root.querySelector('video[controls]')).not.toBeNull()
+      expect(root.querySelector('[data-video-frame]').style.aspectRatio).toBe(
+        ratio,
+      )
+    },
+  )
+
+  it('plays a downloaded Wazzup video through the protected projection', async () => {
+    let root = mountVideo(
+      {
+        id: 'WAZZUP-VIDEO',
+        type: 'video',
+        status: 'available',
+        mime_type: 'video/mp4',
+        file_name: 'clip.mp4',
+        url: '/api/private-wazzup-video',
+      },
+      'wazzup',
+    )
+
+    root.querySelector('button[aria-label="Play Video"]').click()
+    await nextTick()
+    expect(root.querySelector('video[controls]')?.getAttribute('src')).toBe(
+      '/api/private-wazzup-video',
+    )
+    expect(root.querySelector('a')).toBeNull()
+    expect(root.querySelector('[data-test-attachment-card]')).toBeNull()
+  })
+
   it('translates attachment processing status at the display boundary', () => {
     let originalTranslate = globalThis.__
     globalThis.__ = (message) =>

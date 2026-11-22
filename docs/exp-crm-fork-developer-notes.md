@@ -2,6 +2,12 @@
 
 Этот документ описывает поведение, которое раньше частично делалось внешним слоем `exp_theme`, а теперь живет в форке `crm`. `exp_theme` остается обязательным приложением для наших сайтов, но для CRM он должен быть языковым и общесистемным слоем, а не runtime-патчем `/crm`.
 
+Общая тема Desk, домашняя страница `/home`, системные настройки и общий языковой
+слой остаются ответственностью `exp_theme`. CRM сама задаёт свой интерфейс,
+бренд и миграции. Архитектура воронок описана в
+[Sales Pipelines](exp-crm-sales-pipelines-plan.md), настройка мессенджеров — в
+[инструкции администратора](connecting-messenger.md).
+
 ## Брендинг и assets
 
 Основной бренд CRM задается в `crm/branding.py`:
@@ -78,6 +84,10 @@ CRM не должна ссылаться на `/assets/exp_theme/...` для л�
 
 Компоненты `BrandSettings.vue` и `Telephony/...` остаются в коде. Это сделано специально: если разделы понадобятся позже, их можно вернуть в navigation config без восстановления DOM-патчей из `exp_theme`.
 
+`setActiveTab()` выбирает первый доступный раздел, если сохранённая или переданная
+страница скрыта, удалена или недоступна текущему пользователю. При изменении
+навигации этот fallback должен сохраняться.
+
 Чтобы вернуть Brand settings:
 
 1. Импортировать `BrandSettings` в `Settings.vue`, если импорт был удален.
@@ -90,9 +100,14 @@ CRM не должна ссылаться на `/assets/exp_theme/...` для л�
 2. Добавить пункт `Telephony` в группу настроек.
 3. Проверить `callEnabled`, `CRM Telephony Agent` и интеграционные настройки Twilio/Exotel.
 
-## Sales hierarchy banner
+## Sidebar и onboarding
 
-Sales hierarchy/permission banner больше не скрывается через DOM. Если banner выключен в нашем UX, это должно делаться в компоненте или настройке CRM, а не через `MutationObserver`.
+`AppSidebar.vue` не подключает Help/onboarding-блок и `SalesHierarchyBanner`.
+Это нативная конфигурация sidebar: возвращать скрытие через DOM,
+`MutationObserver` или принудительную запись onboarding-флагов в `localStorage`
+не нужно. Отдельный маршрут `Onboarding` остаётся в приложении.
+
+Настройка и права самой иерархии описаны в [User Hierarchy](user-hierarchy.md).
 
 ## EXP ERP integration polish
 
@@ -118,6 +133,22 @@ Sales hierarchy/permission banner больше не скрывается чер�
 3. Добавить русский ключ в `exp_theme/translations.py`, если его еще нет.
 4. Выполнить `bench --site <site> execute exp_theme.setup.configure_translations`.
 
+Контракты общих компонентов:
+
+- Generated placeholders используют переводимые шаблоны `Select {0}...` и
+  `Add {0}...`. Явно заданный пользователем placeholder сохраняется;
+  `FieldLayout` и `SidePanelLayout` не должны закреплять сгенерированный
+  английский текст как пользовательское значение.
+- Операторы list filters используют отдельные ключи `Filter Operator ...`,
+  чтобы общий перевод слова `Like` не менял смысл оператора.
+- Labels, options, empty states, activity actions и заголовки модальных окон
+  проходят через `__()`. Форматы дат и времени задаются компонентами и локалью,
+  а не заменой текста после рендера.
+- Seed labels воронки и стадий остаются каноническими английскими значениями
+  (`Default Deal Pipeline`, `Qualification` и другие) независимо от локали.
+  Русские подписи отображаются через переводы; технические имена записей
+  нельзя менять ради языка интерфейса.
+
 ## Patches, которые меняют существующие сайты
 
 CRM-форк добавляет несколько patch/helper-ов для переноса состояния из старого `exp_theme`-слоя:
@@ -134,13 +165,16 @@ CRM-форк добавляет несколько patch/helper-ов для пе
 Минимальный набор:
 
 ```bash
-python3 -m py_compile crm
+python3 -m compileall -q crm
 git diff --check
-cd frontend && yarn test:run
-cd frontend && yarn build
-bench --site v16.localhost migrate
-bench --site crm-pipeline-test.localhost migrate
+yarn --cwd frontend test:run
+yarn --cwd frontend build
 ```
+
+Из каталога bench проверьте `bench --site <test-site> migrate` на отдельном
+тестовом сайте. Для проверки миграций используйте новый сайт и копию данных
+существующего сайта; повторный migrate должен быть безопасен. Команды тестов и
+миграций не предназначены для рабочей БД без отдельного плана развёртывания.
 
 UI smoke:
 
@@ -150,5 +184,7 @@ UI smoke:
 - dropdown содержит `Рабочий стол`, `Settings`, `Log out`;
 - dropdown не содержит Apps/About/Login to Frappe Cloud/Help;
 - Brand/Telephony settings не видны в CRM settings;
+- старый выбор скрытого раздела открывает первый доступный раздел настроек;
+- sidebar не показывает Help/onboarding-блок и hierarchy banner;
 - Desk не показывает legacy ERPNext CRM как отдельное CRM-приложение;
 - русская локаль не показывает английские строки в основных CRM-сценариях.

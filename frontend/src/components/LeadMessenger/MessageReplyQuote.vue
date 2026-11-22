@@ -10,7 +10,7 @@
       {{ title }}
     </div>
     <div
-      class="line-clamp-2 whitespace-pre-wrap break-words text-sm text-ink-gray-8"
+      class="line-clamp-2 whitespace-pre-wrap break-words text-sm text-ink-gray-8 [overflow-wrap:anywhere]"
     >
       {{ body }}
     </div>

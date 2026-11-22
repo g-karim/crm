@@ -32,6 +32,34 @@ function mountStack(context) {
 }
 
 describe('forwarded message stack', () => {
+  it('uses safe links in forwarded text and embedded replies', () => {
+    let root = mountStack({
+      version: 1,
+      items: [
+        {
+          key: 'forward-0',
+          text: 'https://example.com/forward?item=1',
+          items: [
+            {
+              key: 'forward-0-0',
+              relation: 'reply',
+              text: '<b>Источник</b> https://example.com/original#ответ',
+              items: [],
+            },
+          ],
+        },
+      ],
+    })
+
+    let links = [...root.querySelectorAll('[data-message-text] a')]
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      'https://example.com/original#ответ',
+      'https://example.com/forward?item=1',
+    ])
+    expect(links.every((link) => link.rel === 'noopener noreferrer')).toBe(true)
+    expect(root.querySelector('b')).toBeNull()
+  })
+
   it('renders nested messages and their routed attachments', () => {
     let root = mountStack({
       version: 1,

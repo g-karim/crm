@@ -3,6 +3,12 @@ name: Linters
 on:
     pull_request:
     workflow_dispatch:
+        inputs:
+            base_ref:
+                description: "Base branch for the manual PR comparison"
+                required: true
+                default: "exp/main2"
+                type: string
 
 permissions:
     contents: read
@@ -16,7 +22,7 @@ jobs:
         steps:
             - uses: actions/checkout@v6
               with:
-                  fetch-depth: 200
+                  fetch-depth: 0
 
             - uses: actions/setup-node@v6
               with:
@@ -28,8 +34,8 @@ jobs:
 
             - name: Check commit titles
               env:
-                  BASE_SHA: ${{ github.event.pull_request.base.sha }}
-                  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+                  BASE_SHA: ${{ github.event.pull_request.base.sha || format('origin/{0}', inputs.base_ref || 'exp/main2') }}
+                  HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
               run: bash .github/helper/check-commit-titles.sh "$BASE_SHA" "$HEAD_SHA"
 
     semgrep:
@@ -42,6 +48,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
 
             - name: Set up Python
               uses: actions/setup-python@v6
@@ -56,6 +64,10 @@ jobs:
               run: git clone --depth 1 https://github.com/frappe/semgrep-rules.git frappe-semgrep-rules
 
             - name: Run Semgrep rules
+              env:
+                  # PR events select their baseline automatically. Give manual runs
+                  # the same comparison instead of scanning unrelated legacy code.
+                  SEMGREP_BASELINE_REF: ${{ github.event_name == 'workflow_dispatch' && format('origin/{0}', inputs.base_ref || 'exp/main2') || '' }}
               run: semgrep ci --config ./frappe-semgrep-rules/rules --config r/python.lang.correctness
 
     pre-commit:
