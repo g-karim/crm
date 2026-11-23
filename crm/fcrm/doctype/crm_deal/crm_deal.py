@@ -582,7 +582,10 @@ class CRMDeal(Document):
 					# the agent is already set as an assignee
 					return
 
-		assign({"assign_to": [agent], "doctype": "CRM Deal", "name": self.name}, ignore_permissions=True)
+		from crm.notification_rules.events import assignment_context
+
+		with assignment_context(self):
+			assign({"assign_to": [agent], "doctype": "CRM Deal", "name": self.name}, ignore_permissions=True)
 
 	def share_with_agent(self, agent):
 		if not agent:

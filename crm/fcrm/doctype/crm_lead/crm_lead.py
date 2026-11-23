@@ -198,7 +198,9 @@ class CRMLead(Document):
 					# the agent is already set as an assignee
 					return
 
-		with allow_internal_lead_assignment():
+		from crm.notification_rules.events import assignment_context
+
+		with allow_internal_lead_assignment(), assignment_context(self):
 			assign(
 				{"assign_to": [agent], "doctype": "CRM Lead", "name": self.name},
 				ignore_permissions=True,
