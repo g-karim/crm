@@ -92,7 +92,8 @@ class TestTouchTrackingUI(unittest.TestCase):
 			ui.save_settings({"enabled": 0}, "")
 
 	def test_channels_report_missing_app_and_confirmed_success_rules(self):
-		with patch.object(frappe, "get_installed_apps", return_value=["frappe", "crm"]):
+		installed_apps = [app for app in frappe.get_installed_apps() if app != "crm_messenger"]
+		with patch.object(frappe, "get_installed_apps", return_value=installed_apps):
 			channels = ui.get_settings()["channels"]
 		self.assertFalse(channels[0]["installed"])
 		self.assertIn("Successfully sent message", [rule["label"] for rule in channels[0]["rules"]])

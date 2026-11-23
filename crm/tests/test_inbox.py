@@ -458,6 +458,7 @@ class TestInbox(TestCase):
 				"messenger", self.conversation.name, "No", str(uuid4()), "CRM Lead", "not-this-customer"
 			)
 
+	@patch.dict(frappe.conf, {"crm_inbox_demo_enabled": True})
 	def test_demo_response_is_stored_locally_once_and_never_claims_delivery(self):
 		self.grant()
 		request = str(uuid4())
@@ -551,6 +552,7 @@ class TestInbox(TestCase):
 		with self.assertRaises(frappe.PermissionError):
 			inbox.accounts()
 
+	@patch.dict(frappe.conf, {"crm_inbox_demo_enabled": True})
 	def test_demo_email_reply_preserves_native_thread_and_exact_retries(self):
 		mail = frappe.get_doc(
 			{
