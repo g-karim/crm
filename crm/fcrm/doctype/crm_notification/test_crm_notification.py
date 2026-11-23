@@ -89,15 +89,17 @@ class TestCRMNotification(UnitTestCase):
 		with (
 			patch.object(frappe, "publish_realtime") as publish,
 			patch("crm.fcrm.doctype.crm_notification.crm_notification.can_access_notification", return_value=True),
+			patch.object(frappe.db, "get_value", return_value=doc),
+			patch.object(type(frappe.db.after_commit), "add", autospec=True) as add_after_commit,
 		):
 			CRMNotification.on_update(doc)
-
-		publish.assert_called_once_with(
-			"crm_notification",
-			{"name": "NOTIFICATION-1", "type": "Mention", "reference_name": "LEAD-1"},
-			user="manager@example.com",
-			after_commit=True,
-		)
+			publish.assert_not_called()
+			add_after_commit.call_args.args[1]()
+			publish.assert_called_once_with(
+				"crm_notification",
+				{"name": "NOTIFICATION-1", "type": "Mention", "reference_name": "LEAD-1"},
+				user="manager@example.com",
+			)
 
 
 class TestMessengerNotificationLifecycle(IntegrationTestCase):
@@ -187,7 +189,10 @@ class TestMessengerNotificationLifecycle(IntegrationTestCase):
 		).insert(ignore_permissions=True)
 		frappe.set_user(USER1)
 		self.assertEqual(mark_as_read(self.notification.name)["marked"], 0)
-		self.assertEqual(mark_as_read(personal.name)["marked"], 1)
+		from crm.api.notifications import _head
+
+		self.assertTrue(mark_as_read(personal.name)["stale"])
+		self.assertEqual(mark_as_read(personal.name, observed_head=_head(personal))["marked"], 1)
 		self.assertTrue(frappe.db.get_value("CRM Notification", personal.name, "read"))
 		self.assertFalse(frappe.db.get_value("CRM Notification", self.notification.name, "read"))
 

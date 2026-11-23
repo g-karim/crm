@@ -38,19 +38,8 @@ class CRMNotification(Document):
 		if not self.to_user or not can_access_notification(self, user=self.to_user):
 			return
 
-		message = {"name": self.name, "type": self.type, "reference_name": self.reference_name}
-		if self.type != "Messenger":
-			frappe.publish_realtime("crm_notification", message, user=self.to_user, after_commit=True)
-			return
-
 		frappe.db.after_commit.add(
-			partial(
-				_publish_messenger_realtime,
-				self.to_user,
-				self.reference_doctype,
-				self.reference_name,
-				message,
-			)
+			partial(_publish_notification_realtime, self.to_user, self.name)
 		)
 
 
@@ -159,17 +148,21 @@ def _readable(doctype, name, user):
 	return frappe.has_permission(doctype, "read", doc=frappe.get_doc(doctype, name), user=user)
 
 
-def _publish_messenger_realtime(user, reference_doctype, reference_name, message):
-	notification = frappe._dict(
-		type="Messenger",
-		reference_doctype=reference_doctype,
-		reference_name=reference_name,
+def _publish_notification_realtime(user, name):
+	notification = frappe.db.get_value(
+		"CRM Notification", name,
+		["name", "to_user", "type", "reference_doctype", "reference_name",
+		 "notification_type_doctype", "notification_type_doc"],
+		as_dict=True,
 	)
-	if can_access_notification(notification, user=user):
-		frappe.publish_realtime("crm_notification", message, user=user)
-	else:
-		# Invalidate cached rows without exposing a revoked CRM reference.
-		frappe.publish_realtime("crm_notification", {}, user=user)
+	message = {}
+	if notification and notification.to_user == user and can_access_notification(notification, user=user):
+		message = {
+			"name": notification.name,
+			"type": notification.type,
+			"reference_name": notification.reference_name,
+		}
+	frappe.publish_realtime("crm_notification", message, user=user)
 
 
 def notify_user(notification):

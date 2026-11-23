@@ -90,9 +90,7 @@ class TestCRMCallLog(IntegrationTestCase):
 		self.assertFalse(call.ai_summary)
 
 	@patch("crm.call_analysis.tasks.frappe.enqueue")
-	@patch("crm.call_analysis.automation.get_config")
-	@patch("crm.call_analysis.automation.get_user_analysis_language", return_value="Russian")
-	def test_completed_recording_is_automatically_queued(self, _get_language, _get_config, enqueue):
+	def test_completed_recording_requires_explicit_analysis(self, enqueue):
 		call = create_test_call_log(
 			status="Completed",
 			duration=30,
@@ -100,19 +98,11 @@ class TestCRMCallLog(IntegrationTestCase):
 			receiver="Administrator",
 		)
 
-		self.assertEqual(call.ai_analysis_status, "Queued")
-		enqueue.assert_called_once()
-		self.assertEqual(enqueue.call_args.kwargs["language"], "Russian")
+		self.assertFalse(call.ai_analysis_status)
+		enqueue.assert_not_called()
 
 	@patch("crm.call_analysis.tasks.frappe.enqueue")
-	@patch("crm.call_analysis.automation.get_config")
-	@patch("crm.call_analysis.automation.get_user_analysis_language", return_value="English")
-	def test_recording_received_after_completion_is_automatically_queued(
-		self,
-		_get_language,
-		_get_config,
-		enqueue,
-	):
+	def test_recording_received_after_completion_requires_explicit_analysis(self, enqueue):
 		call = create_test_call_log(status="In Progress", duration=30)
 		enqueue.assert_not_called()
 
@@ -120,8 +110,8 @@ class TestCRMCallLog(IntegrationTestCase):
 		call.recording_url = "https://example.com/recording.mp3"
 		call.save()
 
-		self.assertEqual(call.ai_analysis_status, "Queued")
-		enqueue.assert_called_once()
+		self.assertFalse(call.ai_analysis_status)
+		enqueue.assert_not_called()
 
 	def test_external_recording_plays_through_proxy(self):
 		call = create_test_call_log(recording_url="https://example.com/recording.wav")
