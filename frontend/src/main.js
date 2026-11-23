@@ -6,6 +6,7 @@ import { createDialog } from './utils/dialogs'
 import { setupCalendarLocalization } from './utils/calendarLocalization'
 import { initializeTelemetry } from './utils/telemetry'
 import { initSocket } from './socket'
+import { initCommonPush } from './utils/commonPush'
 import router from './router'
 import translationPlugin from './translation'
 import App from './App.vue'
@@ -80,6 +81,7 @@ function mountApp() {
   initializeTelemetry(app, telemetryPlugin, () =>
     call('frappe.utils.telemetry.pulse.client.boot_config'),
   )
+  void initCommonPush().catch(() => {})
   app.mount('#app')
   calendarLocalizationObserver = setupCalendarLocalization()
 }

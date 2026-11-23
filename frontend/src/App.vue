@@ -5,7 +5,7 @@
     <Layout v-else-if="session.isLoggedIn" class="isolate">
       <router-view
         :key="
-          ['Telephony', 'Messenger'].includes($route.name)
+          ['Telephony', 'Messenger', 'Lead', 'Deal'].includes($route.name)
             ? $route.path
             : $route.fullPath
         "
@@ -30,7 +30,6 @@ import {
 import { globalStore } from '@/stores/global'
 import { FrappeUIProvider, setConfig, useTheme } from 'frappe-ui'
 import {
-  computed,
   defineAsyncComponent,
   onBeforeUnmount,
   onMounted,
@@ -59,19 +58,9 @@ if (!localStorage.getItem('theme')) {
   setTheme('light')
 }
 
-const MobileLayout = defineAsyncComponent(
-  () => import('./components/Layouts/MobileLayout.vue'),
+const Layout = defineAsyncComponent(
+  () => import('./components/Layouts/ResponsiveLayout.vue'),
 )
-const DesktopLayout = defineAsyncComponent(
-  () => import('./components/Layouts/DesktopLayout.vue'),
-)
-const Layout = computed(() => {
-  if (window.innerWidth < 640) {
-    return MobileLayout
-  } else {
-    return DesktopLayout
-  }
-})
 
 setConfig('systemTimezone', window.timezone?.system || null)
 setConfig('localTimezone', window.timezone?.user || null)
