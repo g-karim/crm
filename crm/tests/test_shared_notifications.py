@@ -123,7 +123,7 @@ class TestSharedNotifications(IntegrationTestCase):
 		delivery.send_claimed(name, token)
 		message = frappe.get_doc("Raven Message", frappe.db.get_value(delivery.DOCTYPE, name, "message_id"))
 		self.assertNotIn(task.title, message.text)
-		self.assertIn("/crm/leads/", message.text)
+		self.assertIn(f"/crm/tasks?open={notice.notification_type_doc}", message.text)
 		self.assertEqual(message.owner, self.bot_user)
 		self.assertFalse(self.notice(task).read)
 
