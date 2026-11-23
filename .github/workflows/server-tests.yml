@@ -16,10 +16,10 @@ on:
         - cron: "0 0 * * *"
 env:
     CRM_BRANCH: ${{ github.base_ref || github.ref_name }}
-    CRM_MESSENGER_REF: f944b76ed14bd4fc3334aa9540d8758b77b23e81
+    CRM_MESSENGER_REF: 30ca1942426e49489e2ccab613214c3daafe9331
 
 concurrency:
-    group: develop-crm-${{ github.event.number }}
+    group: develop-crm-${{ github.event.number || github.ref }}
     cancel-in-progress: true
 
 jobs:
