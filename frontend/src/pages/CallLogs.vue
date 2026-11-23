@@ -14,6 +14,9 @@
         v-if="callLogsListView?.customListActions"
         :actions="callLogsListView.customListActions"
       />
+      <Button :route="analyticsRoute" icon-left="lucide-chart-column">
+        {{ __('Аналитика звонков') }}
+      </Button>
       <Button
         variant="solid"
         :label="__('Create')"
@@ -22,7 +25,13 @@
       />
     </template>
   </LayoutHeader>
+  <CallJournalSlice
+    v-if="scoped"
+    :filters="scopedFilters"
+    @open="showCallLog"
+  />
   <ViewControls
+    v-if="!scoped"
     ref="viewControls"
     v-model="callLogs"
     v-model:loadMore="loadMore"
@@ -31,7 +40,7 @@
     doctype="CRM Call Log"
   />
   <CallLogsListView
-    v-if="callLogs.data && rows.length"
+    v-if="!scoped && callLogs.data && rows.length"
     ref="callLogsListView"
     v-model="callLogs.data.page_length_count"
     v-model:list="callLogs"
@@ -55,12 +64,13 @@
     "
   />
   <EmptyState
-    v-else-if="callLogs.data && !rows.length"
+    v-else-if="!scoped && callLogs.data && !rows.length"
     name="Call Logs"
     :icon="PhoneIcon"
   />
   <CallLogDetailModal
     v-model="showCallLogDetailModal"
+    :analytics-scope="scoped"
     v-model:callLog="callLog"
   />
 </template>
@@ -74,6 +84,9 @@ import ViewControls from '@/components/ViewControls.vue'
 import CallLogsListView from '@/components/ListViews/CallLogsListView.vue'
 import EmptyState from '@/components/ListViews/EmptyState.vue'
 import CallLogDetailModal from '@/components/Modals/CallLogDetailModal.vue'
+import CallJournalSlice from '@/components/Analytics/CallJournalSlice.vue'
+import { callReportFilters, callScopeQuery } from '@/utils/callAnalyticsRoute'
+import { useRoute } from 'vue-router'
 import { useDoctypeModal } from '@/composables/doctypeModal'
 import { getCallLogDetail } from '@/utils/callLog'
 import { useTelemetry } from 'frappe-ui/frappe'
@@ -81,6 +94,18 @@ import { createResource } from 'frappe-ui'
 import { computed, ref, onMounted } from 'vue'
 import { useEventListener } from '@vueuse/core'
 
+const route = useRoute()
+const scoped = computed(() => route.query.call_scope === 'analytics')
+const scopedFilters = computed(() => callReportFilters(route.query))
+const analyticsRoute = computed(() => ({
+  name: 'Dashboard',
+  query: {
+    ...callScopeQuery(route.query),
+    ...(scoped.value && route.query.analytics_return === 'call-attribution'
+      ? { section: 'sources', sources_view: 'call-attribution' }
+      : { section: 'calls' }),
+  },
+}))
 const callLogsListView = ref(null)
 
 // callLogs data is loaded in the ViewControls component
@@ -130,9 +155,11 @@ const callLog = ref({})
 function showCallLog(name) {
   showCallLogDetailModal.value = true
   callLog.value = createResource({
-    url: 'crm.fcrm.doctype.crm_call_log.crm_call_log.get_call_log',
+    url: scoped.value
+      ? 'crm.analytics.call_journal.get_scoped_call_log'
+      : 'crm.fcrm.doctype.crm_call_log.crm_call_log.get_call_log',
     params: { name },
-    cache: ['call_log', name],
+    method: scoped.value ? 'GET' : 'POST',
     auto: true,
   })
 }
@@ -159,8 +186,15 @@ const openCallLogFromURL = () => {
 
   if (callLogName) {
     showCallLog(callLogName)
-    searchParams.delete('open')
-    window.history.replaceState(null, '', window.location.pathname)
+    if (!scoped.value) {
+      searchParams.delete('open')
+      const query = searchParams.toString()
+      window.history.replaceState(
+        window.history.state,
+        '',
+        window.location.pathname + (query ? '?' + query : ''),
+      )
+    }
   }
 }
 

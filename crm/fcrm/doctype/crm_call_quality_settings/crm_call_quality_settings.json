@@ -1,0 +1,14 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Call Quality Settings",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "track_changes": 1,
+ "allow_rename": 0,
+ "field_order": ["definition"],
+ "fields": [
+  {"fieldname": "definition", "fieldtype": "Long Text", "label": "Definition", "reqd": 1}
+ ],
+ "permissions": []
+}

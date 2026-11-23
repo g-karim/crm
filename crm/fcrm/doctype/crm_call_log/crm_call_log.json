@@ -41,6 +41,7 @@
   "ai_sentiment",
   "ai_analysis_error",
   "end_time",
+  "analytics_connected_at",
   "note",
   "section_break_kebz",
   "links",
@@ -317,6 +318,14 @@
    "fieldtype": "Select",
    "options": "\npending\nready\nunavailable",
    "label": "Exolve Recording State",
+   "read_only": 1
+  },
+  {
+   "fieldname": "analytics_connected_at",
+   "fieldtype": "Datetime",
+   "hidden": 1,
+   "label": "Recorded Connection Time",
+   "no_copy": 1,
    "read_only": 1
   }
  ],

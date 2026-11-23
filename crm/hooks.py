@@ -105,7 +105,7 @@ setup_wizard_complete = "crm.demo.api.create_demo_data"
 # ------------
 
 before_install = "crm.install.before_install"
-after_install = "crm.install.after_install"
+after_install = ["crm.install.after_install", "crm.analytics.history.prepare"]
 
 # Uninstallation
 # ------------
@@ -301,7 +301,7 @@ scheduler_events = {
 			"crm.touch_tracking.maintenance",
 		],
 		"*/10 * * * *": ["crm.lead_syncing.background_sync.sync_leads_from_sources_10_minutes"],
-		"*/15 * * * *": ["crm.lead_syncing.background_sync.sync_leads_from_sources_15_minutes"],
+		"*/15 * * * *": ["crm.lead_syncing.background_sync.sync_leads_from_sources_15_minutes", "crm.analytics.signal_delivery.schedule"],
 	},
 }
 
@@ -397,3 +397,13 @@ _add_celio_task_event('CRM Task','on_update','crm.task_operations.changed')
 _add_celio_task_event('CRM Notification','after_insert','crm.notification_source.publish')
 _add_celio_task_event('CRM Notification','on_update','crm.notification_source.changed')
 exp_notification_sources=['crm.notification_source.make_source']
+
+# Analytics tracks eligible changes within the existing save transaction.
+data_import_providers = {"CRM Deal": "crm.analytics.import_provider.CRMDealImportProvider"}
+after_migrate = [*after_migrate, "crm.analytics.history.prepare"]
+for _analytics_doctype in ("CRM Lead", "CRM Deal", "CRM Task"):
+	for _analytics_method in ("on_update", "on_trash"):
+		_analytics_handlers = doc_events.setdefault(_analytics_doctype, {}).get(_analytics_method, [])
+		if isinstance(_analytics_handlers, str):
+			_analytics_handlers = [_analytics_handlers]
+		doc_events[_analytics_doctype][_analytics_method] = [*_analytics_handlers, "crm.analytics.history.capture"]

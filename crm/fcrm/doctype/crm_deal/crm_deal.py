@@ -1,10 +1,14 @@
 # Copyright (c) 2023, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+from decimal import Decimal, InvalidOperation
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import cstr
 
+from crm.analytics.utm import clean_document_tags
 from crm.api.exchange_rate import get_exchange_rate
 from crm.fcrm.doctype.crm_external_reference.crm_external_reference import (
 	DEAL_EXTERNAL_DOCTYPE,
@@ -109,6 +113,32 @@ class CRMDeal(Document):
 		website: DF.Data | None
 	# end: auto-generated types
 
+	def check_if_latest(self):
+		# Frappe compares `modified` before writing. Under MariaDB's repeatable
+		# read, two saves can both see the old version and one then fails with a
+		# database snapshot conflict. Serialize writers on the source row first,
+		# so the second request receives an actionable version conflict instead.
+		if not self.is_new() and self.name:
+			try:
+				current = frappe.db.sql(
+					"SELECT `modified` FROM `tabCRM Deal` WHERE `name`=%s FOR UPDATE",
+					self.name,
+					as_dict=True,
+				)
+			except frappe.QueryDeadlockError:
+				# MariaDB also reports a write against an older consistent-read
+				# snapshot as a deadlock. Nothing from this save was written yet.
+				frappe.throw(
+					_("This deal changed while you were editing it. Reload the deal before saving."),
+					frappe.TimestampMismatchError,
+				)
+			if current and cstr(current[0].modified) != cstr(self._original_modified):
+				frappe.throw(
+					_("This deal changed while you were editing it. Reload the deal before saving."),
+					frappe.TimestampMismatchError,
+				)
+		return super().check_if_latest()
+
 	def before_insert(self):
 		# apply CRM enrichment (source/organization/contact) when created via a web form
 		from crm.api.form import enrich_form_submission
@@ -121,24 +151,37 @@ class CRMDeal(Document):
 		self.set_sla()
 
 	def validate(self):
+		clean_document_tags(self)
 		self.validate_pipeline()
 		self.validate_status()
 		self.validate_status_pipeline()
 		self.validate_external_record_id()
 		self.validate_external_record_reference()
+		from crm.analytics.source_event_import import validate_deal_source_event
+		source_event = validate_deal_source_event(self)
 		self.set_primary_contact()
 		self.set_primary_email_mobile_no()
 		if not self.is_new() and self.has_value_changed("deal_owner") and self.deal_owner:
 			self.share_with_agent(self.deal_owner)
 			self.assign_agent(self.deal_owner)
 		if self.has_value_changed("status"):
-			add_status_change_log(self)
+			add_status_change_log(self, at=source_event.occurred_at if source_event else None,
+				at_utc=source_event.occurred_at_utc if source_event else None)
 			if frappe.db.get_value("CRM Deal Status", self.status, "type") == "Won":
-				self.closed_date = frappe.utils.nowdate()
+				self.closed_date = source_event.occurred_at.date() if source_event else frappe.utils.nowdate()
 		self.validate_forecasting_fields()
 		self.validate_lost_reason()
 		self.emit_pipeline_rule_warnings()
+		if self.has_value_changed("exchange_rate") and self.exchange_rate is not None:
+			try:
+				rate = Decimal(str(self.exchange_rate))
+				if not rate.is_finite() or rate < 0 or (not self.is_new() and rate == 0):
+					raise ValueError
+			except (InvalidOperation, ValueError):
+				frappe.throw(_("Exchange rate must be positive."), frappe.ValidationError)
 		self.update_exchange_rate()
+		from crm.analytics.history import remember_value_presence
+		remember_value_presence(self)
 		if self.organization and (self.is_new() or self.has_value_changed("organization")):
 			self.copy_enrichment_from_organization()
 
@@ -617,6 +660,7 @@ class CRMDeal(Document):
 			self.status
 			and frappe.get_cached_value("CRM Deal Status", self.status, "type") == "Won"
 			and not self.closed_date
+			and (self.is_new() or self.has_value_changed("status"))
 		):
 			self.closed_date = frappe.utils.nowdate()
 
@@ -624,7 +668,9 @@ class CRMDeal(Document):
 		"""
 		Update the default probability based on the status.
 		"""
-		if not self.probability or self.probability == 0:
+		if (self.probability is None or self.probability == "") and (
+			self.is_new() or self.has_value_changed("probability") or self.has_value_changed("status")
+		):
 			self.probability = frappe.db.get_value("CRM Deal Status", self.status, "probability") or 0
 
 	def update_expected_deal_value(self):
@@ -639,11 +685,25 @@ class CRMDeal(Document):
 			self.expected_deal_value = self.net_total or self.total
 
 	def validate_forecasting_fields(self):
+		from frappe.utils import getdate
+
 		self.update_closed_date()
 		self.update_default_probability()
 		self.update_expected_deal_value()
+		if self.has_value_changed("probability"):
+			try:
+				probability = Decimal(str(self.probability))
+				if not probability.is_finite() or not 0 <= probability <= 100:
+					raise ValueError
+			except (InvalidOperation, ValueError):
+				frappe.throw(_("Probability must be between 0 and 100."), frappe.ValidationError)
+			self.probability = float(probability)
+		if self.closed_date and (self.has_value_changed("closed_date") or self.has_value_changed("creation")):
+			closed = getdate(self.closed_date)
+			if closed > getdate(frappe.utils.nowdate()) or (self.creation and closed < getdate(self.creation)):
+				frappe.throw(_("Actual closure must be between creation and today."), frappe.ValidationError)
 		if frappe.db.get_single_value("FCRM Settings", "enable_forecasting"):
-			if not self.expected_deal_value or self.expected_deal_value == 0:
+			if self.expected_deal_value is None or self.expected_deal_value == "":
 				frappe.throw(_("Expected deal value is required."), frappe.MandatoryError)
 			if not self.expected_closure_date:
 				frappe.throw(_("Expected closure date is required."), frappe.MandatoryError)
@@ -661,7 +721,11 @@ class CRMDeal(Document):
 			add_or_remove_lost_reason_section_in_sidepanel(self)
 
 	def update_exchange_rate(self):
-		if self.has_value_changed("currency") or not self.exchange_rate:
+		if (
+			self.has_value_changed("currency")
+			or (self.is_new() and not self.exchange_rate)
+			or (self.has_value_changed("exchange_rate") and self.exchange_rate is None)
+		):
 			system_currency = frappe.db.get_single_value("FCRM Settings", "currency") or "USD"
 			exchange_rate = 1
 			if self.currency and self.currency != system_currency:

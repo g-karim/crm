@@ -1,0 +1,18 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Manager Sales Plan",
+ "module": "FCRM",
+ "autoname": "prompt",
+ "engine": "InnoDB",
+ "track_changes": 1,
+ "index_web_pages_for_search": 0,
+ "field_order": ["manager", "month_start", "currency", "target_amount", "target_wins"],
+ "fields": [
+  {"fieldname": "manager", "fieldtype": "Link", "label": "Manager", "options": "User", "reqd": 1},
+  {"fieldname": "month_start", "fieldtype": "Date", "label": "Month", "reqd": 1, "search_index": 1},
+  {"fieldname": "currency", "fieldtype": "Link", "label": "Currency", "options": "Currency", "reqd": 1},
+  {"fieldname": "target_amount", "fieldtype": "Currency", "label": "Won Value Target", "options": "currency", "precision": "6"},
+  {"fieldname": "target_wins", "fieldtype": "Int", "label": "Won Deals Target"}
+ ],
+ "permissions": []
+}

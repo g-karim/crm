@@ -8,7 +8,7 @@ export const chartOptionsByType = ref({})
 let errorNotified = false
 
 export const chartOptions = createResource({
-  url: 'crm.api.dashboard.get_chart_options',
+  url: 'crm.analytics.layouts.get_chart_options',
   cache: 'crm-dashboard-chart-options',
   auto: true,
   onSuccess: (data = {}) => {

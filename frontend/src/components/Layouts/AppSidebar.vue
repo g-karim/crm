@@ -190,7 +190,9 @@ const isCollapsed = computed(() => isSidebarCollapsed.value && !props.mobile)
 const isFCSite = ref(window.is_fc_site)
 const isDemoSite = ref(window.is_demo_site)
 
-const links = getNavigationItems({ mobile: props.mobile })
+const links = getNavigationItems({ mobile: props.mobile }).map((item) =>
+  item.route === 'Dashboard' ? { ...item, label: 'Analytics' } : item,
+)
 
 const allViews = computed(() => {
   let _views = [

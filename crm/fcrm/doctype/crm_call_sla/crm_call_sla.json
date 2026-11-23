@@ -1,0 +1,21 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Call SLA",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "allow_rename": 0,
+ "track_changes": 1,
+ "index_web_pages_for_search": 0,
+ "field_order": ["enabled", "timezone", "weekdays", "work_start", "work_end", "response_minutes", "require_original_employee"],
+ "fields": [
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled"},
+  {"fieldname": "timezone", "fieldtype": "Data", "label": "Timezone", "reqd": 1},
+  {"fieldname": "weekdays", "fieldtype": "Data", "label": "Weekdays", "reqd": 1},
+  {"fieldname": "work_start", "fieldtype": "Data", "label": "Working Day Starts", "reqd": 1},
+  {"fieldname": "work_end", "fieldtype": "Data", "label": "Working Day Ends", "reqd": 1},
+  {"fieldname": "response_minutes", "fieldtype": "Int", "label": "Response Time in Working Minutes", "reqd": 1},
+  {"fieldname": "require_original_employee", "fieldtype": "Check", "label": "Require Original Employee for Callback SLA", "default": "0"}
+ ],
+ "permissions": []
+}

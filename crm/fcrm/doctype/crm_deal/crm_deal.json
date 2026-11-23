@@ -35,6 +35,9 @@
   "lead_details_tab",
   "lead",
   "source",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
   "column_break_wsde",
   "lead_name",
   "organization_details_section",
@@ -90,7 +93,10 @@
   "lost_details_tab",
   "lost_reason",
   "lost_notes",
-  "last_touch_at"
+  "last_touch_at",
+  "analytics_source_event_id",
+  "analytics_source_event_at",
+  "analytics_value_presence"
  ],
  "fields": [
   {
@@ -487,7 +493,7 @@
   },
   {
    "default": "1",
-   "description": "The rate used to convert the deal\u2019s currency to your crm's base currency (set in CRM Settings). It is set once when the currency is first added and doesn't change automatically.",
+   "description": "The rate used to convert the deal’s currency to your crm's base currency (set in CRM Settings). It is set once when the currency is first added and doesn't change automatically.",
    "fieldname": "exchange_rate",
    "fieldtype": "Float",
    "label": "Exchange Rate"
@@ -587,6 +593,48 @@
    "hidden": 1,
    "no_copy": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "utm_source",
+   "fieldtype": "Data",
+   "label": "UTM Source",
+   "length": 120
+  },
+  {
+   "fieldname": "utm_medium",
+   "fieldtype": "Data",
+   "label": "UTM Medium",
+   "length": 120
+  },
+  {
+   "fieldname": "utm_campaign",
+   "fieldtype": "Data",
+   "label": "UTM Campaign",
+   "length": 120
+  },
+  {
+   "fieldname": "analytics_source_event_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "is_virtual": 1,
+   "label": "Source Event ID (Import)",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "analytics_source_event_at",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "is_virtual": 1,
+   "label": "Source Event Time (Import)",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "analytics_value_presence",
+   "fieldtype": "Small Text",
+   "label": "Analytics value presence",
+   "read_only": 1,
+   "hidden": 1,
+   "no_copy": 1
   }
  ],
  "grid_page_length": 50,

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { call } from 'frappe-ui'
+import { callScopeQuery } from '@/utils/callAnalyticsRoute'
 import { usersStore } from '@/stores/users'
 import { sessionStore } from '@/stores/session'
 import { viewsStore } from '@/stores/views'
@@ -34,6 +35,16 @@ const routes = [
   {
     path: '/dashboard',
     name: 'Dashboard',
+    component: () => import('@/pages/Analytics.vue'),
+  },
+  {
+    path: '/dashboard/reports',
+    name: 'AnalyticsReports',
+    component: () => import('@/pages/AnalyticsBoards.vue'),
+  },
+  {
+    path: '/dashboard/layout',
+    name: 'DashboardLayout',
     component: () => import('@/pages/Dashboard.vue'),
   },
   {
@@ -109,6 +120,21 @@ const routes = [
   {
     path: '/telephony',
     name: 'Telephony',
+    beforeEnter: ({ query }) => {
+      if (query.pane !== 'analytics') return
+      const filters = { section: 'calls' }
+      for (const key of ['from_date', 'to_date', 'source', 'pipeline']) {
+        if (typeof query[key] === 'string') filters[key] = query[key]
+      }
+      if (typeof query.employee === 'string') filters.owner = query.employee
+      if (query.view === 'incoming' || query.view === 'outgoing')
+        filters.call_direction = query.view === 'incoming' ? 'Incoming' : 'Outgoing'
+      if (typeof query.outcome === 'string' && query.outcome.length <= 24)
+        filters.call_outcome = query.outcome
+      if (typeof query.line === 'string' && /^[0-9a-f]{24}$/.test(query.line))
+        filters.call_line = query.line
+      return { name: 'Dashboard', query: { ...callScopeQuery(filters), section: 'calls' } }
+    },
     component: () => import('@/pages/Telephony.vue'),
   },
   {

@@ -1,0 +1,17 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Exolve Sync Window",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "allow_rename": 0,
+ "field_order": ["employee", "window_start_utc", "window_end_utc", "checked_at_utc", "result"],
+ "fields": [
+  {"fieldname": "employee", "fieldtype": "Link", "options": "User", "label": "Employee", "reqd": 1, "read_only": 1},
+  {"fieldname": "window_start_utc", "fieldtype": "Datetime", "label": "Window Start UTC", "reqd": 1, "read_only": 1},
+  {"fieldname": "window_end_utc", "fieldtype": "Datetime", "label": "Window End UTC", "reqd": 1, "read_only": 1},
+  {"fieldname": "checked_at_utc", "fieldtype": "Datetime", "label": "Checked At UTC", "reqd": 1, "read_only": 1},
+  {"fieldname": "result", "fieldtype": "Select", "options": "Read\nLimit\nRepeated", "label": "Result", "reqd": 1, "read_only": 1}
+ ],
+ "permissions": []
+}

@@ -3,16 +3,13 @@ import { createResource } from 'frappe-ui'
 import router from '@/router'
 import { ref, computed } from 'vue'
 
-export const sessionStore = defineStore('crm-session', () => {
-  function sessionUser() {
-    let cookies = new URLSearchParams(document.cookie.split('; ').join('&'))
-    let _sessionUser = cookies.get('user_id')
-    if (_sessionUser === 'Guest') {
-      _sessionUser = null
-    }
-    return _sessionUser
-  }
+export function sessionUser() {
+  const cookies = new URLSearchParams(document.cookie.split('; ').join('&'))
+  const viewer = cookies.get('user_id')
+  return viewer === 'Guest' ? null : viewer
+}
 
+export const sessionStore = defineStore('crm-session', () => {
   let user = ref(sessionUser())
   const isLoggedIn = computed(() => !!user.value)
 

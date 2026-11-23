@@ -9,6 +9,7 @@ import frappe
 import requests
 
 from crm.integrations.exolve import api
+from crm.integrations.exolve.coverage import DOCTYPE, mapping_name, recent_windows, record_window
 from crm.integrations.exolve.client import ExolveClient, ExolveError
 from crm.integrations.exolve.utils import log_name, normalize_call, normalize_phone
 
@@ -388,3 +389,113 @@ class TestExolveDatabase(unittest.TestCase):
 		finally:
 			frappe.local.request = previous_request
 			frappe.set_user("Administrator")
+
+	def test_sync_paginates_and_records_the_processed_window(self):
+		from crm.analytics.call_reporting import get_details, get_report
+
+		page_one = [self.row, {**self.row, "application_uuid": "another-app", "call_id": "71"}]
+		page_two = [{**self.row, "call_id": "72"}]
+		requests = []
+
+		def provider(operation, values):
+			if operation != "calls":
+				return self.provider(operation, values)
+			self.assertIn(mapping_name(APP, "Administrator", "123"), frappe.local.exolve_locks)
+			requests.append(values)
+			return {"calls": {0: page_one, 2: page_two}[values["offset"]]}
+
+		with patch.object(api, "HISTORY_PAGE_SIZE", 2), patch.object(ExolveClient, "read", side_effect=provider):
+			synced = api.sync_calls()
+			self.assertFalse(synced["truncated"])
+			self.assertEqual(len(synced["logs"]), 2)
+			report = get_report()
+			self.assertEqual(report["metrics"]["total"], 2)
+			window = report["coverage"]["exolve_windows"][0]
+			self.assertEqual(window["result"], "Read")
+			self.assertEqual([request["offset"] for request in requests], [0, 2])
+			self.assertEqual({request["date_from"] for request in requests}, {window["from_at"]})
+			self.assertEqual({request["date_to"] for request in requests}, {window["to_at"]})
+			self.assertEqual(datetime.fromisoformat(window["to_at"]) - datetime.fromisoformat(window["from_at"]), timedelta(minutes=15))
+			self.assertGreaterEqual(datetime.fromisoformat(window["checked_at"]), datetime.fromisoformat(window["to_at"]))
+			api.sync_calls()
+			self.assertEqual(get_details(report["snapshot_token"])["total"], 2)
+			self.assertEqual(frappe.db.count(DOCTYPE, {"employee": "Administrator"}), 1)
+			self.assertFalse(frappe.db.exists("CRM Call Log", log_name("another-app", "71")))
+			# An older response cannot replace the window for the current mapping.
+			old_end = datetime.fromisoformat(window["to_at"]) - timedelta(minutes=1)
+			record_window(APP, "123", old_end - timedelta(minutes=15), old_end, "Limit")
+			latest = get_report()["coverage"]["exolve_windows"][0]
+			self.assertEqual(latest["result"], "Read")
+			self.assertGreaterEqual(datetime.fromisoformat(latest["to_at"]), datetime.fromisoformat(window["to_at"]))
+			self.assertNotIn(APP, str(latest))
+			self.assertNotIn(NUMBER, str(latest))
+
+	def test_conflicting_duplicate_does_not_overwrite_a_call(self):
+		saved = api.sync_calls()["logs"][0]
+		conflicting = {**self.row, "status": "no_answer"}
+
+		def provider(operation, values):
+			return {"calls": [self.row, conflicting]} if operation == "calls" else self.provider(operation, values)
+
+		with patch.object(ExolveClient, "read", side_effect=provider):
+			result = api.sync_calls()
+		self.assertTrue(result["truncated"])
+		self.assertEqual(result["logs"], [])
+		self.assertEqual(frappe.db.get_value("CRM Call Log", saved["name"], "status"), "Completed")
+		self.assertEqual(recent_windows(None)[0]["result"], "Repeated")
+
+	def test_page_bound_and_invalid_response_are_not_complete_history(self):
+		def provider(operation, values):
+			if operation != "calls":
+				return self.provider(operation, values)
+			return {"calls": [{**self.row, "call_id": str(100 + values["offset"])}]}
+
+		with patch.object(api, "HISTORY_PAGE_SIZE", 1), patch.object(ExolveClient, "read", side_effect=provider):
+			result = api.sync_calls()
+		self.assertTrue(result["truncated"])
+		self.assertEqual(len(result["logs"]), api.HISTORY_MAX_PAGES)
+		window = recent_windows(None)[0]
+		self.assertEqual(window["result"], "Limit")
+
+		def invalid(operation, values):
+			if operation != "calls":
+				return self.provider(operation, values)
+			return {"calls": [self.row]} if values["offset"] == 0 else {"calls": None}
+
+		with patch.object(api, "HISTORY_PAGE_SIZE", 1), patch.object(ExolveClient, "read", side_effect=invalid):
+			with self.assertRaises(frappe.ValidationError):
+				api.sync_calls()
+		self.assertFalse(frappe.db.exists("CRM Call Log", log_name(APP, self.row["call_id"])))
+		self.assertEqual(recent_windows(None)[0], window)
+
+		with patch.object(ExolveClient, "read", side_effect=lambda op, values:
+			{"calls": []} if op == "calls" else self.provider(op, values)):
+			self.assertEqual(api.sync_calls(), {"logs": [], "truncated": False})
+		self.assertEqual(recent_windows(None)[0]["result"], "Read")
+
+	def test_sync_metadata_follows_current_mapping_and_employee_scope(self):
+		from crm.analytics.call_reporting import get_report
+
+		api.sync_calls()
+		user = "analytics-exolve-coverage@example.invalid"
+		frappe.get_doc({"doctype": "User", "email": user, "first_name": "Coverage Test",
+			"send_welcome_email": 0, "roles": [{"role": "Sales User"}]}).insert(ignore_permissions=True)
+		self.settings.reload()
+		self.settings.append("agents", {"user": user, "sip_resource_id": "456", "enabled": 1})
+		self.settings.save()
+		window = get_report({"employee": "Administrator"})["coverage"]["exolve_windows"]
+		self.assertEqual(len(window), 1)
+		self.assertEqual(window[0]["result"], "Read")
+		frappe.set_user(user)
+		window = get_report()["coverage"]["exolve_windows"]
+		self.assertEqual(window, [{"label": "Coverage Test", "result": "Missing"}])
+		self.assertEqual(get_report({"employee": "Administrator"})["coverage"]["exolve_windows"], [])
+		with self.assertRaises(frappe.PermissionError):
+			frappe.get_doc(DOCTYPE, mapping_name(APP, "Administrator", "123")).check_permission("read")
+		frappe.set_user("Administrator")
+		self.settings.reload()
+		next(agent for agent in self.settings.agents if agent.user == "Administrator").sip_resource_id = "124"
+		self.settings.save()
+		window = get_report({"employee": "Administrator"})["coverage"]["exolve_windows"]
+		self.assertEqual(window, [{"label": "Administrator", "result": "Missing"}])
+		self.assertTrue(frappe.db.exists(DOCTYPE, mapping_name(APP, "Administrator", "123")))

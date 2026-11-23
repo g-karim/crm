@@ -1,0 +1,21 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Call Quality Review",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "track_changes": 1,
+ "allow_rename": 0,
+ "field_order": ["call_log", "script_key", "script_revision", "transcript_digest", "state", "review_data", "reviewer", "score"],
+ "fields": [
+  {"fieldname": "call_log", "fieldtype": "Link", "label": "Call Log", "options": "CRM Call Log", "reqd": 1, "search_index": 1},
+  {"fieldname": "script_key", "fieldtype": "Data", "label": "Script Key", "reqd": 1},
+  {"fieldname": "script_revision", "fieldtype": "Data", "label": "Script Revision", "reqd": 1},
+  {"fieldname": "transcript_digest", "fieldtype": "Data", "label": "Transcript Digest", "reqd": 1},
+  {"fieldname": "state", "fieldtype": "Select", "label": "State", "options": "Draft\nConfirmed", "reqd": 1},
+  {"fieldname": "review_data", "fieldtype": "Long Text", "label": "Review Data", "reqd": 1},
+  {"fieldname": "reviewer", "fieldtype": "Link", "label": "Reviewer", "options": "User"},
+  {"fieldname": "score", "fieldtype": "Data", "label": "Confirmed Score"}
+ ],
+ "permissions": []
+}

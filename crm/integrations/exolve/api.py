@@ -7,7 +7,11 @@ import frappe
 from frappe import _
 
 from .client import ExolveClient, ExolveError
+from .coverage import mapping_name, record_window
 from .utils import log_name, normalize_call
+
+HISTORY_PAGE_SIZE = 100
+HISTORY_MAX_PAGES = 3
 
 
 def is_enabled() -> bool:
@@ -207,22 +211,50 @@ def _sync_calls_once() -> dict:
 	agent = _agent(s)
 	c = _client(s)
 	_, attrs = _sip(s, agent, c)
+	# Serialize reads for the same mapping so a delayed older response cannot
+	# overwrite a newer call or its synchronization window.
+	_lock_call(mapping_name(s.application_id, frappe.session.user, agent.sip_resource_id))
 	now = datetime.now(timezone.utc)
 	start = now - timedelta(minutes=15)
-	rows = _read(
-		c, "calls", {"date_from": start.isoformat(), "date_to": now.isoformat(), "limit": 100, "offset": 0}
-	).get("calls", [])
-	accepted = {}
+	rows, result = _read_history(c, start, now)
+	accepted, conflicts = {}, set()
 	for row in rows:
 		values = normalize_call(
 			row, application_id=s.application_id, sip_username=attrs["login"], number=attrs["cli"]
 		)
 		if not values or not start <= values["start_time"] <= values["end_time"] <= now:
 			continue
-		accepted[values["id"]] = values
+		name = values["id"]
+		if name in accepted and accepted[name] != values:
+			conflicts.add(name)
+		accepted[name] = values
 	# Every transaction acquires call locks in the same order.
-	logs = [_save_call(accepted[name]) for name in sorted(accepted)]
-	return {"logs": logs, "truncated": len(rows) == 100}
+	logs = [_save_call(accepted[name]) for name in sorted(accepted.keys() - conflicts)]
+	record_window(s.application_id, agent.sip_resource_id, start, now, result)
+	return {"logs": logs, "truncated": result != "Read"}
+
+
+def _read_history(client, start, end):
+	params = {"date_from": start.isoformat(), "date_to": end.isoformat(), "limit": HISTORY_PAGE_SIZE}
+	rows, seen = [], set()
+	repeated = False
+	for page in range(HISTORY_MAX_PAGES):
+		batch = _read(client, "calls", {**params, "offset": page * HISTORY_PAGE_SIZE}).get("calls")
+		if not isinstance(batch, list) or len(batch) > HISTORY_PAGE_SIZE or any(not isinstance(row, dict) for row in batch):
+			frappe.throw(_("Exolve returned an invalid call history page."), frappe.ValidationError)
+		unseen = False
+		for row in batch:
+			key = (str(row.get("application_uuid") or ""), str(row.get("call_id") or ""))
+			if all(key):
+				repeated = repeated or key in seen
+				unseen = unseen or key not in seen
+				seen.add(key)
+			else:
+				unseen = True
+		rows.extend(batch)
+		if len(batch) < HISTORY_PAGE_SIZE or (repeated and not unseen):
+			return rows, "Repeated" if repeated else "Read"
+	return rows, "Repeated" if repeated else "Limit"
 
 
 def _save_call(values, *, preserve_participant=False):
@@ -230,10 +262,10 @@ def _save_call(values, *, preserve_participant=False):
 
 	values = dict(values)
 	name = values["id"]
-	for field in ("start_time", "end_time"):
-		values[field] = (
-			values[field].astimezone(ZoneInfo(frappe.utils.get_system_timezone())).replace(tzinfo=None)
-		)
+	zone = ZoneInfo(frappe.utils.get_system_timezone())
+	for field in ("start_time", "end_time", "analytics_connected_at"):
+		if value := values.get(field):
+			values[field] = value.astimezone(zone).replace(tzinfo=None)
 	values["caller" if values["type"] == "Outgoing" else "receiver"] = frappe.session.user
 	old_flag = frappe.flags.in_exolve_sync
 	frappe.flags.in_exolve_sync = True
@@ -244,6 +276,8 @@ def _save_call(values, *, preserve_participant=False):
 			doc = frappe.get_doc("CRM Call Log", name, for_update=True)
 			if doc.telephony_medium != "Exolve" or doc.exolve_application_id != values["exolve_application_id"] or doc.exolve_call_id != values["exolve_call_id"] or doc.type != values["type"]:
 				frappe.throw(_("Not permitted"), frappe.PermissionError)
+			if preserve_participant and any(doc.get(field) != values[field] for field in ("start_time", "end_time")):
+				values.pop("analytics_connected_at", None)
 			if preserve_participant:
 				# Existing start/end values are immutable history. Reinterpreting
 				# them after a site timezone change must not shift old calls.
@@ -261,6 +295,9 @@ def _save_call(values, *, preserve_participant=False):
 			if not values["recording_url"]:
 				if doc.recording_url:values.pop("exolve_recording_state",None)
 				values.pop("recording_url")  # A late snapshot cannot remove a ready recording.
+			if (not values.get("analytics_connected_at") and values["status"] == "Completed"
+				and all(doc.get(field) == values[field] for field in ("status", "start_time", "end_time", "duration"))):
+				values.pop("analytics_connected_at", None)
 			if any(doc.get(key) != value for key, value in values.items()):
 				doc.update(values)
 				doc.save(ignore_permissions=True)
@@ -318,6 +355,8 @@ def validate_call_log(doc):
 	if frappe.flags.in_exolve_sync:
 		return
 	old = doc.get_doc_before_save()
+	if (doc.get("analytics_connected_at") or (old and old.get("analytics_connected_at"))) and doc.has_value_changed("analytics_connected_at"):
+		frappe.throw(_("The connection timestamp is supplied by the call provider."), frappe.PermissionError)
 	if doc.telephony_medium != "Exolve" and not (old and old.telephony_medium == "Exolve"):
 		return
 	protected = (

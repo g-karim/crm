@@ -1,0 +1,21 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Campaign Spend",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "track_changes": 1,
+ "allow_rename": 0,
+ "field_order": ["utm_source", "utm_medium", "utm_campaign", "from_date", "to_date", "report_currency", "confirmed_amount", "source_reference"],
+ "fields": [
+  {"fieldname": "utm_source", "fieldtype": "Data", "label": "UTM Source", "length": 120},
+  {"fieldname": "utm_medium", "fieldtype": "Data", "label": "UTM Medium", "length": 120},
+  {"fieldname": "utm_campaign", "fieldtype": "Data", "label": "UTM Campaign", "length": 120, "reqd": 1},
+  {"fieldname": "from_date", "fieldtype": "Date", "label": "From", "reqd": 1},
+  {"fieldname": "to_date", "fieldtype": "Date", "label": "To", "reqd": 1},
+  {"fieldname": "report_currency", "fieldtype": "Link", "label": "Reporting Currency", "options": "Currency", "reqd": 1},
+  {"fieldname": "confirmed_amount", "fieldtype": "Data", "label": "Confirmed Spend", "reqd": 1},
+  {"fieldname": "source_reference", "fieldtype": "Data", "label": "Source Reference", "reqd": 1}
+ ],
+ "permissions": []
+}

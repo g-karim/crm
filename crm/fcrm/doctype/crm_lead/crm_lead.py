@@ -8,6 +8,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import validate_email_address
 
+from crm.analytics.utm import UTM_FIELDS, clean_document_tags, readable_tags
 from crm.api.todo import allow_internal_lead_assignment
 from crm.fcrm.doctype.crm_service_level_agreement.utils import get_sla
 from crm.fcrm.doctype.crm_status_change_log.crm_status_change_log import (
@@ -95,6 +96,7 @@ class CRMLead(Document):
 		self.set_sla()
 
 	def validate(self):
+		clean_document_tags(self)
 		self.validate_status()
 		self.set_full_name()
 		self.set_lead_name()
@@ -360,6 +362,7 @@ class CRMLead(Document):
 
 	def create_deal(self, contact, organization, deal=None):
 		new_deal = frappe.new_doc("CRM Deal")
+		visible_tags = readable_tags(self.doctype)
 		restricted_fieldtypes = [
 			"Tab Break",
 			"Section Break",
@@ -396,6 +399,8 @@ class CRMLead(Document):
 			if field.fieldtype in restricted_fieldtypes:
 				continue
 			if field.fieldname in restricted_map_fields:
+				continue
+			if field.fieldname in UTM_FIELDS and field.fieldname not in visible_tags:
 				continue
 
 			fieldname = get_deal_fieldname(field, new_deal.meta)

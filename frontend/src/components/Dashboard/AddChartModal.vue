@@ -100,7 +100,7 @@ async function getChart(type: string) {
   if (!name) return
 
   await createResource({
-    url: 'crm.api.dashboard.get_chart',
+    url: 'crm.analytics.layouts.get_chart',
     params: {
       name,
       type,

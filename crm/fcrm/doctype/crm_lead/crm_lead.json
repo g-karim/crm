@@ -30,6 +30,9 @@
   "industry",
   "job_title",
   "source",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
   "planned_deal_pipeline",
   "lead_owner",
   "organization_tab",
@@ -182,6 +185,24 @@
    "in_standard_filter": 1,
    "label": "Source",
    "options": "CRM Lead Source"
+  },
+  {
+   "fieldname": "utm_source",
+   "fieldtype": "Data",
+   "label": "UTM Source",
+   "length": 120
+  },
+  {
+   "fieldname": "utm_medium",
+   "fieldtype": "Data",
+   "label": "UTM Medium",
+   "length": 120
+  },
+  {
+   "fieldname": "utm_campaign",
+   "fieldtype": "Data",
+   "label": "UTM Campaign",
+   "length": 120
   },
   {
    "fieldname": "planned_deal_pipeline",

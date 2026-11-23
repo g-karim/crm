@@ -16,7 +16,10 @@
   "archived",
   "column_break_ojiu",
   "probability",
-  "color"
+  "color",
+  "analytics_stale_days",
+  "analytics_disabled_risks",
+  "analytics_forecast_category"
  ],
  "fields": [
   {
@@ -92,6 +95,27 @@
   {
    "fieldname": "column_break_ojiu",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "analytics_stale_days",
+   "fieldtype": "Int",
+   "label": "Long stage threshold (days)",
+   "default": "14",
+   "non_negative": 1,
+   "description": "Analytics flags open deals strictly after this many days in the current stage."
+  },
+  {
+   "fieldname": "analytics_disabled_risks",
+   "fieldtype": "Data",
+   "label": "Disabled analytics attention rules",
+   "hidden": 1
+  },
+  {
+   "fieldname": "analytics_forecast_category",
+   "fieldtype": "Select",
+   "label": "Forecast Category",
+   "options": "\nPipeline\nBest Case\nCommit\nDeferred",
+   "description": "The category for open deals in this stage."
   }
  ],
  "grid_page_length": 50,
@@ -145,6 +169,7 @@
  "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
+ "track_changes": 1,
  "states": [],
  "title_field": "deal_status",
  "translated_doctype": 1

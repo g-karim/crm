@@ -1,6 +1,7 @@
 """CRM-owned runtime translations for fork-specific user interface strings."""
 
 RUSSIAN_TRANSLATIONS = {
+	"Analytics": "Аналитика",
 	"Avito chat is unavailable because this account has no subscription with Messenger API access.": "Переписка недоступна: у аккаунта нет подписки с доступом к API мессенджера Авито.",
 	"The lead is synchronized automatically. Read and reply on Avito.": "Лид синхронизируется автоматически. Читайте сообщения и отвечайте на Авито.",
 	"Continue the conversation on Avito": "Продолжите общение на Авито",

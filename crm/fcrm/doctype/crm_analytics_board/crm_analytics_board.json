@@ -1,0 +1,19 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Analytics Board",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "track_changes": 1,
+ "allow_rename": 0,
+ "index_web_pages_for_search": 0,
+ "field_order": ["title", "audience", "team_lead", "definition", "creation_hash"],
+ "fields": [
+  {"fieldname": "title", "fieldtype": "Data", "label": "Title", "reqd": 1},
+  {"fieldname": "audience", "fieldtype": "Select", "label": "Audience", "options": "Private\nTeam", "reqd": 1, "default": "Private"},
+  {"fieldname": "team_lead", "fieldtype": "Link", "label": "Team Lead", "options": "User"},
+  {"fieldname": "definition", "fieldtype": "Long Text", "label": "Definition", "reqd": 1},
+  {"fieldname": "creation_hash", "fieldtype": "Data", "label": "Creation Hash", "hidden": 1, "read_only": 1}
+ ],
+ "permissions": []
+}

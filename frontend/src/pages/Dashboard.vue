@@ -70,9 +70,10 @@
             updateFilter('period', v, () => {
               showDatePicker = false
               if (!v) {
-                filters.period = getLastXDays()
+                presetDays = 30
                 preset = 'Last 30 Days'
               } else {
+                presetDays = null
                 preset = formatter(v)
               }
             })
@@ -146,7 +147,7 @@ import Link from '@/components/Controls/Link.vue'
 import { usersStore } from '@/stores/users'
 import { copy } from '@/utils'
 import {
-  getLastXDays,
+  type DashboardDateRange,
   formatter,
   formatRange,
   parseDateRange,
@@ -167,10 +168,11 @@ const editing = ref(false)
 const showDatePicker = ref(false)
 const datePickerRef = ref(null)
 const preset = ref('Last 30 Days')
+const presetDays = ref<number | null>(30)
 const showAddChartModal = ref(false)
 
-const filters = reactive({
-  period: getLastXDays(),
+const filters = reactive<{ period: DashboardDateRange; user: string | null }>({
+  period: null,
   user: null,
 })
 
@@ -182,7 +184,11 @@ const toDate = computed(() => {
   return parseDateRange(filters.period)[1] || null
 })
 
-function updateFilter(key: string, value: unknown, callback?: () => void) {
+function updateFilter<Key extends keyof typeof filters>(
+  key: Key,
+  value: (typeof filters)[Key],
+  callback?: () => void,
+) {
   filters[key] = value
   callback?.()
   dashboardItems.reload()
@@ -197,7 +203,7 @@ const options = computed(() => [
         label: __('Last 7 Days'),
         onClick: () => {
           preset.value = 'Last 7 Days'
-          filters.period = getLastXDays(7)
+          presetDays.value = 7
           dashboardItems.reload()
         },
       },
@@ -205,7 +211,7 @@ const options = computed(() => [
         label: __('Last 30 Days'),
         onClick: () => {
           preset.value = 'Last 30 Days'
-          filters.period = getLastXDays(30)
+          presetDays.value = 30
           dashboardItems.reload()
         },
       },
@@ -213,7 +219,7 @@ const options = computed(() => [
         label: __('Last 60 Days'),
         onClick: () => {
           preset.value = 'Last 60 Days'
-          filters.period = getLastXDays(60)
+          presetDays.value = 60
           dashboardItems.reload()
         },
       },
@@ -221,7 +227,7 @@ const options = computed(() => [
         label: __('Last 90 Days'),
         onClick: () => {
           preset.value = 'Last 90 Days'
-          filters.period = getLastXDays(90)
+          presetDays.value = 90
           dashboardItems.reload()
         },
       },
@@ -233,17 +239,23 @@ const options = computed(() => [
       showDatePicker.value = true
       setTimeout(() => datePickerRef.value?.open(), 0)
       preset.value = 'Custom Range'
-      filters.period = null // Reset period to allow custom date selection
     },
   },
 ])
 
+const layoutVersion = ref(null)
 const dashboardItems = createResource({
-  url: 'crm.api.dashboard.get_dashboard',
+  url: 'crm.analytics.layouts.get_dashboard_state',
+  transform(state) {
+    layoutVersion.value = state.modified
+    filters.period = [state.context.from_date, state.context.to_date]
+    return state.items
+  },
   makeParams() {
     return {
-      from_date: fromDate.value,
-      to_date: toDate.value,
+      ...(presetDays.value
+        ? { days: presetDays.value }
+        : { from_date: fromDate.value, to_date: toDate.value }),
       user: filters.user,
     }
   },
@@ -272,7 +284,7 @@ function cancel() {
 }
 
 const saveDashboard = createResource({
-  url: 'frappe.client.set_value',
+  url: 'crm.analytics.layouts.save_layout',
   method: 'POST',
   onSuccess: () => {
     dashboardItems.reload()
@@ -288,16 +300,16 @@ function save() {
   })
 
   saveDashboard.submit({
-    doctype: 'CRM Dashboard',
-    name: 'Manager Dashboard',
-    fieldname: 'layout',
-    value: JSON.stringify(dashboardItemsCopy),
+    layout: JSON.stringify(dashboardItemsCopy),
+    modified: layoutVersion.value,
   })
 }
 
 function resetToDefault() {
   createResource({
-    url: 'crm.api.dashboard.reset_to_default',
+    url: 'crm.analytics.layouts.reset_to_default',
+    params: { modified: layoutVersion.value },
+    method: 'POST',
     auto: true,
     onSuccess: () => {
       dashboardItems.reload()

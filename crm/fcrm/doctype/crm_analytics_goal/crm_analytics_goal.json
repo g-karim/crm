@@ -1,0 +1,21 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Analytics Goal",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "track_changes": 1,
+ "allow_rename": 0,
+ "index_web_pages_for_search": 0,
+ "field_order": ["period", "period_start", "scope", "subject", "metric", "target", "goal_currency"],
+ "fields": [
+  {"fieldname": "period", "fieldtype": "Select", "label": "Period", "options": "Week\nMonth\nQuarter", "reqd": 1},
+  {"fieldname": "period_start", "fieldtype": "Date", "label": "Period Start", "reqd": 1},
+  {"fieldname": "scope", "fieldtype": "Select", "label": "Scope", "options": "Employee\nTeam\nCompany", "reqd": 1},
+  {"fieldname": "subject", "fieldtype": "Link", "label": "Employee or Team Lead", "options": "User"},
+  {"fieldname": "metric", "fieldtype": "Data", "label": "Metric", "reqd": 1},
+  {"fieldname": "target", "fieldtype": "Data", "label": "Target", "reqd": 1},
+  {"fieldname": "goal_currency", "fieldtype": "Link", "label": "Reporting Currency", "options": "Currency"}
+ ],
+ "permissions": []
+}

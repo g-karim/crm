@@ -1,0 +1,17 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Analytics Monitor",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "prompt",
+ "track_changes": 1,
+ "allow_rename": 0,
+ "index_web_pages_for_search": 0,
+ "field_order": ["metric", "threshold", "enabled"],
+ "fields": [
+  {"fieldname": "metric", "fieldtype": "Select", "label": "Metric", "options": "calls_overdue\ntasks_overdue\nmonthly_progress", "reqd": 1},
+  {"fieldname": "threshold", "fieldtype": "Int", "label": "Threshold", "reqd": 1},
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "0"}
+ ],
+ "permissions": []
+}

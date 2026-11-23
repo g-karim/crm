@@ -6,6 +6,9 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.model.naming import make_autoname
 
+from crm.analytics.engine import OPEN, RISK_REASONS
+from crm.analytics.metric_catalog import FORECAST_CATEGORIES
+from crm.analytics.sales_plans import company_plan_editor
 from crm.fcrm.doctype.crm_external_reference.crm_external_reference import (
 	PIPELINE_EXTERNAL_DOCTYPE,
 	STAGE_EXTERNAL_DOCTYPE,
@@ -75,10 +78,52 @@ class CRMDealStatus(Document):
 				self.external_pipeline_id = self.external_pipeline_id or pipeline_external.external_id
 
 	def validate(self):
+		category = self.get("analytics_forecast_category")
+		previous = self.get_doc_before_save()
+		old_category = previous.get("analytics_forecast_category") if previous else None
+		if (category or "") != (old_category or "") and not company_plan_editor():
+			frappe.throw(_("Only system managers may configure forecast categories."), frappe.PermissionError)
+		if category and (category not in FORECAST_CATEGORIES or self.type not in OPEN):
+			frappe.throw(_("Choose a forecast category for an open stage."), frappe.ValidationError)
+		disabled = self.get("analytics_disabled_risks") or ""
+		old_disabled = (previous.get("analytics_disabled_risks") or "") if previous else ""
+		if disabled != old_disabled:
+			if not company_plan_editor():
+				frappe.throw(_("Only system managers may configure analytics attention rules."), frappe.PermissionError)
+			if self.type not in OPEN or self.archived or (disabled and not set(disabled.split(",")) <= set(RISK_REASONS)):
+				frappe.throw(_("Choose valid attention rules for an active open stage."), frappe.ValidationError)
+		if not self.is_new() and self.has_value_changed("type") and self._has_history():
+			frappe.throw(_("A stage used by deals cannot change its outcome type. Create a new stage instead."), frappe.ValidationError)
 		self.validate_external_source_required()
 		self.validate_external_pipeline_id()
 		self.validate_unique_status_in_pipeline()
 		self.validate_unique_external_status_in_pipeline()
+
+	def _has_history(self):
+		return bool(
+			frappe.db.exists("CRM Deal", {"status": self.name})
+			or frappe.db.exists("CRM Status Change Log", {"from": self.name})
+			or frappe.db.exists("CRM Status Change Log", {"to": self.name})
+			or (
+				frappe.db.table_exists("CRM Analytics Event")
+				and frappe.db.sql(
+					"""SELECT `name` FROM `tabCRM Analytics Event`
+						WHERE `source_type` = 'CRM Deal'
+						AND (JSON_UNQUOTE(JSON_EXTRACT(`payload`, '$.before.status')) = %s
+							OR JSON_UNQUOTE(JSON_EXTRACT(`payload`, '$.after.status')) = %s)
+						LIMIT 1""",
+					(self.name, self.name),
+				)
+			)
+		)
+
+	def on_trash(self):
+		if self._has_history():
+			frappe.throw(_("Archive a stage used by deals instead of deleting it."), frappe.ValidationError)
+
+	def before_rename(self, *args, **kwargs):
+		if self._has_history():
+			frappe.throw(_("Change the stage label without renaming its identifier."), frappe.ValidationError)
 
 	def on_update(self):
 		self.sync_external_reference()

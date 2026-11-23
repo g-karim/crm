@@ -7,16 +7,14 @@
     </template>
     <template #right-header>
       <Button
-        :aria-label="analyticsOpen ? __('Журнал звонков') : __('Аналитика')"
-        :tooltip="analyticsOpen ? __('Журнал звонков') : __('Аналитика')"
+        :aria-label="__('Аналитика звонков')"
+        :tooltip="__('Аналитика звонков')"
         icon-left="lucide-bar-chart-2"
         variant="ghost"
         class="telephony-secondary min-h-11 min-w-11"
-        @click="toggleAnalytics"
-        ><span class="hidden sm:inline">{{
-          analyticsOpen ? __('Журнал звонков') : __('Аналитика')
-        }}</span></Button
-      >
+        :loading="openingAnalytics"
+        @click="openAnalytics"
+      ><span class="hidden sm:inline">{{ __('Аналитика звонков') }}</span></Button>
       <Button
         class="telephony-secondary hidden sm:inline-flex"
         :label="__('List view')"
@@ -134,13 +132,7 @@
         {{ tab.label }}
       </button>
     </div>
-    <TelephonyAnalytics
-      v-if="analyticsOpen"
-      :filters="analyticsFilters"
-      :refresh-key="analyticsRevision"
-      @employee="selectAnalyticsEmployee"
-    />
-    <div v-if="!analyticsOpen" class="relative flex min-h-0 flex-1">
+    <div class="relative flex min-h-0 flex-1">
       <section
         class="flex min-w-0 flex-1 flex-col"
         :aria-label="__('Call history')"
@@ -486,7 +478,7 @@
 <script setup>
 import LayoutHeader from '@/components/LayoutHeader.vue'
 import CallInsightsPanel from '@/components/Telephony/CallInsightsPanel.vue'
-import TelephonyAnalytics from '@/components/Telephony/TelephonyAnalytics.vue'
+import { callScopeQuery } from '@/utils/callAnalyticsRoute'
 import CallbackProof from '@/components/Telephony/CallbackProof.vue'
 import { showSettings, activeSettingsPage } from '@/composables/settings'
 import WorkspaceDialer from '@/components/Telephony/WorkspaceDialer.vue'
@@ -500,6 +492,7 @@ import {
   LoadingIndicator,
   call,
   createResource,
+  toast,
 } from 'frappe-ui'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -525,27 +518,25 @@ const route = useRoute(),
   router = useRouter()
 const { prepareCall } = globalStore()
 const { isAnyEnabled, preferredIntegration, isEnabled } = useTelephony()
-const analyticsOpen = computed(() => route.query.pane === 'analytics')
-const analyticsFilters = computed(() => ({
-  search: analyticsSearch.value,
-  period: period.value,
-  employee: employee.value === '@me' ? session.user : employee.value,
-  line: line.value,
-  outcome: outcome.value,
-  view: view.value,
-}))
-const proofRevision = ref(0),
-  analyticsRevision = ref(0),
-  analyticsSearch = ref('')
-function toggleAnalytics() {
-  const query = { ...route.query }
-  if (analyticsOpen.value) delete query.pane
-  else query.pane = 'analytics'
-  router.replace({ query })
-}
-function selectAnalyticsEmployee(value) {
-  employee.value = value
-  toggleAnalytics()
+const proofRevision = ref(0)
+const openingAnalytics = ref(false)
+async function openAnalytics() {
+  if (openingAnalytics.value) return
+  openingAnalytics.value = true
+  try {
+    const filters = await call('crm.analytics.call_reporting.telephony_scope', {
+      period: period.value,
+      employee: employee.value === '@me' ? session.user : employee.value,
+      line: line.value,
+      outcome: outcome.value,
+      view: view.value,
+    })
+    await router.push({ name: 'Dashboard', query: { ...callScopeQuery(filters), section: 'calls' } })
+  } catch {
+    toast.error(__('Could not open call analytics.'))
+  } finally {
+    openingAnalytics.value = false
+  }
 }
 function seekTranscript(seconds) {
   recording.value?.seekTo(seconds)
@@ -759,13 +750,11 @@ function resetFilters() {
   view.value = 'all'
 }
 function refresh() {
-  analyticsRevision.value++
   loadHistoryStatus()
   loadCalls()
   if (selectedName.value) loadDetail(selectedName.value, true)
 }
 function workUpdated() {
-  analyticsRevision.value++
   proofRevision.value++
   loadCalls()
   if (selectedName.value) loadDetail(selectedName.value, true)
@@ -776,7 +765,6 @@ function dayLabel(date) {
   return callCalendarDate(date, locale) || __('Date unavailable')
 }
 const delayedSearch = useDebounceFn(() => {
-  analyticsSearch.value = search.value
   loadCalls()
 }, 250)
 watch(search, () => {

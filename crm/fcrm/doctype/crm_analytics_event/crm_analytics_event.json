@@ -1,0 +1,17 @@
+{
+ "doctype": "DocType", "name": "CRM Analytics Event", "module": "FCRM", "autoname": "prompt", "engine": "InnoDB",
+ "field_order": ["source_type", "source_name", "sequence", "source_event_key", "source_modified", "event_kind", "occurred_at", "actor", "history_complete", "payload"],
+ "fields": [
+  {"fieldname": "source_type", "fieldtype": "Link", "options": "DocType", "label": "Source Type", "reqd": 1, "search_index": 1},
+  {"fieldname": "source_name", "fieldtype": "Data", "label": "Source Name", "reqd": 1, "search_index": 1},
+  {"fieldname": "sequence", "fieldtype": "Int", "label": "Source Sequence", "reqd": 1, "search_index": 1},
+  {"fieldname": "source_event_key", "fieldtype": "Data", "label": "Source Event Key", "length": 64, "hidden": 1, "read_only": 1},
+  {"fieldname": "source_modified", "fieldtype": "Datetime", "label": "Source Revision"},
+  {"fieldname": "event_kind", "fieldtype": "Select", "options": "Created\nUpdated\nBaseline\nDeleted", "label": "Event Kind", "reqd": 1},
+  {"fieldname": "occurred_at", "fieldtype": "Datetime", "label": "Occurred At", "reqd": 1, "search_index": 1},
+  {"fieldname": "actor", "fieldtype": "Link", "options": "User", "label": "Actor", "reqd": 1},
+  {"fieldname": "history_complete", "fieldtype": "Check", "label": "Complete From Creation", "default": "0"},
+  {"fieldname": "payload", "fieldtype": "Long Text", "label": "Fact", "reqd": 1}
+ ],
+ "permissions": [], "track_changes": 0, "index_web_pages_for_search": 0
+}

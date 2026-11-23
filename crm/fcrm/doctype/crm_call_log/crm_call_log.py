@@ -277,76 +277,76 @@ def get_reference_contact(doctype, name):
 	return deal_name and {"full_name": deal_name}
 
 
+def _visible_peer(number):
+	if not number:
+		return {}
+	contact = get_contact_by_phone_number(number)
+	if not contact.get("name"):
+		return {}
+	doctype = "CRM Lead" if contact.get("lead") else "Contact"
+	if not _call_reference(doctype, contact["name"]):
+		return {}
+	return contact
+
+
+def _call_reference(doctype, name):
+	if not doctype or not name:
+		return None
+	try:
+		doc = frappe.get_doc(doctype, name)
+		doc.check_permission("read")
+		kind, context = doc.get("reference_doctype"), doc.get("reference_docname")
+		if (kind or context) and not (kind and context and frappe.has_permission(kind, "read", doc=context)):
+			return None
+		doc.apply_fieldlevel_read_permissions()
+		return doc
+	except (frappe.DoesNotExistError, frappe.PermissionError):
+		return None
+
+
 @frappe.whitelist()
 def get_call_log(name: str):
-	call_doc = frappe.get_cached_doc(
-		"CRM Call Log",
-		name,
-		fields=[
-			"name",
-			"caller",
-			"receiver",
-			"duration",
-			"type",
-			"status",
-			"from",
-			"to",
-			"note",
-			"recording_url",
-			"recording_url_path",
-			"reference_doctype",
-			"reference_docname",
-			"ai_analysis_status",
-			"ai_analysis_requested_on",
-			"ai_analysis_started_on",
-			"ai_analyzed_on",
-			"ai_analysis_requested_by",
-			"ai_analysis_language",
-			"ai_transcription_model",
-			"ai_summary_model",
-			"ai_transcript",
-			"ai_summary",
-			"ai_key_points",
-			"ai_next_steps",
-			"ai_sentiment",
-			"ai_analysis_error",
-			"creation",
-		],
-	)
+	call_doc = frappe.get_doc("CRM Call Log", name)
 	call_doc.check_permission("read")
+	if call_doc.reference_docname and not _call_reference(call_doc.reference_doctype, call_doc.reference_docname):
+		frappe.throw(_("This call is unavailable with your current access."), frappe.PermissionError)
+	call_doc.apply_fieldlevel_read_permissions()
 	call = call_doc.as_dict()
 
 	from crm.call_analysis.config import get_public_status
 
 	call["_call_analysis"] = get_public_status()
-
 	call = parse_call_log(call)
+	notes, tasks, visible_links = {}, {}, []
 
-	note_names = [call["note"]] if call.get("note") else []
-	task_names = []
-	references = {}
+	if call.get("note"):
+		if note := _call_reference("FCRM Note", call["note"]):
+			notes[note.name] = note.as_dict()
+		else:
+			call.pop("note", None)
 
-	if call.get("reference_doctype") in ("CRM Lead", "CRM Deal") and call.get("reference_docname"):
-		references[call["reference_doctype"]] = call["reference_docname"]
+	if call.get("reference_doctype") == "CRM Lead":
+		call["_lead"] = call.get("reference_docname")
+	elif call.get("reference_doctype") == "CRM Deal":
+		call["_deal"] = call.get("reference_docname")
 
 	for link in call.get("links") or []:
-		link_doctype, link_name = link.get("link_doctype"), link.get("link_name")
-		if link_doctype == "CRM Task":
-			task_names.append(link_name)
-		elif link_doctype == "FCRM Note":
-			note_names.append(link_name)
-		elif link_doctype in ("CRM Lead", "CRM Deal"):
-			references.setdefault(link_doctype, link_name)
+		doctype, name = link.get("link_doctype"), link.get("link_name")
+		if not (doc := _call_reference(doctype, name)):
+			continue
+		visible_links.append(link)
+		if doctype == "CRM Task":
+			tasks[doc.name] = doc.as_dict()
+		elif doctype == "FCRM Note":
+			notes[doc.name] = doc.as_dict()
+		elif doctype == "CRM Lead":
+			call["_lead"] = doc.name
+		elif doctype == "CRM Deal":
+			call["_deal"] = doc.name
 
-	call["_notes"] = get_permitted_docs("FCRM Note", note_names)
-	call["_tasks"] = get_permitted_docs("CRM Task", task_names)
-
-	lead, deal = references.get("CRM Lead"), references.get("CRM Deal")
-	if lead and frappe.has_permission("CRM Lead", "read", lead):
-		call["_lead"] = lead
-	if deal and frappe.has_permission("CRM Deal", "read", deal):
-		call["_deal"] = deal
-
+	call["links"] = visible_links
+	call["_tasks"] = list(tasks.values())
+	call["_notes"] = list(notes.values())
 	return call
 
 

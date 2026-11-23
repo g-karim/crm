@@ -1,0 +1,14 @@
+{
+ "doctype":"DocType", "name":"CRM Analytics Snapshot", "module":"FCRM", "autoname":"prompt", "engine":"InnoDB",
+ "field_order":["viewer","title","observed_at","fingerprint","filters","source_access","payload"],
+ "fields":[
+  {"fieldname":"viewer","fieldtype":"Link","options":"User","label":"Viewer","reqd":1,"search_index":1},
+  {"fieldname":"title","fieldtype":"Data","label":"Title","reqd":1},
+  {"fieldname":"observed_at","fieldtype":"Datetime","label":"Observed At","reqd":1},
+  {"fieldname":"fingerprint","fieldtype":"Data","label":"Request Fingerprint","reqd":1},
+  {"fieldname":"filters","fieldtype":"Long Text","label":"Filters","reqd":1},
+  {"fieldname":"source_access","fieldtype":"Long Text","label":"Source Access","reqd":1},
+  {"fieldname":"payload","fieldtype":"Long Text","label":"Saved Report","reqd":1}
+ ],
+ "permissions":[], "track_changes":0, "index_web_pages_for_search":0
+}

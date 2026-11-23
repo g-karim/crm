@@ -1,0 +1,18 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Analytics Signal Notice",
+ "module": "FCRM",
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "track_changes": 1,
+ "allow_rename": 0,
+ "field_order": ["monitor", "metric", "rule_version", "state", "resolved_at"],
+ "fields": [
+  {"fieldname": "monitor", "fieldtype": "Link", "label": "Monitor", "options": "CRM Analytics Monitor", "reqd": 1, "search_index": 1},
+  {"fieldname": "metric", "fieldtype": "Data", "label": "Metric", "reqd": 1},
+  {"fieldname": "rule_version", "fieldtype": "Data", "label": "Rule Version", "reqd": 1},
+  {"fieldname": "state", "fieldtype": "Select", "label": "State", "options": "Unread\nRead\nResolved", "reqd": 1},
+  {"fieldname": "resolved_at", "fieldtype": "Datetime", "label": "Resolved At"}
+ ],
+ "permissions": []
+}

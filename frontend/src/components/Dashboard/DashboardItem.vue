@@ -1,10 +1,29 @@
 <template>
   <div class="h-full w-full">
     <div
-      v-if="item.type == 'number_chart'"
+      v-if="item.data?.unavailable || item.data?.error"
+      role="status"
+      class="p-4 text-sm text-ink-gray-7"
+    >
+      {{ item.data.message || item.data.error }}
+    </div>
+    <div
+      v-else-if="item.type === 'number_chart' && item.data?.value == null"
+      class="flex h-full flex-col justify-center gap-2 rounded border border-outline-gray-2 bg-surface-cards p-4"
+      role="status"
+    >
+      <span class="text-sm text-ink-gray-7">{{
+        __(item.data?.title || '')
+      }}</span>
+      <strong class="text-xl font-medium text-ink-gray-9">{{
+        __('No data')
+      }}</strong>
+    </div>
+    <div
+      v-else-if="item.type == 'number_chart'"
       class="flex h-full w-full rounded shadow overflow-hidden cursor-pointer"
     >
-      <Tooltip :text="__(item.data.tooltip)">
+      <Tooltip :text="__(item.data?.tooltip || '')">
         <NumberChart
           v-if="item.data"
           :key="index"

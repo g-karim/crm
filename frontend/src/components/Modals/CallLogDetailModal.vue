@@ -162,6 +162,12 @@
             </div>
           </div>
         </div>
+        <ScopedCallOutcome
+          v-if="analyticsScope && callLog?.data?.name"
+          :key="callLog.data.name"
+          :name="callLog.data.name"
+          @saved="callLog?.reload?.()"
+        />
         <CallAnalysisPanel
           v-if="callLog?.data?.recording_url_path"
           :call-log="callLog"
@@ -195,6 +201,7 @@ import TaskIcon from '@/components/Icons/TaskIcon.vue'
 import CheckCircleIcon from '@/components/Icons/CheckCircleIcon.vue'
 import FadedScrollableDiv from '@/components/FadedScrollableDiv.vue'
 import CallAnalysisPanel from '@/components/Activities/CallAnalysisPanel.vue'
+import ScopedCallOutcome from '@/components/Analytics/ScopedCallOutcome.vue'
 import { getCallLogDetail } from '@/utils/callLog'
 import { sanitizeHTML } from '@/utils'
 import { isMobileView } from '@/composables/settings'
@@ -207,6 +214,8 @@ import { ref, computed, h, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+
+defineProps({ analyticsScope: Boolean })
 
 const show = defineModel({ type: Boolean })
 
