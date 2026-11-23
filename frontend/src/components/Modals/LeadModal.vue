@@ -71,7 +71,7 @@ import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
 import { createResource, call, toast } from 'frappe-ui'
 import { useDocument } from '@/data/document'
 import { enrichmentStore } from '@/stores/enrichment'
-import { computed, onMounted, ref, nextTick } from 'vue'
+import { computed, onMounted, ref, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
@@ -167,6 +167,27 @@ const tabs = createResource({
   },
 })
 
+// Statuses may arrive after the dialog mounts. Keep the required default and
+// the picker's options in sync without replacing a manager's chosen status.
+watch(
+  leadStatuses,
+  (options) => {
+    if (!lead.doc.status && options[0]?.value) {
+      lead.doc.status = options[0].value
+    }
+    tabs.data?.forEach((tab) =>
+      tab.sections?.forEach((section) =>
+        section.columns?.forEach((column) =>
+          column.fields?.forEach((field) => {
+            if (field.fieldname === 'status') field.options = options
+          }),
+        ),
+      ),
+    )
+  },
+  { immediate: true },
+)
+
 const createLead = createResource({
   url: 'frappe.client.insert',
 })
@@ -223,9 +244,14 @@ async function createNewLead() {
         show.value = false
         lead.doc = {}
         router.push({ name: 'Lead', params: { leadId: data.name } })
-        updateOnboardingStep('create_first_lead', true, false, () => {
-          localStorage.setItem('firstLead' + user, data.name)
-        })
+        // A completed save must not depend on the optional onboarding view.
+        try {
+          updateOnboardingStep('create_first_lead', true, false, () => {
+            localStorage.setItem('firstLead' + user, data.name)
+          })
+        } catch (error) {
+          console.warn('Could not update CRM onboarding progress', error)
+        }
       },
       onError(err) {
         isLeadCreating.value = false

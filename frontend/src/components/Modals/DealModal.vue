@@ -249,7 +249,9 @@ const tabs = createResource({
 })
 
 const dealStatuses = computed(() =>
-  statusOptions('deal', [], null, { pipeline: deal.doc.pipeline }),
+  deal.doc.pipeline
+    ? statusOptions('deal', [], null, { pipeline: deal.doc.pipeline })
+    : [],
 )
 
 watch(dealStatuses, () => {

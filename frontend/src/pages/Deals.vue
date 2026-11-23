@@ -52,8 +52,18 @@
       includeDefaultFiltersInView: true,
     }"
   />
+  <div
+    v-if="pipelineFilterReady && deals.loading && !deals.data"
+    class="flex flex-1 items-center justify-center gap-2 text-p-sm text-ink-gray-6"
+    role="status"
+  >
+    <LoadingIndicator class="size-5" />
+    {{ __('Loading...') }}
+  </div>
   <KanbanView
-    v-if="pipelineFilterReady && route.params.viewType == 'kanban'"
+    v-if="
+      pipelineFilterReady && deals.data && route.params.viewType == 'kanban'
+    "
     v-model="deals"
     :options="{
       getRoute: (row) => ({
@@ -300,7 +310,13 @@ import { formatDate, timeAgo, website, formatTime } from '@/utils'
 import { timestampCell } from '@/composables/useTimelinePreferences'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
 import { useBroadcast } from '@/composables/useBroadcast'
-import { Tooltip, Avatar, Dropdown, createListResource } from 'frappe-ui'
+import {
+  Tooltip,
+  Avatar,
+  Dropdown,
+  LoadingIndicator,
+  createListResource,
+} from 'frappe-ui'
 import { useRoute } from 'vue-router'
 import { ref, reactive, computed, h, watch } from 'vue'
 
@@ -324,6 +340,9 @@ const selectedPipeline = ref(
   localStorage.getItem('crm:selectedDealPipeline') || '',
 )
 const pipelinesLoaded = ref(false)
+const manualPipelineContext = ref(null)
+const pipelineRouteContext = () =>
+  JSON.stringify([route.query.view || '', route.params.viewType || 'list'])
 
 on('trigger_deal_create', (data) => {
   showDealModal.value = Boolean(data)
@@ -431,6 +450,7 @@ watch(
 function setSelectedPipeline(option) {
   let pipeline = option?.value || ''
   if (!pipeline || pipeline === selectedPipeline.value) return
+  manualPipelineContext.value = pipelineRouteContext()
   deals.value = {}
   loadMore.value = 1
   triggerResize.value += 1
@@ -438,6 +458,8 @@ function setSelectedPipeline(option) {
 }
 
 function syncPipelineFromRouteView() {
+  if (manualPipelineContext.value === pipelineRouteContext()) return
+  manualPipelineContext.value = null
   const pipeline = getPipelineFromRouteView()
   if (!pipeline || pipeline === selectedPipeline.value) return
 

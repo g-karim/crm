@@ -54,23 +54,7 @@
               {
                 label: __('Delete'),
                 icon: 'trash-2',
-                onClick: () => {
-                  $dialog({
-                    title: __('Delete Task'),
-                    message: __('Are you sure you want to delete this task?'),
-                    actions: [
-                      {
-                        label: __('Delete'),
-                        theme: 'red',
-                        variant: 'solid',
-                        onClick(close) {
-                          modalRef.deleteTask(task.name)
-                          close()
-                        },
-                      },
-                    ],
-                  })
-                },
+                onClick: () => confirmDeleteTask(task),
               },
             ]"
           >
@@ -100,14 +84,43 @@ import { formatDate, getFormat, taskStatusOptions } from '@/utils'
 import { usersStore } from '@/stores/users'
 import { globalStore } from '@/stores/global'
 import { Tooltip, Dropdown } from 'frappe-ui'
+import { reactive } from 'vue'
 
-defineProps({
+const props = defineProps({
   tasks: { type: Array, default: () => [] },
   modalRef: { type: Object, default: () => ({}) },
 })
 
 const { getUser } = usersStore()
 const { $dialog } = globalStore()
+
+function confirmDeleteTask(task) {
+  const dialog = reactive({
+    title: __('Delete Task'),
+    message: __('Are you sure you want to delete this task?'),
+    error: '',
+    actions: [
+      {
+        label: __('Delete'),
+        theme: 'red',
+        variant: 'solid',
+        async onClick(close) {
+          dialog.error = ''
+          try {
+            await props.modalRef.deleteTask(task.name)
+            close()
+          } catch (error) {
+            dialog.error =
+              error.messages?.join('\n') ||
+              error.message ||
+              __('Could not delete task. Please try again.')
+          }
+        },
+      },
+    ],
+  })
+  $dialog(dialog)
+}
 
 const dateFormat = getFormat('', '', true, false, false)
 const dateTimeFormat = `${dateFormat} | HH:mm`

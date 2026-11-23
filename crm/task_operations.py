@@ -1,4 +1,9 @@
-"""Private HTTP retry receipts. No task content or access grants."""
+"""Private HTTP retry receipts. No task content or access grants.
+
+The task ID is historical data, not a live Link. Keep receipts after a task is
+deleted: a delayed create retry must find its receipt and fail the source task
+access check instead of entering the new-task branch again.
+"""
 from contextlib import contextmanager
 from contextvars import ContextVar
 

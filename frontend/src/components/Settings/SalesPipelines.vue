@@ -226,7 +226,7 @@
                 </template>
                 <template #body="{ togglePopover }">
                   <div
-                    class="my-1 rounded-lg bg-surface-modal p-2 shadow-2xl ring-1 ring-black ring-opacity-5"
+                    class="my-1 rounded-lg bg-surface-elevation-2 p-2 shadow-2xl ring-1 ring-black ring-opacity-5"
                   >
                     <div class="grid grid-cols-7 gap-1.5">
                       <button
@@ -315,7 +315,7 @@
             class="flex items-center gap-1.5 text-p-sm font-medium text-ink-gray-8"
           >
             <span>{{ __('Transition Rules') }}</span>
-            <div class="group relative flex">
+            <Tooltip placement="left" :text="transitionRulesHelpText">
               <button
                 type="button"
                 class="flex size-5 items-center justify-center rounded-full text-ink-gray-5 hover:bg-surface-gray-2 hover:text-ink-gray-8"
@@ -323,12 +323,14 @@
               >
                 ?
               </button>
-              <div
-                class="pointer-events-none absolute left-1/2 top-7 z-20 hidden w-72 -translate-x-1/2 rounded-lg border border-outline-gray-2 bg-surface-modal px-3 py-2 text-p-xs font-normal leading-5 text-ink-gray-8 shadow-lg group-hover:block"
-              >
-                {{ transitionRulesHelpText }}
-              </div>
-            </div>
+              <template #content>
+                <span
+                  class="block max-w-xs whitespace-normal text-sm leading-5"
+                >
+                  {{ transitionRulesHelpText }}
+                </span>
+              </template>
+            </Tooltip>
           </div>
           <FormControl
             v-model="draft.stage_skip_rule"
@@ -491,7 +493,7 @@
               </template>
               <template #body="{ togglePopover }">
                 <div
-                  class="my-1 rounded-lg bg-surface-modal p-2 shadow-2xl ring-1 ring-black ring-opacity-5"
+                  class="my-1 rounded-lg bg-surface-elevation-2 p-2 shadow-2xl ring-1 ring-black ring-opacity-5"
                 >
                   <div class="grid grid-cols-7 gap-1.5">
                     <button
@@ -558,6 +560,7 @@ import {
   LoadingIndicator,
   Popover,
   Switch,
+  Tooltip,
 } from 'frappe-ui'
 import { computed, reactive, ref, watch } from 'vue'
 import { statusesStore } from '@/stores/statuses'
@@ -1066,9 +1069,9 @@ function openStageArchiveDialog(stage) {
       await archiveStage(stage, {
         force: Boolean(
           !restoring &&
-            isActiveType &&
-            activeDeals &&
-            canForceArchivePipeline.value,
+          isActiveType &&
+          activeDeals &&
+          canForceArchivePipeline.value,
         ),
       })
     },

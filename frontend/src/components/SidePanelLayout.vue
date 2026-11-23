@@ -438,6 +438,7 @@ import { getMeta } from '@/stores/meta'
 import {
   parseLinkFilters,
   applyContactOrganizationGrouping,
+  applyDealStatusFilters,
 } from '@/utils/fieldTransforms'
 import { getPlaceholderLabel } from '@/utils/fieldPlaceholders'
 import { usersStore } from '@/stores/users'
@@ -559,6 +560,7 @@ function parsedField(field) {
   }
 
   field = applyContactOrganizationGrouping(field, doc.value, props.doctype)
+  field = applyDealStatusFilters(field, doc.value, props.doctype)
 
   const read_only_via_depends_on = evaluateDependsOnValue(
     field.read_only_depends_on,

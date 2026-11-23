@@ -8,7 +8,7 @@
           trigger="button"
           :model-value="field.fieldname"
           :options="fields.data || []"
-          :placeholder="__('Source')"
+          :placeholder="__('Field')"
           @update:selected-option="(e) => changeField(e)"
         />
       </div>
@@ -18,7 +18,7 @@
           :is="getValueComponent(field)"
           :value="newValue"
           size="md"
-          :placeholder="__('Contact Us')"
+          :placeholder="field.placeholder || __(field.label || 'Value')"
           @change="(v) => updateValue(v)"
         />
       </div>
@@ -77,7 +77,6 @@ import {
   call,
   createResource,
   toast,
-  TextEditor,
   DatePicker,
 } from 'frappe-ui'
 import { ref, computed, onMounted, h } from 'vue'
@@ -260,6 +259,8 @@ function getValueComponent(f) {
       return h(FormControl, { type: 'text' })
     }
     return h(Link, { class: 'form-control', doctype: options })
+  } else if (['Small Text', 'Text', 'Long Text', 'Code'].includes(fieldtype)) {
+    return h(FormControl, { type: 'textarea' })
   } else if (typeNumber.includes(fieldtype)) {
     return h(FormControl, { type: 'number' })
   } else if (typeDate.includes(fieldtype)) {

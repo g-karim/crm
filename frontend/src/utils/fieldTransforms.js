@@ -245,3 +245,24 @@ export function toFilterValueArray(value) {
     .map((v) => v.trim())
     .filter(Boolean)
 }
+
+/** Limit a Deal status picker to its current pipeline, including after a change. */
+export function applyDealStatusFilters(field, doc, doctype) {
+  if (
+    doctype !== 'CRM Deal' ||
+    field?.fieldtype !== 'Link' ||
+    field.options !== 'CRM Deal Status'
+  ) {
+    return field
+  }
+  const filters = parseLinkFilters(field.link_filters)
+  const pipeline = doc?.pipeline || ''
+  const link_filters = Array.isArray(filters)
+    ? [
+        ...filters,
+        ['CRM Deal Status', 'pipeline', '=', pipeline],
+        ['CRM Deal Status', 'archived', '=', 0],
+      ]
+    : { ...filters, pipeline, archived: 0 }
+  return { ...field, disable_create: true, create: undefined, link_filters }
+}

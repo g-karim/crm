@@ -206,16 +206,23 @@ async function convertToDeal() {
     existingContact.value = ''
     existingOrganization.value = ''
     error.value = ''
-    updateOnboardingStep('convert_lead_to_deal', true, false, () => {
-      localStorage.setItem('firstDeal' + user, _deal)
-    })
+    // A completed save must not depend on the optional onboarding view.
+    try {
+      updateOnboardingStep('convert_lead_to_deal', true, false, () => {
+        localStorage.setItem('firstDeal' + user, _deal)
+      })
+    } catch (error) {
+      console.warn('Could not update CRM onboarding progress', error)
+    }
     capture('convert_lead_to_deal')
     router.push({ name: 'Deal', params: { dealId: _deal } })
   }
 }
 
 const dealStatuses = computed(() =>
-  statusOptions('deal', [], null, { pipeline: deal.doc.pipeline }),
+  deal.doc.pipeline
+    ? statusOptions('deal', [], null, { pipeline: deal.doc.pipeline })
+    : [],
 )
 
 watch(dealStatuses, () => {
@@ -279,6 +286,14 @@ watch(leadFields, () => prefillFields(dealTabs.data))
 function resetDealDoc(tabs) {
   deal.doc = { __newDocument: true, doctype: 'CRM Deal' }
   prefillFields(tabs)
+  // The pipeline list can already be cached when this dialog opens, so its
+  // watcher may not run again after reset. Resolve defaults on each reset too.
+  if (!deal.doc.pipeline && defaultPipeline.value) {
+    deal.doc.pipeline = defaultPipeline.value
+  }
+  if (!deal.doc.status && dealStatuses.value[0]?.value) {
+    deal.doc.status = dealStatuses.value[0].value
+  }
 }
 
 function prefillFields(tabs) {
@@ -340,9 +355,9 @@ function isMatchingCustomField(leadField, dealField) {
 function isCustomField(field) {
   return Boolean(
     field?.is_custom_field ||
-      field?.custom ||
-      field?.fieldname?.startsWith('custom_') ||
-      field?.name === `${field?.parent}-${field?.fieldname}`,
+    field?.custom ||
+    field?.fieldname?.startsWith('custom_') ||
+    field?.name === `${field?.parent}-${field?.fieldname}`,
   )
 }
 

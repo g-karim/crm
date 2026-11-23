@@ -324,6 +324,7 @@ import {
   usesDefaultTouchSort,
   touchExportEndpoint,
 } from '@/utils/touchTracking'
+import { viewCacheKey, viewFilters } from '@/utils/viewResource'
 import Icon from '@/components/Icon.vue'
 import ListIcon from '@/components/Icons/ListIcon.vue'
 import KanbanIcon from '@/components/Icons/KanbanIcon.vue'
@@ -517,7 +518,11 @@ function getParams() {
   let _view = getView(route.query.view, route.params.viewType, props.doctype)
   const view_name = _view?.name || ''
   const view_type = _view?.type || route.params.viewType || 'list'
-  const filters = (_view?.filters && JSON.parse(_view.filters)) || {}
+  const filters = viewFilters(
+    props.doctype,
+    (_view?.filters && JSON.parse(_view.filters)) || {},
+    props.filters,
+  )
   const order_by = _view?.order_by || defaultOrderBy.value
   const group_by_field = _view?.group_by_field || 'owner'
   const columns = _view?.columns || ''
@@ -574,7 +579,12 @@ let listResource
 listResource = createResource({
   url: 'crm.api.doc.get_data',
   params: getParams(),
-  cache: [props.doctype, route.query.view, route.params.viewType],
+  cache: viewCacheKey(
+    props.doctype,
+    route.query.view,
+    route.params.viewType,
+    props.filters,
+  ),
   auto: true,
   onSuccess(data) {
     defaultOrderBy.value = data.default_order_by || 'modified desc'

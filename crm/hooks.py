@@ -386,3 +386,14 @@ after_migrate = [
 ]
 
 standard_dropdown_items = STANDARD_DROPDOWN_ITEMS
+
+# Source CRM tasks and shared notifications; retain production Touch Tracking hooks.
+def _add_celio_task_event(doctype,event,handler):
+    _events=doc_events.setdefault(doctype,{})
+    _handlers=_events.get(event,[])
+    if isinstance(_handlers,str):_handlers=[_handlers]
+    if handler not in _handlers:_events[event]=[*_handlers,handler]
+_add_celio_task_event('CRM Task','on_update','crm.task_operations.changed')
+_add_celio_task_event('CRM Notification','after_insert','crm.notification_source.publish')
+_add_celio_task_event('CRM Notification','on_update','crm.notification_source.changed')
+exp_notification_sources=['crm.notification_source.make_source']

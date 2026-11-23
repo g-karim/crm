@@ -357,6 +357,7 @@ import {
   parseLinkFilters,
   applyStateFieldOptions,
   applyContactOrganizationGrouping,
+  applyDealStatusFilters,
 } from '@/utils/fieldTransforms'
 import { getPlaceholderLabel } from '@/utils/fieldPlaceholders'
 import { isFetchedFromLink } from '@/utils/fetchFrom'
@@ -546,6 +547,7 @@ const field = computed(() => {
   }
 
   field = applyContactOrganizationGrouping(field, data.value, doctype)
+  field = applyDealStatusFilters(field, data.value, doctype)
 
   const read_only_via_depends_on = evaluateDependsOnValue(
     field.read_only_depends_on,

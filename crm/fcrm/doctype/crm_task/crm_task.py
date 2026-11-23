@@ -1,6 +1,7 @@
 # Copyright (c) 2023, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import frappe
 from frappe.desk.form.assign_to import add as assign
 from frappe.desk.form.assign_to import remove as unassign
 from frappe.model.document import Document
@@ -37,6 +38,22 @@ class CRMTask(Document):
 		if self.get_doc_before_save().assigned_to != self.assigned_to:
 			self.unassign_from_previous_user(self.get_doc_before_save().assigned_to)
 			self.assign_to()
+
+	def on_trash(self):
+		# Native delete checks permissions before this hook and links afterwards.
+		# Remove only this task's source notices; a later link rejection rolls the
+		# cleanup back with the deletion. Retry receipts must remain untouched.
+		filters = {
+			"notification_type_doctype": self.doctype,
+			"notification_type_doc": str(self.name),
+		}
+		recipients = frappe.get_all("CRM Notification", filters=filters, pluck="to_user")
+		frappe.db.delete("CRM Notification", filters)
+		if recipients:
+			from crm.notification_source import changed
+
+			for user in set(recipients):
+				changed(frappe._dict(to_user=user))
 
 	def unassign_from_previous_user(self, user: str | None):
 		if user:

@@ -39,13 +39,13 @@ class CRMNotification(Document):
 			return
 
 		message = {"name": self.name, "type": self.type, "reference_name": self.reference_name}
-		if self.type != "Messenger" and self.reference_doctype != "CRM Lead":
+		if self.type != "Messenger":
 			frappe.publish_realtime("crm_notification", message, user=self.to_user, after_commit=True)
 			return
 
 		frappe.db.after_commit.add(
 			partial(
-				_publish_scoped_realtime,
+				_publish_messenger_realtime,
 				self.to_user,
 				self.reference_doctype,
 				self.reference_name,
@@ -159,9 +159,9 @@ def _readable(doctype, name, user):
 	return frappe.has_permission(doctype, "read", doc=frappe.get_doc(doctype, name), user=user)
 
 
-def _publish_scoped_realtime(user, reference_doctype, reference_name, message):
+def _publish_messenger_realtime(user, reference_doctype, reference_name, message):
 	notification = frappe._dict(
-		type=message["type"],
+		type="Messenger",
 		reference_doctype=reference_doctype,
 		reference_name=reference_name,
 	)
