@@ -91,7 +91,9 @@ def get_notification_visibility_condition(user=None):
 				),
 			]
 		)
-		+ ") and " + _task_visibility_condition(user)
+		+ ") and "
+		+ _task_visibility_condition(user)
+		+ " and (coalesce(`tabCRM Notification`.`notification_type_doctype`, '') != 'Comment' or exists (select 1 from `tabComment` where `tabComment`.`name` = `tabCRM Notification`.`notification_type_doc` and `tabComment`.`comment_type` = 'Comment' and `tabComment`.`reference_doctype` = `tabCRM Notification`.`reference_doctype` and `tabComment`.`reference_name` = `tabCRM Notification`.`reference_name`))"
 	)
 
 
@@ -125,11 +127,15 @@ def _task_visibility_condition(user):
 
 def can_access_notification(notification, user=None):
 	user = user or frappe.session.user
-	if not frappe.db.get_value("User", user, "enabled") or not frappe.has_permission("CRM Notification", "read", user=user):
+	if not frappe.db.get_value("User", user, "enabled") or not frappe.has_permission(
+		"CRM Notification", "read", user=user
+	):
 		return False
 	reference_type, reference_name = notification.get("reference_doctype"), notification.get("reference_name")
 	if reference_type or reference_name or notification.type == "Messenger":
-		if reference_type not in MESSENGER_REFERENCE_DOCTYPES or not _readable(reference_type, reference_name, user):
+		if reference_type not in MESSENGER_REFERENCE_DOCTYPES or not _readable(
+			reference_type, reference_name, user
+		):
 			return False
 	if notification.get("notification_type_doctype") == "CRM Task":
 		name = notification.get("notification_type_doc")
@@ -137,8 +143,36 @@ def can_access_notification(notification, user=None):
 			return False
 		task = frappe.get_doc("CRM Task", name)
 		if task.reference_doctype or task.reference_docname:
-			return (task.reference_doctype == reference_type and task.reference_docname == reference_name
-				and _readable(task.reference_doctype, task.reference_docname, user))
+			return (
+				task.reference_doctype == reference_type
+				and task.reference_docname == reference_name
+				and _readable(task.reference_doctype, task.reference_docname, user)
+			)
+	if notification.get("notification_type_doctype") == "Comment":
+		comment = frappe.db.get_value(
+			"Comment",
+			notification.get("notification_type_doc"),
+			["reference_doctype", "reference_name", "comment_type"],
+			as_dict=True,
+		)
+		if (
+			not comment
+			or comment.comment_type != "Comment"
+			or (comment.reference_doctype, comment.reference_name) != (reference_type, reference_name)
+		):
+			return False
+	if notification.get("notification_type_doctype") == "Communication" and notification.type == "Message":
+		from crm.notification_rules.incoming import valid
+
+		name = notification.get("notification_type_doc")
+		if not frappe.db.exists("Communication", name):
+			return False
+		message = frappe.get_doc("Communication", name)
+		return bool(
+			valid(message, user)
+			and (message.reference_doctype, str(message.reference_name))
+			== (reference_type, str(reference_name))
+		)
 	return True
 
 
@@ -170,8 +204,11 @@ def notify_user(notification):
 	Notify the assigned user
 	"""
 	notification = frappe._dict(notification)
-	if notification.owner == notification.assigned_to:
-		return
+	if notification.owner == notification.assigned_to and not notification.allow_self_notification:
+		from crm.notification_rules.events import allows_self_assignment
+
+		if not allows_self_assignment(notification):
+			return
 
 	values = frappe._dict(
 		doctype="CRM Notification",
@@ -184,6 +221,9 @@ def notify_user(notification):
 		notification_type_doc=notification.reference_docname,
 		reference_doctype=notification.redirect_to_doctype,
 		reference_name=notification.redirect_to_docname,
+		exp_notification_snapshot=notification.exp_notification_snapshot,
+		aggregation_key=notification.assignment_key,
+		last_event_at=notification.event_at,
 	)
 
 	if notification.event_id:

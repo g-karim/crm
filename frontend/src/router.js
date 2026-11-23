@@ -84,6 +84,11 @@ const routes = [
     component: () => import('@/pages/Tasks.vue'),
   },
   {
+    path: '/notification-rules',
+    name: 'CRMNotificationRules',
+    component: () => import('@/components/Settings/CRMNotificationRules.vue'),
+  },
+  {
     path: '/notification-settings',
     name: 'NotificationDelivery',
     component: () => import('@/components/Settings/NotificationDelivery.vue'),

@@ -43,6 +43,7 @@
   >
     <AssignTo v-model="assignees.data" doctype="CRM Deal" :docname="dealId" />
     <div class="flex flex-wrap items-center gap-2">
+      <CardNotifications v-if="doc.name" doctype="CRM Deal" :record-id="dealId" />
       <EnrichFromWebsite
         v-if="permissions.data?.permissions?.write"
         doctype="CRM Deal"
@@ -282,6 +283,7 @@
   />
 </template>
 <script setup>
+import CardNotifications from '@/components/Settings/CardNotifications.vue'
 import DeleteLinkedDocModal from '@/components/DeleteLinkedDocModal.vue'
 import ErrorPage from '@/components/ErrorPage.vue'
 import Icon from '@/components/Icon.vue'

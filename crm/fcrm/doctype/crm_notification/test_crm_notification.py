@@ -89,8 +89,6 @@ class TestCRMNotification(UnitTestCase):
 		with (
 			patch.object(frappe, "publish_realtime") as publish,
 			patch("crm.fcrm.doctype.crm_notification.crm_notification.can_access_notification", return_value=True),
-			patch.object(frappe.db, "get_value", return_value=doc),
-			patch.object(type(frappe.db.after_commit), "add", autospec=True) as add_after_commit,
 		):
 			CRMNotification.on_update(doc)
 			publish.assert_not_called()

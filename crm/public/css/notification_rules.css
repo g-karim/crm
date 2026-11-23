@@ -1,0 +1,15 @@
+:root{font-family:Inter,system-ui,sans-serif;color:#202124;background:#f6f7f8;font-size:16px;line-height:1.5}
+*{box-sizing:border-box}body{margin:0}main{max-width:840px;margin:auto;padding:28px 24px 64px}
+nav{display:flex;gap:24px}a{color:inherit;display:inline-flex;align-items:center;min-height:44px}
+header{margin:26px 0}h1{font-size:30px;line-height:1.2;margin:4px 0 12px;letter-spacing:-.025em}h2{font-size:21px}
+.eyebrow,.hint{color:#545c66;font-size:14px}.eyebrow{margin-bottom:4px}.note{padding:14px 18px;background:#eef1f5;border:1px solid #cbd1da;border-radius:8px}
+form{background:white;border:1px solid #d3d8df;border-radius:12px;padding:24px}label:not(.check){display:block;font-weight:600;margin-bottom:8px}
+input[type=text],input:not([type]),input[type=search]{font:inherit;width:100%;border:1px solid #a5acb6;border-radius:6px;padding:10px 12px;min-height:44px}
+fieldset{border:0;border-top:1px solid #e0e3e8;padding:20px 0 0;margin:24px 0}legend{font-weight:600;padding:0 12px 0 0}
+.choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px;margin-top:12px;max-height:250px;overflow:auto}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;overflow-wrap:anywhere}.check input{width:18px;height:18px;flex-shrink:0;accent-color:#252b35}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}button{font:inherit;min-height:44px;border:1px solid #252b35;background:#252b35;color:white;border-radius:6px;padding:9px 16px;cursor:pointer}
+button.secondary{color:#252b35;background:white;border-color:#bcc3cd}button:disabled{opacity:.5;cursor:wait}button:hover:not(:disabled){filter:brightness(.9)}
+:focus-visible{outline:3px solid #087f96;outline-offset:3px}#error{border:1px solid #b42318;background:#fff1f0;color:#8a1d14;padding:14px 18px;margin-bottom:16px;border-radius:8px}
+.saved-rule{border-bottom:1px solid #d3d8df;padding:12px 0;display:flex;gap:12px;align-items:center;justify-content:space-between}.saved-rule span{overflow-wrap:anywhere}
+@media(max-width:600px){main{padding:16px 16px 40px}form{padding:18px}.choices{grid-template-columns:1fr}h1{font-size:26px}.actions>button{flex:1 1 auto}}

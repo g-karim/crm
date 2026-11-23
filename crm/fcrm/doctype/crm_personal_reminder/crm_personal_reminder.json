@@ -1,0 +1,76 @@
+{
+ "doctype": "DocType",
+ "name": "CRM Personal Reminder",
+ "module": "FCRM",
+ "autoname": "hash",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "task",
+  "remind_at",
+  "channels",
+  "request_hash",
+  "state",
+  "revision"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "read_only": 1,
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "task",
+   "fieldtype": "Link",
+   "label": "Task",
+   "read_only": 1,
+   "options": "CRM Task",
+   "reqd": 1
+  },
+  {
+   "fieldname": "remind_at",
+   "fieldtype": "Datetime",
+   "label": "Remind At",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "channels",
+   "fieldtype": "Code",
+   "label": "Channels",
+   "read_only": 1,
+   "options": "JSON",
+   "reqd": 1
+  },
+  {
+   "fieldname": "request_hash",
+   "fieldtype": "Data",
+   "label": "Request Hash",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Select",
+   "label": "State",
+   "read_only": 1,
+   "options": "Scheduled\nFired\nCancelled\nExpired",
+   "default": "Scheduled",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "revision",
+   "fieldtype": "Int",
+   "label": "Revision",
+   "read_only": 1,
+   "default": 1
+  }
+ ],
+ "permissions": [],
+ "track_changes": 1
+}

@@ -7,6 +7,7 @@
   >
     <template #content>
       <div class="max-w-xl space-y-5 text-base leading-6">
+		<BrowserPush />
         <ErrorMessage v-if="error" :message="error" role="alert" />
         <p v-if="loading && !state" role="status">{{ __('Loading...') }}</p>
         <form
@@ -24,27 +25,35 @@
           <p role="status">
             {{ __(source.effective ? 'Delivery is on' : 'Delivery is off') }}
           </p>
-          <Checkbox
-            v-model="draft.enabled"
-            :label="__('Receive task assignments in EXP One')"
-            :disabled="locked || (!state.one_available && !source.enabled)"
-            @update:modelValue="dirty = true"
-          />
-          <FormControl
-            v-model="draft.sender"
-            type="select"
-            :label="__('Sender')"
-            :placeholder="__('Choose a sender')"
-            :options="
-              state.senders.map((sender) => ({
-                value: sender.id,
-                label: sender.label,
-              }))
-            "
-            :disabled="locked || !state.one_available"
-            :required="draft.enabled"
-            @update:modelValue="dirty = true"
-          />
+          <label class="flex min-h-11 cursor-pointer items-center gap-3">
+            <input
+              v-model="draft.enabled"
+              type="checkbox"
+              :disabled="locked || (!state.one_available && !source.enabled)"
+              class="size-5 rounded border-outline-gray-3"
+              @change="dirty = true"
+            />
+            {{ __('Receive task assignments in EXP One') }}
+          </label>
+          <label class="block space-y-2">
+            <span>{{ __('Sender') }}</span>
+            <select
+              v-model="draft.sender"
+              :disabled="locked || !state.one_available"
+              :required="draft.enabled"
+              class="block min-h-11 w-full rounded border border-outline-gray-3 bg-surface-base px-3 text-ink-gray-9"
+              @change="dirty = true"
+            >
+              <option value="" disabled>{{ __('Choose a sender') }}</option>
+              <option
+                v-for="sender in state.senders"
+                :key="sender.id"
+                :value="sender.id"
+              >
+                {{ sender.label }}
+              </option>
+            </select>
+          </label>
           <p class="text-ink-gray-6">
             {{
               __(
@@ -52,12 +61,16 @@
               )
             }}
           </p>
-          <Checkbox
-            v-model="draft.push"
-            :label="__('Notify with push from EXP One')"
-            :disabled="locked || !state.one_available"
-            @update:modelValue="dirty = true"
-          />
+          <label class="flex min-h-11 cursor-pointer items-center gap-3">
+            <input
+              v-model="draft.push"
+              type="checkbox"
+              :disabled="locked || !state.one_available"
+              class="size-5 rounded border-outline-gray-3"
+              @change="dirty = true"
+            />
+            {{ __('Notify with push from EXP One') }}
+          </label>
           <p class="text-ink-gray-6">
             {{
               __(
@@ -95,8 +108,9 @@
 </template>
 
 <script setup>
+import BrowserPush from './BrowserPush.vue'
 import { computed, reactive, ref, watch } from 'vue'
-import { Button, Checkbox, ErrorMessage, FormControl } from 'frappe-ui'
+import { Button, ErrorMessage } from 'frappe-ui'
 import SettingsLayoutBase from '@/components/Layouts/SettingsLayoutBase.vue'
 import { useNotificationDelivery } from '@/composables/useNotificationDelivery'
 

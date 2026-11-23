@@ -132,6 +132,8 @@ def clear_owner_on_unassign(doc):
 
 
 def notify_assigned_user(doc, is_cancelled=False):
+	from crm.notification_rules.events import assignment_id, assignment_key
+
 	_doc = frappe.get_doc(doc.reference_type, doc.reference_name)
 	owner = frappe.get_cached_value("User", frappe.session.user, "full_name")
 	notification_text = get_notification_text(owner, doc, _doc, is_cancelled)
@@ -157,7 +159,9 @@ def notify_assigned_user(doc, is_cancelled=False):
 			"reference_docname": doc.reference_name,
 			"redirect_to_doctype": redirect_to_doctype,
 			"redirect_to_docname": redirect_to_name,
-			"event_id": f"crm-assignment:{doc.name}:{'removed' if is_cancelled else 'assigned'}",
+			"event_id": f"crm-assignment:{doc.name}:removed" if is_cancelled else assignment_id(doc),
+			"assignment_key": None if is_cancelled else assignment_key(doc),
+			"event_at": doc.creation,
 		}
 	)
 

@@ -130,6 +130,7 @@ def get_deal_activities(name: str):
 
 	for communication in docinfo.communications + docinfo.automated_messages:
 		activity = {
+			"name": communication.name,
 			"activity_type": "communication",
 			"communication_type": communication.communication_type,
 			"communication_date": communication.communication_date or communication.creation,
@@ -265,6 +266,7 @@ def get_lead_activities(name: str):
 
 	for communication in docinfo.communications + docinfo.automated_messages:
 		activity = {
+			"name": communication.name,
 			"activity_type": "communication",
 			"communication_type": communication.communication_type,
 			"communication_date": communication.communication_date or communication.creation,

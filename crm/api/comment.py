@@ -10,6 +10,13 @@ from crm.fcrm.doctype.crm_notification.crm_notification import notify_user
 
 
 def on_update(self, method):
+	from crm.notification_rules.events import ready
+
+	if ready():
+		from crm.notification_rules.discussions import changed
+
+		changed(self)
+		return
 	notify_mentions(self)
 
 

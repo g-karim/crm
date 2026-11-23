@@ -16,6 +16,7 @@
         v-if="document.actions?.length"
         :actions="document.actions"
       />
+      <CardNotifications v-if="doc.name" doctype="CRM Lead" :record-id="leadId" />
       <EnrichFromWebsite
         v-if="canWrite"
         doctype="CRM Lead"
@@ -286,6 +287,7 @@
   />
 </template>
 <script setup>
+import CardNotifications from '@/components/Settings/CardNotifications.vue'
 import DeleteLinkedDocModal from '@/components/DeleteLinkedDocModal.vue'
 import ErrorPage from '@/components/ErrorPage.vue'
 import Icon from '@/components/Icon.vue'

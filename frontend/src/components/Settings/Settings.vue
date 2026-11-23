@@ -104,6 +104,7 @@ import Hierarchy from '@/components/Settings/Hierarchy/Hierarchy.vue'
 import ProfilePage from '@/components/Settings/Profile/ProfilePage.vue'
 import PreferencesSettings from '@/components/Settings/PreferencesSettings.vue'
 import NotificationDelivery from '@/components/Settings/NotificationDelivery.vue'
+import CRMNotificationRules from '@/components/Settings/CRMNotificationRules.vue'
 import WhatsAppSettings from '@/components/Settings/WhatsAppSettings.vue'
 import ERPNextSettings from '@/components/Settings/ERPNextSettings.vue'
 import LeadSyncSourcePage from '@/components/Settings/LeadSyncing/LeadSyncSourcePage.vue'
@@ -163,6 +164,11 @@ const tabs = computed(() => {
           label: __('Notification delivery'),
           icon: 'bell',
           component: markRaw(NotificationDelivery),
+        },
+        {
+          label: __('CRM notifications'),
+          icon: 'bell',
+          component: markRaw(CRMNotificationRules),
         },
       ],
     },

@@ -919,5 +919,15 @@ function scroll(hash) {
   }, 500)
 }
 
+watch(
+  () => route.hash,
+  (hash) => {
+    const target = hash.slice(1)
+    if (target && !props.tabs.some((tab) => tab.name.toLowerCase() === target.toLowerCase())) {
+      nextTick(() => scroll(target))
+    }
+  },
+)
+
 defineExpose({ emailBox, all_activities, changeTabTo, modalRef })
 </script>

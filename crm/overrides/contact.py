@@ -2,7 +2,7 @@
 from frappe.contacts.doctype.contact.contact import Contact
 
 
-class CustomContact(Contact):
+class ContactListMixin:
 	@staticmethod
 	def default_list_data():
 		columns = [
@@ -47,3 +47,7 @@ class CustomContact(Contact):
 			"image",
 		]
 		return {"columns": columns, "rows": rows}
+
+
+class CustomContact(ContactListMixin, Contact):
+	"""Retained for existing imports; runtime uses the cooperative mixin."""

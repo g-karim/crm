@@ -407,3 +407,32 @@ for _analytics_doctype in ("CRM Lead", "CRM Deal", "CRM Task"):
 		if isinstance(_analytics_handlers, str):
 			_analytics_handlers = [_analytics_handlers]
 		doc_events[_analytics_doctype][_analytics_method] = [*_analytics_handlers, "crm.analytics.history.capture"]
+
+
+# CRM event producers share native hooks with task integration and analytics.
+for _event_dt, _event_type, _event_path in (
+    ("CRM Task", "before_save", "crm.notification_rules.reminders.generation"),
+    ("CRM Notification", "before_insert", "crm.notification_rules.events.capture_notification"),
+    ("CRM Lead", "before_save", "crm.notification_rules.inactivity.generation"),
+    ("CRM Lead", "on_update", "crm.notification_rules.events.lead_changed"),
+    ("CRM Deal", "before_save", "crm.notification_rules.inactivity.generation"),
+    ("CRM Deal", "on_update", "crm.notification_rules.events.deal_changed"),
+):
+    _add_celio_task_event(_event_dt, _event_type, _event_path)
+for _communication_method in ("after_insert", "on_update"):
+    for _notification_handler in ("inactivity.touch", "incoming.changed"):
+        _add_celio_task_event(
+            "Communication", _communication_method, "crm.notification_rules." + _notification_handler
+        )
+    _add_celio_task_event("Comment", _communication_method, "crm.notification_rules.inactivity.touch")
+scheduler_events.setdefault("cron", {}).setdefault("* * * * *", []).extend([
+    "crm.notification_rules.reminders.run",
+    "crm.notification_rules.personal_reminders.run",
+    "crm.notification_rules.inactivity.run",
+])
+
+# Keep native validation, rendering and hooks from other installed apps.
+override_doctype_class.pop("Contact", None)
+override_doctype_class.pop("Email Template", None)
+extend_doctype_class.setdefault("Contact", []).append("crm.overrides.contact.ContactListMixin")
+extend_doctype_class.setdefault("Email Template", []).append("crm.overrides.email_template.EmailTemplateListMixin")

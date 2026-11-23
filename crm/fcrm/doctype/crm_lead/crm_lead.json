@@ -80,7 +80,9 @@
   "lost_details_tab",
   "lost_reason",
   "lost_notes",
-  "last_touch_at"
+  "last_touch_at",
+  "exp_notification_activity_at",
+  "exp_notification_activity_epoch"
  ],
  "fields": [
   {
@@ -502,6 +504,22 @@
    "hidden": 1,
    "no_copy": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "exp_notification_activity_at",
+   "label": "Notification activity at",
+   "fieldtype": "Datetime",
+   "read_only": 1,
+   "hidden": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "exp_notification_activity_epoch",
+   "label": "Notification activity epoch",
+   "fieldtype": "Int",
+   "read_only": 1,
+   "hidden": 1,
+   "default": "0"
   }
  ],
  "grid_page_length": 50,

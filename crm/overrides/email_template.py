@@ -2,7 +2,7 @@
 from frappe.email.doctype.email_template.email_template import EmailTemplate
 
 
-class CustomEmailTemplate(EmailTemplate):
+class EmailTemplateListMixin:
 	@staticmethod
 	def default_list_data():
 		columns = [
@@ -48,3 +48,7 @@ class CustomEmailTemplate(EmailTemplate):
 			"modified",
 		]
 		return {"columns": columns, "rows": rows}
+
+
+class CustomEmailTemplate(EmailTemplateListMixin, EmailTemplate):
+	"""Retained for existing imports; runtime uses the cooperative mixin."""

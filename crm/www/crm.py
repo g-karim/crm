@@ -15,6 +15,14 @@ from crm.translations import get_crm_translations
 no_cache = 1
 
 
+def common_push_enabled():
+	if "exp_theme" not in get_installed_apps():
+		return False
+	from exp_theme.notifications.push import transport, webpush
+
+	return bool(transport.test_allowed() or webpush.allowed())
+
+
 def get_context():
 	from crm.api import check_app_permission
 
@@ -77,6 +85,9 @@ def get_boot():
 		{
 			"frappe_version": frappe.__version__,
 			"lang": lang,
+			"exp_common_push_test": common_push_enabled(),
+			"exp_notification_rules_available": "exp_theme" in get_installed_apps(),
+			"exp_push_viewer": frappe.session.user,
 			"default_route": get_default_route(),
 			"site_name": frappe.local.site,
 			"socketio_port": frappe.conf.socketio_port,
